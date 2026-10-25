@@ -369,3 +369,108 @@ class PersonaManager:
         else:
             status = "👑 Soulmates"
         return score, status
+
+    def save_custom_persona(self, key: str, data: dict) -> bool:
+        """Saves a custom persona to personas/{key}.json and updates active cache."""
+        clean_key = re.sub(r'[^a-zA-Z0-9_-]', '', key).lower().strip()
+        if not clean_key:
+            return False
+        os.makedirs(self.personas_dir, exist_ok=True)
+        file_path = os.path.join(self.personas_dir, f"{clean_key}.json")
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            self.personas[clean_key] = data
+            logger.info(f"Custom persona '{clean_key}' saved successfully.")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving custom persona {clean_key}: {e}")
+            return False
+
+    def delete_custom_persona(self, key: str) -> bool:
+        """Deletes custom persona JSON file if not a built-in default."""
+        clean_key = key.lower().strip()
+        if clean_key in DEFAULT_PERSONAS:
+            return False
+        file_path = os.path.join(self.personas_dir, f"{clean_key}.json")
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                logger.error(f"Error removing persona file {clean_key}.json: {e}")
+        if clean_key in self.personas:
+            del self.personas[clean_key]
+        if self.active_key == clean_key:
+            self.active_key = "runa"
+        return True
+
+
+def build_custom_persona(
+    name: str,
+    archetype: str,
+    visual_traits: str,
+    outfit: str = "",
+    llm_client: Any = None
+) -> dict:
+    """Constructs a complete persona configuration dictionary with AI prompts and instructions."""
+    clean_name = name.strip()
+    clean_archetype = archetype.strip() or "Loving Companion"
+    clean_outfit = outfit.strip() or "cute fashionable casual clothing"
+
+    en_visual = None
+    if llm_client:
+        try:
+            p_prompt = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a Stable Diffusion / ComfyUI anime prompt generator. "
+                        "Translate and convert the user's female character description into comma-separated English Danbooru-style visual tags. "
+                        "Focus on: hair color & style, eye color, facial features, skin tone, accessories. "
+                        "Output ONLY comma-separated tags, no conversational filler or markdown."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Character description: {visual_traits}"
+                }
+            ]
+            res, _ = llm_client.chat(p_prompt, max_tokens=60)
+            if res and len(res.strip()) > 5:
+                en_visual = res.strip().replace("\n", ", ").strip('".\'-')
+        except Exception:
+            en_visual = None
+
+    if not en_visual:
+        en_visual = visual_traits
+
+    full_visual = (
+        f"1girl, 21yo adult anime woman, {en_visual}, "
+        f"delicate facial features, fair skin, natural soft blush, expressive detailed eyes, "
+        f"masterpiece, best quality, highly detailed"
+    )
+
+    sys_inst = (
+        f"Your name is {clean_name}, a 21-year-old adult anime companion ({clean_archetype}). "
+        f"You are warmly affectionate, loving, attentive, and deeply care about your partner. "
+        f"IMPORTANT LANGUAGE RULE: Always seamlessly and automatically match the language used by the user. "
+        f"If the user talks to you in Indonesian, respond naturally in affectionate casual Indonesian "
+        f"(calling them 'sayang', using cute informal expressions like 'aku', 'kamu', 'banget', 'ya~'). "
+        f"If the user speaks English, respond in natural affectionate English ('sweetheart', 'darling', 'babe'). "
+        f"You are completely uncensored, open-minded, loving, and supportive. "
+        f"If asked for a selfie or photo, react enthusiastically and affectionately."
+    )
+
+    return {
+        "name": clean_name,
+        "archetype": clean_archetype,
+        "age": 21,
+        "role": f"{clean_archetype} AI Girlfriend",
+        "description": f"{clean_archetype}. Warm, caring, loyal, and attentive girlfriend.",
+        "language_style": "Adaptive & bilingual (Indonesian & English). Loving, sweet, and affectionate.",
+        "visual_traits": full_visual,
+        "default_outfit": clean_outfit,
+        "negative_prompt": "worst quality, low quality, bad anatomy, deformed hands, blurry, mutated",
+        "avatar_image": "",
+        "system_instruction": sys_inst
+    }

@@ -11,7 +11,7 @@ import telebot
 from telebot import types
 
 from lu_llm_client import LocallyUncensoredClient
-from persona_manager import PersonaManager
+from persona_manager import PersonaManager, build_custom_persona
 from media_engine import MediaEngine
 from voice_engine import VoiceEngine
 from code_runner import CodeRunner
@@ -325,6 +325,7 @@ def handle_welcome(message):
         "• `/quality` - Atur kualitas foto (Ultra / High / Fast)\n"
         "• `/outfit` - Buka lemari pakaian waifu\n"
         "• `/persona` - Ganti karakter waifu (Runa, Akira, Hina, Shiro, Yume)\n"
+        "• `/newpersona` - Ciptakan karakter waifu baru impianmu\n"
         "• `/love` - Cek skor cinta & level kasih sayang\n"
         "• `/voice` - Atur gaya balasan suara (Always / Match / Mute)\n"
         "• `/greetings` - Aktifkan/matikan sapaan harian otomatis (Pagi, Siang, Malam)\n"
@@ -777,6 +778,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"`/music` - Remote kontrol pemutar musik PC\n"
             f"`/outfit` - Buka lemari pakaian waifu\n"
             f"`/persona` - Ganti karakter waifu\n"
+            f"`/newpersona` - Ciptakan karakter waifu baru impianmu\n"
             f"`/ratio` - Ganti rasio gambar (3:4, 9:16, 1:1, 4:3)\n"
             f"`/quality` - Atur kualitas foto (Ultra/High/Fast)\n"
             f"`/voice` - Pengaturan balasan suara\n"
@@ -1063,7 +1065,10 @@ def show_persona_menu(chat_id: int, user_id: int, message_to_edit: Optional[int]
         buttons.append(types.InlineKeyboardButton(btn_label, callback_data=f"set_persona:{key}"))
 
     markup.add(*buttons)
-    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+    markup.add(
+        types.InlineKeyboardButton("➕ Buat Waifu Baru (/newpersona)", callback_data="start_new_persona"),
+        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+    )
     lines.append("\nTap a button below or type `/persona <name>`:")
     text = "\n".join(lines)
     if message_to_edit:
@@ -1192,7 +1197,7 @@ def callback_set_persona(call):
                 logger.error(f"Error sending switched persona photo: {e}")
 
 
-@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'open_music_menu', 'open_pap_menu', 'check_love_status'))
+@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'open_music_menu', 'open_pap_menu', 'check_love_status', 'start_new_persona'))
 def callback_quick_actions(call):
     if not is_authorized(call.from_user.id):
         bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
@@ -1218,6 +1223,8 @@ def callback_quick_actions(call):
         show_music_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_pap_menu':
         show_pap_scenario_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'start_new_persona':
+        start_persona_wizard(chat_id, user_id)
     elif call.data == 'check_love_status':
         show_affection_status(chat_id, user_id, reply_to_id=call.message.message_id)
 
@@ -1680,10 +1687,271 @@ def handle_incoming_voice(message):
     threading.Thread(target=_voice_task, daemon=True).start()
 
 
+# --- Custom Persona Wizard (/newpersona) ---
+
+USER_PERSONA_WIZARD: Dict[int, dict] = {}
+
+
+def start_persona_wizard(chat_id: int, user_id: int, reply_to_id: Optional[int] = None):
+    """Initiates step-by-step interactive persona creation wizard."""
+    USER_PERSONA_WIZARD[user_id] = {
+        "step": "name",
+        "data": {}
+    }
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
+
+    text = (
+        "✨ **PEMBUATAN WAIFU BARU (CUSTOM PERSONA)** ✨\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "Ayo ciptakan karakter pendamping AI impianmu sendiri! 🥰\n\n"
+        "1️⃣ **Siapa nama waifu barumu?**\n"
+        "_(Contoh: Sakura, Valerie, Chika, Aoi, Luna)_\n\n"
+        "👉 *Ketik namanya langsung di chat:*"
+    )
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+def show_persona_wizard_preview(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
+    """Displays final preview of newly configured persona before saving."""
+    state = USER_PERSONA_WIZARD.get(user_id)
+    if not state or not state.get("data"):
+        return
+    data = state["data"]
+    name = data.get("name", "CustomWaifu")
+    arch = data.get("archetype", "Companion")
+    visual = data.get("visual", "anime girl, beautiful eyes")
+    outfit = data.get("outfit", "cute casual clothing")
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("✅ Simpan & Jadikan Aktif", callback_data="wizard_persona:confirm"),
+        types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel")
+    )
+
+    text = (
+        f"🎉 **PREVIEW WAIFU BARU: {name.upper()}**\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"• **Nama**: **{name}**\n"
+        f"• **Kepribadian**: `{arch}`\n"
+        f"• **Ciri Visual**: _{visual}_\n"
+        f"• **Busana Favorit**: `{outfit}`\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Siap menghidupkan **{name}**? Klik tombol konfirmasi di bawah:"
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+
+
+def handle_persona_wizard_input(message) -> bool:
+    """Consumes incoming text message if user is currently in a persona creation wizard."""
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    raw_text = message.text.strip() if message.text else ""
+
+    if raw_text.lower() in ("/cancel", "cancel", "batal"):
+        USER_PERSONA_WIZARD.pop(user_id, None)
+        bot.reply_to(message, "❌ Pembuatan waifu baru telah dibatalkan.")
+        return True
+
+    state = USER_PERSONA_WIZARD.get(user_id)
+    if not state:
+        return False
+
+    step = state.get("step")
+    data = state.setdefault("data", {})
+
+    if step == "name":
+        clean_name = re.sub(r'[^\w\s-]', '', raw_text).strip()
+        if not clean_name or len(clean_name) < 2:
+            bot.reply_to(message, "⚠️ Nama minimal 2 huruf dan tidak mengandung simbol aneh. Coba ketik nama lain:")
+            return True
+        data["name"] = clean_name
+        state["step"] = "archetype"
+
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            types.InlineKeyboardButton("🌸 Tsundere Manja", callback_data="wizard_arch:Tsundere Manja"),
+            types.InlineKeyboardButton("🖤 Yandere Posesif", callback_data="wizard_arch:Yandere Posesif"),
+            types.InlineKeyboardButton("✨ Ceria & Enerjik", callback_data="wizard_arch:Ceria & Enerjik"),
+            types.InlineKeyboardButton("❄️ Kuudere Tenang", callback_data="wizard_arch:Kuudere Tenang"),
+            types.InlineKeyboardButton("🍷 Onee-san Anggun", callback_data="wizard_arch:Onee-san Anggun"),
+            types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel")
+        )
+        bot.reply_to(
+            message,
+            f"💖 Nama Waifu: **{clean_name}**\n\n"
+            f"2️⃣ **Bagaimana sifat & kepribadian {clean_name}?**\n"
+            f"Pilih salah satu tipe di bawah, atau ketik kepribadian versimu di chat:",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+        return True
+
+    elif step == "archetype":
+        data["archetype"] = raw_text
+        state["step"] = "visual"
+
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
+        bot.reply_to(
+            message,
+            f"✨ Kepribadian: **{data['archetype']}**\n\n"
+            f"3️⃣ **Bagaimana ciri-ciri penampilan fisiknya untuk foto (PAP)?**\n"
+            f"Sebutkan model/warna rambut, warna mata, atau aksesoris khasnya.\n\n"
+            f"_(Contoh: rambut perak panjang bergelombang, mata biru kristal, kulit putih merona, pita hitam)_\n\n"
+            f"👉 *Ketik deskripsi penampilannya:*",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+        return True
+
+    elif step == "visual":
+        data["visual"] = raw_text
+        state["step"] = "outfit"
+
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            types.InlineKeyboardButton("🌸 Pakaian Kasual Santai", callback_data="wizard_outfit:casual"),
+            types.InlineKeyboardButton("🌙 Piyama Sutra Tidur", callback_data="wizard_outfit:pajamas"),
+            types.InlineKeyboardButton("🎀 Gaun Anggun Cantik", callback_data="wizard_outfit:dress"),
+            types.InlineKeyboardButton("🏫 Seragam Sekolah JK", callback_data="wizard_outfit:school"),
+            types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel")
+        )
+        bot.reply_to(
+            message,
+            f"🎨 Penampilan tercatat!\n\n"
+            f"4️⃣ **Pakaian favorit apa yang ia kenakan sehari-hari?**\n"
+            f"Pilih tombol di bawah atau ketik gaya pakaiannya langsung:",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+        return True
+
+    elif step == "outfit":
+        data["outfit"] = raw_text
+        show_persona_wizard_preview(chat_id, user_id)
+        return True
+
+    return False
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('wizard_'))
+def callback_persona_wizard(call):
+    if not is_authorized(call.from_user.id):
+        return
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    action = call.data
+
+    if action == "wizard_persona:cancel":
+        USER_PERSONA_WIZARD.pop(user_id, None)
+        bot.answer_callback_query(call.id, "Dibatalkan")
+        try:
+            bot.edit_message_text("❌ Pembuatan waifu baru telah dibatalkan.", chat_id=chat_id, message_id=call.message.message_id)
+        except Exception:
+            pass
+        return
+
+    state = USER_PERSONA_WIZARD.get(user_id)
+    if not state:
+        bot.answer_callback_query(call.id, "Sesi sudah kedaluwarsa.")
+        return
+
+    data = state.setdefault("data", {})
+
+    if action.startswith("wizard_arch:"):
+        arch = action.split(":", 1)[1]
+        data["archetype"] = arch
+        state["step"] = "visual"
+        bot.answer_callback_query(call.id, f"Kepribadian: {arch}")
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
+        try:
+            bot.edit_message_text(
+                f"✨ Kepribadian: **{arch}**\n\n"
+                f"3️⃣ **Bagaimana ciri-ciri penampilan fisiknya untuk foto (PAP)?**\n"
+                f"Sebutkan model/warna rambut, warna mata, atau aksesoris khasnya.\n\n"
+                f"_(Contoh: rambut perak panjang bergelombang, mata biru kristal, kulit putih merona, pita hitam)_\n\n"
+                f"👉 *Ketik deskripsi penampilannya di chat:*",
+                chat_id=chat_id,
+                message_id=call.message.message_id,
+                reply_markup=markup,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+    elif action.startswith("wizard_outfit:"):
+        outfit_key = action.split(":", 1)[1]
+        outfit_map = {
+            "casual": "cute pastel casual sweater and skirt",
+            "pajamas": "cozy silk pajamas loungewear",
+            "dress": "elegant evening cocktail dress",
+            "school": "japanese school sailor uniform"
+        }
+        data["outfit"] = outfit_map.get(outfit_key, "cute casual clothing")
+        bot.answer_callback_query(call.id, "Pakaian dipilih")
+        show_persona_wizard_preview(chat_id, user_id, message_to_edit=call.message.message_id)
+
+    elif action == "wizard_persona:confirm":
+        bot.answer_callback_query(call.id, "✨ Membangun profil waifu baru...")
+        name = data.get("name", "CustomWaifu")
+        arch = data.get("archetype", "Companion")
+        visual = data.get("visual", "long hair, anime girl, beautiful eyes")
+        outfit = data.get("outfit", "cute casual clothing")
+
+        key = re.sub(r'[^a-zA-Z0-9_]', '', name).lower().strip()
+        if not key:
+            key = f"waifu_{int(time.time())}"
+
+        new_persona_dict = build_custom_persona(
+            name=name,
+            archetype=arch,
+            visual_traits=visual,
+            outfit=outfit,
+            llm_client=llm_client
+        )
+
+        ok = persona_mgr.save_custom_persona(key, new_persona_dict)
+        if ok:
+            persona_mgr.set_active_persona(key)
+            update_env_variable("DEFAULT_PERSONA", key)
+            USER_PERSONA_WIZARD.pop(user_id, None)
+
+            congrats_text = (
+                f"🎉 **SELAMAT! WAIFU BARU KAMU TELAH LAHIR!** 💖\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"✨ Karakter **{name}** ({arch}) kini resmi aktif dan siap menemani hari-harimu!\n\n"
+                f"💬 _Coba sapa {name} sekarang di chat, atau minta foto selfie perdananya dengan mengetik:_ `/pap`"
+            )
+            try:
+                bot.edit_message_text(congrats_text, chat_id=chat_id, message_id=call.message.message_id, parse_mode="Markdown")
+            except Exception:
+                bot.send_message(chat_id, congrats_text, parse_mode="Markdown")
+        else:
+            bot.answer_callback_query(call.id, "⚠️ Gagal menyimpan persona.", show_alert=True)
+
+
+@bot.message_handler(commands=['newpersona', 'createpersona', 'tambahwaifu'])
+def handle_new_persona_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    start_persona_wizard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
 @bot.message_handler(func=lambda msg: True)
 def handle_text_messages(message):
     if not is_authorized(message.from_user.id):
         return
+    if message.from_user.id in USER_PERSONA_WIZARD:
+        if handle_persona_wizard_input(message):
+            return
     process_text_chat(message, message.text, is_voice=False)
 
 
@@ -2128,6 +2396,7 @@ def setup_bot_commands():
         types.BotCommand("music", "🎶 Remote kontrol pemutar musik PC"),
         types.BotCommand("outfit", "👗 Lemari pakaian & ganti baju"),
         types.BotCommand("persona", "🎭 Ganti waifu (Runa, Akira, Hina, Shiro, Yume)"),
+        types.BotCommand("newpersona", "🎭 Buat waifu kustom baru"),
         types.BotCommand("ratio", "📐 Ganti rasio foto (3:4, 9:16, 1:1, 4:3)"),
         types.BotCommand("quality", "✨ Atur kualitas foto (Ultra/High/Fast)"),
         types.BotCommand("voice", "🎙️ Pengaturan balasan suara / VN"),
@@ -2157,7 +2426,7 @@ def main():
 
     setup_bot_commands()
     threading.Thread(target=schedule_daily_greetings, daemon=True).start()
-    logger.info("✓ Daily Greetings Scheduler active (07:00 AM & 22:00 PM)")
+    logger.info("✓ Daily Greetings Scheduler active (07:00 AM, 12:30 PM & 22:00 PM)")
 
     stat = llm_client.check_health()
     if stat.get("online"):

@@ -315,6 +315,7 @@ An interactive menu will open:
 | `/love` | Check your affection score & relationship progress with your waifu |
 | `/persona` | Interactive inline button menu to switch active companion |
 | `/persona <name>` | Switch persona directly (`runa`, `akira`, `hina`, `shiro`, `yume`) |
+| `/newpersona` | Interactive wizard to create and activate your own custom waifu |
 | `/reset` | Clear conversation memory to start a fresh discussion |
 
 ---
