@@ -2179,7 +2179,15 @@ def process_photo_request(target, user_text: str):
 
     bot.send_chat_action(chat_id, "upload_photo")
 
-    status_msg = bot.reply_to(reply_to_target, f"📸 *{persona.get('name')} is getting ready for a photo just for you, sweetheart...* 💕", parse_mode="Markdown")
+    status_msg = None
+    status_text = f"📸 *{persona.get('name')} sedang menyiapkan foto spesial untukmu, sayang...* 💕"
+    try:
+        status_msg = bot.reply_to(reply_to_target, status_text, parse_mode="Markdown")
+    except Exception:
+        try:
+            status_msg = bot.send_message(chat_id, status_text, parse_mode="Markdown")
+        except Exception as e_send:
+            logger.warning(f"Could not send photo status message: {e_send}")
 
     detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client)
     visual_prompt = persona_mgr.craft_visual_prompt(user_text, user_id=user_id, scene_override=detected_scene)
@@ -2198,11 +2206,14 @@ def process_photo_request(target, user_text: str):
                     quality=u_qual
                 )
             if not img_bytes:
-                bot.edit_message_text(
-                    "I'm sorry darling, my camera is acting up a little... I will try again soon! 🥺",
-                    chat_id=chat_id,
-                    message_id=status_msg.message_id
-                )
+                fail_text = "Maaf sayang, kameraku agak ngadat... Nanti aku coba foto lagi yaa! 🥺"
+                if status_msg:
+                    try:
+                        bot.edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id)
+                    except Exception:
+                        bot.send_message(chat_id, fail_text)
+                else:
+                    bot.send_message(chat_id, fail_text)
                 return
 
             history = persona_mgr.get_chat_history(user_id)
@@ -2228,10 +2239,11 @@ def process_photo_request(target, user_text: str):
             caption, _ = llm_client.chat(caption_prompt, max_tokens=120)
             clean_caption = caption or f"Ini foto spesial buat kamu sayang~ 🥰 ({source})"
 
-            try:
-                bot.delete_message(chat_id, status_msg.message_id)
-            except Exception:
-                pass
+            if status_msg:
+                try:
+                    bot.delete_message(chat_id, status_msg.message_id)
+                except Exception:
+                    pass
 
             markup = types.InlineKeyboardMarkup(row_width=2)
             markup.add(
@@ -2281,7 +2293,16 @@ def process_video_request(target, user_text: str):
         reply_to_target = target
 
     bot.send_chat_action(chat_id, "record_video")
-    status_msg = bot.reply_to(reply_to_target, f"🎬 *{persona.get('name')} sedang merekam klip video manis untukmu, sayang...* 💕", parse_mode="Markdown")
+
+    status_msg = None
+    status_text = f"🎬 *{persona.get('name')} sedang merekam klip video manis untukmu, sayang...* 💕"
+    try:
+        status_msg = bot.reply_to(reply_to_target, status_text, parse_mode="Markdown")
+    except Exception:
+        try:
+            status_msg = bot.send_message(chat_id, status_text, parse_mode="Markdown")
+        except Exception as e_send:
+            logger.warning(f"Could not send video status message: {e_send}")
 
     detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client)
     visual_prompt = persona_mgr.craft_visual_prompt(user_text, user_id=user_id, scene_override=detected_scene)
@@ -2303,11 +2324,14 @@ def process_video_request(target, user_text: str):
                 )
 
             if not video_bytes:
-                bot.edit_message_text(
-                    "Maaf ya sayang, kameraku tadi agak ngadat pas ngerekam video... Nanti aku coba rekam lagi buat kamu yaa! 🥺",
-                    chat_id=chat_id,
-                    message_id=status_msg.message_id
-                )
+                fail_text = "Maaf ya sayang, kameraku tadi agak ngadat pas ngerekam video... Nanti aku coba rekam lagi buat kamu yaa! 🥺"
+                if status_msg:
+                    try:
+                        bot.edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id)
+                    except Exception:
+                        bot.send_message(chat_id, fail_text)
+                else:
+                    bot.send_message(chat_id, fail_text)
                 return
 
             history = persona_mgr.get_chat_history(user_id)
@@ -2336,10 +2360,11 @@ def process_video_request(target, user_text: str):
                 caption = None
             clean_caption = caption or f"Ini klip video spesial buat kamu sayang, semoga suka yaa~ 🥰 ({source})"
 
-            try:
-                bot.delete_message(chat_id, status_msg.message_id)
-            except Exception:
-                pass
+            if status_msg:
+                try:
+                    bot.delete_message(chat_id, status_msg.message_id)
+                except Exception:
+                    pass
 
             markup = types.InlineKeyboardMarkup(row_width=2)
             markup.add(
