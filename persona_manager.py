@@ -96,6 +96,12 @@ VIDEO_INTENT_KEYWORDS = [
     r"record\s*(a\s*)?video",
     r"kirim\s*video",
     r"bikin\s*video",
+    r"minta\s*video",
+    r"video\s*dong",
+    r"video\s*kamu",
+    r"buat\s*video",
+    r"animasi\s*kamu",
+    r"bikin\s*animasi",
 ]
 
 OUTFIT_PRESETS = {

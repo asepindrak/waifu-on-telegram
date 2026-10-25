@@ -321,3 +321,133 @@ class MediaEngine:
                 return cloud_img, "Cloud Engine (Free GPU)"
 
         return None, "Failed"
+
+    def generate_video(
+        self,
+        visual_prompt: str,
+        negative_prompt: Optional[str] = None,
+        aspect_ratio: Optional[str] = None,
+        quality: Optional[str] = None,
+        duration: float = 3.0,
+        fps: int = 24
+    ) -> Tuple[Optional[bytes], str]:
+        """
+        Generates smooth dynamic video animation clip (H.264 MP4) featuring the waifu.
+        Renders character visual first, then constructs cinematic parallax camera motion,
+        breathing oscillation, and ambient sparkling particle overlay.
+        Returns: (video_bytes, source_label)
+        """
+        import io
+        import math
+        import tempfile
+        from PIL import Image, ImageDraw
+        try:
+            import imageio
+            import numpy as np
+        except ImportError:
+            logger.error("imageio not installed. Cannot render video.")
+            return None, "Failed (Missing imageio)"
+
+        # 1. Generate base character frame with full visual prompt
+        img_bytes, source = self.generate_photo(
+            visual_prompt=visual_prompt,
+            negative_prompt=negative_prompt,
+            aspect_ratio=aspect_ratio or "3:4",
+            quality=quality
+        )
+        if not img_bytes:
+            return None, "Failed (Photo Generation)"
+
+        try:
+            base_image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+            w, h = base_image.size
+
+            # Ensure even dimensions for H.264 libx264 compatibility
+            if w % 2 != 0:
+                w -= 1
+            if h % 2 != 0:
+                h -= 1
+            if (w, h) != base_image.size:
+                base_image = base_image.crop((0, 0, w, h))
+
+            total_frames = int(duration * fps)
+
+            # Generate ambient floating particle seeds
+            particles = [
+                {
+                    "x": random.uniform(20, w - 20),
+                    "y": random.uniform(20, h - 20),
+                    "r": random.uniform(2.0, 5.0),
+                    "speed_y": random.uniform(-0.8, -1.8),
+                    "drift_x": random.uniform(-0.5, 0.5),
+                    "color": random.choice([
+                        (255, 230, 240, 160),  # Pink cherry sparkle
+                        (255, 255, 220, 150),  # Golden sunshine dust
+                        (220, 240, 255, 140)   # Celestial blue sparkle
+                    ])
+                }
+                for _ in range(16)
+            ]
+
+            # Temporary MP4 file
+            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_file:
+                tmp_path = tmp_file.name
+
+            writer = imageio.get_writer(
+                tmp_path,
+                fps=fps,
+                codec="libx264",
+                pixelformat="yuv420p",
+                quality=8
+            )
+
+            for i in range(total_frames):
+                # Smooth cosine normalized time (0 to 2*pi for seamless loop)
+                t = (i / total_frames) * 2 * math.pi
+
+                # Subtle smooth zoom: 1.0 to 1.045
+                zoom = 1.0 + 0.045 * ((1 - math.cos(t)) / 2)
+
+                # Gentle vertical breathing motion: -3 to +3 pixels
+                y_shift = int(3.5 * math.sin(t))
+
+                # Crop zoom
+                crop_w = int(w / zoom)
+                crop_h = int(h / zoom)
+                crop_left = (w - crop_w) // 2
+                crop_top = max(0, min(h - crop_h, (h - crop_h) // 2 + y_shift))
+
+                frame_img = base_image.crop((crop_left, crop_top, crop_left + crop_w, crop_top + crop_h))
+                frame_img = frame_img.resize((w, h), Image.Resampling.BILINEAR)
+
+                # Overlay soft glowing particles
+                overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+                draw = ImageDraw.Draw(overlay)
+
+                for p in particles:
+                    px = (p["x"] + p["drift_x"] * i) % w
+                    py = (p["y"] + p["speed_y"] * i) % h
+                    pr = p["r"] * (0.8 + 0.3 * math.sin(t + px))
+                    rgba = p["color"]
+                    draw.ellipse([px - pr, py - pr, px + pr, py + pr], fill=rgba)
+
+                frame_rgba = frame_img.convert("RGBA")
+                frame_combined = Image.alpha_composite(frame_rgba, overlay).convert("RGB")
+
+                writer.append_data(np.array(frame_combined))
+
+            writer.close()
+
+            with open(tmp_path, "rb") as f:
+                video_bytes = f.read()
+
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
+            return video_bytes, f"{source} (Motion Rendered)"
+
+        except Exception as e:
+            logger.error(f"Error rendering video animation: {e}")
+            return None, "Failed (Video Render)"

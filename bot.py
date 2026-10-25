@@ -319,6 +319,7 @@ def handle_welcome(message):
         "• `/setup` - Dashboard kontrol sistem & pengaturan lengkap\n"
         "• `/help` - Panduan lengkap fitur & cara pakai\n"
         "• `/pap` - Menu interaktif skenario selfie & foto waifu\n"
+        "• `/video` - Minta klip video / animasi bergerak waifu\n"
         "• `/play <judul>` - Putar musik YouTube langsung di layar PC kamu\n"
         "• `/music` - Buka remote kontrol pemutar musik PC\n"
         "• `/ratio` - Ganti rasio foto (3:4, 9:16, 1:1, 4:3)\n"
@@ -774,6 +775,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"`/setup` - Panel kontrol & konfigurasi lengkap\n"
             f"`/help` - Tampilkan buku panduan ini\n"
             f"`/pap` - Menu interaktif skenario selfie & foto waifu\n"
+            f"`/video` - Minta klip video / animasi bergerak waifu\n"
             f"`/play <judul>` - Putar musik YouTube langsung di PC\n"
             f"`/music` - Remote kontrol pemutar musik PC\n"
             f"`/outfit` - Buka lemari pakaian waifu\n"
@@ -1355,6 +1357,17 @@ def callback_regen_photo(call):
     process_photo_request(call, scenario)
 
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('regen_video:'))
+def callback_regen_video(call):
+    if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        return
+
+    scenario = call.data.split(":", 1)[1]
+    bot.answer_callback_query(call.id, "🎬 Sedang merekam video manis... 💕")
+    process_video_request(call, scenario)
+
+
 @bot.message_handler(commands=['love', 'affection'])
 def handle_affection_command(message):
     if not is_authorized(message.from_user.id):
@@ -1601,8 +1614,11 @@ def process_photo_request(target, user_text: str):
             except Exception:
                 pass
 
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔄 Pose Lain (New Pose)", callback_data=f"regen_photo:{detected_scene[:35]}"))
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            markup.add(
+                types.InlineKeyboardButton("🔄 Pose Lain", callback_data=f"regen_photo:{detected_scene[:30]}"),
+                types.InlineKeyboardButton("🎬 Bikin Video Gerak", callback_data=f"regen_video:{detected_scene[:30]}")
+            )
 
             bot.send_photo(chat_id, img_bytes, caption=clean_caption, reply_markup=markup)
 
@@ -1616,6 +1632,123 @@ def process_photo_request(target, user_text: str):
             bot.send_message(chat_id, f"⚠️ Failed to send photo: {e}")
 
     threading.Thread(target=run_gen, daemon=True).start()
+
+
+@bot.message_handler(commands=['video', 'anim', 'animate', 'klip'])
+def handle_video_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    scenario = message.text.replace("/video", "").replace("/anim", "").replace("/animate", "").replace("/klip", "").strip()
+    user_prompt = scenario if scenario else "smiling affectionately, looking into camera"
+    process_video_request(message, user_prompt)
+
+
+def process_video_request(target, user_text: str):
+    """Generates and delivers consistent girlfriend animated video clip with caption and voice."""
+    persona = persona_mgr.get_active_persona()
+
+    if isinstance(target, types.CallbackQuery):
+        chat_id = target.message.chat.id
+        user_id = target.from_user.id
+        reply_to_target = target.message
+    elif hasattr(target, "message") and target.message:
+        chat_id = target.message.chat.id
+        user_id = target.from_user.id
+        reply_to_target = target.message
+    else:
+        chat_id = target.chat.id
+        user_id = target.from_user.id
+        reply_to_target = target
+
+    bot.send_chat_action(chat_id, "record_video")
+    status_msg = bot.reply_to(reply_to_target, f"🎬 *{persona.get('name')} sedang merekam klip video manis untukmu, sayang...* 💕", parse_mode="Markdown")
+
+    detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client)
+    visual_prompt = persona_mgr.craft_visual_prompt(user_text, user_id=user_id, scene_override=detected_scene)
+    logger.info(f"Video visual prompt crafted: {visual_prompt}")
+
+    def run_video_gen():
+        try:
+            with ChatActionLoop(bot, chat_id, "upload_video"):
+                neg_p = persona.get("negative_prompt")
+                u_ar = USER_RATIOS.get(user_id, "3:4")
+                u_qual = USER_QUALITIES.get(user_id, "high")
+                video_bytes, source = media_engine.generate_video(
+                    visual_prompt,
+                    negative_prompt=neg_p,
+                    aspect_ratio=u_ar,
+                    quality=u_qual,
+                    duration=3.0,
+                    fps=24
+                )
+
+            if not video_bytes:
+                bot.edit_message_text(
+                    "Maaf ya sayang, kameraku tadi agak ngadat pas ngerekam video... Nanti aku coba rekam lagi buat kamu yaa! 🥺",
+                    chat_id=chat_id,
+                    message_id=status_msg.message_id
+                )
+                return
+
+            history = persona_mgr.get_chat_history(user_id)
+            clean_recent_turns = [m for m in history[-4:] if not m.get("content", "").startswith("[")]
+
+            caption_prompt = [
+                {
+                    "role": "system",
+                    "content": (
+                        persona.get("system_instruction", "") +
+                        " You just recorded a short sweet video clip for your partner. Write 1-2 sweet, affectionate sentences "
+                        "as your video caption. Seamlessly match the language of the conversation, and naturally "
+                        "reference what you were just doing or talking about in the ongoing chat."
+                    )
+                }
+            ]
+            caption_prompt.extend(clean_recent_turns)
+            caption_prompt.append({
+                "role": "user",
+                "content": f"[Video clip recorded in setting: '{detected_scene}']. Reply sending this video to your lover with 1-2 sweet sentences:"
+            })
+
+            try:
+                caption, _ = llm_client.chat(caption_prompt, max_tokens=120)
+            except Exception:
+                caption = None
+            clean_caption = caption or f"Ini klip video spesial buat kamu sayang, semoga suka yaa~ 🥰 ({source})"
+
+            try:
+                bot.delete_message(chat_id, status_msg.message_id)
+            except Exception:
+                pass
+
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            markup.add(
+                types.InlineKeyboardButton("🔄 Rekam Video Lagi", callback_data=f"regen_video:{detected_scene[:30]}"),
+                types.InlineKeyboardButton("📸 Minta Foto Saja", callback_data=f"regen_photo:{detected_scene[:30]}")
+            )
+            markup.add(
+                types.InlineKeyboardButton("🎵 Remote Musik PC", callback_data="open_music_menu")
+            )
+
+            bot.send_video(
+                chat_id,
+                video_bytes,
+                caption=clean_caption,
+                reply_markup=markup,
+                supports_streaming=True
+            )
+
+            new_aff = persona_mgr.increase_affinity(user_id, delta=3)
+            memory_engine.set_affinity(user_id, new_aff)
+            persona_mgr.add_message(user_id, "user", f"[Requested video: {user_text}]")
+            persona_mgr.add_message(user_id, "assistant", f"[Sent video clip: {detected_scene}] {clean_caption}")
+
+        except Exception as e:
+            logger.error(f"Error in video delivery: {e}")
+            bot.send_message(chat_id, f"⚠️ Gagal mengirim video: {e}")
+
+    threading.Thread(target=run_video_gen, daemon=True).start()
 
 
 @bot.message_handler(content_types=['photo'])
@@ -1959,7 +2092,10 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
     """Main conversation processor running asynchronously with continuous typing status."""
     def _execute():
         is_media, media_type = persona_mgr.detect_media_request(user_text)
-        if is_media and media_type == "photo":
+        if is_media and media_type == "video":
+            process_video_request(message, user_text)
+            return
+        elif is_media and media_type == "photo":
             process_photo_request(message, user_text)
             return
 
@@ -2392,6 +2528,7 @@ def setup_bot_commands():
         types.BotCommand("setup", "⚙️ Panel kontrol & pengaturan lengkap"),
         types.BotCommand("help", "❓ Panduan fitur & cara penggunaan"),
         types.BotCommand("pap", "📸 Minta foto / menu skenario selfie"),
+        types.BotCommand("video", "🎬 Minta klip video / animasi waifu"),
         types.BotCommand("play", "🎵 Putar lagu YouTube di PC"),
         types.BotCommand("music", "🎶 Remote kontrol pemutar musik PC"),
         types.BotCommand("outfit", "👗 Lemari pakaian & ganti baju"),

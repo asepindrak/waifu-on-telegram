@@ -307,6 +307,7 @@ An interactive menu will open:
 | `/status` | Real-time diagnostic check of LLM (Port 8127), ComfyUI (8188), and VRAM |
 | `/photo <scene>` | Request a custom selfie scenario (e.g. `/photo relaxing in cafe`) |
 | `/pap` | Quick shortcut to request a new selfie with interactive retry button |
+| `/video` | Generate dynamic animated video clip (MP4) with parallax motion & ambient sparkles |
 | `/ratio` | Choose photo aspect ratio (3:4 portrait, 9:16 phone story, 1:1 square, 4:3) |
 | `/quality` | Select photo quality preset (Ultra 32-step, High 28-step, Fast 20-step) |
 | `/outfit` | Interactive wardrobe to select clothes (Kimono, Maid, Bikini, Pajamas, etc.) |
