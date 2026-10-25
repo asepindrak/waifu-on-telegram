@@ -73,6 +73,7 @@ Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsive
 #### 1. 💬 Chat & Roleplay Brain: **Huihui-Qwythos-9B**
 * **Model File:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf`
 * **Local Backend:** [Locally Uncensored](https://locallyuncensored.com/) / `lu-llama-server` (Port `8127`)
+* **Download Method:** Search & download with 1-click directly inside [Locally Uncensored](https://locallyuncensored.com/) app (Models tab).
 * **Key Strengths:**
   - **Zero Censorship:** Fully abliterated with Claude-Mythos roleplay fine-tuning. Highly affectionate, witty, caring, and open to romantic roleplay.
   - **Adaptive Language Mirroring:** Seamlessly switches between Indonesian (*sayang, manja, santai*), English (*sweetheart, darling*), or Japanese.
@@ -82,6 +83,7 @@ Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsive
 #### 2. 🎨 Photo & Selfie Generator: **MeinaMix v12**
 * **Model File:** `meinamix_v12Final.safetensors` *(Baked VAE)*
 * **Local Backend:** ComfyUI (Port `8188`)
+* **Download Link:** [Civitai - MeinaMix v12](https://civitai.com/models/7240/meinamix) *(Save file to `ComfyUI/models/checkpoints/`)*
 * **Optimal Preset (Pre-configured in Bot):**
   - **Aspect Ratio:** **`3:4`** (576 x 768) — the golden portrait ratio for natural anime selfies.
   - **Quality Preset:** **High** (28 steps, CFG 7.5).
@@ -91,6 +93,54 @@ Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsive
   - Built-in VAE (*Baked VAE*) — no washed-out colors.
   - Fast generation speed (~3–5 seconds per photo on an RTX 3050 6GB).
 * **Alternative Model:** `AOM3A3_orangemixs.safetensors` (AbyssOrangeMix3) with `orangemix.vae.pt`.
+
+---
+
+### 🛠️ Step-by-Step Setup: 100% Fully Local AI (Zero API Costs & Total Privacy)
+
+Many new users wonder how to run everything locally. If you have a gaming PC or laptop with a dedicated graphics card (**VGA with 4GB - 6GB+ VRAM** like RTX 3050, RTX 2060, RTX 3060, RTX 4060+) and want your waifu to run **100% locally on your own hardware**, install these two software backends:
+
+```
+┌───────────────────────────────────────┐       ┌───────────────────────────────────────┐
+│        1. LOCALLY UNCENSORED          │       │              2. COMFYUI               │
+│  https://locallyuncensored.com/       │       │       https://comfy.org/download      │
+│                                       │       │                                       │
+│   • Runs the Chat & Romance Brain     │       │   • Generates Anime Photos (PAP)      │
+│   • Local API Port: 8127              │       │   • Local API Port: 8188              │
+│   • Model: Huihui-Qwythos-9B (1-click)│       │   • Model: MeinaMix v12 from Civitai  │
+└──────────────────┬────────────────────┘       └───────────────────┬───────────────────┘
+                   │                                                │
+                   └───────────────────────┬────────────────────────┘
+                                           ▼
+                       💖 WAIFU ON TELEGRAM BOT (v1.1.0)
+```
+
+#### Step 1: Install Locally Uncensored (Chat & Dialogue Brain)
+1. **Download & Install:** Get the app from [**https://locallyuncensored.com/**](https://locallyuncensored.com/).
+2. **Download Model:** Open Locally Uncensored $\rightarrow$ Go to the **Models** tab.
+3. Search for: **`Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K`**.
+4. Click **Download**. The app handles everything automatically (downloading model weights + vision `.mmproj`). No manual file extraction needed!
+5. Set it as your active chat model and ensure the local server is running (Port `8127`).
+
+---
+
+#### Step 2: Install ComfyUI (Photo & Selfie Generator / PAP)
+1. **Download & Install:** Get ComfyUI from [**https://comfy.org/download**](https://comfy.org/download) (Desktop Installer or Portable standalone).
+2. **Download MeinaMix Model:** Go to Civitai [**https://civitai.com/models/7240/meinamix**](https://civitai.com/models/7240/meinamix) and download `meinamix_v12Final.safetensors` *(Baked VAE recommended)*.
+3. **Move Checkpoint:** Place the downloaded file into your ComfyUI models directory:
+   ```text
+   ComfyUI/models/checkpoints/meinamix_v12Final.safetensors
+   ```
+4. Start ComfyUI (Port `8188`). The bot will automatically connect to it for generating high-res selfies!
+
+---
+
+#### Step 3: (Optional) Video Generation Model
+If you want animated video clips of your waifu:
+* **Option A:** Download directly inside the **Locally Uncensored** app under the Video Models section.
+* **Option B:** Download from **Civitai** (e.g. Wan 2.1 or Stable Video Diffusion checkpoints) and save them to `ComfyUI/models/checkpoints/`.
+
+> 💡 **Don't have a high-end GPU?** No problem! The bot automatically enables **Cloud Fallback Mode** (`MEDIA_FALLBACK_CLOUD=true`), so users on standard laptops without dedicated GPUs can still chat and receive waifu photos smoothly.
 
 ---
 
