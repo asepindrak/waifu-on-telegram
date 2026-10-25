@@ -41,7 +41,7 @@ def get_version() -> str:
                 return f.read().strip()
         except Exception:
             pass
-    return "1.3.1"
+    return "1.3.2"
 
 
 # Credentials & Permissions
