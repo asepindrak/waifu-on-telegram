@@ -3,6 +3,7 @@ import sys
 import logging
 import threading
 import time
+from typing import Optional
 from dotenv import load_dotenv
 import telebot
 from telebot import types
@@ -215,6 +216,65 @@ def handle_status(message):
     bot.reply_to(message, report, parse_mode="Markdown")
 
 
+def show_persona_menu(chat_id: int, user_id: int, reply_to_id: Optional[int] = None):
+    """Renders interactive persona selection keyboard."""
+    personas = persona_mgr.list_personas()
+    active_key = persona_mgr.active_key
+    active_name = persona_mgr.get_active_persona().get("name")
+    
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    buttons = []
+    lines = [f"🎭 **Available Waifu Personas** (Active: **{active_name}**):\n"]
+    for key, name, desc in personas:
+        is_curr = (key == active_key)
+        lines.append(f"• **{name}** {'*(Currently Active)*' if is_curr else ''} — _{desc}_")
+        btn_label = f"💖 {name} ✓" if is_curr else f"✨ Switch to {name}"
+        buttons.append(types.InlineKeyboardButton(btn_label, callback_data=f"set_persona:{key}"))
+    
+    markup.add(*buttons)
+    lines.append("\nTap a button below or type `/persona <name>`:")
+    bot.send_message(chat_id, "\n".join(lines), reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+def show_outfit_menu(chat_id: int, user_id: int, reply_to_id: Optional[int] = None):
+    """Renders interactive outfit selection keyboard."""
+    cur_key, cur_name = persona_mgr.get_user_outfit(user_id)
+    outfits = persona_mgr.list_outfits()
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    btns = []
+    for key, name in outfits:
+        is_cur = (key == cur_key)
+        label = f"{name} ✓" if is_cur else name
+        btns.append(types.InlineKeyboardButton(label, callback_data=f"set_outfit:{key}"))
+    markup.add(*btns)
+    
+    bot.send_message(
+        chat_id,
+        f"👗 **Waifu Wardrobe / Outfit Selection**\n\n"
+        f"• Current Outfit: **{cur_name}**\n\n"
+        f"Choose what outfit you'd like your waifu to wear for photos & selfies! 💕",
+        reply_markup=markup,
+        parse_mode="Markdown",
+        reply_to_message_id=reply_to_id
+    )
+
+
+def show_affection_status(chat_id: int, user_id: int, reply_to_id: Optional[int] = None):
+    """Displays user affection and romance status."""
+    persona = persona_mgr.get_active_persona()
+    score, status = persona_mgr.get_relationship_status(user_id)
+    filled = int(score / 10)
+    bar = "❤️" * filled + "🤍" * (10 - filled)
+
+    reply = (
+        f"💖 **Affection & Romance Status** with **{persona.get('name')}**\n\n"
+        f"• **Relationship**: {status}\n"
+        f"• **Love Meter**: `[{bar}]` **{score}%**\n\n"
+        f"_{persona.get('name')} cherishes every message and moment spent with you, darling! Keep chatting and asking for photos to grow your bond closer._ 🥰"
+    )
+    bot.send_message(chat_id, reply, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
 @bot.message_handler(commands=['persona'])
 def handle_persona(message):
     if not is_authorized(message.from_user.id):
@@ -239,24 +299,9 @@ def handle_persona(message):
             return
         else:
             bot.reply_to(message, f"⚠️ Persona `{chosen}` was not found.")
+            return
 
-    # Show interactive inline keyboard
-    personas = persona_mgr.list_personas()
-    active_key = persona_mgr.active_key
-    active_name = persona_mgr.get_active_persona().get("name")
-    
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    buttons = []
-    lines = [f"🎭 **Available Waifu Personas** (Active: **{active_name}**):\n"]
-    for key, name, desc in personas:
-        is_curr = (key == active_key)
-        lines.append(f"• **{name}** {'*(Currently Active)*' if is_curr else ''} — _{desc}_")
-        btn_label = f"💖 {name} ✓" if is_curr else f"✨ Switch to {name}"
-        buttons.append(types.InlineKeyboardButton(btn_label, callback_data=f"set_persona:{key}"))
-    
-    markup.add(*buttons)
-    lines.append("\nTap a button below or type `/persona <name>`:")
-    bot.reply_to(message, "\n".join(lines), reply_markup=markup, parse_mode="Markdown")
+    show_persona_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('set_persona:'))
@@ -296,68 +341,42 @@ def callback_set_persona(call):
 @bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'check_love_status'))
 def callback_quick_actions(call):
     if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
         return
     bot.answer_callback_query(call.id)
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
     if call.data == 'open_outfit_menu':
-        handle_outfit_command(call.message)
+        show_outfit_menu(chat_id, user_id, reply_to_id=call.message.message_id)
     elif call.data == 'open_persona_menu':
-        handle_persona(call.message)
+        show_persona_menu(chat_id, user_id, reply_to_id=call.message.message_id)
     elif call.data == 'check_love_status':
-        handle_affection_command(call.message)
+        show_affection_status(chat_id, user_id, reply_to_id=call.message.message_id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('regen_photo:'))
 def callback_regen_photo(call):
     if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
         return
 
     scenario = call.data.split(":", 1)[1]
-    bot.answer_callback_query(call.id, "Generating another pose... 💕")
-    process_photo_request(call.message, scenario)
+    bot.answer_callback_query(call.id, "Generating photo... 💕")
+    process_photo_request(call, scenario)
 
 
 @bot.message_handler(commands=['love', 'affection'])
 def handle_affection_command(message):
     if not is_authorized(message.from_user.id):
         return
-
-    persona = persona_mgr.get_active_persona()
-    score, status = persona_mgr.get_relationship_status(message.from_user.id)
-    filled = int(score / 10)
-    bar = "❤️" * filled + "🤍" * (10 - filled)
-
-    reply = (
-        f"💖 **Affection & Romance Status** with **{persona.get('name')}**\n\n"
-        f"• **Relationship**: {status}\n"
-        f"• **Love Meter**: `[{bar}]` **{score}%**\n\n"
-        f"_{persona.get('name')} cherishes every message and moment spent with you, darling! Keep chatting and asking for photos to grow your bond closer._ 🥰"
-    )
-    bot.reply_to(message, reply, parse_mode="Markdown")
+    show_affection_status(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
 
 
 @bot.message_handler(commands=['outfit', 'wardrobe'])
 def handle_outfit_command(message):
     if not is_authorized(message.from_user.id):
         return
-
-    cur_key, cur_name = persona_mgr.get_user_outfit(message.from_user.id)
-    outfits = persona_mgr.list_outfits()
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    btns = []
-    for key, name in outfits:
-        is_cur = (key == cur_key)
-        label = f"{name} ✓" if is_cur else name
-        btns.append(types.InlineKeyboardButton(label, callback_data=f"set_outfit:{key}"))
-    markup.add(*btns)
-    
-    bot.reply_to(
-        message,
-        f"👗 **Waifu Wardrobe / Outfit Selection**\n\n"
-        f"• Current Outfit: **{cur_name}**\n\n"
-        f"Choose what outfit you'd like your waifu to wear for photos & selfies! 💕",
-        reply_markup=markup,
-        parse_mode="Markdown"
-    )
+    show_outfit_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('set_outfit:'))
@@ -507,19 +526,23 @@ def handle_photo_command(message):
     process_photo_request(message, user_prompt)
 
 
-def process_photo_request(message, user_text: str):
+def process_photo_request(target, user_text: str):
     """Generates and delivers consistent girlfriend photo with caption."""
     persona = persona_mgr.get_active_persona()
 
     # Support both Message and CallbackQuery objects
-    if hasattr(message, "message") and message.message:
-        chat_id = message.message.chat.id
-        user_id = message.from_user.id
-        reply_to_target = message.message
+    if isinstance(target, types.CallbackQuery):
+        chat_id = target.message.chat.id
+        user_id = target.from_user.id
+        reply_to_target = target.message
+    elif hasattr(target, "message") and target.message:
+        chat_id = target.message.chat.id
+        user_id = target.from_user.id
+        reply_to_target = target.message
     else:
-        chat_id = message.chat.id
-        user_id = message.from_user.id
-        reply_to_target = message
+        chat_id = target.chat.id
+        user_id = target.from_user.id
+        reply_to_target = target
 
     bot.send_chat_action(chat_id, "upload_photo")
 
