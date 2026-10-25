@@ -123,21 +123,30 @@ class MediaEngine:
             if matched:
                 chosen_ckpt = matched[0]
 
-        # 2. Prefer MeinaMix if present in folder
+        # 2. Check if dedicated uncensored hentai/NSFW model requested & available
+        is_explicit_nsfw = any(k in prompt.lower() for k in ["completely nude", "bare body", "full body nude", "nipples", "bare skin", "sensual lace lingerie", "lingerie"])
+        if is_explicit_nsfw and not chosen_ckpt:
+            for c in ckpts:
+                if any(k in c.lower() for k in ["basnsfw", "hentai", "nsfw"]):
+                    chosen_ckpt = c
+                    logger.info(f"Auto-selected dedicated uncensored anime model: {chosen_ckpt}")
+                    break
+
+        # 3. Prefer MeinaMix if present in folder
         if not chosen_ckpt:
             for c in ckpts:
                 if "meina" in c.lower():
                     chosen_ckpt = c
                     break
 
-        # 3. Prefer AOM3 / OrangeMix if present
+        # 4. Prefer AOM3 / OrangeMix if present
         if not chosen_ckpt:
             for c in ckpts:
                 if any(k in c.lower() for k in ["aom", "orange"]):
                     chosen_ckpt = c
                     break
 
-        # 4. Fallback to first available checkpoint
+        # 5. Fallback to first available checkpoint
         if not chosen_ckpt:
             chosen_ckpt = ckpts[0]
 

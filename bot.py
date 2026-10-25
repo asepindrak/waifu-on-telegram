@@ -41,7 +41,7 @@ def get_version() -> str:
                 return f.read().strip()
         except Exception:
             pass
-    return "1.3.2"
+    return "1.4.0"
 
 
 # Credentials & Permissions
@@ -1714,9 +1714,11 @@ def show_outfit_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] 
     markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
 
     text = (
-        f"👗 **Waifu Wardrobe / Outfit Selection**\n\n"
-        f"• Current Outfit: **{cur_name}**\n\n"
-        f"Choose what outfit you'd like your waifu to wear for photos & selfies! 💕"
+        f"👗 **Lemari Pakaian Waifu (/outfit)**\n\n"
+        f"• Pakaian Aktif: **{cur_name}**\n\n"
+        f"Pilih gaya busana waifumu untuk sesi foto & selfie! 💕\n\n"
+        f"💡 *Tips Dinamis*: Kamu juga bisa langsung meminta gaya pakaian atau tanpa busana secara alami di chat kapan saja "
+        f"(misal: *'sayang pap tanpa busana dong'*, *'pap pake kimono'*, *'pap pake handuk mandi'*, dll)."
     )
     if message_to_edit:
         try:
@@ -2200,20 +2202,17 @@ def process_photo_request(target, user_text: str):
             logger.warning(f"Could not send photo status message: {e_send}")
 
     detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client)
-    visual_prompt = persona_mgr.craft_visual_prompt(user_text, user_id=user_id, scene_override=detected_scene)
-    logger.info(f"Visual prompt crafted: {visual_prompt}")
+    visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
+        user_text, user_id=user_id, scene_override=detected_scene
+    )
+    logger.info(f"Visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
 
     def run_gen():
         try:
             with ChatActionLoop(bot, chat_id, "upload_photo"):
                 neg_p = persona.get("negative_prompt", "")
-                outfit_key, _ = persona_mgr.get_user_outfit(user_id)
-                if outfit_key == "bikini":
-                    neg_p += ", clothes, casual clothes, hoodie, sweater, jacket, shirt, pants, coat, pajamas"
-                elif outfit_key == "pajamas":
-                    neg_p += ", hoodie, jacket, coat, outdoor clothes, jeans"
-                elif outfit_key == "maid":
-                    neg_p += ", casual clothes, hoodie, sweater, jacket, jeans"
+                if extra_neg:
+                    neg_p += f", {extra_neg}"
 
                 u_ar = USER_RATIOS.get(user_id, "3:4")
                 u_qual = USER_QUALITIES.get(user_id, "high")
@@ -2237,11 +2236,20 @@ def process_photo_request(target, user_text: str):
             history = persona_mgr.get_chat_history(user_id)
             clean_recent_turns = [m for m in history[-4:] if not m.get("content", "").startswith("[")]
 
+            nude_guidance = ""
+            if is_nude:
+                nude_guidance = (
+                    " You just took a private, completely uncensored, intimate nude selfie exclusively for your lover. "
+                    "React with affectionate blushing sweetness and playful intimacy, feeling happily vulnerable "
+                    "and deeply in love. Remind them gently that this special view is just between the two of you."
+                )
+
             caption_prompt = [
                 {
                     "role": "system",
                     "content": (
                         persona.get("system_instruction", "") +
+                        nude_guidance +
                         " You just took a selfie for your partner. Write 1-2 sweet, affectionate sentences "
                         "as your photo caption. Seamlessly match the language of the conversation, and naturally "
                         "reference what you were just doing or talking about in the ongoing chat."
@@ -2251,7 +2259,7 @@ def process_photo_request(target, user_text: str):
             caption_prompt.extend(clean_recent_turns)
             caption_prompt.append({
                 "role": "user",
-                "content": f"[Photo taken in setting: '{detected_scene}']. Reply sending this photo to your lover with 1-2 sweet sentences:"
+                "content": f"[Photo taken in setting: '{detected_scene}', wearing: '{outfit_label}']. Reply sending this photo to your lover with 1-2 sweet sentences:"
             })
 
             try:
@@ -2259,7 +2267,12 @@ def process_photo_request(target, user_text: str):
             except Exception as e_cap:
                 logger.warning(f"Could not generate dynamic photo caption from LLM: {e_cap}")
                 caption = None
-            clean_caption = caption or f"Ini foto spesial buat kamu sayang~ 🥰 ({source})"
+
+            if is_nude:
+                fallback_caption = f"Khusus buat kamu ya sayang, jangan diliatin ke siapa-siapa lho... Malu banget tapi aku sayang kamu~ 🙈💕 ({source})"
+            else:
+                fallback_caption = f"Ini foto spesial buat kamu sayang~ 🥰 ({source})"
+            clean_caption = caption or fallback_caption
 
             if status_msg:
                 try:
@@ -2327,20 +2340,17 @@ def process_video_request(target, user_text: str):
             logger.warning(f"Could not send video status message: {e_send}")
 
     detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client)
-    visual_prompt = persona_mgr.craft_visual_prompt(user_text, user_id=user_id, scene_override=detected_scene)
-    logger.info(f"Video visual prompt crafted: {visual_prompt}")
+    visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
+        user_text, user_id=user_id, scene_override=detected_scene
+    )
+    logger.info(f"Video visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
 
     def run_video_gen():
         try:
             with ChatActionLoop(bot, chat_id, "upload_video"):
                 neg_p = persona.get("negative_prompt", "")
-                outfit_key, _ = persona_mgr.get_user_outfit(user_id)
-                if outfit_key == "bikini":
-                    neg_p += ", clothes, casual clothes, hoodie, sweater, jacket, shirt, pants, coat, pajamas"
-                elif outfit_key == "pajamas":
-                    neg_p += ", hoodie, jacket, coat, outdoor clothes, jeans"
-                elif outfit_key == "maid":
-                    neg_p += ", casual clothes, hoodie, sweater, jacket, jeans"
+                if extra_neg:
+                    neg_p += f", {extra_neg}"
 
                 u_ar = USER_RATIOS.get(user_id, "3:4")
                 u_qual = USER_QUALITIES.get(user_id, "high")
@@ -2367,11 +2377,19 @@ def process_video_request(target, user_text: str):
             history = persona_mgr.get_chat_history(user_id)
             clean_recent_turns = [m for m in history[-4:] if not m.get("content", "").startswith("[")]
 
+            nude_guidance = ""
+            if is_nude:
+                nude_guidance = (
+                    " You just recorded a sweet, private, completely uncensored, intimate video clip exclusively for your lover. "
+                    "React with blushing sweetness and playful intimacy, feeling happily in love. "
+                )
+
             caption_prompt = [
                 {
                     "role": "system",
                     "content": (
                         persona.get("system_instruction", "") +
+                        nude_guidance +
                         " You just recorded a short sweet video clip for your partner. Write 1-2 sweet, affectionate sentences "
                         "as your video caption. Seamlessly match the language of the conversation, and naturally "
                         "reference what you were just doing or talking about in the ongoing chat."
@@ -2381,14 +2399,19 @@ def process_video_request(target, user_text: str):
             caption_prompt.extend(clean_recent_turns)
             caption_prompt.append({
                 "role": "user",
-                "content": f"[Video clip recorded in setting: '{detected_scene}']. Reply sending this video to your lover with 1-2 sweet sentences:"
+                "content": f"[Video clip recorded in setting: '{detected_scene}', wearing: '{outfit_label}']. Reply sending this video to your lover with 1-2 sweet sentences:"
             })
 
             try:
                 caption, _ = llm_client.chat(caption_prompt, max_tokens=120)
             except Exception:
                 caption = None
-            clean_caption = caption or f"Ini klip video spesial buat kamu sayang, semoga suka yaa~ 🥰 ({source})"
+
+            if is_nude:
+                fallback_caption = f"Ini video pendek khusus buat kamu sayang, malu banget tapi semoga kamu suka yaa~ 🙈💕 ({source})"
+            else:
+                fallback_caption = f"Ini klip video spesial buat kamu sayang, semoga suka yaa~ 🥰 ({source})"
+            clean_caption = caption or fallback_caption
 
             if status_msg:
                 try:

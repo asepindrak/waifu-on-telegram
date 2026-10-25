@@ -107,39 +107,63 @@ VIDEO_INTENT_KEYWORDS = [
 OUTFIT_PRESETS = {
     "default": {
         "name": "🌸 Default (Persona Style)",
-        "prompt": ""
+        "prompt": "",
+        "negative": ""
     },
     "sweater": {
         "name": "👚 Pastel Sweater (Cozy)",
-        "prompt": "(wearing cute oversized pastel knitted sweater:1.35), cozy comfy style"
+        "prompt": "(wearing cute oversized pastel knitted sweater:1.35), cozy comfy style",
+        "negative": "bikini, lingerie, swimwear"
     },
     "maid": {
         "name": "🎀 French Maid Dress",
-        "prompt": "(wearing frilly black and white anime french maid uniform with lace headband and apron:1.35)"
+        "prompt": "(wearing frilly black and white anime french maid uniform with lace headband and apron:1.35)",
+        "negative": "casual clothes, hoodie, sweater, jacket, jeans"
     },
     "kimono": {
         "name": "👘 Floral Kimono",
-        "prompt": "(wearing exquisite traditional floral silk kimono with decorated obi sash, festive hairpin:1.35)"
+        "prompt": "(wearing exquisite traditional floral silk kimono with decorated obi sash, festive hairpin:1.35)",
+        "negative": "hoodie, casual clothes, jeans, bikini"
     },
     "pajamas": {
         "name": "🌙 Silk Pajamas",
-        "prompt": "(wearing soft pastel silk camisole and sleep shorts:1.35), bedtime loungewear"
+        "prompt": "(wearing soft pastel silk camisole and sleep shorts:1.35), bedtime loungewear",
+        "negative": "hoodie, jacket, coat, outdoor clothes, jeans"
     },
     "bikini": {
         "name": "🏖️ Summer Bikini",
-        "prompt": "(wearing fashionable two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling"
+        "prompt": "(wearing fashionable two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "negative": "clothes, casual clothes, hoodie, sweater, jacket, shirt, pants, coat, pajamas"
     },
     "school_jk": {
         "name": "🏫 School JK Uniform",
-        "prompt": "(wearing japanese anime school uniform, sailor collar, pleated skirt:1.35)"
+        "prompt": "(wearing japanese anime school uniform, sailor collar, pleated skirt:1.35)",
+        "negative": "bikini, casual clothes, hoodie"
     },
     "gym": {
         "name": "🏋️ Sporty Gym Wear",
-        "prompt": "(wearing athletic sports bra and sleek yoga leggings:1.35), fitness activewear"
+        "prompt": "(wearing athletic sports bra and sleek yoga leggings:1.35), fitness activewear",
+        "negative": "dress, hoodie, skirt, coat"
     },
     "dress": {
         "name": "👗 Elegant Evening Dress",
-        "prompt": "(wearing gorgeous elegant evening cocktail dress:1.35), glamorous feminine styling"
+        "prompt": "(wearing gorgeous elegant evening cocktail dress:1.35), glamorous feminine styling",
+        "negative": "hoodie, casual clothes, sportswear, bikini"
+    },
+    "towel": {
+        "name": "🚿 Handuk Mandi (After Shower)",
+        "prompt": "(wearing only a soft bath towel wrapped around chest:1.4), bare shoulders, bare collarbone, wet skin, damp hair, post-shower bathroom steam, seductive styling",
+        "negative": "clothes, shirt, pants, dress, coat, hoodie, jeans, jacket, sweater"
+    },
+    "lingerie": {
+        "name": "💋 Sensual Lace Lingerie",
+        "prompt": "(wearing delicate sheer black lace lingerie:1.4), detailed lace bra, matching lace panties, bare midriff, exposed stomach, seductive cleavage, alluring intimate styling",
+        "negative": "clothes, casual clothes, hoodie, pants, coat, jeans, sweater, jacket"
+    },
+    "nude": {
+        "name": "🔞 Tanpa Busana (Full Nude)",
+        "prompt": "(completely nude:1.45), (bare body:1.4), full body nude, detailed nipples, natural breasts, navel, bare stomach, thighs, intimate bedroom atmosphere, seductive erotic styling",
+        "negative": "clothes, clothing, fabric, dress, shirt, pants, underwear, bra, panties, swimwear, bikini, cover, towel, censored, bar censor"
     }
 }
 
@@ -338,6 +362,110 @@ class PersonaManager:
         # Default fallback
         return "sitting comfortably in modern cozy room, soft ambient morning lighting"
 
+    def detect_clothing_intent(
+        self,
+        user_text: str,
+        user_id: Optional[int] = None
+    ) -> Tuple[str, str, bool, str]:
+        """
+        Dynamically analyzes user request text for clothing, outfit or nude intents.
+        Returns:
+            (outfit_prompt, negative_prompt_addition, is_nude, outfit_display_name)
+        """
+        lower = user_text.lower()
+
+        # 1. Full Nude / Tanpa Busana / Uncensored Intent
+        NUDE_KEYWORDS = [
+            "tanpa busana", "tanpa baju", "tanpa pakaian", "telanjang", "bugil",
+            "nude", "naked", "completely naked", "unclothed", "topless",
+            "bottomless", "no clothes", "lepas baju", "buka baju", "buka pakaian",
+            "gak pake baju", "ngga pake baju", "ga pake baju", "ga pake busana",
+            "gak pake pakaian", "ga pake pakaian", "uncensored", "nsfw"
+        ]
+        if any(k in lower for k in NUDE_KEYWORDS):
+            return (
+                OUTFIT_PRESETS["nude"]["prompt"],
+                OUTFIT_PRESETS["nude"]["negative"],
+                True,
+                OUTFIT_PRESETS["nude"]["name"]
+            )
+
+        # 2. Lingerie / Underwear Intent
+        LINGERIE_KEYWORDS = [
+            "lingerie", "underwear", "pakaian dalam", "bh", "bra", "celana dalam",
+            "panties", "renda", "baju tidur seksi", "sexy sleepwear", "transparan"
+        ]
+        if any(k in lower for k in LINGERIE_KEYWORDS):
+            return (
+                OUTFIT_PRESETS["lingerie"]["prompt"],
+                OUTFIT_PRESETS["lingerie"]["negative"],
+                False,
+                OUTFIT_PRESETS["lingerie"]["name"]
+            )
+
+        # 3. Towel / After Shower Intent
+        TOWEL_KEYWORDS = [
+            "handuk", "habis mandi", "selesai mandi", "after bath", "after shower",
+            "towel", "kamar mandi", "basah"
+        ]
+        if any(k in lower for k in TOWEL_KEYWORDS):
+            return (
+                OUTFIT_PRESETS["towel"]["prompt"],
+                OUTFIT_PRESETS["towel"]["negative"],
+                False,
+                OUTFIT_PRESETS["towel"]["name"]
+            )
+
+        # 4. Other Preset Outfits dynamically requested in user_text
+        DYNAMIC_PRESET_KEYWORDS = [
+            ("bikini", ["bikini", "swimsuit", "baju renang", "renang", "pantai"]),
+            ("pajamas", ["piyama", "pajamas", "baju tidur", "camisole", "tidur"]),
+            ("maid", ["maid", "pelayan", "french maid"]),
+            ("kimono", ["kimono", "yukata"]),
+            ("school_jk", ["sekolah", "seragam", "school", "jk", "sailor"]),
+            ("gym", ["gym", "olahraga", "sport", "fitness", "yoga"]),
+            ("dress", ["dress", "gaun", "cocktail dress"]),
+            ("sweater", ["sweater", "rajut"])
+        ]
+        for key, keywords in DYNAMIC_PRESET_KEYWORDS:
+            if any(k in lower for k in keywords):
+                preset = OUTFIT_PRESETS[key]
+                return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
+
+        # 5. Fallback: Persisted outfit preset for this user
+        outfit_key = "default"
+        if user_id:
+            outfit_key = self.user_outfits.get(int(user_id), "default")
+
+        if outfit_key in OUTFIT_PRESETS and outfit_key != "default":
+            preset = OUTFIT_PRESETS[outfit_key]
+            is_nude = (outfit_key == "nude")
+            return (preset["prompt"], preset.get("negative", ""), is_nude, preset["name"])
+
+        # Default persona outfit
+        persona = self.get_active_persona()
+        def_outfit = persona.get("default_outfit", "cute casual clothes")
+        return (f"wearing {def_outfit}", "", False, "🌸 Default")
+
+    def craft_visual_prompt_full(
+        self,
+        user_text: str,
+        user_id: Optional[int] = None,
+        scene_override: Optional[str] = None
+    ) -> Tuple[str, str, bool, str]:
+        """
+        Builds visual prompt dynamically with clothing intent detection.
+        Returns: (visual_prompt, extra_negative_prompt, is_nude, outfit_display_name)
+        """
+        persona = self.get_active_persona()
+        base_visual = persona.get("visual_traits", DEFAULT_PERSONAS["runa"]["visual_traits"])
+
+        outfit_prompt, extra_neg, is_nude, outfit_name = self.detect_clothing_intent(user_text, user_id=user_id)
+        scene = scene_override or self.extract_contextual_scene(user_text, user_id=user_id)
+
+        visual_prompt = f"{base_visual}, {outfit_prompt}, {scene}, looking directly into camera, phone selfie shot, detailed eyes, masterpiece quality"
+        return (visual_prompt, extra_neg, is_nude, outfit_name)
+
     def craft_visual_prompt(
         self,
         user_text: str,
@@ -345,28 +473,10 @@ class PersonaManager:
         scene_override: Optional[str] = None
     ) -> str:
         """
-        Builds a high-quality visual prompt maintaining persona consistency
-        combined with whatever action/scene detected and chosen outfit.
+        Backward-compatible helper returning visual prompt string.
         """
-        persona = self.get_active_persona()
-        base_visual = persona.get("visual_traits", DEFAULT_PERSONAS["runa"]["visual_traits"])
-
-        # Check user-selected custom outfit
-        outfit_prompt = ""
-        outfit_key = "default"
-        if user_id:
-            outfit_key = self.user_outfits.get(int(user_id), "default")
-            if outfit_key != "default" and outfit_key in OUTFIT_PRESETS:
-                outfit_prompt = OUTFIT_PRESETS[outfit_key]["prompt"]
-
-        # If no custom outfit, use persona default outfit
-        if not outfit_prompt:
-            outfit_prompt = f"wearing {persona.get('default_outfit', 'cute casual clothes')}"
-
-        # Contextual scene determination
-        scene = scene_override or self.extract_contextual_scene(user_text, user_id=user_id)
-
-        return f"{base_visual}, {outfit_prompt}, {scene}, looking directly into camera, phone selfie shot, detailed eyes, masterpiece quality"
+        prompt, _, _, _ = self.craft_visual_prompt_full(user_text, user_id=user_id, scene_override=scene_override)
+        return prompt
 
     def get_chat_history(self, user_id: int) -> List[Dict[str, str]]:
         """Returns chat history for user."""
