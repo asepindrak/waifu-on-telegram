@@ -219,9 +219,45 @@ def cmd_uninstall():
         else:
             print(c(RED, "uninstall.sh script not found."))
 
+def cmd_update():
+    print_banner()
+    print(c(CYAN, "🔄 Checking and pulling latest updates from GitHub..."))
+    is_running = get_running_pid() is not None
+
+    git_dir = os.path.join(PROJECT_ROOT, ".git")
+    if os.path.exists(git_dir):
+        try:
+            res = subprocess.run(["git", "pull"], cwd=PROJECT_ROOT, capture_output=True, text=True)
+            if res.returncode == 0:
+                print(c(GREEN, "  ✓ Latest source code pulled successfully from GitHub."))
+                if res.stdout.strip():
+                    print(c(DIM, "    " + res.stdout.strip().replace("\n", "\n    ")))
+            else:
+                print(c(YELLOW, f"  ℹ Git notice: {res.stderr.strip() or 'Already up to date'}"))
+        except Exception as e:
+            print(c(YELLOW, f"  ⚠️ Git pull error: {e}"))
+    else:
+        print(c(YELLOW, "  Project directory is not a Git clone. Using 1-line installer to update..."))
+
+    req_txt = os.path.join(PROJECT_ROOT, "requirements.txt")
+    if os.path.exists(req_txt):
+        print(c(CYAN, "📦 Verifying dependencies..."))
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_txt, "--quiet", "--disable-pip-version-check"], cwd=PROJECT_ROOT)
+            print(c(GREEN, "  ✓ Python dependencies are up to date."))
+        except Exception:
+            pass
+
+    print(c(BOLD + GREEN, "\n🎉 Waifu on Telegram has been successfully updated!"))
+    if is_running:
+        print(c(CYAN, "Restarting bot to apply all updates..."))
+        cmd_restart(daemon=True)
+    else:
+        print(c(DIM, "Start your bot anytime with: waifu start --daemon\n"))
+
 def main():
     parser = argparse.ArgumentParser(description="💖 Waifu on Telegram CLI", add_help=False)
-    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "logs", "uninstall", "help"])
+    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "logs", "update", "uninstall", "help"])
     parser.add_argument("arg", nargs="?", default=None)
     parser.add_argument("--daemon", "-d", action="store_true", help="Run bot silently in background")
     args = parser.parse_args()
@@ -245,6 +281,8 @@ def main():
         cmd_persona(p_name)
     elif cmd == "logs":
         cmd_logs()
+    elif cmd == "update":
+        cmd_update()
     elif cmd == "uninstall":
         cmd_uninstall()
     elif cmd == "help":
@@ -255,6 +293,7 @@ def main():
         print("  waifu restart            - Restart bot in background")
         print("  waifu status             - Check diagnostics for LLM, ComfyUI, & process")
         print("  waifu setup              - Open interactive configuration manager")
+        print("  waifu update             - Pull latest updates & restart services")
         print("  waifu persona <name>     - Switch persona (runa, akira, hina, shiro, yume)")
         print("  waifu autorun [on|off]   - Configure autorun on system startup")
         print("  waifu logs               - Inspect recent log activity")

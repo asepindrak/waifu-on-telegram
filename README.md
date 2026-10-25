@@ -151,6 +151,9 @@ waifu autorun off
 # Inspect recent bot activity logs
 waifu logs
 
+# Pull latest updates from GitHub & restart bot
+waifu update
+
 # Restart bot in background
 waifu restart
 
