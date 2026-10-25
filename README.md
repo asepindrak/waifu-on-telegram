@@ -111,7 +111,7 @@ Many new users wonder how to run everything locally. If you have a gaming PC or 
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                       💖 WAIFU ON TELEGRAM BOT (v1.1.0)
+                       💖 WAIFU ON TELEGRAM BOT (v1.2.0)
 ```
 
 #### Step 1: Install Locally Uncensored (Chat & Dialogue Brain)

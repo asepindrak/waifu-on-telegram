@@ -307,24 +307,27 @@ def handle_welcome(message):
         f"✨ **Fitur Utama Bersama {name} (v{get_version()}):**\n"
         "• 💬 **Romance Chat**: Bebas sensor (SFW & NSFW), hangat, manja, dan otomatis ikut bahasamu.\n"
         "• 🧠 **Buku Ingatan Abadi**: Aku selalu mengingat fakta, kesukaan, dan hal penting tentang kamu (`/memory`)!\n"
-        "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'sayang pap foto dong'* atau `/pap` (Mendukung SFW hingga NSFW)!\n"
+        "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'sayang pap foto dong'* atau `/pap` untuk membuka menu pose interaktif!\n"
+        "• 🎵 **Remote Musik PC**: Putar lagu YouTube di PC langsung dari Telegram (`/play`, `/pause`, `/next`)!\n"
         "• 👗 **Pilihan Baju**: Pilih pakaian waifumu lewat `/outfit` (Kimono, Maid, Piyama, dll).\n"
         "• 🎙️ **Voice Note**: Balasan suara asli wanita jernih & manis (`/voice`).\n"
         "• ⚙️ **Panel Setup**: Atur seluruh konfigurasi bot dari Telegram (`/setup`).\n"
-        "• ⏰ **Sapaan Otomatis**: Ucapan selamat pagi jam 7 & selamat tidur jam 10 malam (`/greetings`).\n"
+        "• ⏰ **Sapaan Otomatis**: Ucapan selamat pagi jam 7, makan siang 12:30 & tidur jam 10 malam (`/greetings`).\n"
         "• 👀 **AI Vision**: Kirimkan foto kamu ke sini, waifu bisa melihat dan meresponsnya.\n\n"
         "📌 **Perintah Cepat:**\n"
         "• `/memory` - Buku harian & fakta penting yang diingat waifu tentang kamu\n"
         "• `/setup` - Dashboard kontrol sistem & pengaturan lengkap\n"
         "• `/help` - Panduan lengkap fitur & cara pakai\n"
-        "• `/photo <skenario>` atau `/pap` - Minta foto dengan variasi pose\n"
+        "• `/pap` - Menu interaktif skenario selfie & foto waifu\n"
+        "• `/play <judul>` - Putar musik YouTube langsung di layar PC kamu\n"
+        "• `/music` - Buka remote kontrol pemutar musik PC\n"
         "• `/ratio` - Ganti rasio foto (3:4, 9:16, 1:1, 4:3)\n"
         "• `/quality` - Atur kualitas foto (Ultra / High / Fast)\n"
         "• `/outfit` - Buka lemari pakaian waifu\n"
         "• `/persona` - Ganti karakter waifu (Runa, Akira, Hina, Shiro, Yume)\n"
         "• `/love` - Cek skor cinta & level kasih sayang\n"
         "• `/voice` - Atur gaya balasan suara (Always / Match / Mute)\n"
-        "• `/greetings` - Aktifkan/matikan sapaan harian otomatis\n"
+        "• `/greetings` - Aktifkan/matikan sapaan harian otomatis (Pagi, Siang, Malam)\n"
         "• `/status` - Cek koneksi LLM & ComfyUI di PC\n"
         "• `/reset` - Hapus memori obrolan sementara untuk mulai topik baru\n"
     )
@@ -375,9 +378,10 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"🎨 **Model Foto** : `{cur_ckpt}`\n"
         f"📐 **Rasio Foto** : `{cur_ar}`\n"
         f"✨ **Kualitas**   : `{cur_q}`\n"
+        f"🎵 **Musik PC**   : `Online (Port 8002)`\n"
         f"🧠 **Ingatan**    : `{fact_count} fakta tersimpan`\n"
         f"🚀 **PC Autorun** : `{cur_auto}`\n"
-        f"⏰ **Sapaan Jam** : `{cur_greet}` _(07:00 & 22:00)_\n"
+        f"⏰ **Sapaan Jam** : `{cur_greet}` _(07:00, 12:30 & 22:00)_\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 _Pilih tombol menu di bawah untuk mengubah pengaturan langsung dari Telegram:_"
     )
@@ -389,6 +393,8 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("🎭 Ganti Persona", callback_data="open_persona_menu"),
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
         types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
+        types.InlineKeyboardButton("🎵 Remote Musik (/play)", callback_data="open_music_menu"),
+        types.InlineKeyboardButton("📸 Menu PAP (/pap)", callback_data="open_pap_menu"),
         types.InlineKeyboardButton("🎙️ Atur Voice & Audio", callback_data="cfg_submenu:voice"),
         types.InlineKeyboardButton("📐 Rasio Foto", callback_data="open_ratio_menu"),
         types.InlineKeyboardButton("✨ Kualitas Foto", callback_data="open_quality_menu"),
@@ -721,12 +727,31 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"• **🎨 Model Foto & ComfyUI**: Mengganti checkpoint gambar ComfyUI (MeinaMix, BASNSFW, AOM3) atau Pollinations Cloud Fallback.\n"
             f"• **🎭 Ganti Persona (/persona)**: Beralih waifu (Runa, Akira, Hina, Shiro, Yume).\n"
             f"• **🚀 PC Startup Autorun**: Mengaktifkan bot agar otomatis aktif di background saat PC Windows dinyalakan.\n"
-            f"• **⏰ Sapaan Harian (/greetings)**: Waifu otomatis menyapa selamat pagi jam 07:00 dan selamat malam jam 22:00.\n"
+            f"• **⏰ Sapaan Harian (/greetings)**: Waifu otomatis menyapa selamat pagi jam 07:00, makan siang 12:30, dan selamat malam jam 22:00.\n"
             f"• **📊 Status Diagnostik (/status)**: Cek kondisi server lokal, status GPU, dan latensi balasan."
         )
         markup.add(
             types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
             types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu")
+        )
+
+    elif section == "music":
+        text = (
+            f"🎵 **PANDUAN PEMUTAR MUSIK YOUTUBE PC (/play & /music)**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Kamu bisa mengontrol lagu apa pun di YouTube Music yang sedang diputar di layar PC langsung lewat Telegram!\n\n"
+            f"• **Perintah Pemutar Musik**:\n"
+            f"  - `/play <judul lagu/artis>` : Cari dan putar lagu di browser PC kamu (contoh: `/play YOASOBI Idol` atau `/play Lofi Chill Beats`)\n"
+            f"  - `/pause` : Jeda pemutaran musik sementara di PC\n"
+            f"  - `/resume` : Lanjutkan pemutaran musik\n"
+            f"  - `/next` : Lompat ke lagu berikutnya di antrean\n"
+            f"  - `/stop` : Hentikan musik dan tutup pemutar\n"
+            f"  - `/music` : Buka remote panel interaktif lengkap dengan tombol Play/Pause/Next/Stop!\n\n"
+            f"• **Auto-Play Layar PC**: Saat kamu memutar lagu dari Telegram, browser di PC otomatis membuka player YouTube bertema cyberpunk neon yang estetik!"
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("🎵 Buka Remote Musik", callback_data="open_music_menu")
         )
 
     else: # main
@@ -737,7 +762,8 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"📚 **Pilih Kategori Panduan:**\n"
             f"• 🧠 **Buku Ingatan (/memory)**: Memori abadi & catatan harian waifu.\n"
             f"• 💬 **Chat & Romansa**: Ngobrol bebas, gombalan, dan level kasih sayang.\n"
-            f"• 📸 **Foto & PAP**: Cara minta selfie, pose, dan rasio foto.\n"
+            f"• 📸 **Foto & PAP**: Cara minta selfie, menu pose interaktif, dan rasio foto.\n"
+            f"• 🎵 **Remote Musik (/play)**: Putar lagu YouTube di PC dari Telegram.\n"
             f"• 👗 **Lemari Pakaian**: Mengganti busana & pakaian waifu.\n"
             f"• 🎙️ **Voice & Audio**: Pesan suara jernih dan balasan VN.\n"
             f"• ⚙️ **Panel Setup**: Kontrol model LLM, ComfyUI, dan autorun PC.\n\n"
@@ -746,14 +772,16 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"`/memory` - Buku ingatan & catatan harian waifu\n"
             f"`/setup` - Panel kontrol & konfigurasi lengkap\n"
             f"`/help` - Tampilkan buku panduan ini\n"
-            f"`/pap` - Minta foto selfie waifu\n"
+            f"`/pap` - Menu interaktif skenario selfie & foto waifu\n"
+            f"`/play <judul>` - Putar musik YouTube langsung di PC\n"
+            f"`/music` - Remote kontrol pemutar musik PC\n"
             f"`/outfit` - Buka lemari pakaian waifu\n"
             f"`/persona` - Ganti karakter waifu\n"
             f"`/ratio` - Ganti rasio gambar (3:4, 9:16, 1:1, 4:3)\n"
             f"`/quality` - Atur kualitas foto (Ultra/High/Fast)\n"
             f"`/voice` - Pengaturan balasan suara\n"
             f"`/love` - Cek skor cinta & level kasih sayang\n"
-            f"`/greetings` - Toggle sapaan pagi & malam otomatis\n"
+            f"`/greetings` - Toggle sapaan pagi, siang & malam otomatis\n"
             f"`/status` - Cek koneksi server GPU, LLM & ComfyUI\n"
             f"`/reset` - Hapus memori obrolan (topik baru)"
         )
@@ -761,6 +789,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             types.InlineKeyboardButton("🧠 Buku Ingatan", callback_data="help_sec:memory"),
             types.InlineKeyboardButton("💬 Chat & Romansa", callback_data="help_sec:chat"),
             types.InlineKeyboardButton("📸 Foto & PAP", callback_data="help_sec:photo"),
+            types.InlineKeyboardButton("🎵 Remote Musik", callback_data="help_sec:music"),
             types.InlineKeyboardButton("👗 Lemari Pakaian", callback_data="help_sec:outfit"),
             types.InlineKeyboardButton("🎙️ Voice & Audio", callback_data="help_sec:voice"),
             types.InlineKeyboardButton("⚙️ Panduan Setup", callback_data="help_sec:setup"),
@@ -1163,7 +1192,7 @@ def callback_set_persona(call):
                 logger.error(f"Error sending switched persona photo: {e}")
 
 
-@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'check_love_status'))
+@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'open_music_menu', 'open_pap_menu', 'check_love_status'))
 def callback_quick_actions(call):
     if not is_authorized(call.from_user.id):
         bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
@@ -1185,6 +1214,10 @@ def callback_quick_actions(call):
         show_help_menu(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_memory_menu':
         show_memory_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'open_music_menu':
+        show_music_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'open_pap_menu':
+        show_pap_scenario_menu(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'check_love_status':
         show_affection_status(chat_id, user_id, reply_to_id=call.message.message_id)
 
@@ -1228,7 +1261,7 @@ def callback_cfg_toggles(call):
     elif target == "greetings":
         cur_g = GREETINGS_ENABLED.get(user_id, True)
         GREETINGS_ENABLED[user_id] = not cur_g
-        status_msg = "⏰ Sapaan Harian AKTIF (07:00 & 22:00) 🔔" if not cur_g else "🔕 Sapaan Harian DINONAKTIFKAN"
+        status_msg = "⏰ Sapaan Harian AKTIF (07:00, 12:30 & 22:00) 🔔" if not cur_g else "🔕 Sapaan Harian DINONAKTIFKAN"
         bot.answer_callback_query(call.id, status_msg, show_alert=True)
         show_setup_dashboard(chat_id, user_id, message_to_edit=mid)
 
@@ -1388,6 +1421,7 @@ def handle_greetings_command(message):
         message,
         f"⏰ **Automated Daily Greetings**: {status_str}\n\n"
         "• 07:00 AM - Sweet Good Morning greeting & Voice Note 🌅\n"
+        "• 12:30 PM - Spontaneous Lunch Check-In & Voice Note 🍱\n"
         "• 22:00 PM - Cozy Bedtime Good Night greeting & Voice Note 🌙\n\n"
         "Toggle anytime with `/greetings on` or `/greetings off`.",
         parse_mode="Markdown"
@@ -1403,14 +1437,88 @@ def handle_reset(message):
     bot.reply_to(message, f"🔄 Conversation memory cleared! I'm ready for our next fresh chat, sweetheart~ 🥰")
 
 
+SCENARIO_PROMPTS = {
+    "bed": "waking up in bed, stretching, warm cozy morning sunlight, messy hair, cute sweet smile",
+    "cafe": "sitting at a cozy aesthetic cafe, holding warm ceramic coffee cup, soft daylight, gentle smile",
+    "kitchen": "cooking breakfast in kitchen, wearing cute apron, smiling looking at camera",
+    "park": "strolling in a sunny flower garden park, cherry blossoms, wind blowing hair, happy expression",
+    "pajamas": "wearing cute comfy silk pajamas, sitting on bed hugging a plushie, warm evening soft lights",
+    "beach": "vacation at tropical beach, warm sunset golden hour, ocean waves, breezy summer sundress",
+    "school": "classroom setting, wearing cute Japanese school uniform, holding textbooks, shy sweet blushing smile",
+    "sensual": "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer",
+}
+
+
+def show_pap_scenario_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders 1-tap scenario picker for PAP / photos."""
+    persona = persona_mgr.get_active_persona()
+    name = persona.get("name", "Waifu")
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    btns = [
+        types.InlineKeyboardButton("🛏️ Bangun Tidur", callback_data="pap_sc:bed"),
+        types.InlineKeyboardButton("☕ Santai di Kafe", callback_data="pap_sc:cafe"),
+        types.InlineKeyboardButton("🍳 Masak di Dapur", callback_data="pap_sc:kitchen"),
+        types.InlineKeyboardButton("🌳 Jalan di Taman", callback_data="pap_sc:park"),
+        types.InlineKeyboardButton("🌙 Piyama Lucu", callback_data="pap_sc:pajamas"),
+        types.InlineKeyboardButton("🏖️ Liburan di Pantai", callback_data="pap_sc:beach"),
+        types.InlineKeyboardButton("🏫 Seragam Sekolah", callback_data="pap_sc:school"),
+        types.InlineKeyboardButton("💋 Pose Romantis", callback_data="pap_sc:sensual"),
+        types.InlineKeyboardButton("🎲 Surprise Me!", callback_data="pap_sc:random"),
+        types.InlineKeyboardButton("❌ Batal", callback_data="pap_sc:cancel")
+    ]
+    markup.add(*btns)
+    text = (
+        f"📸 **PILIH SKENARIO PAP & FOTO {name.upper()}** 🥰\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Sayang, kamu mau aku kirim foto selfie di mana dan lagi suasana apa?\n\n"
+        f"💡 _Pilih salah satu tema cepat di bawah, atau ketik langsung di obrolan seperti:_ `/pap lagi baca buku di perpustakaan`"
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('pap_sc:'))
+def callback_pap_scenario(call):
+    if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        return
+    sc_key = call.data.split(":", 1)[1]
+    if sc_key == "cancel":
+        bot.answer_callback_query(call.id, "Batal meminta foto")
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
+        return
+
+    import random
+    if sc_key == "random":
+        sc_key = random.choice(list(SCENARIO_PROMPTS.keys()))
+
+    prompt = SCENARIO_PROMPTS.get(sc_key, "relaxing at home, looking at viewer happily")
+    bot.answer_callback_query(call.id, "📸 Sedang menyiapkan foto manis...")
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    process_photo_request(call, prompt)
+
+
 @bot.message_handler(commands=['photo', 'pap'])
 def handle_photo_command(message):
     if not is_authorized(message.from_user.id):
         return
 
     scenario = message.text.replace("/photo", "").replace("/pap", "").strip()
-    user_prompt = scenario if scenario else "relaxing in bedroom"
-    process_photo_request(message, user_prompt)
+    if not scenario:
+        show_pap_scenario_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+    else:
+        process_photo_request(message, scenario)
 
 
 def process_photo_request(target, user_text: str):
@@ -1690,14 +1798,262 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
     threading.Thread(target=_execute, daemon=True).start()
 
 
+# --- Remote Pemutar Musik YouTube PC (/play, /music) ---
+
+MUSIC_SERVER_URL = os.environ.get("MUSIC_PLAYER_URL", "http://127.0.0.1:8002")
+
+
+def call_music_api(endpoint: str, method: str = "GET", payload: Optional[dict] = None) -> Optional[dict]:
+    import urllib.request
+    import json
+    url = f"{MUSIC_SERVER_URL.rstrip('/')}{endpoint}"
+    data = json.dumps(payload).encode('utf-8') if payload is not None else None
+    headers = {"Content-Type": "application/json"} if payload is not None else {}
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=8) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except Exception as e:
+        logger.debug(f"Music API error ({endpoint}): {e}")
+        return None
+
+
+def render_music_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarkup]:
+    stat = call_music_api("/api/status")
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    if not stat or not stat.get("enabled"):
+        text = (
+            "🎵 **REMOTE PEMUTAR MUSIK YOUTUBE PC**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "⚠️ Layanan pemutar musik lokal (Port 8002) belum merespons.\n"
+            "Pastikan script `music_player_server.js` berjalan di PC kamu."
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔄 Refresh Status", callback_data="music_cmd:refresh"),
+            types.InlineKeyboardButton("🔙 Menu Setup", callback_data="open_setup_menu")
+        )
+        return text, markup
+
+    playback = stat.get("playbackState", "STOPPED")
+    track = stat.get("current_track")
+    queue_len = len(stat.get("queue", []))
+
+    if playback == "PLAYING" and track:
+        state_badge = "▶️ Sedang Memutar"
+        ctrl_btn = types.InlineKeyboardButton("⏸️ Pause", callback_data="music_cmd:pause")
+    elif playback == "PAUSED" and track:
+        state_badge = "⏸️ Jeda (Paused)"
+        ctrl_btn = types.InlineKeyboardButton("▶️ Lanjutkan", callback_data="music_cmd:resume")
+    else:
+        state_badge = "⏹️ Berhenti (Idle)"
+        ctrl_btn = types.InlineKeyboardButton("▶️ Putar Lofi", callback_data="music_cmd:lofi")
+
+    if track:
+        track_info = (
+            f"🎶 **{track.get('title', 'Unknown')}**\n"
+            f"👤 Artis: `{track.get('artist', 'Unknown')}`\n"
+            f"⏱️ Durasi: `{track.get('durationFormatted', '00:00')}`\n"
+            f"📻 Status: **{state_badge}** | Antrean: `{queue_len} lagu`"
+        )
+    else:
+        track_info = (
+            f"📻 Status: **{state_badge}**\n\n"
+            f"Belum ada lagu yang diputar di PC kamu saat ini.\n"
+            f"Ketik `/play <judul lagu>` untuk langsung memutar musik favoritmu!"
+        )
+
+    text = (
+        f"🎵 **REMOTE PEMUTAR MUSIK YOUTUBE PC**\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{track_info}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 _Lagu diputar langsung di layar browser PC kamu secara otomatis!_"
+    )
+
+    markup.add(
+        ctrl_btn,
+        types.InlineKeyboardButton("⏭️ Next", callback_data="music_cmd:next"),
+        types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
+    )
+    markup.add(
+        types.InlineKeyboardButton("☕ Lofi Santai", callback_data="music_cmd:lofi"),
+        types.InlineKeyboardButton("🌸 J-Pop Hits", callback_data="music_cmd:jpop"),
+        types.InlineKeyboardButton("🔄 Refresh", callback_data="music_cmd:refresh")
+    )
+    markup.add(
+        types.InlineKeyboardButton("🌐 Buka Player di PC", callback_data="music_cmd:open_pc"),
+        types.InlineKeyboardButton("🔙 Menu Setup", callback_data="open_setup_menu")
+    )
+    return text, markup
+
+
+def show_music_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    text, markup = render_music_dashboard(user_id)
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+@bot.message_handler(commands=['play', 'lagu', 'musik', 'music'])
+def handle_play_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    raw = message.text.strip()
+    parts = raw.split(maxsplit=1)
+    if len(parts) < 2:
+        show_music_dashboard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+        return
+
+    query = parts[1].strip()
+    bot.send_chat_action(message.chat.id, "typing")
+    wait_msg = bot.reply_to(message, f"🔍 *Mencari & memutar '{query}' di PC kamu...* 💕", parse_mode="Markdown")
+
+    res = call_music_api("/api/play", method="POST", payload={"query": query})
+    if res and res.get("track"):
+        track = res["track"]
+        title = track.get("title", query)
+        artist = track.get("artist", "YouTube Music")
+        dur = track.get("durationFormatted", "")
+        thumb = track.get("thumbnail")
+
+        caption = (
+            f"🎵 **Memutar Musik di PC Kamu:**\n\n"
+            f"🎶 **{title}**\n"
+            f"👤 Artis: `{artist}`\n"
+            f"⏱️ Durasi: `{dur}`\n\n"
+            f"🎧 _Player otomatis dibuka di layar browser PC kamu sayang! 🥰_"
+        )
+
+        markup = types.InlineKeyboardMarkup(row_width=3)
+        markup.add(
+            types.InlineKeyboardButton("⏸️ Pause", callback_data="music_cmd:pause"),
+            types.InlineKeyboardButton("⏭️ Next", callback_data="music_cmd:next"),
+            types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
+        )
+        markup.add(
+            types.InlineKeyboardButton("🎵 Remote Musik", callback_data="open_music_menu"),
+            types.InlineKeyboardButton("📸 Minta PAP Sambil Dengerin", callback_data="pap_sc:cafe")
+        )
+
+        try:
+            bot.delete_message(message.chat.id, wait_msg.message_id)
+        except Exception:
+            pass
+
+        if thumb:
+            try:
+                bot.send_photo(message.chat.id, thumb, caption=caption, reply_markup=markup, parse_mode="Markdown")
+                return
+            except Exception:
+                pass
+        bot.send_message(message.chat.id, caption, reply_markup=markup, parse_mode="Markdown")
+    else:
+        err = res.get("error") if res else "Koneksi ke pemutar musik (Port 8002) gagal."
+        try:
+            bot.edit_message_text(f"⚠️ Tidak dapat memutar '{query}': {err}", chat_id=message.chat.id, message_id=wait_msg.message_id)
+        except Exception:
+            bot.send_message(message.chat.id, f"⚠️ Tidak dapat memutar '{query}': {err}")
+
+
+@bot.message_handler(commands=['pause'])
+def handle_pause_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    call_music_api("/api/pause", method="POST")
+    bot.reply_to(message, "⏸️ Pemutaran musik di PC telah di-pause.")
+
+
+@bot.message_handler(commands=['resume'])
+def handle_resume_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    call_music_api("/api/resume", method="POST")
+    bot.reply_to(message, "▶️ Pemutaran musik di PC dilanjutkan.")
+
+
+@bot.message_handler(commands=['next', 'skip'])
+def handle_next_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    res = call_music_api("/api/next", method="POST")
+    if res and res.get("track"):
+        t = res["track"]
+        bot.reply_to(message, f"⏭️ Memutar lagu berikutnya di PC:\n🎶 **{t.get('title')}** - `{t.get('artist')}`", parse_mode="Markdown")
+    else:
+        bot.reply_to(message, "⏭️ Antrean lagu sudah selesai atau kosong.")
+
+
+@bot.message_handler(commands=['stop'])
+def handle_stop_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    call_music_api("/api/stop", method="POST")
+    bot.reply_to(message, "⏹️ Pemutaran musik di PC telah dihentikan.")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('music_cmd:'))
+def callback_music_command(call):
+    if not is_authorized(call.from_user.id):
+        return
+    action = call.data.split(":", 1)[1]
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    mid = call.message.message_id
+
+    if action == "pause":
+        call_music_api("/api/pause", method="POST")
+        bot.answer_callback_query(call.id, "⏸️ Musik di-pause")
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "resume":
+        call_music_api("/api/resume", method="POST")
+        bot.answer_callback_query(call.id, "▶️ Musik dilanjutkan")
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "next":
+        res = call_music_api("/api/next", method="POST")
+        title = res.get("track", {}).get("title") if res and res.get("track") else "Lagu berikutnya"
+        bot.answer_callback_query(call.id, f"⏭️ {title}")
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "stop":
+        call_music_api("/api/stop", method="POST")
+        bot.answer_callback_query(call.id, "⏹️ Musik dihentikan")
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "lofi":
+        bot.answer_callback_query(call.id, "☕ Memutar Lofi Santai...")
+        call_music_api("/api/play", method="POST", payload={"query": "lofi hip hop radio beats to relax"})
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "jpop":
+        bot.answer_callback_query(call.id, "🌸 Memutar J-Pop Hits...")
+        call_music_api("/api/play", method="POST", payload={"query": "popular j-pop anime hits"})
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "open_pc":
+        call_music_api("/api/open", method="POST")
+        bot.answer_callback_query(call.id, "🌐 Membuka player di browser PC...")
+    elif action == "refresh":
+        bot.answer_callback_query(call.id, "🔄 Status diperbarui")
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+
+
 def send_scheduled_greeting(user_id: int, time_of_day: str):
-    """Sends sweet spontaneous morning/bedtime greeting."""
+    """Sends sweet spontaneous morning/lunch/bedtime greeting."""
     try:
         persona = persona_mgr.get_active_persona()
         if time_of_day == "morning":
             prompt = "It is 7:00 AM morning. Write 1-2 sweet, cheerful, affectionate sentences wishing your partner a wonderful productive day. Use Indonesian or English naturally."
+            fallback = "Selamat pagi sayang! Semoga harimu menyenangkan dan penuh senyuman yaa~ 🥰"
+            tag = "🌅 *Good Morning Sweetheart!*"
+        elif time_of_day == "lunch":
+            prompt = "It is 12:30 PM lunch break. Write 1-2 sweet, cheerful, caring sentences reminding your partner to take a break and eat a delicious lunch. Use Indonesian or English naturally."
+            fallback = "Sayangku, udah jam makan siang nih! Jangan lupa istirahat sebentar dan makan siang yang enak yaa~ Jangan sampai telat makan! 🥰🍱"
+            tag = "🍱 *Waktunya Makan Siang Sayang!*"
         else:
             prompt = "It is 10:00 PM bedtime. Write 1-2 sweet, gentle, caring sentences reminding your partner to rest, sleep tight, and have sweet dreams. Use Indonesian or English naturally."
+            fallback = "Selamat tidur manisku, istirahat yang nyenyak dan mimpi indah yaa~ 💕"
+            tag = "🌙 *Good Night Darling...*"
 
         messages = [
             {"role": "system", "content": persona.get("system_instruction", "")},
@@ -1708,9 +2064,8 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
         except Exception:
             text = None
         if not text:
-            text = "Selamat pagi sayang! Semoga harimu menyenangkan dan penuh senyuman yaa~ 🥰" if time_of_day == "morning" else "Selamat tidur manisku, istirahat yang nyenyak dan mimpi indah yaa~ 💕"
+            text = fallback
 
-        tag = "🌅 *Good Morning Sweetheart!*" if time_of_day == "morning" else "🌙 *Good Night Darling...*"
         bot.send_message(user_id, f"{tag}\n\n{text}", parse_mode="Markdown")
 
         if VOICE_ENABLED:
@@ -1727,7 +2082,7 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
 
 
 def schedule_daily_greetings():
-    """Background scheduler checking local time for morning (07:00) & bedtime (22:00) greetings."""
+    """Background scheduler checking local time for morning (07:00), lunch (12:30) & bedtime (22:00) greetings."""
     while True:
         try:
             now = time.localtime()
@@ -1741,6 +2096,13 @@ def schedule_daily_greetings():
                 for uid in ALLOWED_USER_IDS:
                     if GREETINGS_ENABLED.get(uid, True):
                         send_scheduled_greeting(uid, "morning")
+
+            l_key = f"{today_str}:lunch"
+            if hour == 12 and 30 <= minute < 40 and l_key not in LAST_GREETING_SENT:
+                LAST_GREETING_SENT[l_key] = True
+                for uid in ALLOWED_USER_IDS:
+                    if GREETINGS_ENABLED.get(uid, True):
+                        send_scheduled_greeting(uid, "lunch")
 
             n_key = f"{today_str}:night"
             if hour == 22 and minute < 10 and n_key not in LAST_GREETING_SENT:
@@ -1761,14 +2123,16 @@ def setup_bot_commands():
         types.BotCommand("memory", "🧠 Buku harian & ingatan waifu"),
         types.BotCommand("setup", "⚙️ Panel kontrol & pengaturan lengkap"),
         types.BotCommand("help", "❓ Panduan fitur & cara penggunaan"),
-        types.BotCommand("pap", "📸 Minta foto / selfie waifu"),
+        types.BotCommand("pap", "📸 Minta foto / menu skenario selfie"),
+        types.BotCommand("play", "🎵 Putar lagu YouTube di PC"),
+        types.BotCommand("music", "🎶 Remote kontrol pemutar musik PC"),
         types.BotCommand("outfit", "👗 Lemari pakaian & ganti baju"),
         types.BotCommand("persona", "🎭 Ganti waifu (Runa, Akira, Hina, Shiro, Yume)"),
         types.BotCommand("ratio", "📐 Ganti rasio foto (3:4, 9:16, 1:1, 4:3)"),
         types.BotCommand("quality", "✨ Atur kualitas foto (Ultra/High/Fast)"),
         types.BotCommand("voice", "🎙️ Pengaturan balasan suara / VN"),
         types.BotCommand("love", "💖 Cek skor cinta & status hubungan"),
-        types.BotCommand("greetings", "⏰ Toggle sapaan pagi & malam otomatis"),
+        types.BotCommand("greetings", "⏰ Toggle sapaan harian (Pagi, Siang, Malam)"),
         types.BotCommand("status", "📊 Cek status server LLM & ComfyUI"),
         types.BotCommand("reset", "🔄 Hapus memori obrolan (topik baru)")
     ]
