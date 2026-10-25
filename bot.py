@@ -527,7 +527,7 @@ def handle_photo_command(message):
 
 
 def process_photo_request(target, user_text: str):
-    """Generates and delivers consistent girlfriend photo with caption."""
+    """Generates and delivers consistent girlfriend photo with caption matching conversation context."""
     persona = persona_mgr.get_active_persona()
 
     # Support both Message and CallbackQuery objects
@@ -548,7 +548,9 @@ def process_photo_request(target, user_text: str):
 
     status_msg = bot.reply_to(reply_to_target, f"📸 *{persona.get('name')} is getting ready for a photo just for you, sweetheart...* 💕", parse_mode="Markdown")
 
-    visual_prompt = persona_mgr.craft_visual_prompt(user_text, user_id=user_id)
+    # Extract contextual scene from conversation history & user request
+    detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client)
+    visual_prompt = persona_mgr.craft_visual_prompt(user_text, user_id=user_id, scene_override=detected_scene)
     logger.info(f"Visual prompt crafted: {visual_prompt}")
 
     def run_gen():
@@ -571,12 +573,29 @@ def process_photo_request(target, user_text: str):
                 )
                 return
 
+            # Build context-aware caption reflecting ongoing conversation
+            history = persona_mgr.get_chat_history(user_id)
+            clean_recent_turns = [m for m in history[-4:] if not m.get("content", "").startswith("[")]
+
             caption_prompt = [
-                {"role": "system", "content": persona.get("system_instruction", "")},
-                {"role": "user", "content": f"You just took a lovely selfie for the user in this scenario: '{user_text}'. Write 1-2 sweet, affectionate sentences for your photo caption."}
+                {
+                    "role": "system",
+                    "content": (
+                        persona.get("system_instruction", "") +
+                        " You just took a selfie for your partner. Write 1-2 sweet, affectionate sentences "
+                        "as your photo caption. Seamlessly match the language of the conversation, and naturally "
+                        "reference what you were just doing or talking about in the ongoing chat."
+                    )
+                }
             ]
-            caption, _ = llm_client.chat(caption_prompt, max_tokens=150)
-            clean_caption = caption or f"Here's a special photo just for you darling~ 🥰 ({source})"
+            caption_prompt.extend(clean_recent_turns)
+            caption_prompt.append({
+                "role": "user",
+                "content": f"[Photo taken in setting: '{detected_scene}']. Reply sending this photo to your lover with 1-2 sweet sentences:"
+            })
+
+            caption, _ = llm_client.chat(caption_prompt, max_tokens=120)
+            clean_caption = caption or f"Ini foto spesial buat kamu sayang~ 🥰 ({source})"
 
             try:
                 bot.delete_message(chat_id, status_msg.message_id)
@@ -585,14 +604,14 @@ def process_photo_request(target, user_text: str):
 
             # Inline button for quick pose variant
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔄 Pose Lain (New Pose)", callback_data=f"regen_photo:{user_text[:35]}"))
+            markup.add(types.InlineKeyboardButton("🔄 Pose Lain (New Pose)", callback_data=f"regen_photo:{detected_scene[:35]}"))
 
             bot.send_photo(chat_id, img_bytes, caption=clean_caption, reply_markup=markup)
 
             # Increase affection on photo request
             persona_mgr.increase_affinity(user_id, delta=2)
             persona_mgr.add_message(user_id, "user", f"[Requested photo: {user_text}]")
-            persona_mgr.add_message(user_id, "assistant", f"[Sent selfie photo] {clean_caption}")
+            persona_mgr.add_message(user_id, "assistant", f"[Sent selfie: {detected_scene}] {clean_caption}")
 
         except Exception as e:
             logger.error(f"Error in photo delivery: {e}")

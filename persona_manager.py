@@ -212,14 +212,107 @@ class PersonaManager:
         key = self.user_outfits.get(user_id, "default")
         return key, OUTFIT_PRESETS.get(key, OUTFIT_PRESETS["default"])["name"]
 
-    def craft_visual_prompt(self, user_text: str, user_id: Optional[int] = None) -> str:
+    def extract_contextual_scene(
+        self,
+        user_text: str,
+        user_id: Optional[int] = None,
+        llm_client: Any = None
+    ) -> str:
+        """
+        Determines the visual scene/location for image generation based on
+        either explicit user prompt or ongoing conversation history.
+        """
+        lower = user_text.lower()
+
+        # Keyword mapping for common anime / girlfriend situations
+        SCENE_PATTERNS = [
+            (["bed", "sleep", "night", "tidur", "kasur", "pajamas", "rebahan", "bangun", "selimut", "bantal"],
+             "relaxing on bed with fluffy pillows, warm dim night bedroom lamp"),
+            (["cafe", "coffee", "tea", "kafe", "kopi", "boba", "matcha", "nongkrong", "starbucks"],
+             "sitting at aesthetic cafe table holding a warm beverage, beautiful bokeh background"),
+            (["kitchen", "cook", "baking", "masak", "sarapan", "makan", "dapur", "dinner", "lunch", "kue", "goreng"],
+             "standing in modern cozy kitchen preparing food, warm domestic lighting"),
+            (["walk", "park", "garden", "outdoor", "taman", "jalan", "jogging", "sore", "sepeda"],
+             "standing in blooming park, natural golden hour sunlight, dynamic selfie perspective"),
+            (["beach", "ocean", "sea", "pantai", "laut", "kolam", "renang", "swim", "ombak"],
+             "walking along tropical beach, ocean sunset horizon, gentle sea breeze"),
+            (["bikini", "swimsuit", "seksi", "sexy", "lingerie"],
+             "confident alluring pose, summer beach glow"),
+            (["study", "library", "buku", "kampus", "sekolah", "belajar", "tugas", "kuliah", "perpustakaan", "skripsi"],
+             "sitting at wooden desk with open books in cozy library, gentle study lamp"),
+            (["mall", "shopping", "belanja", "bioskop", "nonton", "pameran"],
+             "walking in vibrant illuminated shopping mall, modern urban background"),
+            (["office", "work", "kerja", "kantor", "lembur", "laptop", "meeting"],
+             "sitting at modern sleek office workspace with laptop, focused and cute"),
+            (["rain", "hujan", "payung", "dingin", "gerimis"],
+             "standing near window on rainy day, holding umbrella, soft rain drops background"),
+            (["gym", "workout", "olahraga", "yoga", "fitness"],
+             "wearing sporty athletic wear in bright modern gym studio"),
+            (["car", "mobil", "nyetir", "macet", "perjalanan"],
+             "sitting in passenger seat of car, scenic city view through window")
+        ]
+
+        # 1. First priority: Check if user explicitly specified a scene in their prompt
+        for keywords, scene_desc in SCENE_PATTERNS:
+            if any(k in lower for k in keywords):
+                return scene_desc
+
+        # 2. Second priority: Context from ongoing chat history
+        if user_id:
+            history = self.get_chat_history(user_id)
+            if history:
+                # Filter clean dialogue (excluding internal tags like [Requested photo...])
+                clean_turns = [m.get("content", "") for m in history[-5:] if not m.get("content", "").startswith("[")]
+                conv_text = " ".join(clean_turns).lower()
+
+                # Check keyword patterns in recent dialogue
+                for keywords, scene_desc in SCENE_PATTERNS:
+                    if any(k in conv_text for k in keywords):
+                        logger.info(f"Contextual scene extracted from chat history keywords: {scene_desc}")
+                        return scene_desc
+
+                # 3. Third priority: If LLM is available, fast intelligent extraction
+                if llm_client and clean_turns:
+                    try:
+                        summary_prompt = [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are an anime visual scene extractor for image generation. "
+                                    "Based on the conversation, output ONLY 3-7 English words describing "
+                                    "the female character's current location, activity, and atmosphere "
+                                    "(e.g., 'sitting at cozy cafe with coffee', 'cooking in kitchen', 'relaxing on bed'). "
+                                    "Do not output sentences or markdown."
+                                )
+                            },
+                            {
+                                "role": "user",
+                                "content": f"Recent dialog:\n" + "\n".join(clean_turns[-3:]) + "\n\nCurrent visual setting:"
+                            }
+                        ]
+                        extracted, _ = llm_client.chat(summary_prompt, max_tokens=25)
+                        if extracted and len(extracted.strip()) > 3:
+                            clean_scene = extracted.strip().split("\n")[0].strip('".\'-')
+                            logger.info(f"LLM extracted contextual scene: {clean_scene}")
+                            return f"{clean_scene}, soft ambient lighting"
+                    except Exception as e:
+                        logger.warning(f"LLM scene extraction failed: {e}")
+
+        # Default fallback
+        return "sitting comfortably in modern cozy room, soft ambient morning lighting"
+
+    def craft_visual_prompt(
+        self,
+        user_text: str,
+        user_id: Optional[int] = None,
+        scene_override: Optional[str] = None
+    ) -> str:
         """
         Builds a high-quality visual prompt maintaining persona consistency
-        combined with whatever action/scene the user mentioned and chosen outfit.
+        combined with whatever action/scene detected and chosen outfit.
         """
         persona = self.get_active_persona()
         base_visual = persona.get("visual_traits", DEFAULT_PERSONAS["runa"]["visual_traits"])
-        lower = user_text.lower()
 
         # Check user-selected custom outfit
         outfit_prompt = ""
@@ -232,18 +325,8 @@ class PersonaManager:
         if not outfit_prompt:
             outfit_prompt = f"wearing {persona.get('default_outfit', 'cute casual clothes')}"
 
-        # Extract context / scene hints
-        scene = "sitting comfortably in modern cozy bedroom, soft ambient morning lighting"
-        if any(w in lower for w in ["bed", "sleep", "night", "tidur", "kasur", "pajamas"]):
-            scene = "relaxing on bed with fluffy pillows, warm dim night bedroom lamp"
-        elif any(w in lower for w in ["cafe", "coffee", "tea", "kafe", "kopi"]):
-            scene = "sitting at aesthetic cafe table holding a warm beverage, beautiful bokeh background"
-        elif any(w in lower for w in ["walk", "park", "garden", "outdoor", "taman", "jalan"]):
-            scene = "standing in blooming park, natural golden hour sunlight, dynamic selfie perspective"
-        elif any(w in lower for w in ["beach", "ocean", "sea", "pantai"]):
-            scene = "walking along tropical beach, ocean sunset horizon, gentle sea breeze"
-        elif any(w in lower for w in ["bikini", "swimsuit", "seksi", "sexy", "lingerie"]):
-            scene = "confident alluring pose, summer beach glow"
+        # Contextual scene determination
+        scene = scene_override or self.extract_contextual_scene(user_text, user_id=user_id)
 
         return f"{base_visual}, {outfit_prompt}, {scene}, looking directly into camera, phone selfie shot, detailed eyes, masterpiece quality"
 
