@@ -226,10 +226,14 @@ def config_image_model(env_vars):
 def config_persona_voice(env_vars):
     print(c(BOLD + CYAN, "\n[Step 5/7: AI Girlfriend Persona & Voice Selection]"))
     print("-" * 60)
-    print("1) Runa (Cheerful, affectionate, playful, calls you 'sweetheart' ~ 🥰)")
-    print("2) Aoi (Mature, graceful, soothing, romantic, and comforting)")
-    p_choice = input("Select character [1/2, default: 1]: ").strip()
-    env_vars["DEFAULT_PERSONA"] = "aoi" if p_choice == "2" else "runa"
+    print("1) Runa  - The Playful Girlfriend (Teasing, mischievous, kawaii gaming aesthetic)")
+    print("2) Akira - The Seductive Tease (Confident, witty, gothic elegance)")
+    print("3) Hina  - The Sunshine Girlfriend (Cheerful, energetic, bubbly, warm)")
+    print("4) Shiro - The Kuudere Girlfriend (Calm, intelligent, cool-blue moonlit)")
+    print("5) Yume  - The Dreamy Soulmate (Gentle, soft-spoken, celestial romantic)")
+    p_choice = input("Select character [1-5, default: 1]: ").strip()
+    mapping = {"1": "runa", "2": "akira", "3": "hina", "4": "shiro", "5": "yume"}
+    env_vars["DEFAULT_PERSONA"] = mapping.get(p_choice, "runa")
 
     print("\nVoice Note Speech Voice (Edge-TTS):")
     print("1) en-US-AnaNeural (English sweet & natural girlfriend voice - Recommended)")

@@ -61,6 +61,7 @@ Thumbs.db
 *.mp4
 *.webm
 
-# Whitelist project assets
+# Whitelist project assets & persona reference artwork
 !logo.png
 !assets/**
+!personas/brief/**

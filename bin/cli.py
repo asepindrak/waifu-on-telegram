@@ -8,7 +8,7 @@ Usage:
   waifu restart
   waifu status
   waifu setup
-  waifu persona [runa|aoi]
+  waifu persona [runa|akira|hina|shiro|yume]
   waifu autorun [on|off]
   waifu logs
 """
@@ -255,7 +255,7 @@ def main():
         print("  waifu restart            - Restart bot in background")
         print("  waifu status             - Check diagnostics for LLM, ComfyUI, & process")
         print("  waifu setup              - Open interactive configuration manager")
-        print("  waifu persona <runa|aoi> - Switch active AI girlfriend persona")
+        print("  waifu persona <name>     - Switch persona (runa, akira, hina, shiro, yume)")
         print("  waifu autorun [on|off]   - Configure autorun on system startup")
         print("  waifu logs               - Inspect recent log activity")
         print("  waifu uninstall          - Complete uninstallation and cleanup wizard")

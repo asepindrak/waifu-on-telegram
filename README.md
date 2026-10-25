@@ -147,20 +147,37 @@ An interactive menu will open:
 | `/greetings` | Toggle automatic romantic Good Morning (07:00) & Bedtime (22:00) greetings |
 | `/love` | Check your affection score & relationship progress with your waifu |
 | `/persona` | Interactive inline button menu to switch active companion |
-| `/persona <name>` | Switch persona directly (e.g. `/persona aoi`) |
+| `/persona <name>` | Switch persona directly (`runa`, `akira`, `hina`, `shiro`, `yume`) |
 | `/reset` | Clear conversation memory to start a fresh discussion |
 
 ---
 
-## 🎭 Persona Customization (`personas/` directory)
+## 🎭 Waifu Personas & Official Character Roster
 
-Each waifu character is stored as a clean `.json` file in `personas/`:
-- `personas/runa.json`: Cheerful, playful, affectionate, calls you 'sweetheart'.
-- `personas/aoi.json`: Mature, graceful, soothing, deeply caring and comforting.
+Switch your companion anytime with `/persona` or through the interactive buttons:
 
-You can create brand new personas simply by adding a `.json` file inside `personas/` (e.g. `personas/sakura.json`). Customize:
-- `visual_traits`: Consistent physical prompt (hair, eyes, face structure) to maintain facial recognition across ComfyUI renders.
-- `system_instruction`: Personality, conversational style, and roleplay behavior.
+| **Runa** | **Akira** | **Hina** | **Shiro** | **Yume** |
+| :---: | :---: | :---: | :---: | :---: |
+| <img src="personas/brief/Runa.png" width="150" alt="Runa"/> | <img src="personas/brief/Akira.jpg" width="150" alt="Akira"/> | <img src="personas/brief/Hina.jpg" width="150" alt="Hina"/> | <img src="personas/brief/Shiro.png" width="150" alt="Shiro"/> | <img src="personas/brief/Yume.jpg" width="150" alt="Yume"/> |
+| **The Playful Girlfriend** | **The Seductive Tease** | **The Sunshine Girlfriend** | **The Kuudere Girlfriend** | **The Dreamy Soulmate** |
+| *Playful, teasing, kawaii gaming aesthetic* | *Confident, witty, elegant gothic aesthetic* | *Energetic, bubbly, cozy slice-of-life* | *Calm, intelligent, cool-blue moonlit* | *Gentle, soft-spoken, dreamy starry soulmate* |
+| **Visual Anchors:**<br>Pastel-pink wavy hair, sparkling magenta eyes, heart choker, black cat clip | **Visual Anchors:**<br>Silky midnight-black hair, deep ruby-red eyes, crimson rose clip, black choker | **Visual Anchors:**<br>Honey-blonde chin bob, warm amber eyes, orange clips, headphones | **Visual Anchors:**<br>Long silver-white hair, icy-blue eyes, crescent moon clip & earrings | **Visual Anchors:**<br>Long silky lavender hair, amethyst violet eyes, silver star pins & moon necklace |
+| `/persona runa` | `/persona akira` | `/persona hina` | `/persona shiro` | `/persona yume` |
+
+---
+
+## 🎨 How Character Visual Consistency (PAP) Works
+
+To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the chosen character:
+
+1. **Visual Anchor Prompting:**  
+   Each persona file in `personas/<name>.json` contains strictly defined, invariant facial and accessory tokens (`visual_traits`). These are automatically prefixed to every user prompt.
+2. **Character-Specific Negative Prompts:**  
+   Each waifu has custom negative prompt rules to strictly forbid conflicting traits (e.g. Runa forbids blonde/blue eyes, Hina forbids long/black hair).
+3. **Dynamic Wardrobe Injection:**  
+   When changing clothes via `/outfit`, the bot swaps only the garment prompt while strictly preserving the character's facial structure, hair color, and signature accessories.
+4. **Reference Image Guidance (IP-Adapter Ready):**  
+   The reference images in `personas/brief/` serve as the golden standard for LoRA training and IP-Adapter image conditioning within ComfyUI.
 
 ---
 

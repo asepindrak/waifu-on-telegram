@@ -224,7 +224,7 @@ class MediaEngine:
 
         return None
 
-    def generate_photo(self, visual_prompt: str) -> Tuple[Optional[bytes], str]:
+    def generate_photo(self, visual_prompt: str, negative_prompt: Optional[str] = None) -> Tuple[Optional[bytes], str]:
         """
         Main entry for photo generation.
         Tries local ComfyUI first; if offline or fails, falls back to cloud.
@@ -232,7 +232,10 @@ class MediaEngine:
         """
         # 1. Try local ComfyUI
         if self.comfyui_url:
-            local_img = self.generate_image_comfyui(visual_prompt)
+            if negative_prompt:
+                local_img = self.generate_image_comfyui(visual_prompt, negative_prompt=negative_prompt)
+            else:
+                local_img = self.generate_image_comfyui(visual_prompt)
             if local_img:
                 return local_img, "ComfyUI Local (RTX 3050)"
 

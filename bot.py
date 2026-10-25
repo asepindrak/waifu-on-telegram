@@ -367,7 +367,8 @@ def process_photo_request(message, user_text: str):
 
     def run_gen():
         try:
-            img_bytes, source = media_engine.generate_photo(visual_prompt)
+            neg_p = persona.get("negative_prompt")
+            img_bytes, source = media_engine.generate_photo(visual_prompt, negative_prompt=neg_p)
             if not img_bytes:
                 bot.edit_message_text(
                     "I'm sorry darling, my camera is acting up a little... I will try again soon! 🥺",
