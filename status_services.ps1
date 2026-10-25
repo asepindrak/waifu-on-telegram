@@ -1,5 +1,6 @@
 # Health & Status Checker for Waifu on Telegram
-$version = if (Test-Path "VERSION") { (Get-Content "VERSION").Trim() } else { "1.1.0" }
+$vPath = Join-Path $PSScriptRoot "VERSION"
+$version = if (Test-Path $vPath) { (Get-Content $vPath).Trim() } else { "1.2.0" }
 Write-Host "====================================================================" -ForegroundColor Magenta
 Write-Host "       WAIFU ON TELEGRAM v$version - SYSTEM STATUS DIAGNOSTICS      " -ForegroundColor Magenta
 Write-Host "====================================================================" -ForegroundColor Magenta
