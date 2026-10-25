@@ -1,7 +1,7 @@
 {
   "name": "waifu-on-telegram",
   "version": "1.1.0",
-  "description": "Waifu on Telegram - Autonomous AI Girlfriend & Romance Companion Powered by Local LLM & ComfyUI",
+  "description": "Waifu on Telegram - Autonomous AI Girlfriend & Romance Companion Powered by Local LLM & ComfyUI (SFW & NSFW)",
   "main": "music_player_server.js",
   "bin": {
     "waifu": "./bin/cli.py",
@@ -19,7 +19,10 @@
     "locally-uncensored",
     "comfyui",
     "edge-tts",
-    "stable-diffusion"
+    "stable-diffusion",
+    "sfw",
+    "nsfw",
+    "uncensored"
   ],
   "author": "asepindrak",
   "license": "MIT",

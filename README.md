@@ -5,11 +5,12 @@
 # 💖 Waifu on Telegram 🤖
 
 <p align="center">
-  <b>Autonomous AI Girlfriend & Romance Companion Powered by Local LLM & ComfyUI</b><br>
-  <i>Enrich your daily life with an AI girlfriend who chats affectionately, sends consistent selfies (photos), voice notes, and listens with warmth — completely private & uncensored.</i>
+  <b>Autonomous AI Girlfriend & Romance Companion Powered by Local LLM & ComfyUI (SFW & NSFW)</b><br>
+  <i>Enrich your daily life with an AI girlfriend who chats affectionately, sends consistent selfies (photos), voice notes, and listens with warmth — completely private, uncensored, with full SFW and NSFW support.</i>
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Content-SFW%20%26%20NSFW-ff4081.svg" alt="SFW & NSFW" />
   <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python" />
   <img src="https://img.shields.io/badge/Local%20LLM-Locally%20Uncensored-purple.svg" alt="Local LLM" />
   <img src="https://img.shields.io/badge/Image%20Generator-ComfyUI%20%2F%20Cloud-green.svg" alt="ComfyUI" />

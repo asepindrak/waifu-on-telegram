@@ -179,8 +179,8 @@ def handle_welcome(message):
     # 2. Send feature guide & commands
     guide_text = (
         f"✨ **Fitur Utama Bersama {name} (v{get_version()}):**\n"
-        "• 💬 **Romance Chat**: Bebas sensor, hangat, manja, dan otomatis ikut bahasamu.\n"
-        "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'sayang pap foto dong'* atau `/pap`!\n"
+        "• 💬 **Romance Chat**: Bebas sensor (SFW & NSFW), hangat, manja, dan otomatis ikut bahasamu.\n"
+        "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'sayang pap foto dong'* atau `/pap` (Mendukung SFW hingga NSFW)!\n"
         "• 👗 **Pilihan Baju**: Pilih pakaian waifumu lewat `/outfit` (Kimono, Maid, Piyama, dll).\n"
         "• 🎙️ **Voice Note**: Balasan suara asli wanita jernih & manis (`/voice`).\n"
         "• ⏰ **Sapaan Otomatis**: Ucapan selamat pagi jam 7 & selamat tidur jam 10 malam (`/greetings`).\n"

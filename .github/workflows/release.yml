@@ -53,7 +53,7 @@ jobs:
           generate_release_notes: true
           body: |
             # 💖 Waifu on Telegram ${{ steps.vars.outputs.tag }} 🤖
-            Autonomous AI Romance Companion Powered by Local LLM & ComfyUI.
+            Autonomous AI Romance Companion Powered by Local LLM & ComfyUI (SFW & NSFW).
 
             ### 🚀 Highlights & Changes in this Release:
             ${{ env.CHANGELOG }}
