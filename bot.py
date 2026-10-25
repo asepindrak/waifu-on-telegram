@@ -26,6 +26,16 @@ logger = logging.getLogger("WaifuOnTelegram")
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
+def get_version() -> str:
+    v_file = os.path.join(PROJECT_ROOT, "VERSION")
+    if os.path.exists(v_file):
+        try:
+            with open(v_file, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+    return "1.1.0"
+
 # Credentials & Permissions
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 RAW_ALLOWED_USERS = os.environ.get("TELEGRAM_ALLOWED_USER_ID", "").strip()
@@ -168,7 +178,7 @@ def handle_welcome(message):
 
     # 2. Send feature guide & commands
     guide_text = (
-        f"✨ **Fitur Utama Bersama {name}:**\n"
+        f"✨ **Fitur Utama Bersama {name} (v{get_version()}):**\n"
         "• 💬 **Romance Chat**: Bebas sensor, hangat, manja, dan otomatis ikut bahasamu.\n"
         "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'sayang pap foto dong'* atau `/pap`!\n"
         "• 👗 **Pilihan Baju**: Pilih pakaian waifumu lewat `/outfit` (Kimono, Maid, Piyama, dll).\n"
@@ -208,7 +218,7 @@ def handle_status(message):
     media_icon = "🟢 Active" if media_stat.get("online") else "🟡 Cloud Fallback"
 
     report = (
-        f"📊 **Waifu on Telegram - System Diagnostics**\n\n"
+        f"📊 **Waifu on Telegram v{get_version()} - System Diagnostics**\n\n"
         f"🧠 **Local LLM**: {status_icon}\n"
         f"• Backend: `{llm_stat.get('backend', 'Unknown')}`\n"
         f"• Endpoint: `{LLM_BASE_URL}`\n"
@@ -865,7 +875,7 @@ def setup_bot_commands():
 def main():
     persona = persona_mgr.get_active_persona()
     logger.info("=" * 60)
-    logger.info(f"💖 Waifu on Telegram ({persona.get('name')}) is starting...")
+    logger.info(f"💖 Waifu on Telegram v{get_version()} ({persona.get('name')}) is starting...")
     logger.info(f"🧠 Local LLM Base URL: {LLM_BASE_URL}")
     logger.info(f"🎨 ComfyUI URL: {COMFYUI_URL}")
     logger.info("=" * 60)

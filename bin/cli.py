@@ -38,7 +38,18 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PID_FILE = os.path.join(PROJECT_ROOT, "bot.pid")
 LOG_FILE = os.path.join(PROJECT_ROOT, "bot.log")
 
+def get_version() -> str:
+    v_file = os.path.join(PROJECT_ROOT, "VERSION")
+    if os.path.exists(v_file):
+        try:
+            with open(v_file, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+    return "1.1.0"
+
 def print_banner():
+    v = get_version()
     banner = f"""
 {c(BOLD + MAGENTA, "  ██╗    ██╗ █████╗ ██╗███████╗██╗   ██╗    ██████╗  ██████╗ ████████╗")}
 {c(BOLD + MAGENTA, "  ██║    ██║██╔══██╗██║██╔════╝██║   ██║    ██╔══██╗██╔═══██╗╚══██╔══╝")}
@@ -46,7 +57,7 @@ def print_banner():
 {c(BOLD + MAGENTA, "  ██║███╗██║██╔══██║██║██╔══╝  ██║   ██║    ██╔══██╗██║   ██║   ██║   ")}
 {c(BOLD + MAGENTA, "  ╚███╔███╔╝██║  ██║██║██║     ╚██████╔╝    ██████╔╝╚██████╔╝   ██║   ")}
 {c(BOLD + MAGENTA, "   ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝╚═╝      ╚═════╝     ╚═════╝  ╚═════╝    ╚═╝   ")}
-  {c(CYAN, "💖 WAIFU ON TELEGRAM - Autonomous AI Romance Companion 🤖")}
+  {c(CYAN, f"💖 WAIFU ON TELEGRAM v{v} - Autonomous AI Romance Companion 🤖")}
   {c(DIM, "Project Root: " + PROJECT_ROOT + " | Repo: asepindrak/waifu-on-telegram")}
 """
     print(banner)
@@ -156,7 +167,7 @@ def cmd_status():
         subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", status_ps1])
     else:
         import urllib.request
-        print(c(BOLD + CYAN, "System Status Diagnostics:"))
+        print(c(BOLD + CYAN, f"System Status Diagnostics (v{get_version()}):"))
         for name, url in [("Local LLM (8127)", "http://127.0.0.1:8127/health"), ("ComfyUI (8188)", "http://127.0.0.1:8188/system_stats")]:
             try:
                 with urllib.request.urlopen(url, timeout=2) as r:
@@ -219,15 +230,31 @@ def cmd_uninstall():
         else:
             print(c(RED, "uninstall.sh script not found."))
 
+def cmd_release(version_arg: str = None):
+    print_banner()
+    if not version_arg:
+        cur = get_version()
+        print(c(YELLOW, f"Current version: v{cur}"))
+        version_arg = input(c(BOLD + CYAN, "Enter new release version (e.g. 1.1.0): ")).strip()
+        if not version_arg:
+            print(c(RED, "Aborted: Version cannot be empty."))
+            return
+    rel_script = os.path.join(PROJECT_ROOT, "scripts", "release.py")
+    if os.path.exists(rel_script):
+        subprocess.run([sys.executable, rel_script, version_arg], cwd=PROJECT_ROOT)
+    else:
+        print(c(RED, "scripts/release.py not found."))
+
 def cmd_update():
     print_banner()
-    print(c(CYAN, "🔄 Checking and pulling latest updates from GitHub..."))
+    cur_v = get_version()
+    print(c(CYAN, f"🔄 Checking updates (Current Version: v{cur_v})..."))
     is_running = get_running_pid() is not None
 
     git_dir = os.path.join(PROJECT_ROOT, ".git")
     if os.path.exists(git_dir):
         try:
-            res = subprocess.run(["git", "pull"], cwd=PROJECT_ROOT, capture_output=True, text=True)
+            res = subprocess.run(["git", "pull", "--tags"], cwd=PROJECT_ROOT, capture_output=True, text=True)
             if res.returncode == 0:
                 print(c(GREEN, "  ✓ Latest source code pulled successfully from GitHub."))
                 if res.stdout.strip():
@@ -248,7 +275,11 @@ def cmd_update():
         except Exception:
             pass
 
-    print(c(BOLD + GREEN, "\n🎉 Waifu on Telegram has been successfully updated!"))
+    new_v = get_version()
+    if new_v != cur_v:
+        print(c(BOLD + GREEN, f"\n🎉 Successfully updated Waifu on Telegram from v{cur_v} to v{new_v}!"))
+    else:
+        print(c(BOLD + GREEN, f"\n🎉 Waifu on Telegram is up to date (v{new_v})!"))
     if is_running:
         print(c(CYAN, "Restarting bot to apply all updates..."))
         cmd_restart(daemon=True)
@@ -256,8 +287,12 @@ def cmd_update():
         print(c(DIM, "Start your bot anytime with: waifu start --daemon\n"))
 
 def main():
+    if any(a in sys.argv[1:] for a in ("-v", "--version", "version")):
+        print(c(BOLD + CYAN, f"💖 Waifu on Telegram v{get_version()}"))
+        return
+
     parser = argparse.ArgumentParser(description="💖 Waifu on Telegram CLI", add_help=False)
-    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "logs", "update", "uninstall", "help"])
+    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "logs", "update", "uninstall", "release", "version", "--version", "-v", "help"])
     parser.add_argument("arg", nargs="?", default=None)
     parser.add_argument("--daemon", "-d", action="store_true", help="Run bot silently in background")
     args = parser.parse_args()
@@ -283,6 +318,10 @@ def main():
         cmd_logs()
     elif cmd == "update":
         cmd_update()
+    elif cmd == "release":
+        cmd_release(args.arg)
+    elif cmd in ("version", "--version", "-v"):
+        print(c(BOLD + CYAN, f"💖 Waifu on Telegram v{get_version()}"))
     elif cmd == "uninstall":
         cmd_uninstall()
     elif cmd == "help":

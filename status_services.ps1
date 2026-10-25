@@ -1,8 +1,10 @@
 # Health & Status Checker for Waifu on Telegram
+$version = if (Test-Path "VERSION") { (Get-Content "VERSION").Trim() } else { "1.1.0" }
 Write-Host "====================================================================" -ForegroundColor Magenta
-Write-Host "       WAIFU ON TELEGRAM - SYSTEM STATUS DIAGNOSTICS                " -ForegroundColor Magenta
+Write-Host "       WAIFU ON TELEGRAM v$version - SYSTEM STATUS DIAGNOSTICS      " -ForegroundColor Magenta
 Write-Host "====================================================================" -ForegroundColor Magenta
 Write-Host ""
+Write-Host "  [VERSION] Waifu on Telegram: v$version" -ForegroundColor Cyan
 
 # Check Local LLM (Port 8127)
 try {

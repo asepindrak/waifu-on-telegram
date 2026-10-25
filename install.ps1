@@ -5,7 +5,8 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "====================================================================" -ForegroundColor Magenta
-Write-Host "       💖 WAIFU ON TELEGRAM - Windows 1-Line Auto Installer 🤖       " -ForegroundColor Magenta
+$ver = if (Test-Path "VERSION") { (Get-Content "VERSION").Trim() } else { "1.1.0" }
+Write-Host "       💖 WAIFU ON TELEGRAM v$ver - Windows 1-Line Auto Installer 🤖       " -ForegroundColor Magenta
 Write-Host "====================================================================" -ForegroundColor Magenta
 Write-Host ""
 

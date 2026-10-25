@@ -1,0 +1,77 @@
+name: Release Automation
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish Official GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Tag & Version
+        id: vars
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-creatordate | grep -v "${{ steps.vars.outputs.tag }}" | head -n 1)
+          echo "Previous tag: $PREV_TAG"
+          if [ -n "$PREV_TAG" ]; then
+            echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+            git log ${PREV_TAG}..${{ steps.vars.outputs.tag }} --pretty=format:"* %s (%h)" --no-merges >> $GITHUB_ENV
+            echo "" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          else
+            echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+            git log --pretty=format:"* %s (%h)" -n 25 --no-merges >> $GITHUB_ENV
+            echo "" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Waifu on Telegram ${{ steps.vars.outputs.tag }}"
+          tag_name: ${{ steps.vars.outputs.tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            # 💖 Waifu on Telegram ${{ steps.vars.outputs.tag }} 🤖
+            Autonomous AI Romance Companion Powered by Local LLM & ComfyUI.
+
+            ### 🚀 Highlights & Changes in this Release:
+            ${{ env.CHANGELOG }}
+
+            ---
+            ### ⚡ 1-Line Universal Install & Update
+
+            **Windows (PowerShell as Administrator or User):**
+            ```powershell
+            irm https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/install.ps1 | iex
+            ```
+
+            **Linux / macOS (Terminal):**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/install.sh | bash
+            ```
+
+            **Existing Users Quick Update:**
+            ```bash
+            waifu update
+            ```
