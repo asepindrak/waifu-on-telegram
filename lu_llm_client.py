@@ -106,7 +106,7 @@ class LocallyUncensoredClient:
         base_url: str = "http://127.0.0.1:8127/v1",
         api_key: str = "auto",
         model: str = "default",
-        timeout: int = 180
+        timeout: int = 50
     ):
         self.base_url = base_url.rstrip("/")
         self.config_api_key = api_key
@@ -240,12 +240,22 @@ class LocallyUncensoredClient:
                 think_part = parts[0].replace("<think>", "").strip()
                 clean_reply = parts[1].strip()
                 reasoning = think_part
+            elif "<think>" in raw_content:
+                # Thought started but never finished (token limit hit during thinking)
+                clean_reply = ""
+                reasoning = raw_content.replace("<think>", "").strip()
             else:
                 clean_reply = raw_content.strip()
 
-            # Fallback if content was empty and only reasoning was returned
+            # If clean_reply was empty because tokens ended during reasoning:
             if not clean_reply and reasoning:
-                clean_reply = reasoning
+                # Look for quoted dialogue inside reasoning: e.g. "Lagi nunggu kamu kok, sayang!"
+                quotes = re.findall(r'"([^"]{5,120})"', reasoning)
+                if quotes:
+                    clean_reply = quotes[-1].strip()
+                else:
+                    # Look for Indonesian or affectionate sentence inside reasoning
+                    clean_reply = "Hai sayang! Aku lagi di sini kok nemenin kamu~ 🥰 Ada yang mau diceritain manis?"
 
             return clean_reply, reasoning
 

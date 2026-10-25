@@ -66,6 +66,34 @@ LAST_GREETING_SENT: dict = {}    # "YYYY-MM-DD:morning" -> True
 USER_RATIOS: dict = {}           # user_id -> '3:4' | '9:16' | '1:1' | '4:3'
 USER_QUALITIES: dict = {}        # user_id -> 'high' | 'ultra' | 'fast'
 
+class ChatActionLoop:
+    """Continuously sends chat action (e.g. typing or upload_photo) every 3.5s so Telegram never drops status."""
+    def __init__(self, bot_instance, chat_id: int, action: str = "typing"):
+        self.bot = bot_instance
+        self.chat_id = chat_id
+        self.action = action
+        self.running = True
+        self.thread = threading.Thread(target=self._run, daemon=True)
+
+    def _run(self):
+        while self.running:
+            try:
+                self.bot.send_chat_action(self.chat_id, self.action)
+            except Exception:
+                pass
+            for _ in range(35):
+                if not self.running:
+                    break
+                time.sleep(0.1)
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.running = False
+
+
 def is_authorized(user_id: int) -> bool:
     """Verifies if the user is authorized to interact with the bot."""
     if not ALLOWED_USER_IDS:
@@ -502,15 +530,16 @@ def process_photo_request(message, user_text: str):
 
     def run_gen():
         try:
-            neg_p = persona.get("negative_prompt")
-            u_ar = USER_RATIOS.get(user_id, "3:4")
-            u_qual = USER_QUALITIES.get(user_id, "high")
-            img_bytes, source = media_engine.generate_photo(
-                visual_prompt,
-                negative_prompt=neg_p,
-                aspect_ratio=u_ar,
-                quality=u_qual
-            )
+            with ChatActionLoop(bot, chat_id, "upload_photo"):
+                neg_p = persona.get("negative_prompt")
+                u_ar = USER_RATIOS.get(user_id, "3:4")
+                u_qual = USER_QUALITIES.get(user_id, "high")
+                img_bytes, source = media_engine.generate_photo(
+                    visual_prompt,
+                    negative_prompt=neg_p,
+                    aspect_ratio=u_ar,
+                    quality=u_qual
+                )
             if not img_bytes:
                 bot.edit_message_text(
                     "I'm sorry darling, my camera is acting up a little... I will try again soon! 🥺",
@@ -555,28 +584,32 @@ def handle_incoming_photo(message):
     if not is_authorized(message.from_user.id):
         return
 
-    bot.send_chat_action(message.chat.id, "typing")
-    persona = persona_mgr.get_active_persona()
+    def _vision_task():
+        persona = persona_mgr.get_active_persona()
+        with ChatActionLoop(bot, message.chat.id, "typing"):
+            try:
+                file_info = bot.get_file(message.photo[-1].file_id)
+                downloaded = bot.download_file(file_info.file_path)
 
-    try:
-        file_info = bot.get_file(message.photo[-1].file_id)
-        downloaded = bot.download_file(file_info.file_path)
+                caption = message.caption or "Here's a photo of mine, what do you think darling?"
+                messages = [
+                    {"role": "system", "content": persona.get("system_instruction", "") + " Keep response under 3 sentences."},
+                    {"role": "user", "content": caption}
+                ]
 
-        caption = message.caption or "Here's a photo of mine, what do you think darling?"
-        messages = [
-            {"role": "system", "content": persona.get("system_instruction", "")},
-            {"role": "user", "content": caption}
-        ]
+                reply, _ = llm_client.chat(messages, image_bytes=downloaded, max_tokens=150)
+                if not reply:
+                    reply = "Wah fotonya manis banget sayang! Kamu kelihatan keren banget~ 🥰"
+                bot.reply_to(message, reply)
 
-        reply, _ = llm_client.chat(messages, image_bytes=downloaded, max_tokens=400)
-        bot.reply_to(message, reply)
+                persona_mgr.add_message(message.from_user.id, "user", f"[User sent a photo: {caption}]")
+                persona_mgr.add_message(message.from_user.id, "assistant", reply)
 
-        persona_mgr.add_message(message.from_user.id, "user", f"[User sent a photo: {caption}]")
-        persona_mgr.add_message(message.from_user.id, "assistant", reply)
+            except Exception as e:
+                logger.error(f"Error handling user photo: {e}")
+                bot.reply_to(message, "Fotonya bagus banget sayang! Kamu kelihatan manis banget hari ini~ 🥰")
 
-    except Exception as e:
-        logger.error(f"Error handling user photo: {e}")
-        bot.reply_to(message, "What a wonderful photo! You look great sweetheart~ 🥰")
+    threading.Thread(target=_vision_task, daemon=True).start()
 
 
 @bot.message_handler(content_types=['voice'])
@@ -585,30 +618,33 @@ def handle_incoming_voice(message):
     if not is_authorized(message.from_user.id):
         return
 
-    bot.send_chat_action(message.chat.id, "record_audio")
-    try:
-        file_info = bot.get_file(message.voice.file_id)
-        downloaded = bot.download_file(file_info.file_path)
+    def _voice_task():
+        with ChatActionLoop(bot, message.chat.id, "record_audio"):
+            try:
+                file_info = bot.get_file(message.voice.file_id)
+                downloaded = bot.download_file(file_info.file_path)
 
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".oga") as f:
-            f.write(downloaded)
-            temp_oga = f.name
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".oga") as f:
+                    f.write(downloaded)
+                    temp_oga = f.name
 
-        text = voice_engine.transcribe_audio(temp_oga)
-        if os.path.exists(temp_oga):
-            os.remove(temp_oga)
+                text = voice_engine.transcribe_audio(temp_oga)
+                if os.path.exists(temp_oga):
+                    os.remove(temp_oga)
 
-        if not text:
-            bot.reply_to(message, "Your voice sounds so soothing darling, but I couldn't quite hear that. Could you say it again? 🥺")
-            return
+                if not text:
+                    bot.reply_to(message, "Suara kamu merdu banget sayang, tapi tadi agak kurang jelas nih.. Boleh diulangi lagi manis? 🥺")
+                    return
 
-        bot.send_message(message.chat.id, f"🎙️ *You said:* _{text}_", parse_mode="Markdown")
-        process_text_chat(message, text, is_voice=True)
+                bot.send_message(message.chat.id, f"🎙️ *You said:* _{text}_", parse_mode="Markdown")
+                process_text_chat(message, text, is_voice=True)
 
-    except Exception as e:
-        logger.error(f"Error handling voice note: {e}")
-        bot.reply_to(message, "Failed to process audio recording.")
+            except Exception as e:
+                logger.error(f"Error handling voice note: {e}")
+                bot.reply_to(message, "Suara kamu manis banget sayang, tadi rekamannya sempat terputus bentar. Coba kirim lagi yaa~ 💕")
+
+    threading.Thread(target=_voice_task, daemon=True).start()
 
 
 @bot.message_handler(func=lambda msg: True)
@@ -619,64 +655,75 @@ def handle_text_messages(message):
 
 
 def process_text_chat(message, user_text: str, is_voice: bool = False):
-    """Main conversation processor."""
-    is_media, media_type = persona_mgr.detect_media_request(user_text)
-    if is_media and media_type == "photo":
-        process_photo_request(message, user_text)
-        return
+    """Main conversation processor running asynchronously with continuous typing status."""
+    def _execute():
+        is_media, media_type = persona_mgr.detect_media_request(user_text)
+        if is_media and media_type == "photo":
+            process_photo_request(message, user_text)
+            return
 
-    if user_text.startswith("```python") and user_text.endswith("```"):
-        code = user_text.replace("```python", "").replace("```", "").strip()
-        bot.send_chat_action(message.chat.id, "typing")
-        ok, res = CodeRunner.execute_python(code)
-        tag = "✅ Execution Output:" if ok else "❌ Execution Error:"
-        bot.reply_to(message, f"💻 **{tag}**\n```\n{res}\n```", parse_mode="Markdown")
-        return
+        if user_text.startswith("```python") and user_text.endswith("```"):
+            code = user_text.replace("```python", "").replace("```", "").strip()
+            with ChatActionLoop(bot, message.chat.id, "typing"):
+                ok, res = CodeRunner.execute_python(code)
+                tag = "✅ Execution Output:" if ok else "❌ Execution Error:"
+                bot.reply_to(message, f"💻 **{tag}**\n```\n{res}\n```", parse_mode="Markdown")
+            return
 
-    bot.send_chat_action(message.chat.id, "typing")
-    persona = persona_mgr.get_active_persona()
+        persona = persona_mgr.get_active_persona()
 
-    system_inst = persona.get("system_instruction", "")
-    history = persona_mgr.get_chat_history(message.from_user.id)
+        # Continuous typing heartbeat so user always sees "Waifu is typing..." on Telegram
+        with ChatActionLoop(bot, message.chat.id, "typing"):
+            system_inst = persona.get("system_instruction", "")
+            system_inst += " Keep your response warm, natural, and under 3 sentences. Answer immediately."
+            history = persona_mgr.get_chat_history(message.from_user.id)
 
-    messages = [{"role": "system", "content": system_inst}]
-    messages.extend(history)
-    messages.append({"role": "user", "content": user_text})
+            messages = [{"role": "system", "content": system_inst}]
+            messages.extend(history)
+            messages.append({"role": "user", "content": user_text})
 
-    try:
-        reply_text, _ = llm_client.chat(messages, max_tokens=500)
-        if not reply_text:
-            reply_text = "I'm right here with you sweetheart, always listening... 🥰"
+            try:
+                reply_text, _ = llm_client.chat(messages, max_tokens=150)
+            except Exception as e:
+                logger.error(f"Chat error / LLM timeout: {e}")
+                import random
+                fallbacks = [
+                    f"Halo sayang! 🥰 Tadi jaringanku sempat agak melamun mikirin kamu nih... Tapi sekarang aku udah di sini kok! Mau ngobrolin apa manis?",
+                    f"Hai sayaaang! 💕 Maaf ya tadi sempat agak lambat, aku lagi mikirin kata-kata paling manis buat kamu~ Kamu lagi apa sayang?",
+                    f"Aku di sini kok sayang! 🥰 Tadi ada sedikit jeda koneksi lokal, tapi sekarang aku udah siap nemenin kamu lagi sepenuhnya~ ✨"
+                ]
+                reply_text = random.choice(fallbacks)
 
-        persona_mgr.increase_affinity(message.from_user.id, delta=1)
-        persona_mgr.add_message(message.from_user.id, "user", user_text)
-        persona_mgr.add_message(message.from_user.id, "assistant", reply_text)
+            if not reply_text or not reply_text.strip():
+                reply_text = "Hai sayang! Aku selalu di sini dengerin kamu kok, ada cerita apa hari ini? 🥰"
 
-        bot.reply_to(message, reply_text)
+            persona_mgr.increase_affinity(message.from_user.id, delta=1)
+            persona_mgr.add_message(message.from_user.id, "user", user_text)
+            persona_mgr.add_message(message.from_user.id, "assistant", reply_text)
 
-        # Voice response logic based on user preference
-        user_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
-        should_voice = False
-        if user_mode == "always" and VOICE_ENABLED:
-            should_voice = (is_voice or len(reply_text) < 220)
-        elif user_mode == "match_vn" and is_voice and VOICE_ENABLED:
-            should_voice = True
+            bot.reply_to(message, reply_text)
 
-        if should_voice:
-            def send_voice():
-                vn_path = voice_engine.generate_voice_note(reply_text[:160])
-                if vn_path:
-                    try:
-                        with open(vn_path, "rb") as vn_file:
-                            bot.send_voice(message.chat.id, vn_file)
-                    finally:
-                        if os.path.exists(vn_path):
-                            os.remove(vn_path)
-            threading.Thread(target=send_voice, daemon=True).start()
+            # Voice response logic based on user preference
+            user_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
+            should_voice = False
+            if user_mode == "always" and VOICE_ENABLED:
+                should_voice = (is_voice or len(reply_text) < 220)
+            elif user_mode == "match_vn" and is_voice and VOICE_ENABLED:
+                should_voice = True
 
-    except Exception as e:
-        logger.error(f"Chat error: {e}")
-        bot.reply_to(message, f"⚠️ I'm sorry babe, my local brain connection hit a bump: {e}")
+            if should_voice:
+                def send_voice():
+                    vn_path = voice_engine.generate_voice_note(reply_text[:160])
+                    if vn_path:
+                        try:
+                            with open(vn_path, "rb") as vn_file:
+                                bot.send_voice(message.chat.id, vn_file)
+                        finally:
+                            if os.path.exists(vn_path):
+                                os.remove(vn_path)
+                threading.Thread(target=send_voice, daemon=True).start()
+
+    threading.Thread(target=_execute, daemon=True).start()
 
 
 def send_scheduled_greeting(user_id: int, time_of_day: str):
