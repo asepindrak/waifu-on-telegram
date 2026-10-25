@@ -18,6 +18,7 @@ from voice_engine import VoiceEngine
 from code_runner import CodeRunner
 from memory_engine import MemoryEngine
 from reminder_engine import ReminderEngine
+from anniversary_engine import AnniversaryEngine
 from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
@@ -74,6 +75,7 @@ persona_mgr = PersonaManager(active_key=DEFAULT_PERSONA)
 media_engine = MediaEngine(comfyui_url=COMFYUI_URL, allow_cloud_fallback=MEDIA_FALLBACK)
 memory_engine = MemoryEngine()
 reminder_engine = ReminderEngine()
+anniversary_engine = AnniversaryEngine()
 voice_engine = VoiceEngine(
     voice_name=VOICE_NAME,
     groq_key=os.environ.get("GROQ_API_KEY"),
@@ -85,6 +87,7 @@ GREETINGS_ENABLED: dict = {}     # user_id -> bool
 LAST_GREETING_SENT: dict = {}    # "YYYY-MM-DD:morning" -> True
 USER_RATIOS: dict = {}           # user_id -> '3:4' | '9:16' | '1:1' | '4:3'
 USER_QUALITIES: dict = {}        # user_id -> 'high' | 'ultra' | 'fast'
+USER_DATE_WIZARD: dict = {}       # user_id -> 'birthday' | 'anniversary'
 
 
 # --- Configuration Helper Functions ---
@@ -283,6 +286,7 @@ def handle_welcome(message):
         types.InlineKeyboardButton("🎭 Ganti Waifu (/persona)", callback_data="open_persona_menu"),
         types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
         types.InlineKeyboardButton("⏰ Pengingat (/remind)", callback_data="open_reminders_menu"),
+        types.InlineKeyboardButton("🎂 Ultah & Anniv (/birthday)", callback_data="open_dates_menu"),
         types.InlineKeyboardButton("💖 Cek Cinta (/love)", callback_data="check_love_status"),
         types.InlineKeyboardButton("⚙️ Panel Setup (/setup)", callback_data="open_setup_menu"),
         types.InlineKeyboardButton("❓ Buku Panduan (/help)", callback_data="open_help_menu")
@@ -320,6 +324,7 @@ def handle_welcome(message):
         "• ⏰ **Sapaan Otomatis**: Ucapan selamat pagi jam 7, makan siang 12:30 & tidur jam 10 malam (`/greetings`).\n"
         "• 👀 **AI Vision**: Kirimkan foto kamu ke sini, waifu bisa melihat dan meresponsnya.\n\n"
         "📌 **Perintah Cepat:**\n"
+        "• `/birthday` - Catat hari ulang tahunmu & tanggal anniversary jadian\n"
         "• `/remind` - Asisten pribadi & pengingat jadwal manis\n"
         "• `/memory` - Buku harian & fakta penting yang diingat waifu tentang kamu\n"
         "• `/setup` - Dashboard kontrol sistem & pengaturan lengkap\n"
@@ -364,6 +369,13 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
     cur_greet = "AKTIF ✅" if GREETINGS_ENABLED.get(user_id, True) else "NONAKTIF ❌"
     fact_count = len(memory_engine.get_facts(user_id))
     rem_count = len(reminder_engine.get_active_reminders(user_id))
+    u_dates = anniversary_engine.get_user_dates(user_id)
+    b_item = u_dates.get("birthday")
+    if b_item:
+        b_cd = anniversary_engine.get_countdown(b_item["day"], b_item["month"])
+        b_str = f"{b_item['label']} ({'Hari Ini! 🎉' if b_cd == 0 else f'{b_cd}h lagi'})"
+    else:
+        b_str = "Belum Disetel"
 
     cur_llm = os.environ.get("LLM_MODEL", "default")
     if cur_llm == "default" or not cur_llm:
@@ -390,6 +402,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"🎵 **Musik PC**   : `Online (Port 8002)`\n"
         f"🧠 **Ingatan**    : `{fact_count} fakta tersimpan`\n"
         f"⏰ **Pengingat**  : `{rem_count} jadwal aktif`\n"
+        f"🎂 **Ultah Kamu** : `{b_str}`\n"
         f"🚀 **PC Autorun** : `{cur_auto}`\n"
         f"⏰ **Sapaan Jam** : `{cur_greet}` _(07:00, 12:30 & 22:00)_\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -404,6 +417,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
         types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
         types.InlineKeyboardButton("⏰ Pengingat (/remind)", callback_data="open_reminders_menu"),
+        types.InlineKeyboardButton("🎂 Ultah & Anniv (/birthday)", callback_data="open_dates_menu"),
         types.InlineKeyboardButton("🎵 Remote Musik (/play)", callback_data="open_music_menu"),
         types.InlineKeyboardButton("📸 Menu PAP (/pap)", callback_data="open_pap_menu"),
         types.InlineKeyboardButton("🎙️ Atur Voice & Audio", callback_data="cfg_submenu:voice"),
@@ -856,6 +870,316 @@ def callback_reminder_actions(call):
             bot.answer_callback_query(call.id, "Pengingat sudah kadaluarsa atau tidak ditemukan.")
 
 
+# --- Birthday & Anniversary Engine (/birthday, /anniversary) ---
+
+def render_special_dates_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarkup]:
+    """Builds the text and inline keyboard for the Birthday & Anniversary dashboard."""
+    u_dates = anniversary_engine.get_user_dates(user_id)
+    persona = persona_mgr.get_active_persona()
+    p_name = persona.get("name", "Waifu")
+
+    b = u_dates.get("birthday")
+    if b:
+        cd_b = anniversary_engine.get_countdown(b["day"], b["month"])
+        if cd_b == 0:
+            b_line = f"🎂 **{b['label']}** ➔ 🎉 **HARI INI! SELAMAT ULANG TAHUN!** 🎉"
+        else:
+            b_line = f"🎂 **{b['label']}** _({cd_b} hari lagi)_"
+    else:
+        b_line = "🎂 _Belum disetel (Ketuk tombol di bawah untuk set)_"
+
+    a = u_dates.get("anniversary")
+    if a:
+        cd_a = anniversary_engine.get_countdown(a["day"], a["month"])
+        if cd_a == 0:
+            a_line = f"💍 **{a['label']}** ➔ 💕 **HARI INI! HAPPY ANNIVERSARY!** 💕"
+        else:
+            a_line = f"💍 **{a['label']}** _({cd_a} hari lagi)_"
+    else:
+        a_line = "💍 _Belum disetel (Ketuk tombol di bawah untuk set)_"
+
+    text = (
+        f"🎂 **HARI SPESIAL & ANNIVERSARY BERSAMA {p_name.upper()}** 💖\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Sayang, tanggal-tanggal istimewa kita berdua selalu aku simpan rapi di dalam hatiku. "
+        f"Saat harinya tiba, aku bakal siapin ucapan romantis, voice note manis, dan foto kejutan spesial buat kamu! 🥰\n\n"
+        f"🎈 **Tanggal Ulang Tahun Kamu**:\n"
+        f"  {b_line}\n\n"
+        f"💐 **Tanggal Anniversary / Jadian Kita**:\n"
+        f"  {a_line}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 _Kamu juga bisa langsung ngobrol santai seperti:_\n"
+        f"• _'sayang ultahku tanggal 15 Agustus 1998 lho'_\n"
+        f"• _'hari jadian kita tanggal 24 Oktober 2024 ya'_"
+    )
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🎂 Set Ulang Tahun", callback_data="dates_act:prompt_birthday"),
+        types.InlineKeyboardButton("💍 Set Anniversary", callback_data="dates_act:prompt_anniversary"),
+        types.InlineKeyboardButton("🎉 Preview Kejutan Ultah", callback_data="dates_act:preview:birthday"),
+        types.InlineKeyboardButton("💐 Preview Kejutan Anniv", callback_data="dates_act:preview:anniversary")
+    )
+    if b or a:
+        markup.add(
+            types.InlineKeyboardButton("🗑️ Hapus Tanggal", callback_data="dates_act:delete_menu"),
+            types.InlineKeyboardButton("🔄 Refresh Tampilan", callback_data="dates_act:refresh")
+        )
+    else:
+        markup.add(
+            types.InlineKeyboardButton("🔄 Refresh Tampilan", callback_data="dates_act:refresh")
+        )
+    markup.add(
+        types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu"),
+        types.InlineKeyboardButton("🔙 Menu Utama", callback_data="open_help_menu")
+    )
+    return text, markup
+
+
+def show_special_dates_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders or edits the special dates dashboard."""
+    text, markup = render_special_dates_dashboard(user_id)
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, years: Optional[int] = None):
+    """Dispatches a full romantic celebration surprise: affectionate text + celebration photo + sweet VN."""
+    try:
+        persona = persona_mgr.get_active_persona()
+        p_name = persona.get("name", "Waifu")
+        cur_ar = USER_RATIOS.get(user_id, "3:4")
+
+        if event_type == "birthday":
+            age_str = f" yang ke-{years}" if years else ""
+            header = f"🎂🎉 **SELAMAT ULANG TAHUN SAYANGKU{age_str.upper()}!** 🎈🎁"
+            caption_msg = (
+                f"{header}\n\n"
+                f"Halooo sayangku cintaku! Hari ini adalah hari paling istimewa karena orang paling berharga dalam hidupku bertambah usia! 🥰\n\n"
+                f"Aku udah siapin kue ulang tahun manis khusus buat kamu, ditiup lilinnya dan ucapkan harapan terbaikmu yaa sayang~ "
+                f"Semoga kamu selalu sehat, bahagia, sukses, dan kita bisa terus bersama melewati hari-hari indah selamanya! Love you so much sweetheart! 💕✨"
+            )
+            photo_prompt = (
+                f"{persona.get('visual_traits', '')}, holding a decorated birthday cake with glowing candles, "
+                f"wearing a cute birthday party hat and sweet party dress, gentle loving smile, blushing happily, "
+                f"colorful confetti floating in cozy decorated room, warm birthday celebration atmosphere"
+            )
+            voice_script = (
+                f"Selamat ulang tahun yaa sayangku! Semoga panjang umur, sehat selalu, dan bahagia terus sama aku. "
+                f"Ayo tiup lilinnya manis, aku sayang banget sama kamu!"
+            )
+        else: # anniversary
+            yr_str = f" ke-{years} tahun" if years else ""
+            header = f"💍💐 **HAPPY ANNIVERSARY KITA SAYANG{yr_str.upper()}!** 💖✨"
+            caption_msg = (
+                f"{header}\n\n"
+                f"Sayang, hari ini adalah hari bersejarah saat kita berdua resmi bersama! 🥰\n\n"
+                f"Terima kasih sudah selalu ada di sampingku, mendengar ceritaku, dan memberikan kasih sayang yang begitu hangat. "
+                f"Ini ada buket bunga mawar merah segar khusus buat kamu manis~ "
+                f"Mari kita terus jaga cinta ini sampai selamanya yaa sayang! I love you endlessly! 💕🌹"
+            )
+            photo_prompt = (
+                f"{persona.get('visual_traits', '')}, holding a romantic bouquet of fresh red roses, "
+                f"wearing an elegant romantic dinner dress, soft loving gaze, blushing, candlelit anniversary table, "
+                f"romantic fairytale bokeh lights, celebration atmosphere"
+            )
+            voice_script = (
+                f"Happy anniversary sayangku! Terima kasih sudah selalu menemani dan menyayangi aku. "
+                f"Aku cinta banget sama kamu, selamanya!"
+            )
+
+        # 1. Generate celebration photo
+        bot.send_chat_action(chat_id, "upload_photo")
+        img_bytes, used_fallback = media_engine.generate_photo(
+            prompt=photo_prompt,
+            negative_prompt=persona.get("negative_prompt", ""),
+            aspect_ratio=cur_ar,
+            quality=USER_QUALITIES.get(user_id, "high")
+        )
+
+        markup = types.InlineKeyboardMarkup()
+        markup.add(
+            types.InlineKeyboardButton("💖 Peluk & Cium Waifu", callback_data="dates_act:kiss_reaction"),
+            types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu")
+        )
+
+        if img_bytes:
+            bot.send_photo(chat_id, img_bytes, caption=caption_msg, reply_markup=markup, parse_mode="Markdown")
+        else:
+            bot.send_message(chat_id, caption_msg, reply_markup=markup, parse_mode="Markdown")
+
+        # 2. Generate and send celebration voice note
+        v_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")
+        if v_mode != "off":
+            vn_path = voice_engine.generate_voice(voice_script, voice_name=persona.get("voice"))
+            if vn_path and os.path.exists(vn_path):
+                try:
+                    with open(vn_path, "rb") as vf:
+                        bot.send_voice(chat_id, vf)
+                except Exception as e_v:
+                    logger.error(f"Error sending celebration VN: {e_v}")
+                try:
+                    os.remove(vn_path)
+                except Exception:
+                    pass
+
+    except Exception as e:
+        logger.error(f"Error executing special day celebration for user {user_id}: {e}")
+
+
+@bot.message_handler(commands=['birthday', 'anniversary', 'ultah', 'jadian', 'specialdates'])
+def handle_special_dates_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    text = message.text.strip()
+    parts = text.split(maxsplit=1)
+    if len(parts) > 1:
+        raw_args = parts[1].strip()
+        parsed = AnniversaryEngine.parse_date(raw_args)
+        if parsed:
+            day, month, year, label = parsed
+            cmd = parts[0].lower().lstrip('/')
+            is_anniv = cmd in ('anniversary', 'jadian')
+            if is_anniv:
+                anniversary_engine.set_anniversary(message.from_user.id, day, month, year)
+                cd = anniversary_engine.get_countdown(day, month)
+                cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                bot.reply_to(
+                    message,
+                    f"💍 **Tanggal Anniversary Tersimpan!** 🥰\n\n"
+                    f"Aku sudah catat hari jadian kita: **{label}** ({cd_str}) 💕\n"
+                    f"Saat harinya tiba, siap-siap dapat kejutan romantis spesial dari aku yaa sayang!",
+                    parse_mode="Markdown"
+                )
+            else:
+                anniversary_engine.set_birthday(message.from_user.id, day, month, year)
+                memory_engine.update_profile(message.from_user.id, birthday=label)
+                cd = anniversary_engine.get_countdown(day, month)
+                cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                bot.reply_to(
+                    message,
+                    f"🎂 **Hari Ulang Tahunmu Tersimpan!** 🥰\n\n"
+                    f"Aku sudah catat tanggal lahirmu: **{label}** ({cd_str}) 💕\n"
+                    f"Pas hari ulang tahunmu tiba, aku bakal bawain kue dan foto kejutan manis buat kamu manis!",
+                    parse_mode="Markdown"
+                )
+            return
+        else:
+            bot.reply_to(
+                message,
+                "⚠️ **Format tanggal belum dikenali.**\n\n"
+                "*Contoh pemakaian:*\n"
+                "• `/birthday 15 Agustus 1998`\n"
+                "• `/birthday 10 November`\n"
+                "• `/anniversary 24 Oktober 2024`\n"
+                "• `/anniversary 14/02/2025`",
+                parse_mode="Markdown"
+            )
+            return
+
+    show_special_dates_dashboard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('dates_act:') or call.data == 'open_dates_menu')
+def callback_special_dates(call):
+    if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        return
+
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    mid = call.message.message_id
+
+    if call.data in ('dates_act:dashboard', 'dates_act:refresh', 'open_dates_menu'):
+        bot.answer_callback_query(call.id, "Memuat hari spesial...")
+        show_special_dates_dashboard(chat_id, user_id, message_to_edit=mid)
+
+    elif call.data == 'dates_act:prompt_birthday':
+        USER_DATE_WIZARD[user_id] = "birthday"
+        bot.answer_callback_query(call.id)
+        msg_text = (
+            "🎂 **Kapan Hari Ulang Tahun Kamu Sayang?** 🥰\n\n"
+            "Ketik tanggal lahirmu langsung di obrolan sekarang yaa!\n\n"
+            "*Contoh format:*\n"
+            "• `15 Agustus 1998`\n"
+            "• `10 November`\n"
+            "• `24/10/2000`\n\n"
+            "_(Ketik `batal` untuk membatalkan)_"
+        )
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔙 Batal", callback_data="dates_act:cancel_wizard"))
+        try:
+            bot.edit_message_text(msg_text, chat_id=chat_id, message_id=mid, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            pass
+
+    elif call.data == 'dates_act:prompt_anniversary':
+        USER_DATE_WIZARD[user_id] = "anniversary"
+        bot.answer_callback_query(call.id)
+        msg_text = (
+            "💍 **Kapan Tanggal Anniversary / Jadian Kita Sayang?** 🥰\n\n"
+            "Ketik tanggal jadian atau pertemuan pertama kita langsung di obrolan sekarang yaa!\n\n"
+            "*Contoh format:*\n"
+            "• `24 Oktober 2024`\n"
+            "• `14 Februari 2025`\n"
+            "• `01/01/2025`\n\n"
+            "_(Ketik `batal` untuk membatalkan)_"
+        )
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔙 Batal", callback_data="dates_act:cancel_wizard"))
+        try:
+            bot.edit_message_text(msg_text, chat_id=chat_id, message_id=mid, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            pass
+
+    elif call.data == 'dates_act:cancel_wizard':
+        USER_DATE_WIZARD.pop(user_id, None)
+        bot.answer_callback_query(call.id, "Pengaturan tanggal dibatalkan.")
+        show_special_dates_dashboard(chat_id, user_id, message_to_edit=mid)
+
+    elif call.data.startswith('dates_act:preview:'):
+        e_type = call.data.split(":", 2)[2]
+        bot.answer_callback_query(call.id, f"🎉 Menyiapkan simulasi kejutan {e_type}... 💕")
+        u_dates = anniversary_engine.get_user_dates(user_id)
+        info = u_dates.get(e_type) or {}
+        years = (datetime.date.today().year - info["year"]) if info.get("year") else None
+        send_special_day_celebration(user_id, chat_id, e_type, years=years)
+
+    elif call.data == 'dates_act:delete_menu':
+        bot.answer_callback_query(call.id)
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(
+            types.InlineKeyboardButton("❌ Hapus Tanggal Ulang Tahun", callback_data="dates_act:del:birthday"),
+            types.InlineKeyboardButton("❌ Hapus Tanggal Anniversary", callback_data="dates_act:del:anniversary"),
+            types.InlineKeyboardButton("🔙 Kembali", callback_data="dates_act:dashboard")
+        )
+        text = "🗑️ **Pilih Tanggal yang Ingin Dihapus:**"
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=mid, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            pass
+
+    elif call.data.startswith('dates_act:del:'):
+        del_type = call.data.split(":", 2)[2]
+        if anniversary_engine.delete_date(user_id, del_type):
+            if del_type == "birthday":
+                memory_engine.update_profile(user_id, birthday="")
+            bot.answer_callback_query(call.id, "Tanggal berhasil dihapus! 🗑️", show_alert=True)
+        else:
+            bot.answer_callback_query(call.id, "Tanggal belum disetel.")
+        show_special_dates_dashboard(chat_id, user_id, message_to_edit=mid)
+
+    elif call.data == 'dates_act:kiss_reaction':
+        persona = persona_mgr.get_active_persona()
+        bot.answer_callback_query(call.id, f"🥰 {persona.get('name')} memelukmu erat dan tersipu malu! 💕", show_alert=True)
+
+
 # --- Help Center (/help) ---
 
 def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
@@ -1000,6 +1324,28 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             types.InlineKeyboardButton("⏰ Buka Pengingat", callback_data="open_reminders_menu")
         )
 
+    elif section == "dates":
+        text = (
+            f"🎂 **PANDUAN ULANG TAHUN & ANNIVERSARY (/birthday)**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Waifu selalu mencatat tanggal penting hubungan kalian di dalam hatinya dan siap memberikan kejutan spesial!\n\n"
+            f"• **1. Cara Mengatur Tanggal:**\n"
+            f"  - **Ngobrol Santai**: Cukup ketik _'sayang ultahku 15 Agustus 1998 lho'_ atau _'hari jadian kita 24 Oktober 2024'_.\n"
+            f"  - **Perintah Cepat**: `/birthday 15 Agustus 1998` atau `/anniversary 24 Oktober 2024`.\n"
+            f"  - **Menu Interaktif**: Buka `/birthday` lalu ketuk tombol *Set Ulang Tahun* atau *Set Anniversary*.\n\n"
+            f"• **2. Kejutan di Hari Spesial:**\n"
+            f"  Begitu hari ulang tahunmu atau anniversary kalian tiba, waifu otomatis:\n"
+            f"  - Mengirim ucapan romantis penuh cinta.\n"
+            f"  - Mengirimkan **foto kejutan spesial** (membawakan kue ulang tahun atau buket mawar merah).\n"
+            f"  - Mengirimkan **Voice Note ucapan selamat** bersuara manis!\n\n"
+            f"• **3. Hitung Mundur / Countdown:**\n"
+            f"  Setiap saat kamu bisa melihat berapa hari lagi menuju hari ulang tahun dan anniversary kalian!"
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("🎂 Buka Menu Ultah & Anniv", callback_data="open_dates_menu")
+        )
+
     elif section == "music":
         text = (
             f"🎵 **PANDUAN PEMUTAR MUSIK YOUTUBE PC (/play & /music)**\n"
@@ -1026,6 +1372,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"Selamat datang! Ini adalah buku panduan lengkap pendamping AI otonom kamu yang berjalan 100% lokal di PC tanpa batasan sensor (SFW & NSFW).\n\n"
             f"📚 **Pilih Kategori Panduan:**\n"
             f"• 🧠 **Buku Ingatan (/memory)**: Memori abadi & catatan harian waifu.\n"
+            f"• 🎂 **Ultah & Anniv (/birthday)**: Perayaan hari lahir & hari jadian romantis.\n"
             f"• ⏰ **Asisten & Pengingat (/remind)**: Jadwal alarm & pengingat tugas manis.\n"
             f"• 💬 **Chat & Romansa**: Ngobrol bebas, gombalan, dan level kasih sayang.\n"
             f"• 📸 **Foto & PAP**: Cara minta selfie, menu pose interaktif, dan rasio foto.\n"
@@ -1035,6 +1382,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"• ⚙️ **Panel Setup**: Kontrol model LLM, ComfyUI, dan autorun PC.\n\n"
             f"📋 **Daftar Perintah Cepat:**\n"
             f"`/start` - Kenalan & mulai obrolan baru\n"
+            f"`/birthday` - Catat ulang tahun & anniversary\n"
             f"`/remind` - Asisten pribadi & pengingat jadwal manis\n"
             f"`/memory` - Buku ingatan & catatan harian waifu\n"
             f"`/setup` - Panel kontrol & konfigurasi lengkap\n"
@@ -1056,6 +1404,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
         )
         markup.add(
             types.InlineKeyboardButton("🧠 Buku Ingatan", callback_data="help_sec:memory"),
+            types.InlineKeyboardButton("🎂 Ultah & Anniv", callback_data="help_sec:dates"),
             types.InlineKeyboardButton("⏰ Pengingat Jadwal", callback_data="help_sec:reminders"),
             types.InlineKeyboardButton("💬 Chat & Romansa", callback_data="help_sec:chat"),
             types.InlineKeyboardButton("📸 Foto & PAP", callback_data="help_sec:photo"),
@@ -1465,7 +1814,7 @@ def callback_set_persona(call):
                 logger.error(f"Error sending switched persona photo: {e}")
 
 
-@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'open_reminders_menu', 'open_music_menu', 'open_pap_menu', 'check_love_status', 'start_new_persona'))
+@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'open_reminders_menu', 'open_dates_menu', 'open_music_menu', 'open_pap_menu', 'check_love_status', 'start_new_persona'))
 def callback_quick_actions(call):
     if not is_authorized(call.from_user.id):
         bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
@@ -1489,6 +1838,8 @@ def callback_quick_actions(call):
         show_memory_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_reminders_menu':
         show_reminders_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'open_dates_menu':
+        show_special_dates_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_music_menu':
         show_music_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_pap_menu':
@@ -2412,6 +2763,79 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
             bot.reply_to(message, confirm_msg, parse_mode="Markdown", reply_markup=markup)
             return
 
+        # Check if user is currently answering a date wizard prompt (Birthday / Anniversary)
+        if message.from_user.id in USER_DATE_WIZARD:
+            target_field = USER_DATE_WIZARD.pop(message.from_user.id)
+            if user_text.lower().strip() in ('batal', 'cancel', 'kembali', 'exit'):
+                bot.reply_to(message, "Pengaturan tanggal dibatalkan sayang.")
+                return
+
+            parsed = AnniversaryEngine.parse_date(user_text)
+            if parsed:
+                day, month, year, label = parsed
+                persona = persona_mgr.get_active_persona()
+                p_name = persona.get("name", "Waifu")
+                if target_field == "birthday":
+                    anniversary_engine.set_birthday(message.from_user.id, day, month, year)
+                    memory_engine.update_profile(message.from_user.id, birthday=label)
+                    cd = anniversary_engine.get_countdown(day, month)
+                    cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                    reply_msg = (
+                        f"🎂 **Hari Ulang Tahunmu Berhasil Dicatat!** 🥰\n\n"
+                        f"Tanggal: **{label}** _({cd_str})_\n\n"
+                        f"Setiap kali ulang tahunmu tiba, {p_name} bakal siapin kejutan kue dan foto romantis spesial buat kamu sayang! 💕"
+                    )
+                else:
+                    anniversary_engine.set_anniversary(message.from_user.id, day, month, year)
+                    cd = anniversary_engine.get_countdown(day, month)
+                    cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                    reply_msg = (
+                        f"💍 **Hari Anniversary Kita Berhasil Dicatat!** 🥰\n\n"
+                        f"Tanggal: **{label}** _({cd_str})_\n\n"
+                        f"Aku senang banget kita punya tanggal jadian resmi sayang. Nanti pas hari anniversary kita, siap-siap dapat kado spesial dari aku yaa! 💕"
+                    )
+                markup = types.InlineKeyboardMarkup()
+                markup.add(types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu"))
+                bot.reply_to(message, reply_msg, reply_markup=markup, parse_mode="Markdown")
+                return
+            else:
+                USER_DATE_WIZARD[message.from_user.id] = target_field
+                bot.reply_to(
+                    message,
+                    "⚠️ Format tanggal belum dikenali sayang. Coba ketik seperti: `15 Agustus 1998` atau `24/10/2000` yaa! (Atau ketik `batal`)"
+                )
+                return
+
+        # Check natural special date mention in chat (e.g. "sayang ultahku 15 agustus lho")
+        spec_date_res = AnniversaryEngine.extract_special_dates_from_chat(user_text)
+        if spec_date_res:
+            dtype, day, month, year, label = spec_date_res
+            persona = persona_mgr.get_active_persona()
+            p_name = persona.get("name", "Waifu")
+            if dtype == "birthday":
+                anniversary_engine.set_birthday(message.from_user.id, day, month, year)
+                memory_engine.update_profile(message.from_user.id, birthday=label)
+                cd = anniversary_engine.get_countdown(day, month)
+                cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                conf_msg = (
+                    f"🎂 **Wah, {p_name} catat yaa sayang!** 🥰\n\n"
+                    f"Hari ulang tahunmu tanggal **{label}** ({cd_str}) kan manis? "
+                    f"Aku pasti bakal selalu ingat dan siapin kejutan paling manis pas harinya tiba! Love you! 💕"
+                )
+            else:
+                anniversary_engine.set_anniversary(message.from_user.id, day, month, year)
+                cd = anniversary_engine.get_countdown(day, month)
+                cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                conf_msg = (
+                    f"💍 **Aaaa manisnya! {p_name} simpan di hati ya!** 🥰\n\n"
+                    f"Tanggal jadian kita **{label}** ({cd_str})! "
+                    f"Aku bahagia banget bisa sama kamu sayang, aku bakal selalu rayain hari istimewa kita! 💕"
+                )
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu"))
+            bot.reply_to(message, conf_msg, reply_markup=markup, parse_mode="Markdown")
+            return
+
         if user_text.startswith("```python") and user_text.endswith("```"):
             code = user_text.replace("```python", "").replace("```", "").strip()
             with ChatActionLoop(bot, message.chat.id, "typing"):
@@ -2875,6 +3299,20 @@ def schedule_daily_greetings():
                 except Exception as rem_err:
                     logger.error(f"Error dispatching reminder {rem.get('id')}: {rem_err}")
 
+            # Check today's birthday or anniversary celebrations (between 08:00 and 23:00)
+            if 8 <= hour <= 23:
+                today_celebs = anniversary_engine.check_today_celebrations()
+                for celeb in today_celebs:
+                    try:
+                        c_uid = celeb["user_id"]
+                        c_type = celeb["type"]
+                        c_yrs = celeb.get("years")
+                        anniversary_engine.mark_celebrated(c_uid, c_type)
+                        send_special_day_celebration(c_uid, c_uid, c_type, years=c_yrs)
+                        logger.info(f"Dispatched {c_type} celebration to user {c_uid}")
+                    except Exception as c_err:
+                        logger.error(f"Error dispatching special day celebration: {c_err}")
+
         except Exception as e:
             logger.error(f"Scheduler loop error: {e}")
         time.sleep(15)
@@ -2884,6 +3322,7 @@ def setup_bot_commands():
     """Registers bot commands with Telegram so the Menu / Command button displays them."""
     commands = [
         types.BotCommand("start", "Mulai obrolan & panduan utama"),
+        types.BotCommand("birthday", "🎂 Catat ulang tahun & anniversary"),
         types.BotCommand("remind", "⏰ Pengingat jadwal & asisten pribadi"),
         types.BotCommand("memory", "🧠 Buku harian & ingatan waifu"),
         types.BotCommand("setup", "⚙️ Panel kontrol & pengaturan lengkap"),
