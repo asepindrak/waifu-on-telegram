@@ -3,6 +3,7 @@ import sys
 import re
 import json
 import base64
+import time
 import logging
 import requests
 from typing import List, Dict, Any, Optional, Tuple
@@ -203,23 +204,26 @@ class LocallyUncensoredClient:
             "messages": payload_messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
+            "chat_template_kwargs": {"enable_thinking": False},
+            "reasoning_budget": 0,
             "stream": False
         }
 
-        try:
-            resp = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=self.timeout
-            )
+        max_retries = 3
+        resp = None
+        for attempt in range(max_retries):
+            try:
+                resp = requests.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout
+                )
 
-            # If 401 Unauthorized, refresh the extracted key and retry once
-            if resp.status_code == 401 and self.config_api_key.lower() == "auto":
-                new_key = extract_llama_key_from_process()
-                if new_key and new_key != self.cached_api_key:
-                    self.cached_api_key = new_key
-                    headers["Authorization"] = f"Bearer {new_key}"
+                # If backend rejected reasoning kwargs (400 Bad Request), fallback to standard payload
+                if resp.status_code == 400:
+                    payload.pop("chat_template_kwargs", None)
+                    payload.pop("reasoning_budget", None)
                     resp = requests.post(
                         f"{self.base_url}/chat/completions",
                         headers=headers,
@@ -227,38 +231,67 @@ class LocallyUncensoredClient:
                         timeout=self.timeout
                     )
 
-            resp.raise_for_status()
-            data = resp.json()
+                # If 401 Unauthorized, refresh the extracted key and retry once
+                if resp.status_code == 401 and self.config_api_key.lower() == "auto":
+                    new_key = extract_llama_key_from_process()
+                    if new_key and new_key != self.cached_api_key:
+                        self.cached_api_key = new_key
+                        headers["Authorization"] = f"Bearer {new_key}"
+                        resp = requests.post(
+                            f"{self.base_url}/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=self.timeout
+                        )
 
-            choice = data["choices"][0]["message"]
-            raw_content = choice.get("content", "") or ""
-            reasoning = choice.get("reasoning_content", "") or ""
+                # If 503 (model loading), wait briefly and retry
+                if resp.status_code == 503 and attempt < max_retries - 1:
+                    logger.warning("Local LLM model is loading (503), retrying in 3s...")
+                    time.sleep(3)
+                    continue
 
-            # If reasoning was enclosed inside <think> tags in content
-            if "<think>" in raw_content and "</think>" in raw_content:
-                parts = re.split(r"</think>", raw_content, flags=re.DOTALL)
-                think_part = parts[0].replace("<think>", "").strip()
-                clean_reply = parts[1].strip()
-                reasoning = think_part
-            elif "<think>" in raw_content:
-                # Thought started but never finished (token limit hit during thinking)
-                clean_reply = ""
-                reasoning = raw_content.replace("<think>", "").strip()
-            else:
-                clean_reply = raw_content.strip()
+                resp.raise_for_status()
+                break
 
-            # If clean_reply was empty because tokens ended during reasoning:
-            if not clean_reply and reasoning:
-                # Look for quoted dialogue inside reasoning: e.g. "Lagi nunggu kamu kok, sayang!"
-                quotes = re.findall(r'"([^"]{5,120})"', reasoning)
-                if quotes:
-                    clean_reply = quotes[-1].strip()
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Local LLM not ready yet ({e}), retrying in 3s (attempt {attempt + 1}/{max_retries})...")
+                    time.sleep(3)
                 else:
-                    # Look for Indonesian or affectionate sentence inside reasoning
-                    clean_reply = "Hai sayang! Aku lagi di sini kok nemenin kamu~ 🥰 Ada yang mau diceritain manis?"
+                    logger.error(f"Local LLM connection failed after {max_retries} attempts: {e}")
+                    raise RuntimeError(f"Gagal menghubungi Local LLM ({e})")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"LLM request error: {e}")
+                raise RuntimeError(f"Gagal menghubungi Local LLM ({e})")
+        data = resp.json()
 
-            return clean_reply, reasoning
+        choice = data["choices"][0]["message"]
+        raw_content = choice.get("content", "") or ""
+        reasoning = choice.get("reasoning_content", "") or ""
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"LLM request error: {e}")
-            raise RuntimeError(f"Gagal menghubungi Local LLM ({e})")
+        # If reasoning was enclosed inside <think> tags in content
+        if "<think>" in raw_content and "</think>" in raw_content:
+            parts = re.split(r"</think>", raw_content, flags=re.DOTALL)
+            think_part = parts[0].replace("<think>", "").strip()
+            clean_reply = parts[1].strip()
+            reasoning = think_part
+        elif "<think>" in raw_content:
+            # Thought started but never finished (token limit hit during thinking)
+            clean_reply = ""
+            reasoning = raw_content.replace("<think>", "").strip()
+        else:
+            clean_reply = raw_content.strip()
+
+        # If clean_reply was empty because tokens ended during reasoning:
+        if not clean_reply and reasoning:
+            # Look for quoted dialogue inside reasoning: e.g. "Lagi nunggu kamu kok, sayang!"
+            quotes = re.findall(r'"([^"]{5,120})"', reasoning)
+            if quotes:
+                clean_reply = quotes[-1].strip()
+            else:
+                # Look for Indonesian or affectionate sentence inside reasoning
+                clean_reply = "Hai sayang! Aku lagi di sini kok nemenin kamu~ 🥰 Ada yang mau diceritain manis?"
+
+        return clean_reply, reasoning
+
+
