@@ -85,7 +85,8 @@ def handle_welcome(message):
         "• 💻 **Coding Assistant**: Ask me to write or execute Python snippets.\n\n"
         "📌 **Quick Commands:**\n"
         "• `/photo <scene>` - Request a photo with a custom scenario\n"
-        "• `/persona` - View or switch active persona\n"
+        "• `/persona` - View or switch active persona via interactive buttons\n"
+        "• `/love` - Check your romantic affection level with your waifu\n"
         "• `/status` - Check Local LLM & ComfyUI diagnostics\n"
         "• `/reset` - Clear chat memory\n"
     )
@@ -135,14 +136,73 @@ def handle_persona(message):
         else:
             bot.reply_to(message, f"⚠️ Persona `{chosen}` was not found.")
 
-    # Show list
+    # Show interactive inline keyboard
     personas = persona_mgr.list_personas()
-    active = persona_mgr.get_active_persona().get("name")
-    lines = [f"🎭 **Available Waifu Personas:** (Active: **{active}**)\n"]
+    active_key = persona_mgr.active_key
+    active_name = persona_mgr.get_active_persona().get("name")
+    
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    buttons = []
+    lines = [f"🎭 **Available Waifu Personas** (Active: **{active_name}**):\n"]
     for key, name, desc in personas:
-        lines.append(f"• `/persona {key}` : **{name}** — {desc}")
-    lines.append("\nType `/persona <name>` to switch character.")
-    bot.reply_to(message, "\n".join(lines), parse_mode="Markdown")
+        is_curr = (key == active_key)
+        lines.append(f"• **{name}** {'*(Currently Active)*' if is_curr else ''} — _{desc}_")
+        btn_label = f"💖 {name} ✓" if is_curr else f"✨ Switch to {name}"
+        buttons.append(types.InlineKeyboardButton(btn_label, callback_data=f"set_persona:{key}"))
+    
+    markup.add(*buttons)
+    lines.append("\nTap a button below or type `/persona <name>`:")
+    bot.reply_to(message, "\n".join(lines), reply_markup=markup, parse_mode="Markdown")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('set_persona:'))
+def callback_set_persona(call):
+    if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        return
+
+    chosen = call.data.split(":", 1)[1]
+    if persona_mgr.set_active_persona(chosen):
+        p = persona_mgr.get_active_persona()
+        bot.answer_callback_query(call.id, f"Switched to {p.get('name')}!")
+        try:
+            bot.edit_message_text(
+                f"💖 Active companion switched to **{p.get('name')}**! 🥰\n_{p.get('description')}_",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('regen_photo:'))
+def callback_regen_photo(call):
+    if not is_authorized(call.from_user.id):
+        return
+
+    scenario = call.data.split(":", 1)[1]
+    bot.answer_callback_query(call.id, "Generating another pose... 💕")
+    process_photo_request(call.message, scenario)
+
+
+@bot.message_handler(commands=['love', 'affection'])
+def handle_affection_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    persona = persona_mgr.get_active_persona()
+    score, status = persona_mgr.get_relationship_status(message.from_user.id)
+    filled = int(score / 10)
+    bar = "❤️" * filled + "🤍" * (10 - filled)
+
+    reply = (
+        f"💖 **Affection & Romance Status** with **{persona.get('name')}**\n\n"
+        f"• **Relationship**: {status}\n"
+        f"• **Love Meter**: `[{bar}]` **{score}%**\n\n"
+        f"_{persona.get('name')} cherishes every message and moment spent with you, darling! Keep chatting and asking for photos to grow your bond closer._ 🥰"
+    )
+    bot.reply_to(message, reply, parse_mode="Markdown")
 
 
 @bot.message_handler(commands=['reset'])
@@ -197,8 +257,14 @@ def process_photo_request(message, user_text: str):
             except Exception:
                 pass
 
-            bot.send_photo(message.chat.id, img_bytes, caption=clean_caption)
+            # Inline button for quick pose variant
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔄 Pose Lain (New Pose)", callback_data=f"regen_photo:{user_text[:35]}"))
 
+            bot.send_photo(message.chat.id, img_bytes, caption=clean_caption, reply_markup=markup)
+
+            # Increase affection on photo request
+            persona_mgr.increase_affinity(message.from_user.id, delta=2)
             persona_mgr.add_message(message.from_user.id, "user", f"[Requested photo: {user_text}]")
             persona_mgr.add_message(message.from_user.id, "assistant", f"[Sent selfie photo] {clean_caption}")
 
@@ -308,6 +374,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
         if not reply_text:
             reply_text = "I'm right here with you sweetheart, always listening... 🥰"
 
+        persona_mgr.increase_affinity(message.from_user.id, delta=1)
         persona_mgr.add_message(message.from_user.id, "user", user_text)
         persona_mgr.add_message(message.from_user.id, "assistant", reply_text)
 

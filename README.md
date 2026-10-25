@@ -141,8 +141,9 @@ An interactive menu will open:
 | `/start` or `/help` | Welcome greeting and feature overview |
 | `/status` | Real-time diagnostic check of LLM (Port 8127), ComfyUI (8188), and VRAM |
 | `/photo <scene>` | Request a custom selfie scenario (e.g. `/photo relaxing in cafe`) |
-| `/pap` | Quick shortcut to request a new selfie |
-| `/persona` | View available waifu personas and switch active companion |
+| `/pap` | Quick shortcut to request a new selfie with interactive retry button |
+| `/love` | Check your affection score & relationship progress with your waifu |
+| `/persona` | Interactive inline button menu to switch active companion |
 | `/persona <name>` | Switch persona directly (e.g. `/persona aoi`) |
 | `/reset` | Clear conversation memory to start a fresh discussion |
 

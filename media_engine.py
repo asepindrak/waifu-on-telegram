@@ -52,24 +52,62 @@ class MediaEngine:
             pass
         return []
 
+    def get_available_vaes(self) -> list:
+        """Queries ComfyUI for available VAE models."""
+        try:
+            r = requests.get(f"{self.comfyui_url}/object_info/VAELoader", timeout=4)
+            if r.status_code == 200:
+                data = r.json()
+                return data["VAELoader"]["input"]["required"]["vae_name"][0]
+        except Exception:
+            pass
+        return []
+
     def generate_image_comfyui(
         self,
         prompt: str,
-        negative_prompt: str = "worst quality, low quality, bad anatomy, deformed, blurry, extra limbs",
-        width: int = 768,
-        height: int = 1024,
+        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
+        width: Optional[int] = None,
+        height: Optional[int] = None,
         steps: int = 25,
         cfg: float = 7.0
     ) -> Optional[bytes]:
-        """Runs standard Text-to-Image workflow on local ComfyUI."""
+        """Runs standard Text-to-Image workflow on local ComfyUI with optimal anime settings."""
         ckpts = self.get_available_checkpoints()
         if not ckpts:
             logger.warning("No ComfyUI checkpoints found for T2I.")
             return None
 
-        # Choose the first available checkpoint
+        # Choose checkpoint: prefer user config COMFYUI_CHECKPOINT from .env if available
+        env_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "").strip()
         chosen_ckpt = ckpts[0]
+        if env_ckpt:
+            matched = [c for c in ckpts if env_ckpt.lower() in c.lower()]
+            if matched:
+                chosen_ckpt = matched[0]
+
+        is_sdxl = any(k in chosen_ckpt.lower() for k in ["xl", "sdxl", "pony", "illustrious"])
+        
+        # Optimal dimensions for SD 1.5 vs SDXL on 6GB VRAM
+        if width is None or height is None:
+            if is_sdxl:
+                width, height = 832, 1216
+            else:
+                width, height = 512, 768  # 512x768 prevents classic SD 1.5 mutant duplicate heads!
+
+        # Optimal sampler: DPM++ 2M Karras for Anime models (AOM3, MeinaMix)
+        sampler_name = "euler_ancestral" if is_sdxl else "dpmpp_2m"
+        scheduler_name = "normal" if is_sdxl else "karras"
+
         seed = random.randint(10000000, 99999999)
+
+        # Detect optional external VAE (e.g. orangemix.vae.pt)
+        available_vaes = self.get_available_vaes()
+        chosen_vae = None
+        for v in available_vaes:
+            if any(k in v.lower() for k in ["orangemix", "anime", "vae-ft", "kl-f8"]):
+                chosen_vae = v
+                break
 
         workflow = {
             "4": {
@@ -94,8 +132,8 @@ class MediaEngine:
                     "seed": seed,
                     "steps": steps,
                     "cfg": cfg,
-                    "sampler_name": "euler",
-                    "scheduler": "normal",
+                    "sampler_name": sampler_name,
+                    "scheduler": scheduler_name,
                     "denoise": 1.0,
                     "model": ["4", 0],
                     "positive": ["6", 0],
@@ -105,13 +143,20 @@ class MediaEngine:
             },
             "8": {
                 "class_type": "VAEDecode",
-                "inputs": {"samples": ["3", 0], "vae": ["4", 2]}
+                "inputs": {"samples": ["3", 0], "vae": ["10", 0] if chosen_vae else ["4", 2]}
             },
             "9": {
                 "class_type": "SaveImage",
-                "inputs": {"filename_prefix": "AIGirlfriend", "images": ["8", 0]}
+                "inputs": {"filename_prefix": "WaifuSelfie", "images": ["8", 0]}
             }
         }
+
+        # If a dedicated anime VAE exists in models/vae, wire it in
+        if chosen_vae:
+            workflow["10"] = {
+                "class_type": "VAELoader",
+                "inputs": {"vae_name": chosen_vae}
+            }
 
         try:
             # Queue prompt

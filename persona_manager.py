@@ -167,3 +167,27 @@ class PersonaManager:
         """Clears chat history for user."""
         if user_id in self.user_conversations:
             self.user_conversations[user_id] = []
+
+    def get_affinity(self, user_id: int) -> int:
+        """Returns affection points (0-100)."""
+        return self.user_affinity.get(user_id, 15)
+
+    def increase_affinity(self, user_id: int, delta: int = 1) -> int:
+        """Increases affection score smoothly."""
+        cur = self.get_affinity(user_id) + delta
+        new_val = min(max(cur, 0), 100)
+        self.user_affinity[user_id] = new_val
+        return new_val
+
+    def get_relationship_status(self, user_id: int) -> Tuple[int, str]:
+        """Returns (score, relationship_title)."""
+        score = self.get_affinity(user_id)
+        if score < 25:
+            status = "🌱 Close Friends"
+        elif score < 50:
+            status = "🌸 Sweethearts"
+        elif score < 75:
+            status = "💖 Deeply in Love"
+        else:
+            status = "👑 Soulmates"
+        return score, status
