@@ -63,5 +63,6 @@ Thumbs.db
 
 # Whitelist project assets & persona reference artwork
 !logo.png
+!waifu-on-telegram.jpg
 !assets/**
 !personas/brief/**

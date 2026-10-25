@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="Waifu on Telegram Logo" width="320" style="border-radius: 20px;" />
+  <img src="waifu-on-telegram.jpg" alt="Waifu on Telegram Wallpaper" width="100%" style="border-radius: 12px;" />
 </p>
 
 # 💖 Waifu on Telegram 🤖
