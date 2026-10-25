@@ -63,14 +63,50 @@ class MediaEngine:
             pass
         return []
 
+    @staticmethod
+    def get_dimensions(aspect_ratio: str = "3:4", is_sdxl: bool = False) -> Tuple[int, int]:
+        """Calculates optimal (width, height) tailored for SD 1.5 or SDXL based on aspect ratio."""
+        ar = aspect_ratio.strip().replace(" ", "")
+        if is_sdxl:
+            table = {
+                "3:4": (896, 1152),
+                "4:3": (1152, 896),
+                "9:16": (720, 1280),
+                "16:9": (1280, 720),
+                "1:1": (1024, 1024)
+            }
+            return table.get(ar, (896, 1152))
+        else: # SD 1.5 (MeinaMix, AOM3)
+            table = {
+                "3:4": (576, 768),   # 3:4 portrait (576/768 = 0.75)
+                "4:3": (768, 576),   # 4:3 landscape
+                "9:16": (512, 910),  # Smartphone story/wallpaper
+                "16:9": (910, 512),  # Widescreen
+                "1:1": (512, 512)    # Square avatar
+            }
+            return table.get(ar, (576, 768))
+
+    @staticmethod
+    def get_quality_params(quality: str = "high") -> Tuple[int, float]:
+        """Returns (steps, cfg) based on desired quality preset."""
+        q = quality.lower().strip()
+        if q in ("ultra", "best", "very_high"):
+            return 32, 8.0
+        elif q in ("fast", "low", "standard"):
+            return 20, 7.0
+        else: # high (MeinaMix sweet spot)
+            return 28, 7.5
+
     def generate_image_comfyui(
         self,
         prompt: str,
         negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
+        aspect_ratio: Optional[str] = None,
+        quality: Optional[str] = None,
         width: Optional[int] = None,
         height: Optional[int] = None,
-        steps: int = 25,
-        cfg: float = 7.0
+        steps: Optional[int] = None,
+        cfg: Optional[float] = None
     ) -> Optional[bytes]:
         """Runs standard Text-to-Image workflow on local ComfyUI with optimal anime settings."""
         ckpts = self.get_available_checkpoints()
@@ -78,24 +114,49 @@ class MediaEngine:
             logger.warning("No ComfyUI checkpoints found for T2I.")
             return None
 
-        # Choose checkpoint: prefer user config COMFYUI_CHECKPOINT from .env if available
+        # Smart Checkpoint Selection:
+        # 1. Environment variable if user configured specific model
         env_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "").strip()
-        chosen_ckpt = ckpts[0]
+        chosen_ckpt = None
         if env_ckpt:
             matched = [c for c in ckpts if env_ckpt.lower() in c.lower()]
             if matched:
                 chosen_ckpt = matched[0]
 
-        is_sdxl = any(k in chosen_ckpt.lower() for k in ["xl", "sdxl", "pony", "illustrious"])
-        
-        # Optimal dimensions for SD 1.5 vs SDXL on 6GB VRAM
-        if width is None or height is None:
-            if is_sdxl:
-                width, height = 832, 1216
-            else:
-                width, height = 512, 768  # 512x768 prevents classic SD 1.5 mutant duplicate heads!
+        # 2. Prefer MeinaMix if present in folder
+        if not chosen_ckpt:
+            for c in ckpts:
+                if "meina" in c.lower():
+                    chosen_ckpt = c
+                    break
 
-        # Optimal sampler: DPM++ 2M Karras for Anime models (AOM3, MeinaMix)
+        # 3. Prefer AOM3 / OrangeMix if present
+        if not chosen_ckpt:
+            for c in ckpts:
+                if any(k in c.lower() for k in ["aom", "orange"]):
+                    chosen_ckpt = c
+                    break
+
+        # 4. Fallback to first available checkpoint
+        if not chosen_ckpt:
+            chosen_ckpt = ckpts[0]
+
+        is_sdxl = any(k in chosen_ckpt.lower() for k in ["xl", "sdxl", "pony", "illustrious"])
+
+        # Determine Aspect Ratio & Dimensions
+        ar = aspect_ratio or os.environ.get("IMAGE_ASPECT_RATIO", "3:4")
+        if width is None or height is None:
+            width, height = self.get_dimensions(ar, is_sdxl=is_sdxl)
+
+        # Determine Quality Parameters (steps & cfg)
+        qual = quality or os.environ.get("IMAGE_QUALITY", "high")
+        def_steps, def_cfg = self.get_quality_params(qual)
+        if steps is None:
+            steps = def_steps
+        if cfg is None:
+            cfg = def_cfg
+
+        # Optimal sampler: DPM++ 2M Karras for MeinaMix / Anime SD 1.5
         sampler_name = "euler_ancestral" if is_sdxl else "dpmpp_2m"
         scheduler_name = "normal" if is_sdxl else "karras"
 
@@ -114,17 +175,22 @@ class MediaEngine:
                 "class_type": "CheckpointLoaderSimple",
                 "inputs": {"ckpt_name": chosen_ckpt}
             },
+            # Clip Skip 2 for anime models (MeinaMix & AOM3)
+            "11": {
+                "class_type": "CLIPSetLastLayer",
+                "inputs": {"stop_at_clip_layer": -2, "clip": ["4", 1]}
+            },
             "5": {
                 "class_type": "EmptyLatentImage",
                 "inputs": {"width": width, "height": height, "batch_size": 1}
             },
             "6": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"text": prompt, "clip": ["4", 1]}
+                "inputs": {"text": prompt, "clip": ["11", 0]}
             },
             "7": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"text": negative_prompt, "clip": ["4", 1]}
+                "inputs": {"text": negative_prompt, "clip": ["11", 0]}
             },
             "3": {
                 "class_type": "KSampler",
@@ -224,7 +290,13 @@ class MediaEngine:
 
         return None
 
-    def generate_photo(self, visual_prompt: str, negative_prompt: Optional[str] = None) -> Tuple[Optional[bytes], str]:
+    def generate_photo(
+        self,
+        visual_prompt: str,
+        negative_prompt: Optional[str] = None,
+        aspect_ratio: Optional[str] = None,
+        quality: Optional[str] = None
+    ) -> Tuple[Optional[bytes], str]:
         """
         Main entry for photo generation.
         Tries local ComfyUI first; if offline or fails, falls back to cloud.
@@ -232,16 +304,19 @@ class MediaEngine:
         """
         # 1. Try local ComfyUI
         if self.comfyui_url:
-            if negative_prompt:
-                local_img = self.generate_image_comfyui(visual_prompt, negative_prompt=negative_prompt)
-            else:
-                local_img = self.generate_image_comfyui(visual_prompt)
+            local_img = self.generate_image_comfyui(
+                visual_prompt,
+                negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
+                aspect_ratio=aspect_ratio,
+                quality=quality
+            )
             if local_img:
-                return local_img, "ComfyUI Local (RTX 3050)"
+                return local_img, "ComfyUI Local"
 
         # 2. Cloud Fallback
         if self.allow_cloud_fallback:
-            cloud_img = self.generate_image_cloud_fallback(visual_prompt)
+            w, h = self.get_dimensions(aspect_ratio or "3:4", is_sdxl=False)
+            cloud_img = self.generate_image_cloud_fallback(visual_prompt, width=w, height=h)
             if cloud_img:
                 return cloud_img, "Cloud Engine (Free GPU)"
 

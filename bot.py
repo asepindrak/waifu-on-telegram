@@ -61,6 +61,8 @@ voice_engine = VoiceEngine(
 USER_VOICE_MODES: dict = {}      # user_id -> 'always' | 'match_vn' | 'off'
 GREETINGS_ENABLED: dict = {}     # user_id -> bool
 LAST_GREETING_SENT: dict = {}    # "YYYY-MM-DD:morning" -> True
+USER_RATIOS: dict = {}           # user_id -> '3:4' | '9:16' | '1:1' | '4:3'
+USER_QUALITIES: dict = {}        # user_id -> 'high' | 'ultra' | 'fast'
 
 def is_authorized(user_id: int) -> bool:
     """Verifies if the user is authorized to interact with the bot."""
@@ -91,6 +93,7 @@ def handle_welcome(message):
         "• 💻 **Coding Assistant**: Ask me to write or execute Python snippets.\n\n"
         "📌 **Quick Commands:**\n"
         "• `/photo <scene>` or `/pap` - Request a selfie with interactive retry\n"
+        "• `/ratio` - Change photo aspect ratio (3:4, 9:16, 1:1, 4:3)\n"
         "• `/outfit` - Open wardrobe to change what I wear in photos\n"
         "• `/persona` - Switch active waifu companion with 1-tap buttons\n"
         "• `/love` - Check our affection score & romantic bond progress\n"
@@ -325,6 +328,48 @@ def handle_greetings_command(message):
     )
 
 
+@bot.message_handler(commands=['ratio', 'aspect_ratio'])
+def handle_ratio_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    cur_ar = USER_RATIOS.get(message.from_user.id, "3:4")
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    btns = [
+        types.InlineKeyboardButton(f"📐 3:4 (Portrait) {'✓' if cur_ar == '3:4' else ''}", callback_data="set_ratio:3:4"),
+        types.InlineKeyboardButton(f"📱 9:16 (Story/Wallpaper) {'✓' if cur_ar == '9:16' else ''}", callback_data="set_ratio:9:16"),
+        types.InlineKeyboardButton(f"⏹️ 1:1 (Square Avatar) {'✓' if cur_ar == '1:1' else ''}", callback_data="set_ratio:1:1"),
+        types.InlineKeyboardButton(f"🖥️ 4:3 (Landscape) {'✓' if cur_ar == '4:3' else ''}", callback_data="set_ratio:4:3"),
+    ]
+    markup.add(*btns)
+    bot.reply_to(
+        message,
+        f"📐 **Photo Aspect Ratio Settings**\n\n"
+        f"• Current Ratio: **{cur_ar}**\n\n"
+        f"Select the aspect ratio for waifu selfies & photos:",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('set_ratio:'))
+def callback_set_ratio(call):
+    if not is_authorized(call.from_user.id):
+        return
+    ar = call.data.split(":", 1)[1]
+    USER_RATIOS[call.from_user.id] = ar
+    bot.answer_callback_query(call.id, f"Aspect ratio set to {ar}!")
+    try:
+        bot.edit_message_text(
+            f"📐 **Aspect Ratio Updated!**\n\nUpcoming photos will be generated in **{ar}** format! 📸",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            parse_mode="Markdown"
+        )
+    except Exception:
+        pass
+
+
 @bot.message_handler(commands=['reset'])
 def handle_reset(message):
     if not is_authorized(message.from_user.id):
@@ -368,7 +413,14 @@ def process_photo_request(message, user_text: str):
     def run_gen():
         try:
             neg_p = persona.get("negative_prompt")
-            img_bytes, source = media_engine.generate_photo(visual_prompt, negative_prompt=neg_p)
+            u_ar = USER_RATIOS.get(user_id, "3:4")
+            u_qual = USER_QUALITIES.get(user_id, "high")
+            img_bytes, source = media_engine.generate_photo(
+                visual_prompt,
+                negative_prompt=neg_p,
+                aspect_ratio=u_ar,
+                quality=u_qual
+            )
             if not img_bytes:
                 bot.edit_message_text(
                     "I'm sorry darling, my camera is acting up a little... I will try again soon! 🥺",
