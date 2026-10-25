@@ -1703,9 +1703,12 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
             {"role": "system", "content": persona.get("system_instruction", "")},
             {"role": "user", "content": prompt}
         ]
-        text, _ = llm_client.chat(messages, max_tokens=150)
+        try:
+            text, _ = llm_client.chat(messages, max_tokens=150)
+        except Exception:
+            text = None
         if not text:
-            text = "Good morning sweetheart! Hope your day is filled with joy and smile~ 🥰" if time_of_day == "morning" else "Good night darling, sleep tight and sweet dreams! 💕"
+            text = "Selamat pagi sayang! Semoga harimu menyenangkan dan penuh senyuman yaa~ 🥰" if time_of_day == "morning" else "Selamat tidur manisku, istirahat yang nyenyak dan mimpi indah yaa~ 💕"
 
         tag = "🌅 *Good Morning Sweetheart!*" if time_of_day == "morning" else "🌙 *Good Night Darling...*"
         bot.send_message(user_id, f"{tag}\n\n{text}", parse_mode="Markdown")
