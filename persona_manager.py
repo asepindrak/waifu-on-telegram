@@ -111,35 +111,35 @@ OUTFIT_PRESETS = {
     },
     "sweater": {
         "name": "👚 Pastel Sweater (Cozy)",
-        "prompt": "wearing cute oversized pastel knitted sweater, cozy comfy style"
+        "prompt": "(wearing cute oversized pastel knitted sweater:1.35), cozy comfy style"
     },
     "maid": {
         "name": "🎀 French Maid Dress",
-        "prompt": "wearing cute frilly black and white anime maid outfit with lace headband and apron"
+        "prompt": "(wearing frilly black and white anime french maid uniform with lace headband and apron:1.35)"
     },
     "kimono": {
         "name": "👘 Floral Kimono",
-        "prompt": "wearing exquisite traditional floral silk kimono with decorated obi sash, festive hairpin"
+        "prompt": "(wearing exquisite traditional floral silk kimono with decorated obi sash, festive hairpin:1.35)"
     },
     "pajamas": {
         "name": "🌙 Silk Pajamas",
-        "prompt": "wearing soft pastel silk camisole and sleep shorts, cozy bedtime loungewear"
+        "prompt": "(wearing soft pastel silk camisole and sleep shorts:1.35), bedtime loungewear"
     },
     "bikini": {
         "name": "🏖️ Summer Bikini",
-        "prompt": "wearing stylish fashionable two-piece bikini, confident summer beach look"
+        "prompt": "(wearing fashionable two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling"
     },
     "school_jk": {
         "name": "🏫 School JK Uniform",
-        "prompt": "wearing japanese anime school uniform, sailor collar, pleated skirt"
+        "prompt": "(wearing japanese anime school uniform, sailor collar, pleated skirt:1.35)"
     },
     "gym": {
         "name": "🏋️ Sporty Gym Wear",
-        "prompt": "wearing athletic sports bra and sleek yoga leggings, fitness activewear"
+        "prompt": "(wearing athletic sports bra and sleek yoga leggings:1.35), fitness activewear"
     },
     "dress": {
         "name": "👗 Elegant Evening Dress",
-        "prompt": "wearing gorgeous elegant evening cocktail dress, glamorous feminine styling"
+        "prompt": "(wearing gorgeous elegant evening cocktail dress:1.35), glamorous feminine styling"
     }
 }
 
@@ -154,7 +154,36 @@ class PersonaManager:
         self.user_conversations: Dict[int, List[Dict[str, str]]] = {}
         self.user_affinity: Dict[int, int] = {}
         self.user_outfits: Dict[int, str] = {}
+        self.outfits_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_outfits.json")
         self._load_all_personas()
+        self._load_user_outfits()
+
+    def _load_user_outfits(self):
+        """Loads user selected outfits from persistent JSON storage."""
+        if os.path.exists(self.outfits_file):
+            try:
+                with open(self.outfits_file, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                    self.user_outfits = {int(k): str(v) for k, v in raw.items() if str(k).isdigit()}
+            except Exception as e:
+                logger.error(f"Error loading user outfits: {e}")
+                self.user_outfits = {}
+        else:
+            self.user_outfits = {}
+
+    def _save_user_outfits(self):
+        """Saves user selected outfits to persistent JSON storage."""
+        d = os.path.dirname(self.outfits_file)
+        if d and not os.path.exists(d):
+            try:
+                os.makedirs(d, exist_ok=True)
+            except Exception as e:
+                logger.error(f"Error creating dir for outfits: {e}")
+        try:
+            with open(self.outfits_file, "w", encoding="utf-8") as f:
+                json.dump({str(k): v for k, v in self.user_outfits.items()}, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving user outfits to {self.outfits_file}: {e}")
 
     def _load_all_personas(self):
         """Loads personas from default dictionary and local JSON files."""
@@ -207,15 +236,17 @@ class PersonaManager:
         return [(k, v["name"]) for k, v in OUTFIT_PRESETS.items()]
 
     def set_user_outfit(self, user_id: int, key: str) -> bool:
-        """Sets chosen outfit preset for user."""
+        """Sets chosen outfit preset for user and persists to disk."""
         if key in OUTFIT_PRESETS:
-            self.user_outfits[user_id] = key
+            self.user_outfits[int(user_id)] = key
+            self._save_user_outfits()
+            logger.info(f"User {user_id} outfit set and saved: {key}")
             return True
         return False
 
     def get_user_outfit(self, user_id: int) -> Tuple[str, str]:
         """Returns (key, name) of active outfit for user."""
-        key = self.user_outfits.get(user_id, "default")
+        key = self.user_outfits.get(int(user_id), "default")
         return key, OUTFIT_PRESETS.get(key, OUTFIT_PRESETS["default"])["name"]
 
     def extract_contextual_scene(
@@ -322,8 +353,9 @@ class PersonaManager:
 
         # Check user-selected custom outfit
         outfit_prompt = ""
+        outfit_key = "default"
         if user_id:
-            outfit_key = self.user_outfits.get(user_id, "default")
+            outfit_key = self.user_outfits.get(int(user_id), "default")
             if outfit_key != "default" and outfit_key in OUTFIT_PRESETS:
                 outfit_prompt = OUTFIT_PRESETS[outfit_key]["prompt"]
 

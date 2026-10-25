@@ -377,6 +377,8 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
     else:
         b_str = "Belum Disetel"
 
+    _, cur_outfit_name = persona_mgr.get_user_outfit(user_id)
+
     cur_llm = os.environ.get("LLM_MODEL", "default")
     if cur_llm == "default" or not cur_llm:
         cur_llm = "Auto-detect (Locally Uncensored)"
@@ -393,6 +395,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"⚙️ **WAIFU ON TELEGRAM - SETUP & SYSTEM CONTROL** `(v{get_version()})`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👑 **Waifu Aktif** : **{persona.get('name')}** _({persona.get('archetype', 'Companion')})_\n"
+        f"👗 **Pakaian**    : `{cur_outfit_name}`\n"
         f"🎙️ **Mode Suara** : `{v_labels.get(v_mode, v_mode)}`\n"
         f"🗣️ **Voice TTS**  : `{voice_engine.default_voice}`\n"
         f"🧠 **Model LLM**  : `{cur_llm}`\n"
@@ -2009,11 +2012,18 @@ def callback_set_outfit(call):
     if persona_mgr.set_user_outfit(call.from_user.id, key):
         _, name = persona_mgr.get_user_outfit(call.from_user.id)
         bot.answer_callback_query(call.id, f"Outfit set to: {name}")
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            types.InlineKeyboardButton("📸 Minta PAP Sekarang", callback_data="open_pap_menu"),
+            types.InlineKeyboardButton("👗 Ganti Pakaian Lain", callback_data="open_outfit_menu"),
+            types.InlineKeyboardButton("🔙 Panel Setup", callback_data="cfg_submenu:dashboard")
+        )
         try:
             bot.edit_message_text(
-                f"👗 **Outfit Updated!**\n\nYour waifu is now wearing **{name}** for upcoming photos! 🥰📸",
+                f"👗 **Outfit Berhasil Diganti!**\n\nWaifumu sekarang mengenakan **{name}** untuk sesi foto & selfie berikutnya! 🥰📸",
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
+                reply_markup=markup,
                 parse_mode="Markdown"
             )
         except Exception:
@@ -2196,7 +2206,15 @@ def process_photo_request(target, user_text: str):
     def run_gen():
         try:
             with ChatActionLoop(bot, chat_id, "upload_photo"):
-                neg_p = persona.get("negative_prompt")
+                neg_p = persona.get("negative_prompt", "")
+                outfit_key, _ = persona_mgr.get_user_outfit(user_id)
+                if outfit_key == "bikini":
+                    neg_p += ", clothes, casual clothes, hoodie, sweater, jacket, shirt, pants, coat, pajamas"
+                elif outfit_key == "pajamas":
+                    neg_p += ", hoodie, jacket, coat, outdoor clothes, jeans"
+                elif outfit_key == "maid":
+                    neg_p += ", casual clothes, hoodie, sweater, jacket, jeans"
+
                 u_ar = USER_RATIOS.get(user_id, "3:4")
                 u_qual = USER_QUALITIES.get(user_id, "high")
                 img_bytes, source = media_engine.generate_photo(
@@ -2311,7 +2329,15 @@ def process_video_request(target, user_text: str):
     def run_video_gen():
         try:
             with ChatActionLoop(bot, chat_id, "upload_video"):
-                neg_p = persona.get("negative_prompt")
+                neg_p = persona.get("negative_prompt", "")
+                outfit_key, _ = persona_mgr.get_user_outfit(user_id)
+                if outfit_key == "bikini":
+                    neg_p += ", clothes, casual clothes, hoodie, sweater, jacket, shirt, pants, coat, pajamas"
+                elif outfit_key == "pajamas":
+                    neg_p += ", hoodie, jacket, coat, outdoor clothes, jeans"
+                elif outfit_key == "maid":
+                    neg_p += ", casual clothes, hoodie, sweater, jacket, jeans"
+
                 u_ar = USER_RATIOS.get(user_id, "3:4")
                 u_qual = USER_QUALITIES.get(user_id, "high")
                 video_bytes, source = media_engine.generate_video(
