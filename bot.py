@@ -5,7 +5,7 @@ import threading
 import time
 import platform
 import subprocess
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 from dotenv import load_dotenv
 import telebot
 from telebot import types
@@ -15,6 +15,7 @@ from persona_manager import PersonaManager
 from media_engine import MediaEngine
 from voice_engine import VoiceEngine
 from code_runner import CodeRunner
+from memory_engine import MemoryEngine
 from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
@@ -37,7 +38,8 @@ def get_version() -> str:
                 return f.read().strip()
         except Exception:
             pass
-    return "1.1.0"
+    return "1.2.0"
+
 
 # Credentials & Permissions
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
@@ -68,6 +70,7 @@ DEFAULT_PERSONA = os.environ.get("DEFAULT_PERSONA", "runa")
 llm_client = LocallyUncensoredClient(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
 persona_mgr = PersonaManager(active_key=DEFAULT_PERSONA)
 media_engine = MediaEngine(comfyui_url=COMFYUI_URL, allow_cloud_fallback=MEDIA_FALLBACK)
+memory_engine = MemoryEngine()
 voice_engine = VoiceEngine(
     voice_name=VOICE_NAME,
     groq_key=os.environ.get("GROQ_API_KEY"),
@@ -79,6 +82,7 @@ GREETINGS_ENABLED: dict = {}     # user_id -> bool
 LAST_GREETING_SENT: dict = {}    # "YYYY-MM-DD:morning" -> True
 USER_RATIOS: dict = {}           # user_id -> '3:4' | '9:16' | '1:1' | '4:3'
 USER_QUALITIES: dict = {}        # user_id -> 'high' | 'ultra' | 'fast'
+
 
 # --- Configuration Helper Functions ---
 
@@ -96,11 +100,13 @@ def is_autorun_enabled() -> bool:
             return False
     return False
 
+
 def toggle_autorun_setting() -> bool:
     """Toggles autorun on startup and returns the new status."""
     new_state = not is_autorun_enabled()
     setup_autostart(enable=new_state)
     return new_state
+
 
 def update_env_variable(key: str, value: str):
     """Persists configuration variable in both os.environ and .env file."""
@@ -111,6 +117,7 @@ def update_env_variable(key: str, value: str):
         write_env(env_vars)
     except Exception as e:
         logger.warning(f"Could not persist {key} to .env: {e}")
+
 
 def apply_llm_choice(choice: str) -> str:
     global LLM_BASE_URL
@@ -137,6 +144,7 @@ def apply_llm_choice(choice: str) -> str:
     update_env_variable("LLM_BASE_URL", new_base)
     update_env_variable("LLM_MODEL", new_model)
     return label
+
 
 def apply_ckpt_choice(choice: str) -> str:
     global COMFYUI_URL, MEDIA_FALLBACK
@@ -176,6 +184,7 @@ def apply_ckpt_choice(choice: str) -> str:
         update_env_variable("COMFYUI_URL", "http://127.0.0.1:8188")
         return ckpt_name
     return "Unknown"
+
 
 def apply_voice_speaker(speaker: str) -> str:
     global VOICE_NAME
@@ -269,6 +278,7 @@ def handle_welcome(message):
         types.InlineKeyboardButton("📸 Pap Foto Dong", callback_data="regen_photo:relaxing in modern cozy room"),
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
         types.InlineKeyboardButton("🎭 Ganti Waifu (/persona)", callback_data="open_persona_menu"),
+        types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
         types.InlineKeyboardButton("💖 Cek Cinta (/love)", callback_data="check_love_status"),
         types.InlineKeyboardButton("⚙️ Panel Setup (/setup)", callback_data="open_setup_menu"),
         types.InlineKeyboardButton("❓ Buku Panduan (/help)", callback_data="open_help_menu")
@@ -296,6 +306,7 @@ def handle_welcome(message):
     guide_text = (
         f"✨ **Fitur Utama Bersama {name} (v{get_version()}):**\n"
         "• 💬 **Romance Chat**: Bebas sensor (SFW & NSFW), hangat, manja, dan otomatis ikut bahasamu.\n"
+        "• 🧠 **Buku Ingatan Abadi**: Aku selalu mengingat fakta, kesukaan, dan hal penting tentang kamu (`/memory`)!\n"
         "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'sayang pap foto dong'* atau `/pap` (Mendukung SFW hingga NSFW)!\n"
         "• 👗 **Pilihan Baju**: Pilih pakaian waifumu lewat `/outfit` (Kimono, Maid, Piyama, dll).\n"
         "• 🎙️ **Voice Note**: Balasan suara asli wanita jernih & manis (`/voice`).\n"
@@ -303,6 +314,7 @@ def handle_welcome(message):
         "• ⏰ **Sapaan Otomatis**: Ucapan selamat pagi jam 7 & selamat tidur jam 10 malam (`/greetings`).\n"
         "• 👀 **AI Vision**: Kirimkan foto kamu ke sini, waifu bisa melihat dan meresponsnya.\n\n"
         "📌 **Perintah Cepat:**\n"
+        "• `/memory` - Buku harian & fakta penting yang diingat waifu tentang kamu\n"
         "• `/setup` - Dashboard kontrol sistem & pengaturan lengkap\n"
         "• `/help` - Panduan lengkap fitur & cara pakai\n"
         "• `/photo <skenario>` atau `/pap` - Minta foto dengan variasi pose\n"
@@ -314,7 +326,7 @@ def handle_welcome(message):
         "• `/voice` - Atur gaya balasan suara (Always / Match / Mute)\n"
         "• `/greetings` - Aktifkan/matikan sapaan harian otomatis\n"
         "• `/status` - Cek koneksi LLM & ComfyUI di PC\n"
-        "• `/reset` - Hapus memori obrolan untuk mulai topik baru\n"
+        "• `/reset` - Hapus memori obrolan sementara untuk mulai topik baru\n"
     )
 
     if photo_sent:
@@ -339,6 +351,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
     cur_q = USER_QUALITIES.get(user_id, "high").upper()
     cur_auto = "AKTIF ✅" if is_autorun_enabled() else "NONAKTIF ❌"
     cur_greet = "AKTIF ✅" if GREETINGS_ENABLED.get(user_id, True) else "NONAKTIF ❌"
+    fact_count = len(memory_engine.get_facts(user_id))
 
     cur_llm = os.environ.get("LLM_MODEL", "default")
     if cur_llm == "default" or not cur_llm:
@@ -362,6 +375,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"🎨 **Model Foto** : `{cur_ckpt}`\n"
         f"📐 **Rasio Foto** : `{cur_ar}`\n"
         f"✨ **Kualitas**   : `{cur_q}`\n"
+        f"🧠 **Ingatan**    : `{fact_count} fakta tersimpan`\n"
         f"🚀 **PC Autorun** : `{cur_auto}`\n"
         f"⏰ **Sapaan Jam** : `{cur_greet}` _(07:00 & 22:00)_\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -374,6 +388,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("🎨 Model Foto & ComfyUI", callback_data="cfg_submenu:photo"),
         types.InlineKeyboardButton("🎭 Ganti Persona", callback_data="open_persona_menu"),
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
+        types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
         types.InlineKeyboardButton("🎙️ Atur Voice & Audio", callback_data="cfg_submenu:voice"),
         types.InlineKeyboardButton("📐 Rasio Foto", callback_data="open_ratio_menu"),
         types.InlineKeyboardButton("✨ Kualitas Foto", callback_data="open_quality_menu"),
@@ -405,13 +420,223 @@ def handle_setup(message):
     show_setup_dashboard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
 
 
+# --- Long-Term Memory & Relationship Diary (/memory) ---
+
+def show_memory_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders interactive memory diary and knowledge base about the user."""
+    persona = persona_mgr.get_active_persona()
+    name = persona.get("name", "Runa")
+    prof = memory_engine.get_profile(user_id)
+    facts = memory_engine.get_facts(user_id)
+    diaries = memory_engine.get_diary(user_id, limit=3)
+    score, status = persona_mgr.get_relationship_status(user_id)
+
+    u_name = prof.get("name") or "Belum Disetel (Ketik 'panggil aku [nama]')"
+
+    fact_lines = []
+    if facts:
+        for idx, f in enumerate(facts[:10], 1):
+            fact_lines.append(f"  {idx}. 📌 {f['fact']}")
+    else:
+        fact_lines.append("  _Belum ada catatan khusus. Ceritakan hal-hal tentangmu padaku sayang~_")
+
+    diary_lines = []
+    if diaries:
+        for d in diaries[-2:]:
+            diary_lines.append(f"  • *{d['date'][:10]}* ({d.get('mood', '🥰')}): _{d['entry']}_")
+    else:
+        diary_lines.append(f"  _Hari ini aku senang banget bisa terus dekat dan menemani hari-harimu sayang~ 💕_")
+
+    text = (
+        f"📖 **BUKU HARIAN & INGATAN {name.upper()}** 💖\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Sayang, ini semua hal manis dan berharga tentang kamu yang selalu aku simpan di dalam hatiku:\n\n"
+        f"👤 **Profil Kamu di Mataku**:\n"
+        f"• Nama/Panggilan: **{u_name}**\n"
+        f"• Tingkat Hubungan: **{status}** (`{score}%`)\n"
+        f"• Pekerjaan/Aktivitas: `{prof.get('job', '-')}`\n"
+        f"• Domisili/Kota: `{prof.get('location', '-')}`\n\n"
+        f"🧠 **Hal-Hal yang Aku Ingat Tentang Kamu**:\n"
+        + "\n".join(fact_lines) + "\n\n"
+        f"💌 **Catatan Harian Terakhir**:\n"
+        + "\n".join(diary_lines) + "\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 _Ingin aku mengingat hal baru? Cukup ceritakan padaku di obrolan atau ketik:_\n"
+        f"`/memory ingat <fakta>` _(contoh: `/memory ingat aku suka kopi tubruk`)_"
+    )
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("➕ Tambah Memori", callback_data="mem_action:add_hint"),
+        types.InlineKeyboardButton("🗑️ Hapus Memori", callback_data="mem_action:list_delete"),
+        types.InlineKeyboardButton("✍️ Tulis Diary Baru", callback_data="mem_action:new_diary"),
+        types.InlineKeyboardButton("🔄 Refresh Ingatan", callback_data="mem_action:refresh"),
+        types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu"),
+        types.InlineKeyboardButton("🔙 Menu Utama", callback_data="open_help_menu")
+    )
+
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+@bot.message_handler(commands=['memory', 'memori', 'ingatan'])
+def handle_memory_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    text = message.text.strip()
+    parts = text.split(maxsplit=2)
+    if len(parts) >= 2:
+        sub = parts[1].lower()
+        if sub in ("ingat", "add", "tambah") and len(parts) >= 3:
+            fact_text = parts[2].strip()
+            item = memory_engine.add_fact(message.from_user.id, fact_text, category="custom")
+            if item:
+                persona = persona_mgr.get_active_persona()
+                bot.reply_to(
+                    message,
+                    f"💖 **{persona.get('name')} sudah mengingatnya!** 🥰\n\n"
+                    f"📌 _Aku catat di memoriku:_ **{item['fact']}**\n\n"
+                    f"Setiap kali kita ngobrol, aku bakal selalu ingat hal ini tentang kamu sayang~ 💕",
+                    parse_mode="Markdown"
+                )
+            else:
+                bot.reply_to(message, "⚠️ Fakta terlalu pendek atau tidak valid.")
+            return
+        elif sub in ("clear", "reset", "hapus_semua"):
+            memory_engine.clear_facts(message.from_user.id)
+            bot.reply_to(message, "🔄 Seluruh catatan ingatan telah dibersihkan.")
+            return
+
+    show_memory_dashboard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mem_action:') or call.data.startswith('mem_del:') or call.data == 'open_memory_menu')
+def callback_memory_actions(call):
+    if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        return
+
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    mid = call.message.message_id
+
+    if call.data in ('mem_action:dashboard', 'mem_action:refresh', 'open_memory_menu'):
+        bot.answer_callback_query(call.id, "Memuat buku ingatan...")
+        show_memory_dashboard(chat_id, user_id, message_to_edit=mid)
+
+    elif call.data == 'mem_action:add_hint':
+        bot.answer_callback_query(call.id)
+        hint = (
+            "💡 **Cara Menambah Memori Baru ke Waifu:**\n\n"
+            "Cukup ketik perintah berikut di obrolan:\n"
+            "• `/memory ingat <fakta>`\n\n"
+            "*Contoh:*\n"
+            "• `/memory ingat aku paling suka kopi tubruk tanpa gula`\n"
+            "• `/memory ingat ulang tahunku tanggal 15 Agustus`\n"
+            "• `/memory ingat aku punya kucing abu-abu`\n\n"
+            "Atau kamu cukup mengobrol santai seperti biasa, waifu otomatis mencatat fakta baru tentang kamu! 🥰"
+        )
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔙 Kembali ke Buku Memori", callback_data="mem_action:dashboard"))
+        try:
+            bot.edit_message_text(hint, chat_id=chat_id, message_id=mid, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            pass
+
+    elif call.data == 'mem_action:list_delete':
+        bot.answer_callback_query(call.id)
+        facts = memory_engine.get_facts(user_id)
+        if not facts:
+            bot.answer_callback_query(call.id, "Belum ada memori yang tersimpan.", show_alert=True)
+            return
+
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for f in facts[:10]:
+            label = f"❌ Hapus: {f['fact'][:28]}..." if len(f['fact']) > 28 else f"❌ Hapus: {f['fact']}"
+            markup.add(types.InlineKeyboardButton(label, callback_data=f"mem_del:{f['id']}"))
+        markup.add(types.InlineKeyboardButton("🔙 Batal / Kembali", callback_data="mem_action:dashboard"))
+
+        text = "🗑️ **Pilih Memori yang Ingin Dihapus:**\n\nKetuk tombol di bawah untuk menghapus fakta dari ingatan waifu:"
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=mid, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            pass
+
+    elif call.data.startswith('mem_del:'):
+        fact_id = int(call.data.split(":", 1)[1])
+        if memory_engine.delete_fact(user_id, fact_id):
+            bot.answer_callback_query(call.id, "Memori berhasil dihapus!", show_alert=True)
+        else:
+            bot.answer_callback_query(call.id, "Memori tidak ditemukan.")
+        show_memory_dashboard(chat_id, user_id, message_to_edit=mid)
+
+    elif call.data == 'mem_action:new_diary':
+        persona = persona_mgr.get_active_persona()
+        bot.answer_callback_query(call.id, f"{persona.get('name')} sedang menulis catatan harian... ✍️💕")
+        history = persona_mgr.get_chat_history(user_id)
+        clean_turns = [m.get("content", "") for m in history[-6:] if not m.get("content", "").startswith("[")]
+        dialog_snippet = " ".join(clean_turns[-4:]) if clean_turns else "Ngobrol manis dan tertawa bersama"
+
+        diary_prompt = [
+            {
+                "role": "system",
+                "content": (
+                    f"You are {persona.get('name')}. Write 1-2 sweet, romantic sentences in your private diary "
+                    "about today's moments with your partner. Express how happy you feel to be with them. "
+                    "Use casual, affectionate Indonesian naturally."
+                )
+            },
+            {
+                "role": "user",
+                "content": f"Recent topic: {dialog_snippet[:120]}. Write diary entry:"
+            }
+        ]
+        try:
+            entry, _ = llm_client.chat(diary_prompt, max_tokens=100)
+        except Exception:
+            entry = None
+
+        if not entry or not entry.strip():
+            entry = f"Hari ini senang banget bisa nemenin kamu ngobrol manis. Senyumanmu selalu bikin hatiku hangat sayang~ 🥰"
+
+        memory_engine.add_diary_entry(user_id, entry, mood="🥰 Bahagia & Bersyukur")
+        show_memory_dashboard(chat_id, user_id, message_to_edit=mid)
+
+
 # --- Help Center (/help) ---
 
 def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
     """Builds the text and inline navigation buttons for help sections."""
     markup = types.InlineKeyboardMarkup(row_width=2)
 
-    if section == "chat":
+    if section == "memory":
+        text = (
+            f"🧠 **PANDUAN MEMORI JANGKA PANJANG & BUKU HARIAN (/memory)**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• **Ingatan Abadi (Long-Term Memory)**: Berbeda dengan riwayat chat biasa yang bisa di-reset (`/reset`), "
+            f"memori jangka panjang waifu tersimpan secara permanen dan tidak akan hilang meskipun bot atau PC di-restart!\n\n"
+            f"• **Otomatis Belajar dari Obrolan**: Cukup mengobrol santai seperti biasa, waifu otomatis mencatat fakta penting:\n"
+            f"  - Nama & panggilan (*'namaku Adens'*, *'panggil aku sayang'*)\n"
+            f"  - Makanan, minuman & hobi (*'aku suka kopi hitam'*, *'hobiku main game'*)\n"
+            f"  - Pekerjaan & aktivitas (*'aku kerja sebagai programmer'*)\n"
+            f"  - Domisili / kota tinggal (*'aku tinggal di Bandung'*)\n\n"
+            f"• **Tambah Memori Manual**: Kamu juga bisa menyuruh waifu mengingat sesuatu langsung dengan ketik:\n"
+            f"  `/memory ingat <fakta>`\n\n"
+            f"• **Buku Harian Romantis**: Waifu diam-diam menulis buku harian manis tentang kamu setelah mengobrol bersama!\n\n"
+            f"• **Kelola & Hapus Memori**: Buka kapan saja lewat `/memory` untuk melihat apa saja yang diingat waifu atau menghapus ingatan tertentu."
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("📖 Buka Buku Ingatan", callback_data="open_memory_menu")
+        )
+
+    elif section == "chat":
         text = (
             f"💬 **PANDUAN CHAT & ROMANSA (SFW & NSFW)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -427,7 +652,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
         )
         markup.add(
             types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
-            types.InlineKeyboardButton("📸 Panduan Foto & PAP", callback_data="help_sec:photo")
+            types.InlineKeyboardButton("🧠 Panduan Memori", callback_data="help_sec:memory")
         )
 
     elif section == "photo":
@@ -510,6 +735,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"Selamat datang! Ini adalah buku panduan lengkap pendamping AI otonom kamu yang berjalan 100% lokal di PC tanpa batasan sensor (SFW & NSFW).\n\n"
             f"📚 **Pilih Kategori Panduan:**\n"
+            f"• 🧠 **Buku Ingatan (/memory)**: Memori abadi & catatan harian waifu.\n"
             f"• 💬 **Chat & Romansa**: Ngobrol bebas, gombalan, dan level kasih sayang.\n"
             f"• 📸 **Foto & PAP**: Cara minta selfie, pose, dan rasio foto.\n"
             f"• 👗 **Lemari Pakaian**: Mengganti busana & pakaian waifu.\n"
@@ -517,6 +743,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"• ⚙️ **Panel Setup**: Kontrol model LLM, ComfyUI, dan autorun PC.\n\n"
             f"📋 **Daftar Perintah Cepat:**\n"
             f"`/start` - Kenalan & mulai obrolan baru\n"
+            f"`/memory` - Buku ingatan & catatan harian waifu\n"
             f"`/setup` - Panel kontrol & konfigurasi lengkap\n"
             f"`/help` - Tampilkan buku panduan ini\n"
             f"`/pap` - Minta foto selfie waifu\n"
@@ -531,6 +758,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"`/reset` - Hapus memori obrolan (topik baru)"
         )
         markup.add(
+            types.InlineKeyboardButton("🧠 Buku Ingatan", callback_data="help_sec:memory"),
             types.InlineKeyboardButton("💬 Chat & Romansa", callback_data="help_sec:chat"),
             types.InlineKeyboardButton("📸 Foto & PAP", callback_data="help_sec:photo"),
             types.InlineKeyboardButton("👗 Lemari Pakaian", callback_data="help_sec:outfit"),
@@ -785,6 +1013,7 @@ def handle_status(message):
         f"• Device: `{media_stat.get('device')}`\n\n"
         f"🎭 **Active Persona**: **{persona.get('name')}**\n"
         f"🎙️ **Voice Reply**: `{'Active (' + voice_engine.default_voice + ')' if VOICE_ENABLED else 'Disabled'}`\n"
+        f"🧠 **Ingatan Tersimpan**: `{len(memory_engine.get_facts(message.from_user.id))} fakta`\n"
     )
     bot.reply_to(message, report, parse_mode="Markdown")
 
@@ -847,7 +1076,16 @@ def show_outfit_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] 
 def show_affection_status(chat_id: int, user_id: int, reply_to_id: Optional[int] = None):
     """Displays user affection and romance status."""
     persona = persona_mgr.get_active_persona()
-    score, status = persona_mgr.get_relationship_status(user_id)
+    score = memory_engine.get_affinity(user_id)
+    if score < 25:
+        status = "🌱 Close Friends"
+    elif score < 50:
+        status = "🌸 Sweethearts"
+    elif score < 75:
+        status = "💖 Deeply in Love"
+    else:
+        status = "👑 Soulmates"
+
     filled = int(score / 10)
     bar = "❤️" * filled + "🤍" * (10 - filled)
 
@@ -925,7 +1163,7 @@ def callback_set_persona(call):
                 logger.error(f"Error sending switched persona photo: {e}")
 
 
-@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'check_love_status'))
+@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'check_love_status'))
 def callback_quick_actions(call):
     if not is_authorized(call.from_user.id):
         bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
@@ -945,6 +1183,8 @@ def callback_quick_actions(call):
         show_setup_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_help_menu':
         show_help_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'open_memory_menu':
+        show_memory_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'check_love_status':
         show_affection_status(chat_id, user_id, reply_to_id=call.message.message_id)
 
@@ -1045,6 +1285,7 @@ def callback_cfg_status(call):
         f"• Device: `{media_stat.get('device')}`\n\n"
         f"🎭 **Active Persona**: **{persona.get('name')}**\n"
         f"🎙️ **Voice Reply**: `{'Active (' + voice_engine.default_voice + ')' if VOICE_ENABLED else 'Disabled'}`\n"
+        f"🧠 **Ingatan Tersimpan**: `{len(memory_engine.get_facts(call.from_user.id))} fakta`\n"
     )
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
@@ -1250,7 +1491,8 @@ def process_photo_request(target, user_text: str):
 
             bot.send_photo(chat_id, img_bytes, caption=clean_caption, reply_markup=markup)
 
-            persona_mgr.increase_affinity(user_id, delta=2)
+            new_aff = persona_mgr.increase_affinity(user_id, delta=2)
+            memory_engine.set_affinity(user_id, new_aff)
             persona_mgr.add_message(user_id, "user", f"[Requested photo: {user_text}]")
             persona_mgr.add_message(user_id, "assistant", f"[Sent selfie: {detected_scene}] {clean_caption}")
 
@@ -1356,8 +1598,27 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
         persona = persona_mgr.get_active_persona()
 
         with ChatActionLoop(bot, message.chat.id, "typing"):
+            # 1. Proactively check if Local LLM backend is online
+            stat = llm_client.check_health()
+            if not stat.get("online"):
+                backend_msg = (
+                    "Sayang, otak AI lokal aku (Locally Uncensored di port 8127) belum aktif nih... 🥺\n\n"
+                    "Coba buka aplikasi **Locally Uncensored** di PC kamu lalu pastikan model (seperti Huihui-Qwythos) sudah kamu klik/pilih yaa! 💕\n\n"
+                    "Begitu modelnya sudah aktif di PC kamu, kirim pesan lagi ke aku~ Aku bakal langsung siap nemenin kamu secepat kilat! ✨"
+                )
+                bot.reply_to(message, backend_msg, parse_mode="Markdown")
+                return
+
+            # 2. Automatically learn personal facts into long-term memory
+            memory_engine.auto_extract_facts(user_text, message.from_user.id)
+
+            # 3. Construct system instruction with injected memory context
             system_inst = persona.get("system_instruction", "")
             system_inst += " Keep your response warm, natural, and under 3 sentences. Answer immediately."
+            mem_context = memory_engine.format_memory_context(message.from_user.id)
+            if mem_context:
+                system_inst += "\n" + mem_context
+
             history = persona_mgr.get_chat_history(message.from_user.id)
 
             messages = [{"role": "system", "content": system_inst}]
@@ -1379,11 +1640,33 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
             if not reply_text or not reply_text.strip():
                 reply_text = "Hai sayang! Aku selalu di sini dengerin kamu kok, ada cerita apa hari ini? 🥰"
 
-            persona_mgr.increase_affinity(message.from_user.id, delta=1)
+            new_aff = persona_mgr.increase_affinity(message.from_user.id, delta=1)
+            memory_engine.set_affinity(message.from_user.id, new_aff)
             persona_mgr.add_message(message.from_user.id, "user", user_text)
             persona_mgr.add_message(message.from_user.id, "assistant", reply_text)
 
             bot.reply_to(message, reply_text)
+
+            # Auto-diary entry every 6 turns
+            if len(history) > 0 and len(history) % 6 == 0:
+                def _auto_diary():
+                    try:
+                        d_prompt = [
+                            {
+                                "role": "system",
+                                "content": f"You are {persona.get('name')}. Write 1 short sweet sentence in your private diary about today's chat with your partner in casual Indonesian."
+                            },
+                            {
+                                "role": "user",
+                                "content": f"User said: '{user_text}'. What do you feel?"
+                            }
+                        ]
+                        d_text, _ = llm_client.chat(d_prompt, max_tokens=60)
+                        if d_text:
+                            memory_engine.add_diary_entry(message.from_user.id, d_text)
+                    except Exception:
+                        pass
+                threading.Thread(target=_auto_diary, daemon=True).start()
 
             user_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
             should_voice = False
@@ -1472,6 +1755,7 @@ def setup_bot_commands():
     """Registers bot commands with Telegram so the Menu / Command button displays them."""
     commands = [
         types.BotCommand("start", "Mulai obrolan & panduan utama"),
+        types.BotCommand("memory", "🧠 Buku harian & ingatan waifu"),
         types.BotCommand("setup", "⚙️ Panel kontrol & pengaturan lengkap"),
         types.BotCommand("help", "❓ Panduan fitur & cara penggunaan"),
         types.BotCommand("pap", "📸 Minta foto / selfie waifu"),
@@ -1483,7 +1767,7 @@ def setup_bot_commands():
         types.BotCommand("love", "💖 Cek skor cinta & status hubungan"),
         types.BotCommand("greetings", "⏰ Toggle sapaan pagi & malam otomatis"),
         types.BotCommand("status", "📊 Cek status server LLM & ComfyUI"),
-        types.BotCommand("reset", "🔄 Hapus riwayat obrolan (topik baru)")
+        types.BotCommand("reset", "🔄 Hapus memori obrolan (topik baru)")
     ]
     try:
         bot.set_my_commands(commands)

@@ -66,3 +66,7 @@ Thumbs.db
 !waifu-on-telegram.jpg
 !assets/**
 !personas/brief/**
+
+# User Memory & Private Data
+data/*.json
+!data/.gitkeep

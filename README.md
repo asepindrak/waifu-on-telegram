@@ -302,6 +302,7 @@ An interactive menu will open:
 | :--- | :--- |
 | `/start` | Welcome greeting and quick action buttons |
 | `/setup` | Master configuration dashboard to configure all CLI options in Telegram |
+| `/memory` | Long-term memory & diary of personal facts waifu remembers about you |
 | `/help` | Comprehensive interactive guide and documentation center |
 | `/status` | Real-time diagnostic check of LLM (Port 8127), ComfyUI (8188), and VRAM |
 | `/photo <scene>` | Request a custom selfie scenario (e.g. `/photo relaxing in cafe`) |
