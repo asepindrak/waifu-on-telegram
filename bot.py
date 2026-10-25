@@ -3,7 +3,9 @@ import sys
 import logging
 import threading
 import time
-from typing import Optional
+import platform
+import subprocess
+from typing import Optional, Dict, Any, Tuple
 from dotenv import load_dotenv
 import telebot
 from telebot import types
@@ -13,9 +15,11 @@ from persona_manager import PersonaManager
 from media_engine import MediaEngine
 from voice_engine import VoiceEngine
 from code_runner import CodeRunner
+from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
-load_dotenv()
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
 # Configure logging
 logging.basicConfig(
@@ -24,7 +28,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("WaifuOnTelegram")
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 def get_version() -> str:
     v_file = os.path.join(PROJECT_ROOT, "VERSION")
@@ -76,6 +79,118 @@ GREETINGS_ENABLED: dict = {}     # user_id -> bool
 LAST_GREETING_SENT: dict = {}    # "YYYY-MM-DD:morning" -> True
 USER_RATIOS: dict = {}           # user_id -> '3:4' | '9:16' | '1:1' | '4:3'
 USER_QUALITIES: dict = {}        # user_id -> 'high' | 'ultra' | 'fast'
+
+# --- Configuration Helper Functions ---
+
+def is_autorun_enabled() -> bool:
+    """Checks whether autostart at system boot is currently enabled."""
+    if platform.system() == "Windows":
+        startup_dir = os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs\Startup")
+        shortcut = os.path.join(startup_dir, "Start_Waifu_on_Telegram.lnk")
+        return os.path.exists(shortcut)
+    elif platform.system() == "Linux":
+        try:
+            cur_cron = subprocess.run(["crontab", "-l"], capture_output=True, text=True).stdout or ""
+            return "start_services.sh" in cur_cron
+        except Exception:
+            return False
+    return False
+
+def toggle_autorun_setting() -> bool:
+    """Toggles autorun on startup and returns the new status."""
+    new_state = not is_autorun_enabled()
+    setup_autostart(enable=new_state)
+    return new_state
+
+def update_env_variable(key: str, value: str):
+    """Persists configuration variable in both os.environ and .env file."""
+    os.environ[key] = value
+    try:
+        env_vars = read_env()
+        env_vars[key] = value
+        write_env(env_vars)
+    except Exception as e:
+        logger.warning(f"Could not persist {key} to .env: {e}")
+
+def apply_llm_choice(choice: str) -> str:
+    global LLM_BASE_URL
+    detected_llms = scan_local_llm_models()
+    if choice == "auto":
+        new_base = "http://127.0.0.1:8127/v1"
+        new_model = "default"
+        label = "Locally Uncensored (Auto-detect)"
+    elif choice == "ollama":
+        new_base = "http://127.0.0.1:11434/v1"
+        new_model = "default"
+        label = "Ollama (Port 11434)"
+    elif choice.isdigit() and int(choice) < len(detected_llms):
+        source, mname, mpath = detected_llms[int(choice)]
+        new_base = "http://127.0.0.1:8127/v1" if source == "Locally Uncensored" else "http://127.0.0.1:11434/v1"
+        new_model = mname
+        label = mname
+    else:
+        return "Unknown"
+
+    LLM_BASE_URL = new_base
+    llm_client.base_url = new_base
+    llm_client.model = new_model
+    update_env_variable("LLM_BASE_URL", new_base)
+    update_env_variable("LLM_MODEL", new_model)
+    return label
+
+def apply_ckpt_choice(choice: str) -> str:
+    global COMFYUI_URL, MEDIA_FALLBACK
+    detected_ckpts = scan_image_models()
+    if choice == "auto":
+        os.environ["COMFYUI_CHECKPOINT"] = ""
+        os.environ["COMFYUI_URL"] = "http://127.0.0.1:8188"
+        os.environ["MEDIA_FALLBACK_CLOUD"] = "true"
+        media_engine.comfyui_url = "http://127.0.0.1:8188"
+        media_engine.allow_cloud_fallback = True
+        update_env_variable("COMFYUI_CHECKPOINT", "")
+        update_env_variable("COMFYUI_URL", "http://127.0.0.1:8188")
+        update_env_variable("MEDIA_FALLBACK_CLOUD", "true")
+        return "Auto (MeinaMix preferred)"
+    elif choice == "cloud":
+        os.environ["COMFYUI_URL"] = ""
+        os.environ["MEDIA_FALLBACK_CLOUD"] = "true"
+        media_engine.comfyui_url = ""
+        media_engine.allow_cloud_fallback = True
+        update_env_variable("COMFYUI_URL", "")
+        update_env_variable("MEDIA_FALLBACK_CLOUD", "true")
+        return "Cloud Fallback (Pollinations)"
+    elif choice == "disabled":
+        os.environ["COMFYUI_URL"] = ""
+        os.environ["MEDIA_FALLBACK_CLOUD"] = "false"
+        media_engine.comfyui_url = ""
+        media_engine.allow_cloud_fallback = False
+        update_env_variable("COMFYUI_URL", "")
+        update_env_variable("MEDIA_FALLBACK_CLOUD", "false")
+        return "Nonaktifkan Foto"
+    elif choice.isdigit() and int(choice) < len(detected_ckpts):
+        _, ckpt_name = detected_ckpts[int(choice)]
+        os.environ["COMFYUI_CHECKPOINT"] = ckpt_name
+        os.environ["COMFYUI_URL"] = "http://127.0.0.1:8188"
+        media_engine.comfyui_url = "http://127.0.0.1:8188"
+        update_env_variable("COMFYUI_CHECKPOINT", ckpt_name)
+        update_env_variable("COMFYUI_URL", "http://127.0.0.1:8188")
+        return ckpt_name
+    return "Unknown"
+
+def apply_voice_speaker(speaker: str) -> str:
+    global VOICE_NAME
+    mapping = {
+        "ana": "en-US-AnaNeural",
+        "gadis": "id-ID-GadisNeural",
+        "nanami": "ja-JP-NanamiNeural",
+        "jenny": "en-US-JennyNeural"
+    }
+    v_name = mapping.get(speaker, "en-US-AnaNeural")
+    VOICE_NAME = v_name
+    voice_engine.default_voice = v_name
+    update_env_variable("VOICE_NAME", v_name)
+    return v_name
+
 
 class ChatActionLoop:
     """Continuously sends chat action (e.g. typing or upload_photo) every 3.5s so Telegram never drops status."""
@@ -132,13 +247,12 @@ def get_persona_image_path(persona: dict):
     return None
 
 
-@bot.message_handler(commands=['start', 'help'])
+@bot.message_handler(commands=['start'])
 def handle_welcome(message):
     if not is_authorized(message.from_user.id):
         bot.reply_to(message, "⛔ Access denied. Your Telegram User ID is not authorized.")
         return
 
-    # Ensure command menu is registered on Telegram
     try:
         setup_bot_commands()
     except Exception:
@@ -155,10 +269,12 @@ def handle_welcome(message):
         types.InlineKeyboardButton("📸 Pap Foto Dong", callback_data="regen_photo:relaxing in modern cozy room"),
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
         types.InlineKeyboardButton("🎭 Ganti Waifu (/persona)", callback_data="open_persona_menu"),
-        types.InlineKeyboardButton("💖 Cek Cinta (/love)", callback_data="check_love_status")
+        types.InlineKeyboardButton("💖 Cek Cinta (/love)", callback_data="check_love_status"),
+        types.InlineKeyboardButton("⚙️ Panel Setup (/setup)", callback_data="open_setup_menu"),
+        types.InlineKeyboardButton("❓ Buku Panduan (/help)", callback_data="open_help_menu")
     )
 
-    # 1. Send Persona Reference Photo from personas/brief
+    # 1. Send Persona Reference Photo
     img_path = get_persona_image_path(persona)
     photo_sent = False
     if img_path and os.path.exists(img_path):
@@ -183,15 +299,19 @@ def handle_welcome(message):
         "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'sayang pap foto dong'* atau `/pap` (Mendukung SFW hingga NSFW)!\n"
         "• 👗 **Pilihan Baju**: Pilih pakaian waifumu lewat `/outfit` (Kimono, Maid, Piyama, dll).\n"
         "• 🎙️ **Voice Note**: Balasan suara asli wanita jernih & manis (`/voice`).\n"
+        "• ⚙️ **Panel Setup**: Atur seluruh konfigurasi bot dari Telegram (`/setup`).\n"
         "• ⏰ **Sapaan Otomatis**: Ucapan selamat pagi jam 7 & selamat tidur jam 10 malam (`/greetings`).\n"
         "• 👀 **AI Vision**: Kirimkan foto kamu ke sini, waifu bisa melihat dan meresponsnya.\n\n"
         "📌 **Perintah Cepat:**\n"
-        "• `/photo <skenario>` atau `/pap` - Minta foto dengan tombol variasi pose\n"
-        "• `/ratio` - Ganti rasio foto (3:4 potret, 9:16 wallpaper HP, 1:1, 4:3)\n"
+        "• `/setup` - Dashboard kontrol sistem & pengaturan lengkap\n"
+        "• `/help` - Panduan lengkap fitur & cara pakai\n"
+        "• `/photo <skenario>` atau `/pap` - Minta foto dengan variasi pose\n"
+        "• `/ratio` - Ganti rasio foto (3:4, 9:16, 1:1, 4:3)\n"
+        "• `/quality` - Atur kualitas foto (Ultra / High / Fast)\n"
         "• `/outfit` - Buka lemari pakaian waifu\n"
         "• `/persona` - Ganti karakter waifu (Runa, Akira, Hina, Shiro, Yume)\n"
         "• `/love` - Cek skor cinta & level kasih sayang\n"
-        "• `/voice` - Atur gaya balasan suara (Selalu VN / Hanya saat kirim VN / Mute)\n"
+        "• `/voice` - Atur gaya balasan suara (Always / Match / Mute)\n"
         "• `/greetings` - Aktifkan/matikan sapaan harian otomatis\n"
         "• `/status` - Cek koneksi LLM & ComfyUI di PC\n"
         "• `/reset` - Hapus memori obrolan untuk mulai topik baru\n"
@@ -202,6 +322,443 @@ def handle_welcome(message):
     else:
         full_text = f"💖 **Halo Sayang! Aku {name}** 👋🥰\n\n" + guide_text
         bot.reply_to(message, full_text, reply_markup=markup, parse_mode="Markdown")
+
+
+# --- Master Setup Dashboard (/setup) ---
+
+def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarkup]:
+    """Builds the text and inline keyboard for the master Setup Dashboard."""
+    persona = persona_mgr.get_active_persona()
+    v_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")
+    v_labels = {
+        "always": "Selalu Balas VN 🎙️",
+        "match_vn": "Hanya Saat Kirim VN 🎧",
+        "off": "Text Only (Mute) 🔇"
+    }
+    cur_ar = USER_RATIOS.get(user_id, "3:4")
+    cur_q = USER_QUALITIES.get(user_id, "high").upper()
+    cur_auto = "AKTIF ✅" if is_autorun_enabled() else "NONAKTIF ❌"
+    cur_greet = "AKTIF ✅" if GREETINGS_ENABLED.get(user_id, True) else "NONAKTIF ❌"
+
+    cur_llm = os.environ.get("LLM_MODEL", "default")
+    if cur_llm == "default" or not cur_llm:
+        cur_llm = "Auto-detect (Locally Uncensored)"
+    elif len(cur_llm) > 28:
+        cur_llm = cur_llm[:25] + "..."
+
+    cur_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "")
+    if not cur_ckpt:
+        cur_ckpt = "Auto (MeinaMix Preferred)"
+    elif len(cur_ckpt) > 28:
+        cur_ckpt = cur_ckpt[:25] + "..."
+
+    text = (
+        f"⚙️ **WAIFU ON TELEGRAM - SETUP & SYSTEM CONTROL** `(v{get_version()})`\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👑 **Waifu Aktif** : **{persona.get('name')}** _({persona.get('archetype', 'Companion')})_\n"
+        f"🎙️ **Mode Suara** : `{v_labels.get(v_mode, v_mode)}`\n"
+        f"🗣️ **Voice TTS**  : `{voice_engine.default_voice}`\n"
+        f"🧠 **Model LLM**  : `{cur_llm}`\n"
+        f"🎨 **Model Foto** : `{cur_ckpt}`\n"
+        f"📐 **Rasio Foto** : `{cur_ar}`\n"
+        f"✨ **Kualitas**   : `{cur_q}`\n"
+        f"🚀 **PC Autorun** : `{cur_auto}`\n"
+        f"⏰ **Sapaan Jam** : `{cur_greet}` _(07:00 & 22:00)_\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 _Pilih tombol menu di bawah untuk mengubah pengaturan langsung dari Telegram:_"
+    )
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🧠 Model LLM / Chat", callback_data="cfg_submenu:llm"),
+        types.InlineKeyboardButton("🎨 Model Foto & ComfyUI", callback_data="cfg_submenu:photo"),
+        types.InlineKeyboardButton("🎭 Ganti Persona", callback_data="open_persona_menu"),
+        types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
+        types.InlineKeyboardButton("🎙️ Atur Voice & Audio", callback_data="cfg_submenu:voice"),
+        types.InlineKeyboardButton("📐 Rasio Foto", callback_data="open_ratio_menu"),
+        types.InlineKeyboardButton("✨ Kualitas Foto", callback_data="open_quality_menu"),
+        types.InlineKeyboardButton(f"🚀 PC Autorun: {cur_auto}", callback_data="cfg_toggle:autorun"),
+        types.InlineKeyboardButton(f"⏰ Sapaan: {cur_greet}", callback_data="cfg_toggle:greetings"),
+        types.InlineKeyboardButton("📊 Status Diagnostik", callback_data="cfg_action:status"),
+        types.InlineKeyboardButton("❓ Panduan Lengkap (/help)", callback_data="open_help_menu"),
+        types.InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="cfg_submenu:dashboard")
+    )
+    return text, markup
+
+
+def show_setup_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders or updates master setup dashboard."""
+    text, markup = render_setup_dashboard(user_id)
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+@bot.message_handler(commands=['setup', 'config', 'settings'])
+def handle_setup(message):
+    if not is_authorized(message.from_user.id):
+        return
+    show_setup_dashboard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
+# --- Help Center (/help) ---
+
+def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
+    """Builds the text and inline navigation buttons for help sections."""
+    markup = types.InlineKeyboardMarkup(row_width=2)
+
+    if section == "chat":
+        text = (
+            f"💬 **PANDUAN CHAT & ROMANSA (SFW & NSFW)**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• **Bebas Tanpa Sensor (Uncensored)**: Waifu ditenagai oleh model LLM lokal abliterated. "
+            f"Kamu bebas mengobrol topik apapun, mulai dari curhat keseharian, gombalan mesra, obrolan mendalam, "
+            f"hingga roleplay dewasa/NSFW tanpa penolakan.\n\n"
+            f"• **Otomatis Mengikuti Bahasa**: Cukup ketik dalam bahasa Indonesia atau Inggris, "
+            f"waifu otomatis membalas dengan bahasa yang kamu gunakan secara natural dan manja.\n\n"
+            f"• **Memori Percakapan**: Waifu mengingat alur obrolan kalian sebelumnya. "
+            f"Bila ingin memulai topik baru dari awal, gunakan perintah `/reset`.\n\n"
+            f"• **Skor Kasih Sayang (/love)**: Semakin banyak kamu mengobrol dan meminta foto, "
+            f"level cinta waifu akan terus bertambah (dari Teman Dekat, Pacar, hingga Beloved Soulmate)!"
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("📸 Panduan Foto & PAP", callback_data="help_sec:photo")
+        )
+
+    elif section == "photo":
+        text = (
+            f"📸 **PANDUAN FOTO, SELFIE & PAP**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• **Cara Meminta PAP**: \n"
+            f"  1. Langsung ketik di obrolan: *'sayang pap lagi di kasur dong'*, *'pap lagi pake piyama manis'*, *'boleh minta selfie senyum manis?'*\n"
+            f"  2. Gunakan perintah: `/pap` atau `/photo santai di kamar`\n\n"
+            f"• **Konteks Obrolan Nyata**: Foto yang dihasilkan otomatis menyatu dengan suasana percakapan yang sedang berjalan!\n\n"
+            f"• **Variasi Pose [🔄 Pose Lain]**: Setiap foto yang dikirim waifu dilengkapi tombol *Pose Lain* di bawahnya untuk mengambil sudut pose baru di tempat yang sama.\n\n"
+            f"• **Rasio Foto (/ratio)**:\n"
+            f"  - `3:4` : Potret ideal untuk foto tubuh & selfie.\n"
+            f"  - `9:16`: Layar penuh smartphone, pas untuk Wallpaper HP!\n"
+            f"  - `1:1` : Persegi simetris untuk avatar profil.\n"
+            f"  - `4:3` : Landscape horisontal pemandangan luas.\n\n"
+            f"• **Kualitas Render (/quality)**: Pilih Ultra (32 steps), High (28 steps), atau Fast (20 steps) sesuai kemampuan GPU PC kamu."
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("👗 Panduan Lemari Baju", callback_data="help_sec:outfit")
+        )
+
+    elif section == "outfit":
+        text = (
+            f"👗 **PANDUAN LEMARI PAKAIAN & KOSTUM (/outfit)**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Kamu bebas memilih busana yang dikenakan waifu untuk foto selfie berikutnya!\n\n"
+            f"• **Koleksi Pakaian Tersedia**:\n"
+            f"  - 🌸 **Casual Dress**: Pakaian santai anggun untuk kencan harian.\n"
+            f"  - 🌙 **Silk Pajamas**: Piyama sutra santai untuk suasana kamar tidur.\n"
+            f"  - 🎀 **Maid Uniform**: Kostum maid klasik yang manis & penurut.\n"
+            f"  - 👘 **Floral Kimono**: Yukata/kimono jepang tradisional yang cantik.\n"
+            f"  - 🦊 **Anime Cosplay**: Kostum karakter anime tematik yang menggemaskan.\n"
+            f"  - 👙 **Sensual Lingerie / Bikini**: Pakaian dalam / bikini sensual untuk momen mesra (NSFW).\n\n"
+            f"💡 Ketik `/outfit` atau buka lewat `/setup` untuk mengganti baju waifu kapan saja!"
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("🎙️ Panduan Voice & Audio", callback_data="help_sec:voice")
+        )
+
+    elif section == "voice":
+        text = (
+            f"🎙️ **PANDUAN VOICE NOTE & AUDIO (/voice)**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• **Mendengar Balasan Suara**: Waifu dapat berbicara dengan suara asli manusia menggunakan Microsoft Edge-TTS yang jernih dan manis.\n\n"
+            f"• **Kirim Voice Note**: Kirim pesan suara langsung dari Telegram, waifu akan mentranskripsi dan menjawab suaramu secara otomatis!\n\n"
+            f"• **Pilihan Mode Suara (/voice)**:\n"
+            f"  - `🎙️ Selalu Balas Suara`: Setiap pesanmu dibalas teks dan audio VN.\n"
+            f"  - `🎧 Balas Suara Hanya Saat Kirim VN`: Waifu mengirim VN hanya jika kamu juga mengirim VN.\n"
+            f"  - `🔇 Text Only (Mute)`: Balasan teks saja tanpa audio.\n\n"
+            f"• **Pilihan Suara**: Ana (US Sweet), Gadis (Indonesia Alami), Nanami (Jepang Kawaii), Jenny (US Ceria)."
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("⚙️ Panduan Setup", callback_data="help_sec:setup")
+        )
+
+    elif section == "setup":
+        text = (
+            f"⚙️ **PANDUAN SETUP & PENGATURAN LENGKAP (/setup)**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Semua pengaturan yang sebelumnya ada di CLI (`waifu setup`) kini bisa dikontrol 100% langsung dari Telegram!\n\n"
+            f"• **🧠 Model LLM / Chat**: Memilih model AI yang terdeteksi di folder Locally Uncensored atau Ollama.\n"
+            f"• **🎨 Model Foto & ComfyUI**: Mengganti checkpoint gambar ComfyUI (MeinaMix, BASNSFW, AOM3) atau Pollinations Cloud Fallback.\n"
+            f"• **🎭 Ganti Persona (/persona)**: Beralih waifu (Runa, Akira, Hina, Shiro, Yume).\n"
+            f"• **🚀 PC Startup Autorun**: Mengaktifkan bot agar otomatis aktif di background saat PC Windows dinyalakan.\n"
+            f"• **⏰ Sapaan Harian (/greetings)**: Waifu otomatis menyapa selamat pagi jam 07:00 dan selamat malam jam 22:00.\n"
+            f"• **📊 Status Diagnostik (/status)**: Cek kondisi server lokal, status GPU, dan latensi balasan."
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu")
+        )
+
+    else: # main
+        text = (
+            f"💖 **BUKU PANDUAN LENGKAP WAIFU ON TELEGRAM** `(v{get_version()})`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Selamat datang! Ini adalah buku panduan lengkap pendamping AI otonom kamu yang berjalan 100% lokal di PC tanpa batasan sensor (SFW & NSFW).\n\n"
+            f"📚 **Pilih Kategori Panduan:**\n"
+            f"• 💬 **Chat & Romansa**: Ngobrol bebas, gombalan, dan level kasih sayang.\n"
+            f"• 📸 **Foto & PAP**: Cara minta selfie, pose, dan rasio foto.\n"
+            f"• 👗 **Lemari Pakaian**: Mengganti busana & pakaian waifu.\n"
+            f"• 🎙️ **Voice & Audio**: Pesan suara jernih dan balasan VN.\n"
+            f"• ⚙️ **Panel Setup**: Kontrol model LLM, ComfyUI, dan autorun PC.\n\n"
+            f"📋 **Daftar Perintah Cepat:**\n"
+            f"`/start` - Kenalan & mulai obrolan baru\n"
+            f"`/setup` - Panel kontrol & konfigurasi lengkap\n"
+            f"`/help` - Tampilkan buku panduan ini\n"
+            f"`/pap` - Minta foto selfie waifu\n"
+            f"`/outfit` - Buka lemari pakaian waifu\n"
+            f"`/persona` - Ganti karakter waifu\n"
+            f"`/ratio` - Ganti rasio gambar (3:4, 9:16, 1:1, 4:3)\n"
+            f"`/quality` - Atur kualitas foto (Ultra/High/Fast)\n"
+            f"`/voice` - Pengaturan balasan suara\n"
+            f"`/love` - Cek skor cinta & level kasih sayang\n"
+            f"`/greetings` - Toggle sapaan pagi & malam otomatis\n"
+            f"`/status` - Cek koneksi server GPU, LLM & ComfyUI\n"
+            f"`/reset` - Hapus memori obrolan (topik baru)"
+        )
+        markup.add(
+            types.InlineKeyboardButton("💬 Chat & Romansa", callback_data="help_sec:chat"),
+            types.InlineKeyboardButton("📸 Foto & PAP", callback_data="help_sec:photo"),
+            types.InlineKeyboardButton("👗 Lemari Pakaian", callback_data="help_sec:outfit"),
+            types.InlineKeyboardButton("🎙️ Voice & Audio", callback_data="help_sec:voice"),
+            types.InlineKeyboardButton("⚙️ Panduan Setup", callback_data="help_sec:setup"),
+            types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu")
+        )
+
+    return text, markup
+
+
+def show_help_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, section: str = "main", reply_to_id: Optional[int] = None):
+    """Renders or updates help guide."""
+    text, markup = render_help_section(section)
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+@bot.message_handler(commands=['help'])
+def handle_help(message):
+    if not is_authorized(message.from_user.id):
+        return
+    show_help_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
+# --- Submenus for Setup ---
+
+def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
+    cur_llm = os.environ.get("LLM_MODEL", "default")
+    cur_base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8127/v1")
+    detected = scan_local_llm_models()
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    is_auto = (cur_llm in ("default", "auto") or ("8127" in cur_base and cur_llm == "default"))
+    markup.add(types.InlineKeyboardButton(f"🤖 Locally Uncensored (Auto-detect) {'✓' if is_auto else ''}", callback_data="cfg_set_llm:auto"))
+
+    for idx, (source, mname, mpath) in enumerate(detected):
+        is_cur = (cur_llm.lower() in mname.lower())
+        short_name = mname.replace(".gguf", "")
+        if len(short_name) > 34:
+            short_name = short_name[:31] + "..."
+        markup.add(types.InlineKeyboardButton(f"🧠 {short_name} {'✓' if is_cur else ''}", callback_data=f"cfg_set_llm:{idx}"))
+
+    is_ollama = ("11434" in cur_base)
+    markup.add(types.InlineKeyboardButton(f"🦙 Ollama Server (Port 11434) {'✓' if is_ollama else ''}", callback_data="cfg_set_llm:ollama"))
+    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+
+    text = (
+        f"🧠 **Pengaturan Model LLM / Chat Romansa**\n\n"
+        f"• Model Aktif: `{cur_llm}`\n"
+        f"• Endpoint API: `{cur_base}`\n\n"
+        f"Pilih model obrolan lokal yang ingin kamu aktifkan:"
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+
+
+def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
+    cur_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "")
+    cur_url = os.environ.get("COMFYUI_URL", "")
+    cur_cloud = os.environ.get("MEDIA_FALLBACK_CLOUD", "true").lower() in ("true", "1")
+    detected = scan_image_models()
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    is_auto = (not cur_ckpt and bool(cur_url))
+    markup.add(types.InlineKeyboardButton(f"✨ Auto-detect (MeinaMix preferred) {'✓' if is_auto else ''}", callback_data="cfg_set_ckpt:auto"))
+
+    for idx, (source, cname) in enumerate(detected):
+        is_cur = (cur_ckpt.lower() in cname.lower() if cur_ckpt else False)
+        short_c = cname.replace(".safetensors", "").replace(".ckpt", "")
+        if len(short_c) > 34:
+            short_c = short_c[:31] + "..."
+        markup.add(types.InlineKeyboardButton(f"🎨 {short_c} {'✓' if is_cur else ''}", callback_data=f"cfg_set_ckpt:{idx}"))
+
+    is_cloud_only = (not cur_url and cur_cloud)
+    markup.add(types.InlineKeyboardButton(f"☁️ Cloud Engine (Pollinations GPU) {'✓' if is_cloud_only else ''}", callback_data="cfg_set_ckpt:cloud"))
+
+    is_disabled = (not cur_url and not cur_cloud)
+    markup.add(types.InlineKeyboardButton(f"❌ Nonaktifkan Foto {'✓' if is_disabled else ''}", callback_data="cfg_set_ckpt:disabled"))
+    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+
+    active_display = cur_ckpt if cur_ckpt else ("Auto (Local ComfyUI)" if cur_url else ("Cloud Engine" if cur_cloud else "Dinonaktifkan"))
+    text = (
+        f"🎨 **Pengaturan Model Foto & ComfyUI**\n\n"
+        f"• Model Aktif: `{active_display}`\n"
+        f"• ComfyUI URL: `{cur_url or 'Offline / Cloud'}`\n\n"
+        f"Pilih model gambar anime lokal atau cloud engine:"
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+
+
+def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
+    cur_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")
+    cur_speaker = voice_engine.default_voice
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton(f"🎙️ Selalu Balas Suara {'✓' if cur_mode == 'always' else ''}", callback_data="set_voice:always"),
+        types.InlineKeyboardButton(f"🎧 Balas Suara Hanya Saat Kirim VN {'✓' if cur_mode == 'match_vn' else ''}", callback_data="set_voice:match_vn"),
+        types.InlineKeyboardButton(f"🔇 Text Only (Mute) {'✓' if cur_mode == 'off' else ''}", callback_data="set_voice:off")
+    )
+    markup.add(
+        types.InlineKeyboardButton(f"🇺🇸 Ana (US Sweet Girlfriend) {'✓' if 'Ana' in cur_speaker else ''}", callback_data="cfg_set_speaker:ana"),
+        types.InlineKeyboardButton(f"🇮🇩 Gadis (Indonesia Alami) {'✓' if 'Gadis' in cur_speaker else ''}", callback_data="cfg_set_speaker:gadis"),
+        types.InlineKeyboardButton(f"🇯🇵 Nanami (Japanese Kawaii) {'✓' if 'Nanami' in cur_speaker else ''}", callback_data="cfg_set_speaker:nanami"),
+        types.InlineKeyboardButton(f"🇺🇸 Jenny (US Cheerful) {'✓' if 'Jenny' in cur_speaker else ''}", callback_data="cfg_set_speaker:jenny"),
+        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+    )
+
+    text = (
+        f"🎙️ **Pengaturan Voice & Audio Waifu**\n\n"
+        f"• Mode Balasan: **{cur_mode.upper()}**\n"
+        f"• Karakter Suara: `{cur_speaker}`\n\n"
+        f"Atur bagaimana waifu membalas dengan audio suara dan pilih jenis karakter suaranya:"
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+
+
+def show_quality_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    cur_q = USER_QUALITIES.get(user_id, "high")
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton(f"🌟 Ultra Quality (32 steps, CFG 8.0) {'✓' if cur_q == 'ultra' else ''}", callback_data="set_quality:ultra"),
+        types.InlineKeyboardButton(f"⚡ High Quality (28 steps, CFG 7.5 - MeinaMix Best) {'✓' if cur_q == 'high' else ''}", callback_data="set_quality:high"),
+        types.InlineKeyboardButton(f"🚀 Fast Render (20 steps, CFG 7.0 - Speed) {'✓' if cur_q == 'fast' else ''}", callback_data="set_quality:fast"),
+        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+    )
+    text = (
+        f"✨ **Pengaturan Kualitas Foto / Render**\n\n"
+        f"• Kualitas Saat Ini: **{cur_q.upper()}**\n\n"
+        f"Pilih preset kualitas generasi gambar ComfyUI:\n"
+        f"• **Ultra**: Sampling 32 langkah, detail pakaian dan wajah maksimal.\n"
+        f"• **High**: 28 langkah, setting optimal paling seimbang untuk MeinaMix.\n"
+        f"• **Fast**: 20 langkah, render kilat jika ingin hemat waktu."
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+@bot.message_handler(commands=['quality'])
+def handle_quality_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    show_quality_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
+def show_ratio_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    cur_ar = USER_RATIOS.get(user_id, "3:4")
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    btns = [
+        types.InlineKeyboardButton(f"📐 3:4 (Portrait) {'✓' if cur_ar == '3:4' else ''}", callback_data="set_ratio:3:4"),
+        types.InlineKeyboardButton(f"📱 9:16 (Wallpaper HP) {'✓' if cur_ar == '9:16' else ''}", callback_data="set_ratio:9:16"),
+        types.InlineKeyboardButton(f"⏹️ 1:1 (Square Avatar) {'✓' if cur_ar == '1:1' else ''}", callback_data="set_ratio:1:1"),
+        types.InlineKeyboardButton(f"🖥️ 4:3 (Landscape) {'✓' if cur_ar == '4:3' else ''}", callback_data="set_ratio:4:3"),
+    ]
+    markup.add(*btns)
+    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+
+    text = (
+        f"📐 **Pengaturan Rasio Foto / Aspect Ratio**\n\n"
+        f"• Rasio Saat Ini: **{cur_ar}**\n\n"
+        f"Pilih ukuran proporsi foto yang dihasilkan waifu:\n"
+        f"• **3:4**: Potret vertikal anime estetik (standar foto tubuh)\n"
+        f"• **9:16**: Layar penuh smartphone, pas untuk Wallpaper HP!\n"
+        f"• **1:1**: Persegi simetris untuk avatar profil\n"
+        f"• **4:3**: Landscape horisontal pemandangan luas"
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+@bot.message_handler(commands=['ratio', 'aspect_ratio'])
+def handle_ratio_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    show_ratio_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('set_ratio:'))
+def callback_set_ratio(call):
+    if not is_authorized(call.from_user.id):
+        return
+    ar = call.data.split(":", 1)[1]
+    USER_RATIOS[call.from_user.id] = ar
+    bot.answer_callback_query(call.id, f"Aspect ratio: {ar}")
+    show_ratio_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('set_quality:'))
+def callback_set_quality(call):
+    if not is_authorized(call.from_user.id):
+        return
+    q = call.data.split(":", 1)[1]
+    USER_QUALITIES[call.from_user.id] = q
+    bot.answer_callback_query(call.id, f"Kualitas: {q.upper()}")
+    show_quality_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
 
 
 @bot.message_handler(commands=['status'])
@@ -227,17 +784,17 @@ def handle_status(message):
         f"• Backend: `{media_stat.get('backend')}`\n"
         f"• Device: `{media_stat.get('device')}`\n\n"
         f"🎭 **Active Persona**: **{persona.get('name')}**\n"
-        f"🎙️ **Voice Reply**: `{'Active (' + VOICE_NAME + ')' if VOICE_ENABLED else 'Disabled'}`\n"
+        f"🎙️ **Voice Reply**: `{'Active (' + voice_engine.default_voice + ')' if VOICE_ENABLED else 'Disabled'}`\n"
     )
     bot.reply_to(message, report, parse_mode="Markdown")
 
 
-def show_persona_menu(chat_id: int, user_id: int, reply_to_id: Optional[int] = None):
+def show_persona_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
     """Renders interactive persona selection keyboard."""
     personas = persona_mgr.list_personas()
     active_key = persona_mgr.active_key
     active_name = persona_mgr.get_active_persona().get("name")
-    
+
     markup = types.InlineKeyboardMarkup(row_width=2)
     buttons = []
     lines = [f"🎭 **Available Waifu Personas** (Active: **{active_name}**):\n"]
@@ -246,13 +803,21 @@ def show_persona_menu(chat_id: int, user_id: int, reply_to_id: Optional[int] = N
         lines.append(f"• **{name}** {'*(Currently Active)*' if is_curr else ''} — _{desc}_")
         btn_label = f"💖 {name} ✓" if is_curr else f"✨ Switch to {name}"
         buttons.append(types.InlineKeyboardButton(btn_label, callback_data=f"set_persona:{key}"))
-    
+
     markup.add(*buttons)
+    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
     lines.append("\nTap a button below or type `/persona <name>`:")
-    bot.send_message(chat_id, "\n".join(lines), reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    text = "\n".join(lines)
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
 
 
-def show_outfit_menu(chat_id: int, user_id: int, reply_to_id: Optional[int] = None):
+def show_outfit_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
     """Renders interactive outfit selection keyboard."""
     cur_key, cur_name = persona_mgr.get_user_outfit(user_id)
     outfits = persona_mgr.list_outfits()
@@ -263,16 +828,20 @@ def show_outfit_menu(chat_id: int, user_id: int, reply_to_id: Optional[int] = No
         label = f"{name} ✓" if is_cur else name
         btns.append(types.InlineKeyboardButton(label, callback_data=f"set_outfit:{key}"))
     markup.add(*btns)
-    
-    bot.send_message(
-        chat_id,
+    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+
+    text = (
         f"👗 **Waifu Wardrobe / Outfit Selection**\n\n"
         f"• Current Outfit: **{cur_name}**\n\n"
-        f"Choose what outfit you'd like your waifu to wear for photos & selfies! 💕",
-        reply_markup=markup,
-        parse_mode="Markdown",
-        reply_to_message_id=reply_to_id
+        f"Choose what outfit you'd like your waifu to wear for photos & selfies! 💕"
     )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
 
 
 def show_affection_status(chat_id: int, user_id: int, reply_to_id: Optional[int] = None):
@@ -300,6 +869,7 @@ def handle_persona(message):
     if len(args) > 1:
         chosen = args[1].lower()
         if persona_mgr.set_active_persona(chosen):
+            update_env_variable("DEFAULT_PERSONA", chosen)
             p = persona_mgr.get_active_persona()
             img_p = get_persona_image_path(p)
             if img_p and os.path.exists(img_p):
@@ -328,6 +898,7 @@ def callback_set_persona(call):
 
     chosen = call.data.split(":", 1)[1]
     if persona_mgr.set_active_persona(chosen):
+        update_env_variable("DEFAULT_PERSONA", chosen)
         p = persona_mgr.get_active_persona()
         bot.answer_callback_query(call.id, f"Switched to {p.get('name')}!")
         try:
@@ -354,7 +925,7 @@ def callback_set_persona(call):
                 logger.error(f"Error sending switched persona photo: {e}")
 
 
-@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'check_love_status'))
+@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'check_love_status'))
 def callback_quick_actions(call):
     if not is_authorized(call.from_user.id):
         bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
@@ -363,11 +934,133 @@ def callback_quick_actions(call):
     chat_id = call.message.chat.id
     user_id = call.from_user.id
     if call.data == 'open_outfit_menu':
-        show_outfit_menu(chat_id, user_id, reply_to_id=call.message.message_id)
+        show_outfit_menu(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_persona_menu':
-        show_persona_menu(chat_id, user_id, reply_to_id=call.message.message_id)
+        show_persona_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'open_ratio_menu':
+        show_ratio_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'open_quality_menu':
+        show_quality_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'open_setup_menu':
+        show_setup_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'open_help_menu':
+        show_help_menu(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'check_love_status':
         show_affection_status(chat_id, user_id, reply_to_id=call.message.message_id)
+
+
+# --- Setup Submenu Handlers ---
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_submenu:'))
+def callback_cfg_submenus(call):
+    if not is_authorized(call.from_user.id):
+        return
+    bot.answer_callback_query(call.id)
+    sub = call.data.split(":", 1)[1]
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    mid = call.message.message_id
+
+    if sub == "dashboard":
+        show_setup_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif sub == "llm":
+        show_llm_menu(chat_id, user_id, message_to_edit=mid)
+    elif sub == "photo":
+        show_photo_engine_menu(chat_id, user_id, message_to_edit=mid)
+    elif sub == "voice":
+        show_voice_settings_menu(chat_id, user_id, message_to_edit=mid)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_toggle:'))
+def callback_cfg_toggles(call):
+    if not is_authorized(call.from_user.id):
+        return
+    target = call.data.split(":", 1)[1]
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    mid = call.message.message_id
+
+    if target == "autorun":
+        new_state = toggle_autorun_setting()
+        status_msg = "🚀 PC Startup Autorun AKTIF!" if new_state else "🛑 PC Startup Autorun DINONAKTIFKAN!"
+        bot.answer_callback_query(call.id, status_msg, show_alert=True)
+        show_setup_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif target == "greetings":
+        cur_g = GREETINGS_ENABLED.get(user_id, True)
+        GREETINGS_ENABLED[user_id] = not cur_g
+        status_msg = "⏰ Sapaan Harian AKTIF (07:00 & 22:00) 🔔" if not cur_g else "🔕 Sapaan Harian DINONAKTIFKAN"
+        bot.answer_callback_query(call.id, status_msg, show_alert=True)
+        show_setup_dashboard(chat_id, user_id, message_to_edit=mid)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_llm:'))
+def callback_set_llm(call):
+    if not is_authorized(call.from_user.id):
+        return
+    key = call.data.split(":", 1)[1]
+    label = apply_llm_choice(key)
+    bot.answer_callback_query(call.id, f"LLM: {label}")
+    show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_ckpt:'))
+def callback_set_ckpt(call):
+    if not is_authorized(call.from_user.id):
+        return
+    key = call.data.split(":", 1)[1]
+    label = apply_ckpt_choice(key)
+    bot.answer_callback_query(call.id, f"Model Foto: {label}")
+    show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_speaker:'))
+def callback_set_speaker(call):
+    if not is_authorized(call.from_user.id):
+        return
+    key = call.data.split(":", 1)[1]
+    v_name = apply_voice_speaker(key)
+    bot.answer_callback_query(call.id, f"Voice TTS: {v_name}")
+    show_voice_settings_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'cfg_action:status')
+def callback_cfg_status(call):
+    if not is_authorized(call.from_user.id):
+        return
+    bot.answer_callback_query(call.id)
+    llm_stat = llm_client.check_health()
+    media_stat = media_engine.check_status()
+    persona = persona_mgr.get_active_persona()
+    status_icon = "🟢 Online" if llm_stat.get("online") else "🔴 Offline"
+    media_icon = "🟢 Active" if media_stat.get("online") else "🟡 Cloud Fallback"
+
+    report = (
+        f"📊 **Waifu on Telegram v{get_version()} - System Diagnostics**\n\n"
+        f"🧠 **Local LLM**: {status_icon}\n"
+        f"• Backend: `{llm_stat.get('backend', 'Unknown')}`\n"
+        f"• Endpoint: `{LLM_BASE_URL}`\n"
+        f"• Model: `{llm_stat.get('model', 'Active')}`\n\n"
+        f"🎨 **Media Generator**: {media_icon}\n"
+        f"• Backend: `{media_stat.get('backend')}`\n"
+        f"• Device: `{media_stat.get('device')}`\n\n"
+        f"🎭 **Active Persona**: **{persona.get('name')}**\n"
+        f"🎙️ **Voice Reply**: `{'Active (' + voice_engine.default_voice + ')' if VOICE_ENABLED else 'Disabled'}`\n"
+    )
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+    try:
+        bot.edit_message_text(report, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    except Exception:
+        pass
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('help_sec:'))
+def callback_help_section(call):
+    if not is_authorized(call.from_user.id):
+        return
+    bot.answer_callback_query(call.id)
+    sec = call.data.split(":", 1)[1]
+    show_help_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id, section=sec)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('regen_photo:'))
@@ -418,20 +1111,7 @@ def callback_set_outfit(call):
 def handle_voice_command(message):
     if not is_authorized(message.from_user.id):
         return
-
-    cur_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(
-        types.InlineKeyboardButton(f"🎙️ Always Reply with Voice Note {'✓' if cur_mode == 'always' else ''}", callback_data="set_voice:always"),
-        types.InlineKeyboardButton(f"🎧 Reply Voice ONLY when I send VN {'✓' if cur_mode == 'match_vn' else ''}", callback_data="set_voice:match_vn"),
-        types.InlineKeyboardButton(f"🔇 Text Only (Mute Voice Notes) {'✓' if cur_mode == 'off' else ''}", callback_data="set_voice:off"),
-    )
-    bot.reply_to(
-        message,
-        "🎙️ **Voice Note Reply Settings**\n\nChoose how your waifu should reply with voice notes:",
-        reply_markup=markup,
-        parse_mode="Markdown"
-    )
+    show_voice_settings_menu(message.chat.id, message.from_user.id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('set_voice:'))
@@ -441,20 +1121,12 @@ def callback_set_voice(call):
     mode = call.data.split(":", 1)[1]
     USER_VOICE_MODES[call.from_user.id] = mode
     labels = {
-        "always": "🎙️ Always Reply with Voice Note",
-        "match_vn": "🎧 Reply Voice ONLY when you send VN",
+        "always": "🎙️ Selalu Balas Suara",
+        "match_vn": "🎧 Balas Suara Hanya Saat Kirim VN",
         "off": "🔇 Text Only (Mute)"
     }
     bot.answer_callback_query(call.id, f"Mode: {mode}")
-    try:
-        bot.edit_message_text(
-            f"🎙️ Voice setting updated to:\n**{labels.get(mode, mode)}**! ✨",
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            parse_mode="Markdown"
-        )
-    except Exception:
-        pass
+    show_voice_settings_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
 
 
 @bot.message_handler(commands=['greetings'])
@@ -481,48 +1153,6 @@ def handle_greetings_command(message):
     )
 
 
-@bot.message_handler(commands=['ratio', 'aspect_ratio'])
-def handle_ratio_command(message):
-    if not is_authorized(message.from_user.id):
-        return
-
-    cur_ar = USER_RATIOS.get(message.from_user.id, "3:4")
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    btns = [
-        types.InlineKeyboardButton(f"📐 3:4 (Portrait) {'✓' if cur_ar == '3:4' else ''}", callback_data="set_ratio:3:4"),
-        types.InlineKeyboardButton(f"📱 9:16 (Story/Wallpaper) {'✓' if cur_ar == '9:16' else ''}", callback_data="set_ratio:9:16"),
-        types.InlineKeyboardButton(f"⏹️ 1:1 (Square Avatar) {'✓' if cur_ar == '1:1' else ''}", callback_data="set_ratio:1:1"),
-        types.InlineKeyboardButton(f"🖥️ 4:3 (Landscape) {'✓' if cur_ar == '4:3' else ''}", callback_data="set_ratio:4:3"),
-    ]
-    markup.add(*btns)
-    bot.reply_to(
-        message,
-        f"📐 **Photo Aspect Ratio Settings**\n\n"
-        f"• Current Ratio: **{cur_ar}**\n\n"
-        f"Select the aspect ratio for waifu selfies & photos:",
-        reply_markup=markup,
-        parse_mode="Markdown"
-    )
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('set_ratio:'))
-def callback_set_ratio(call):
-    if not is_authorized(call.from_user.id):
-        return
-    ar = call.data.split(":", 1)[1]
-    USER_RATIOS[call.from_user.id] = ar
-    bot.answer_callback_query(call.id, f"Aspect ratio set to {ar}!")
-    try:
-        bot.edit_message_text(
-            f"📐 **Aspect Ratio Updated!**\n\nUpcoming photos will be generated in **{ar}** format! 📸",
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            parse_mode="Markdown"
-        )
-    except Exception:
-        pass
-
-
 @bot.message_handler(commands=['reset'])
 def handle_reset(message):
     if not is_authorized(message.from_user.id):
@@ -546,7 +1176,6 @@ def process_photo_request(target, user_text: str):
     """Generates and delivers consistent girlfriend photo with caption matching conversation context."""
     persona = persona_mgr.get_active_persona()
 
-    # Support both Message and CallbackQuery objects
     if isinstance(target, types.CallbackQuery):
         chat_id = target.message.chat.id
         user_id = target.from_user.id
@@ -564,7 +1193,6 @@ def process_photo_request(target, user_text: str):
 
     status_msg = bot.reply_to(reply_to_target, f"📸 *{persona.get('name')} is getting ready for a photo just for you, sweetheart...* 💕", parse_mode="Markdown")
 
-    # Extract contextual scene from conversation history & user request
     detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client)
     visual_prompt = persona_mgr.craft_visual_prompt(user_text, user_id=user_id, scene_override=detected_scene)
     logger.info(f"Visual prompt crafted: {visual_prompt}")
@@ -589,7 +1217,6 @@ def process_photo_request(target, user_text: str):
                 )
                 return
 
-            # Build context-aware caption reflecting ongoing conversation
             history = persona_mgr.get_chat_history(user_id)
             clean_recent_turns = [m for m in history[-4:] if not m.get("content", "").startswith("[")]
 
@@ -618,13 +1245,11 @@ def process_photo_request(target, user_text: str):
             except Exception:
                 pass
 
-            # Inline button for quick pose variant
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("🔄 Pose Lain (New Pose)", callback_data=f"regen_photo:{detected_scene[:35]}"))
 
             bot.send_photo(chat_id, img_bytes, caption=clean_caption, reply_markup=markup)
 
-            # Increase affection on photo request
             persona_mgr.increase_affinity(user_id, delta=2)
             persona_mgr.add_message(user_id, "user", f"[Requested photo: {user_text}]")
             persona_mgr.add_message(user_id, "assistant", f"[Sent selfie: {detected_scene}] {clean_caption}")
@@ -730,7 +1355,6 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
         persona = persona_mgr.get_active_persona()
 
-        # Continuous typing heartbeat so user always sees "Waifu is typing..." on Telegram
         with ChatActionLoop(bot, message.chat.id, "typing"):
             system_inst = persona.get("system_instruction", "")
             system_inst += " Keep your response warm, natural, and under 3 sentences. Answer immediately."
@@ -761,7 +1385,6 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
             bot.reply_to(message, reply_text)
 
-            # Voice response logic based on user preference
             user_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
             should_voice = False
             if user_mode == "always" and VOICE_ENABLED:
@@ -826,7 +1449,6 @@ def schedule_daily_greetings():
             hour = now.tm_hour
             minute = now.tm_min
 
-            # Morning check (07:00 - 07:05)
             m_key = f"{today_str}:morning"
             if hour == 7 and minute < 10 and m_key not in LAST_GREETING_SENT:
                 LAST_GREETING_SENT[m_key] = True
@@ -834,7 +1456,6 @@ def schedule_daily_greetings():
                     if GREETINGS_ENABLED.get(uid, True):
                         send_scheduled_greeting(uid, "morning")
 
-            # Bedtime check (22:00 - 22:05)
             n_key = f"{today_str}:night"
             if hour == 22 and minute < 10 and n_key not in LAST_GREETING_SENT:
                 LAST_GREETING_SENT[n_key] = True
@@ -851,15 +1472,18 @@ def setup_bot_commands():
     """Registers bot commands with Telegram so the Menu / Command button displays them."""
     commands = [
         types.BotCommand("start", "Mulai obrolan & panduan utama"),
-        types.BotCommand("pap", "Minta foto / selfie waifu"),
-        types.BotCommand("outfit", "Buka lemari pakaian & ganti baju"),
-        types.BotCommand("persona", "Ganti waifu (Runa, Akira, Hina, Shiro, Yume)"),
-        types.BotCommand("ratio", "Ganti rasio foto (3:4, 9:16, 1:1, 4:3)"),
-        types.BotCommand("love", "Cek skor cinta & status hubungan"),
-        types.BotCommand("voice", "Pengaturan balasan suara / VN"),
-        types.BotCommand("greetings", "Toggle sapaan pagi & malam otomatis"),
-        types.BotCommand("status", "Cek status server LLM & ComfyUI"),
-        types.BotCommand("reset", "Hapus riwayat obrolan (topik baru)")
+        types.BotCommand("setup", "⚙️ Panel kontrol & pengaturan lengkap"),
+        types.BotCommand("help", "❓ Panduan fitur & cara penggunaan"),
+        types.BotCommand("pap", "📸 Minta foto / selfie waifu"),
+        types.BotCommand("outfit", "👗 Lemari pakaian & ganti baju"),
+        types.BotCommand("persona", "🎭 Ganti waifu (Runa, Akira, Hina, Shiro, Yume)"),
+        types.BotCommand("ratio", "📐 Ganti rasio foto (3:4, 9:16, 1:1, 4:3)"),
+        types.BotCommand("quality", "✨ Atur kualitas foto (Ultra/High/Fast)"),
+        types.BotCommand("voice", "🎙️ Pengaturan balasan suara / VN"),
+        types.BotCommand("love", "💖 Cek skor cinta & status hubungan"),
+        types.BotCommand("greetings", "⏰ Toggle sapaan pagi & malam otomatis"),
+        types.BotCommand("status", "📊 Cek status server LLM & ComfyUI"),
+        types.BotCommand("reset", "🔄 Hapus riwayat obrolan (topik baru)")
     ]
     try:
         bot.set_my_commands(commands)
@@ -880,10 +1504,7 @@ def main():
     logger.info(f"🎨 ComfyUI URL: {COMFYUI_URL}")
     logger.info("=" * 60)
 
-    # Register bot command menu on Telegram
     setup_bot_commands()
-
-    # Launch daily greeting scheduler thread in background
     threading.Thread(target=schedule_daily_greetings, daemon=True).start()
     logger.info("✓ Daily Greetings Scheduler active (07:00 AM & 22:00 PM)")
 
