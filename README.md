@@ -301,6 +301,7 @@ An interactive menu will open:
 | Command | Function |
 | :--- | :--- |
 | `/start` | Welcome greeting and quick action buttons |
+| `/remind` | Smart personal assistant & conversational reminders (`/remind 30m meeting` or natural chat) |
 | `/setup` | Master configuration dashboard to configure all CLI options in Telegram |
 | `/memory` | Long-term memory & diary of personal facts waifu remembers about you |
 | `/help` | Comprehensive interactive guide and documentation center |

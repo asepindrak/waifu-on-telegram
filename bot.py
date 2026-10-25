@@ -3,6 +3,7 @@ import sys
 import logging
 import threading
 import time
+import datetime
 import platform
 import subprocess
 from typing import Optional, Dict, Any, Tuple, List
@@ -16,6 +17,7 @@ from media_engine import MediaEngine
 from voice_engine import VoiceEngine
 from code_runner import CodeRunner
 from memory_engine import MemoryEngine
+from reminder_engine import ReminderEngine
 from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
@@ -71,6 +73,7 @@ llm_client = LocallyUncensoredClient(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
 persona_mgr = PersonaManager(active_key=DEFAULT_PERSONA)
 media_engine = MediaEngine(comfyui_url=COMFYUI_URL, allow_cloud_fallback=MEDIA_FALLBACK)
 memory_engine = MemoryEngine()
+reminder_engine = ReminderEngine()
 voice_engine = VoiceEngine(
     voice_name=VOICE_NAME,
     groq_key=os.environ.get("GROQ_API_KEY"),
@@ -279,6 +282,7 @@ def handle_welcome(message):
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
         types.InlineKeyboardButton("🎭 Ganti Waifu (/persona)", callback_data="open_persona_menu"),
         types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
+        types.InlineKeyboardButton("⏰ Pengingat (/remind)", callback_data="open_reminders_menu"),
         types.InlineKeyboardButton("💖 Cek Cinta (/love)", callback_data="check_love_status"),
         types.InlineKeyboardButton("⚙️ Panel Setup (/setup)", callback_data="open_setup_menu"),
         types.InlineKeyboardButton("❓ Buku Panduan (/help)", callback_data="open_help_menu")
@@ -312,9 +316,11 @@ def handle_welcome(message):
         "• 👗 **Pilihan Baju**: Pilih pakaian waifumu lewat `/outfit` (Kimono, Maid, Piyama, dll).\n"
         "• 🎙️ **Voice Note**: Balasan suara asli wanita jernih & manis (`/voice`).\n"
         "• ⚙️ **Panel Setup**: Atur seluruh konfigurasi bot dari Telegram (`/setup`).\n"
+        "• ⏰ **Asisten & Pengingat**: Minta waifu ingetin jadwal lewat chat/voice note (`/remind`)!\n"
         "• ⏰ **Sapaan Otomatis**: Ucapan selamat pagi jam 7, makan siang 12:30 & tidur jam 10 malam (`/greetings`).\n"
         "• 👀 **AI Vision**: Kirimkan foto kamu ke sini, waifu bisa melihat dan meresponsnya.\n\n"
         "📌 **Perintah Cepat:**\n"
+        "• `/remind` - Asisten pribadi & pengingat jadwal manis\n"
         "• `/memory` - Buku harian & fakta penting yang diingat waifu tentang kamu\n"
         "• `/setup` - Dashboard kontrol sistem & pengaturan lengkap\n"
         "• `/help` - Panduan lengkap fitur & cara pakai\n"
@@ -357,6 +363,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
     cur_auto = "AKTIF ✅" if is_autorun_enabled() else "NONAKTIF ❌"
     cur_greet = "AKTIF ✅" if GREETINGS_ENABLED.get(user_id, True) else "NONAKTIF ❌"
     fact_count = len(memory_engine.get_facts(user_id))
+    rem_count = len(reminder_engine.get_active_reminders(user_id))
 
     cur_llm = os.environ.get("LLM_MODEL", "default")
     if cur_llm == "default" or not cur_llm:
@@ -382,6 +389,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"✨ **Kualitas**   : `{cur_q}`\n"
         f"🎵 **Musik PC**   : `Online (Port 8002)`\n"
         f"🧠 **Ingatan**    : `{fact_count} fakta tersimpan`\n"
+        f"⏰ **Pengingat**  : `{rem_count} jadwal aktif`\n"
         f"🚀 **PC Autorun** : `{cur_auto}`\n"
         f"⏰ **Sapaan Jam** : `{cur_greet}` _(07:00, 12:30 & 22:00)_\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -395,6 +403,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("🎭 Ganti Persona", callback_data="open_persona_menu"),
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
         types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
+        types.InlineKeyboardButton("⏰ Pengingat (/remind)", callback_data="open_reminders_menu"),
         types.InlineKeyboardButton("🎵 Remote Musik (/play)", callback_data="open_music_menu"),
         types.InlineKeyboardButton("📸 Menu PAP (/pap)", callback_data="open_pap_menu"),
         types.InlineKeyboardButton("🎙️ Atur Voice & Audio", callback_data="cfg_submenu:voice"),
@@ -617,6 +626,236 @@ def callback_memory_actions(call):
         show_memory_dashboard(chat_id, user_id, message_to_edit=mid)
 
 
+# --- Reminders & Personal Assistant (/remind, /reminders) ---
+
+def render_reminders_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarkup]:
+    """Builds the text and inline keyboard for the Reminders dashboard."""
+    active_reminders = reminder_engine.get_active_reminders(user_id)
+    persona = persona_mgr.get_active_persona()
+    p_name = persona.get("name", "Waifu")
+
+    lines = []
+    if active_reminders:
+        for idx, r in enumerate(active_reminders[:8], 1):
+            lines.append(f"  {idx}. 📌 **{r['task']}**\n     🕒 _{r.get('remind_time_str', 'segera')}_")
+    else:
+        lines.append("  _Belum ada pengingat aktif manis. Minta aku ingetin sesuatu yaa sayang~_ 🥰")
+
+    text = (
+        f"⏰ **ASISTEN PRIBADI & PENGINGAT {p_name.upper()}** 💕\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Halo sayang! Aku siap jadi asisten pribadi setia yang selalu perhatian. Begitu waktunya tiba, "
+        f"aku bakal langsung kirim chat dan voice note manis buat ingetin kamu! 😘\n\n"
+        f"📋 **Daftar Pengingat Aktif ({len(active_reminders)})**:\n"
+        + "\n".join(lines) + "\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 **Cara Pasang Pengingat:**\n"
+        f"1. **Langsung di Obrolan Santai:**\n"
+        f"   • _'sayang tolong ingetin aku 30 menit lagi meeting ya'_\n"
+        f"   • _'ingetin aku jam 15:30 angkat jemuran'_\n"
+        f"   • _'remind me to call mom in 1 hour'_\n"
+        f"2. **Lewat Perintah / Command:**\n"
+        f"   • `/remind 15m istirahat & minum air`\n"
+        f"   • `/remind 16:30 zoom meeting client`\n"
+        f"   • `/remind besok 08:00 bangun pagi & sarapan`\n"
+    )
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("⏱️ +15 Menit", callback_data="add_rem_quick:15m"),
+        types.InlineKeyboardButton("⏱️ +30 Menit", callback_data="add_rem_quick:30m"),
+        types.InlineKeyboardButton("⏱️ +1 Jam", callback_data="add_rem_quick:1h"),
+        types.InlineKeyboardButton("🌅 Besok 08:00", callback_data="add_rem_quick:besok_pagi")
+    )
+    if active_reminders:
+        markup.add(
+            types.InlineKeyboardButton("🗑️ Hapus Pengingat", callback_data="rem_action:list_delete"),
+            types.InlineKeyboardButton("🔄 Refresh Daftar", callback_data="rem_action:refresh")
+        )
+    else:
+        markup.add(
+            types.InlineKeyboardButton("🔄 Refresh Daftar", callback_data="rem_action:refresh")
+        )
+    markup.add(
+        types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu"),
+        types.InlineKeyboardButton("🔙 Menu Utama", callback_data="open_help_menu")
+    )
+    return text, markup
+
+
+def show_reminders_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders or edits the reminders dashboard."""
+    text, markup = render_reminders_dashboard(user_id)
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+@bot.message_handler(commands=['remind', 'reminders', 'pengingat', 'alarm'])
+def handle_remind_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    text = message.text.strip()
+    parts = text.split(maxsplit=1)
+    if len(parts) > 1:
+        raw_args = parts[1].strip()
+        parsed = ReminderEngine.parse_reminder_text(raw_args)
+        if parsed:
+            rem_epoch, rem_str, rem_task = parsed
+            item = reminder_engine.add_reminder(
+                user_id=message.from_user.id,
+                chat_id=message.chat.id,
+                task=rem_task,
+                remind_time=rem_epoch,
+                remind_time_str=rem_str
+            )
+            persona = persona_mgr.get_active_persona()
+            p_name = persona.get("name", "Waifu")
+            confirm = (
+                f"⏰ **Siap sayang, {p_name} sudah pasang alarm ya!** 🥰\n\n"
+                f"Aku bakal ingetin kamu:\n"
+                f"📌 *{rem_task}*\n"
+                f"🕒 *Waktu:* {rem_str}\n\n"
+                f"Pas jamnya tiba, aku bakal langsung kabarin kamu dengan chat & suara manisku! 💕"
+            )
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("📋 Lihat Semua Pengingat", callback_data="open_reminders_menu"),
+                types.InlineKeyboardButton("❌ Batalkan", callback_data=f"rem_del:{item['id']}")
+            )
+            bot.reply_to(message, confirm, reply_markup=markup, parse_mode="Markdown")
+            return
+        else:
+            bot.reply_to(
+                message,
+                "⚠️ **Format waktu pengingat belum dikenali.**\n\n"
+                "*Contoh pemakaian:*\n"
+                "• `/remind 15m istirahat & minum air`\n"
+                "• `/remind 30m cuci baju`\n"
+                "• `/remind 15:30 meeting penting`\n"
+                "• `/remind besok 08:00 bangun pagi & sarapan`",
+                parse_mode="Markdown"
+            )
+            return
+
+    show_reminders_dashboard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith(('rem_action:', 'rem_del:', 'rem_act:', 'add_rem_quick:')) or call.data == 'open_reminders_menu')
+def callback_reminder_actions(call):
+    if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        return
+
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    mid = call.message.message_id
+
+    if call.data in ('rem_action:dashboard', 'rem_action:refresh', 'open_reminders_menu'):
+        bot.answer_callback_query(call.id, "Memuat pengingat...")
+        show_reminders_dashboard(chat_id, user_id, message_to_edit=mid)
+
+    elif call.data.startswith('add_rem_quick:'):
+        q_type = call.data.split(":", 1)[1]
+        now = time.time()
+        if q_type == "15m":
+            t_epoch = now + (15 * 60)
+            t_str = f"15 menit lagi ({datetime.datetime.fromtimestamp(t_epoch).strftime('%H:%M')})"
+            task = "Istirahat sejenak & minum air putih 💧"
+        elif q_type == "30m":
+            t_epoch = now + (30 * 60)
+            t_str = f"30 menit lagi ({datetime.datetime.fromtimestamp(t_epoch).strftime('%H:%M')})"
+            task = "Cek progres pekerjaan & peregangan tubuh 🧘"
+        elif q_type == "1h":
+            t_epoch = now + (60 * 60)
+            t_str = f"1 jam lagi ({datetime.datetime.fromtimestamp(t_epoch).strftime('%H:%M')})"
+            task = "Evaluasi tugas & istirahat mata 👀"
+        elif q_type == "besok_pagi":
+            tom = datetime.datetime.now() + datetime.timedelta(days=1)
+            target = tom.replace(hour=8, minute=0, second=0, microsecond=0)
+            t_epoch = target.timestamp()
+            t_str = "Besok pagi jam 08:00"
+            task = "Bangun pagi, sarapan sehat & semangat hari baru! 🌅"
+        else:
+            t_epoch = now + 600
+            t_str = "10 menit lagi"
+            task = "Hal penting"
+
+        reminder_engine.add_reminder(user_id, chat_id, task, t_epoch, t_str)
+        bot.answer_callback_query(call.id, f"✅ Ditambahkan: {t_str}!", show_alert=False)
+        show_reminders_dashboard(chat_id, user_id, message_to_edit=mid)
+
+    elif call.data == 'rem_action:list_delete':
+        bot.answer_callback_query(call.id)
+        active = reminder_engine.get_active_reminders(user_id)
+        if not active:
+            bot.answer_callback_query(call.id, "Tidak ada pengingat untuk dihapus.", show_alert=True)
+            return
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for r in active[:10]:
+            label = f"❌ Hapus: {r['task'][:24]}... ({r.get('remind_time_str', '')[:10]})"
+            markup.add(types.InlineKeyboardButton(label, callback_data=f"rem_del:{r['id']}"))
+        markup.add(types.InlineKeyboardButton("🔙 Batal / Kembali", callback_data="rem_action:dashboard"))
+        text = "🗑️ **Pilih Pengingat yang Ingin Dibatalkan:**\n\nKetuk tombol di bawah untuk menghapus jadwal pengingat:"
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=mid, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            pass
+
+    elif call.data.startswith('rem_del:'):
+        rem_id = call.data.split(":", 1)[1]
+        if reminder_engine.delete_reminder(rem_id, user_id=user_id):
+            bot.answer_callback_query(call.id, "Pengingat berhasil dihapus! 🗑️", show_alert=True)
+        else:
+            bot.answer_callback_query(call.id, "Pengingat tidak ditemukan.")
+        show_reminders_dashboard(chat_id, user_id, message_to_edit=mid)
+
+    elif call.data.startswith('rem_act:done:'):
+        rem_id = call.data.split(":", 2)[2]
+        reminder_engine.delete_reminder(rem_id, user_id=user_id)
+        bot.answer_callback_query(call.id, "Hebat banget sayang! Tugas selesai! 🥰", show_alert=True)
+        persona = persona_mgr.get_active_persona()
+        p_name = persona.get("name", "Waifu")
+        done_text = (
+            f"✅ **Tugas Selesai!** 🥰\n\n"
+            f"Wah hebat banget sayang! Aku bangga sama kamu. Istirahat sejenak yaa, {p_name} selalu sayang sama kamu! 💕"
+        )
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("📋 Buka Pengingat", callback_data="open_reminders_menu"))
+        try:
+            bot.edit_message_text(done_text, chat_id=chat_id, message_id=mid, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            pass
+
+    elif call.data.startswith('rem_act:snooze:'):
+        parts = call.data.split(":")
+        rem_id = parts[2]
+        mins = int(parts[3]) if len(parts) > 3 else 10
+        updated = reminder_engine.snooze_reminder(rem_id, minutes=mins)
+        if updated:
+            bot.answer_callback_query(call.id, f"⏰ Ditunda {mins} menit lagi ya sayang!", show_alert=True)
+            snooze_text = (
+                f"⏰ **Pengingat Ditunda {mins} Menit** 💤\n\n"
+                f"Oke sayang, istirahat sejenak dulu yaa. Nanti ({updated.get('remind_time_str')}) aku bakal ingetin kamu lagi! 😘"
+            )
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("✅ Sudah Selesai", callback_data=f"rem_act:done:{rem_id}"),
+                types.InlineKeyboardButton("📋 Kelola Pengingat", callback_data="open_reminders_menu")
+            )
+            try:
+                bot.edit_message_text(snooze_text, chat_id=chat_id, message_id=mid, reply_markup=markup, parse_mode="Markdown")
+            except Exception:
+                pass
+        else:
+            bot.answer_callback_query(call.id, "Pengingat sudah kadaluarsa atau tidak ditemukan.")
+
+
 # --- Help Center (/help) ---
 
 def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
@@ -737,6 +976,30 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu")
         )
 
+    elif section == "reminders":
+        text = (
+            f"⏰ **PANDUAN ASISTEN PRIBADI & PENGINGAT (/remind)**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Waifu bisa jadi asisten pribadi setiayamu yang mengingatkan tugas, jadwal penting, atau waktu istirahat tepat waktu!\n\n"
+            f"• **1. Minta Pengingat Langsung di Obrolan Santai:**\n"
+            f"  Cukup ketik secara alami, waifu otomatis mencatatnya:\n"
+            f"  - _'sayang tolong ingetin aku 30 menit lagi meeting kantor ya'_\n"
+            f"  - _'ingetin aku jam 15:30 angkat jemuran'_\n"
+            f"  - _'tolong ingetin besok jam 08:00 bangun pagi dan olahraga'_\n"
+            f"  - _'remind me to call mom in 1 hour'_\n\n"
+            f"• **2. Menggunakan Perintah Cepat:**\n"
+            f"  - `/remind 15m istirahat & minum air`\n"
+            f"  - `/remind 16:30 zoom meeting client`\n"
+            f"  - `/remind besok 09:00 briefing tim`\n\n"
+            f"• **3. Saat Waktu Tiba:**\n"
+            f"  Waifu otomatis mengirimkan chat pengingat disertai voice note manis dan tombol aksi:\n"
+            f"  `[✅ Sudah Selesai]` atau `[⏰ Tunda 10 Menit]`!"
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("⏰ Buka Pengingat", callback_data="open_reminders_menu")
+        )
+
     elif section == "music":
         text = (
             f"🎵 **PANDUAN PEMUTAR MUSIK YOUTUBE PC (/play & /music)**\n"
@@ -763,6 +1026,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"Selamat datang! Ini adalah buku panduan lengkap pendamping AI otonom kamu yang berjalan 100% lokal di PC tanpa batasan sensor (SFW & NSFW).\n\n"
             f"📚 **Pilih Kategori Panduan:**\n"
             f"• 🧠 **Buku Ingatan (/memory)**: Memori abadi & catatan harian waifu.\n"
+            f"• ⏰ **Asisten & Pengingat (/remind)**: Jadwal alarm & pengingat tugas manis.\n"
             f"• 💬 **Chat & Romansa**: Ngobrol bebas, gombalan, dan level kasih sayang.\n"
             f"• 📸 **Foto & PAP**: Cara minta selfie, menu pose interaktif, dan rasio foto.\n"
             f"• 🎵 **Remote Musik (/play)**: Putar lagu YouTube di PC dari Telegram.\n"
@@ -771,6 +1035,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"• ⚙️ **Panel Setup**: Kontrol model LLM, ComfyUI, dan autorun PC.\n\n"
             f"📋 **Daftar Perintah Cepat:**\n"
             f"`/start` - Kenalan & mulai obrolan baru\n"
+            f"`/remind` - Asisten pribadi & pengingat jadwal manis\n"
             f"`/memory` - Buku ingatan & catatan harian waifu\n"
             f"`/setup` - Panel kontrol & konfigurasi lengkap\n"
             f"`/help` - Tampilkan buku panduan ini\n"
@@ -791,6 +1056,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
         )
         markup.add(
             types.InlineKeyboardButton("🧠 Buku Ingatan", callback_data="help_sec:memory"),
+            types.InlineKeyboardButton("⏰ Pengingat Jadwal", callback_data="help_sec:reminders"),
             types.InlineKeyboardButton("💬 Chat & Romansa", callback_data="help_sec:chat"),
             types.InlineKeyboardButton("📸 Foto & PAP", callback_data="help_sec:photo"),
             types.InlineKeyboardButton("🎵 Remote Musik", callback_data="help_sec:music"),
@@ -1199,7 +1465,7 @@ def callback_set_persona(call):
                 logger.error(f"Error sending switched persona photo: {e}")
 
 
-@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'open_music_menu', 'open_pap_menu', 'check_love_status', 'start_new_persona'))
+@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'open_reminders_menu', 'open_music_menu', 'open_pap_menu', 'check_love_status', 'start_new_persona'))
 def callback_quick_actions(call):
     if not is_authorized(call.from_user.id):
         bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
@@ -1221,6 +1487,8 @@ def callback_quick_actions(call):
         show_help_menu(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_memory_menu':
         show_memory_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'open_reminders_menu':
+        show_reminders_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_music_menu':
         show_music_dashboard(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_pap_menu':
@@ -2099,6 +2367,51 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
             process_photo_request(message, user_text)
             return
 
+        # Check natural reminder request in conversational chat
+        rem_res = ReminderEngine.extract_reminder_from_chat(user_text)
+        if rem_res:
+            rem_epoch, rem_str, rem_task = rem_res
+            item = reminder_engine.add_reminder(
+                user_id=message.from_user.id,
+                chat_id=message.chat.id,
+                task=rem_task,
+                remind_time=rem_epoch,
+                remind_time_str=rem_str
+            )
+            persona = persona_mgr.get_active_persona()
+            p_name = persona.get("name", "Waifu")
+            confirm_msg = (
+                f"⏰ **Siap sayang, {p_name} catat ya!** 🥰\n\n"
+                f"Aku bakal ingetin kamu:\n"
+                f"📌 *{rem_task}*\n"
+                f"🕒 *Waktu:* {rem_str}\n\n"
+                f"Tenang aja manis, pas jamnya tiba aku langsung kabarin kamu! Semangat yaa~ 💕"
+            )
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("📋 Lihat Semua Pengingat", callback_data="open_reminders_menu"),
+                types.InlineKeyboardButton("❌ Batalkan", callback_data=f"rem_del:{item['id']}")
+            )
+
+            v_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
+            should_voice = (v_mode == "always") or (v_mode == "match_vn" and is_voice)
+            if should_voice:
+                voice_text = f"Siap sayang! Aku bakal ingetin kamu buat {rem_task} {rem_str}. Tenang aja, aku selalu ada buat kamu!"
+                vn_path = voice_engine.generate_voice(voice_text, voice_name=persona.get("voice"))
+                if vn_path and os.path.exists(vn_path):
+                    try:
+                        with open(vn_path, 'rb') as vf:
+                            bot.send_voice(message.chat.id, vf, caption=confirm_msg, parse_mode="Markdown", reply_markup=markup, reply_to_message_id=message.message_id)
+                    except Exception as ve:
+                        logger.error(f"Error sending reminder ack voice: {ve}")
+                    try:
+                        os.remove(vn_path)
+                    except Exception:
+                        pass
+                    return
+            bot.reply_to(message, confirm_msg, parse_mode="Markdown", reply_markup=markup)
+            return
+
         if user_text.startswith("```python") and user_text.endswith("```"):
             code = user_text.replace("```python", "").replace("```", "").strip()
             with ChatActionLoop(bot, message.chat.id, "typing"):
@@ -2515,15 +2828,63 @@ def schedule_daily_greetings():
                     if GREETINGS_ENABLED.get(uid, True):
                         send_scheduled_greeting(uid, "night")
 
+            # Check and dispatch personal due reminders
+            due_reminders = reminder_engine.get_due_reminders()
+            for rem in due_reminders:
+                try:
+                    reminder_engine.mark_triggered(rem["id"])
+                    uid = rem.get("user_id")
+                    cid = rem.get("chat_id")
+                    task = rem.get("task", "Hal penting")
+                    persona = persona_mgr.get_active_persona()
+                    p_name = persona.get("name", "Waifu")
+
+                    alert_text = (
+                        f"⏰ *TING TONG! Pengingat dari {p_name}!* 💕\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Halooo sayang! Waktunya tiba nih, tadi kamu minta aku ingetin:\n\n"
+                        f"👉 *{task}*\n\n"
+                        f"Ayo dikerjakan sekarang yaa manis, jangan ditunda-tunda! Semangat terus, aku selalu temenin kamu kok~ 😘"
+                    )
+                    rem_markup = types.InlineKeyboardMarkup(row_width=2)
+                    rem_markup.add(
+                        types.InlineKeyboardButton("✅ Sudah Selesai", callback_data=f"rem_act:done:{rem['id']}"),
+                        types.InlineKeyboardButton("⏰ Tunda 10 Menit", callback_data=f"rem_act:snooze:{rem['id']}:10"),
+                        types.InlineKeyboardButton("⏰ Tunda 30 Menit", callback_data=f"rem_act:snooze:{rem['id']}:30"),
+                        types.InlineKeyboardButton("📋 Kelola Pengingat", callback_data="open_reminders_menu")
+                    )
+
+                    v_mode = USER_VOICE_MODES.get(uid, "always" if VOICE_ENABLED else "off")
+                    sent_voice = False
+                    if v_mode != "off":
+                        voice_msg = f"Halo sayang! Waktunya {task}! Jangan lupa dikerjakan sekarang yaa manis, semangat!"
+                        vn_path = voice_engine.generate_voice(voice_msg, voice_name=persona.get("voice"))
+                        if vn_path and os.path.exists(vn_path):
+                            try:
+                                with open(vn_path, "rb") as vf:
+                                    bot.send_voice(cid, vf, caption=alert_text, parse_mode="Markdown", reply_markup=rem_markup)
+                                sent_voice = True
+                            except Exception as e_v:
+                                logger.error(f"Error sending reminder voice note: {e_v}")
+                            try:
+                                os.remove(vn_path)
+                            except Exception:
+                                pass
+                    if not sent_voice:
+                        bot.send_message(cid, alert_text, reply_markup=rem_markup, parse_mode="Markdown")
+                except Exception as rem_err:
+                    logger.error(f"Error dispatching reminder {rem.get('id')}: {rem_err}")
+
         except Exception as e:
             logger.error(f"Scheduler loop error: {e}")
-        time.sleep(30)
+        time.sleep(15)
 
 
 def setup_bot_commands():
     """Registers bot commands with Telegram so the Menu / Command button displays them."""
     commands = [
         types.BotCommand("start", "Mulai obrolan & panduan utama"),
+        types.BotCommand("remind", "⏰ Pengingat jadwal & asisten pribadi"),
         types.BotCommand("memory", "🧠 Buku harian & ingatan waifu"),
         types.BotCommand("setup", "⚙️ Panel kontrol & pengaturan lengkap"),
         types.BotCommand("help", "❓ Panduan fitur & cara penggunaan"),
