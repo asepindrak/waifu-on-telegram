@@ -204,9 +204,24 @@ def cmd_logs():
     else:
         print(c(YELLOW, "No log file found yet."))
 
+def cmd_uninstall():
+    print_banner()
+    if platform.system() == "Windows":
+        ps1_script = os.path.join(PROJECT_ROOT, "uninstall.ps1")
+        if os.path.exists(ps1_script):
+            subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1_script])
+        else:
+            print(c(RED, "uninstall.ps1 script not found."))
+    else:
+        sh_script = os.path.join(PROJECT_ROOT, "uninstall.sh")
+        if os.path.exists(sh_script):
+            subprocess.run(["bash", sh_script])
+        else:
+            print(c(RED, "uninstall.sh script not found."))
+
 def main():
     parser = argparse.ArgumentParser(description="💖 Waifu on Telegram CLI", add_help=False)
-    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "logs", "help"])
+    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "logs", "uninstall", "help"])
     parser.add_argument("arg", nargs="?", default=None)
     parser.add_argument("--daemon", "-d", action="store_true", help="Run bot silently in background")
     args = parser.parse_args()
@@ -230,6 +245,8 @@ def main():
         cmd_persona(p_name)
     elif cmd == "logs":
         cmd_logs()
+    elif cmd == "uninstall":
+        cmd_uninstall()
     elif cmd == "help":
         print_banner()
         print("Available CLI Commands:")
@@ -241,6 +258,7 @@ def main():
         print("  waifu persona <runa|aoi> - Switch active AI girlfriend persona")
         print("  waifu autorun [on|off]   - Configure autorun on system startup")
         print("  waifu logs               - Inspect recent log activity")
+        print("  waifu uninstall          - Complete uninstallation and cleanup wizard")
 
 if __name__ == "__main__":
     main()

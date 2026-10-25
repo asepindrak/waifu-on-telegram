@@ -172,5 +172,28 @@ You can create brand new personas simply by adding a `.json` file inside `person
 
 ---
 
+## 🗑️ Uninstallation
+
+If you ever wish to uninstall Waifu on Telegram from your machine, run the 1-line uninstaller:
+
+### Windows (PowerShell):
+```powershell
+irm https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/uninstall.ps1 | iex
+```
+
+### Linux / macOS (Bash):
+```bash
+curl -fsSL https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/uninstall.sh | bash
+```
+
+### Or using the CLI:
+```bash
+waifu uninstall
+```
+
+The uninstaller will safely stop running processes, remove startup shortcuts, clean up global CLI aliases, and ask whether you want a **Clean Reset** or to **Preserve Your Data & Tokens**.
+
+---
+
 ## 📄 License
 Distributed under the **MIT License**. Free to use, modify, and distribute.
