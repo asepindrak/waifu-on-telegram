@@ -23,6 +23,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("WaifuOnTelegram")
 
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
 # Credentials & Permissions
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 RAW_ALLOWED_USERS = os.environ.get("TELEGRAM_ALLOWED_USER_ID", "").strip()
@@ -71,6 +73,26 @@ def is_authorized(user_id: int) -> bool:
     return user_id in ALLOWED_USER_IDS
 
 
+def get_persona_image_path(persona: dict):
+    """Finds reference image file path for persona from personas/brief."""
+    avatar_rel = persona.get("avatar_image", "")
+    if avatar_rel:
+        p = os.path.join(PROJECT_ROOT, avatar_rel)
+        if os.path.exists(p):
+            return p
+
+    name = persona.get("name", "Runa")
+    for ext in [".png", ".jpg", ".jpeg"]:
+        candidate = os.path.join(PROJECT_ROOT, "personas", "brief", f"{name}{ext}")
+        if os.path.exists(candidate):
+            return candidate
+        candidate_lower = os.path.join(PROJECT_ROOT, "personas", "brief", f"{name.lower()}{ext}")
+        if os.path.exists(candidate_lower):
+            return candidate_lower
+
+    return None
+
+
 @bot.message_handler(commands=['start', 'help'])
 def handle_welcome(message):
     if not is_authorized(message.from_user.id):
@@ -79,30 +101,62 @@ def handle_welcome(message):
 
     persona = persona_mgr.get_active_persona()
     name = persona.get("name", "Runa")
+    archetype = persona.get("archetype", "AI Girlfriend")
+    desc = persona.get("description", "")
 
-    text = (
-        f"💖 **Hello Sweetheart! I'm {name}** 👋🥰\n\n"
-        f"Your virtual AI companion ready to chat, listen, joke around, share selfies, and help with coding & music on your PC!\n\n"
-        "✨ **Special Features:**\n"
-        "• 💬 **Romance Chat**: Uncensored, warm, and affectionate conversation.\n"
-        "• 📸 **Send Selfies & Photos**: Just ask *'Send me a selfie babe'* or *'Show me what you are wearing'*.\n"
-        "• 👗 **Wardrobe Selection**: Choose my outfits with `/outfit`!\n"
-        "• 🎙️ **Voice Notes**: Sweet natural voice replies (configure with `/voice`).\n"
-        "• ⏰ **Morning & Night Greetings**: Romantic daily wake-up and bedtime sapaan (`/greetings`).\n"
-        "• 👀 **AI Vision**: Send me your photos; I can see and react to them.\n"
-        "• 💻 **Coding Assistant**: Ask me to write or execute Python snippets.\n\n"
-        "📌 **Quick Commands:**\n"
-        "• `/photo <scene>` or `/pap` - Request a selfie with interactive retry\n"
-        "• `/ratio` - Change photo aspect ratio (3:4, 9:16, 1:1, 4:3)\n"
-        "• `/outfit` - Open wardrobe to change what I wear in photos\n"
-        "• `/persona` - Switch active waifu companion with 1-tap buttons\n"
-        "• `/love` - Check our affection score & romantic bond progress\n"
-        "• `/voice` - Set voice note reply style (always, match VN, or mute)\n"
-        "• `/greetings` - Toggle automated morning & bedtime greetings\n"
-        "• `/status` - Check Local LLM & ComfyUI diagnostics\n"
-        "• `/reset` - Clear chat memory\n"
+    # Quick interactive action keyboard
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("📸 Pap Foto Dong", callback_data="regen_photo:relaxing in modern cozy room"),
+        types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
+        types.InlineKeyboardButton("🎭 Ganti Waifu (/persona)", callback_data="open_persona_menu"),
+        types.InlineKeyboardButton("💖 Cek Cinta (/love)", callback_data="check_love_status")
     )
-    bot.reply_to(message, text, parse_mode="Markdown")
+
+    # 1. Send Persona Reference Photo from personas/brief
+    img_path = get_persona_image_path(persona)
+    photo_sent = False
+    if img_path and os.path.exists(img_path):
+        bot.send_chat_action(message.chat.id, "upload_photo")
+        try:
+            caption = (
+                f"💖 **Halo Sayang! Aku {name}** 👋🥰\n"
+                f"*({archetype})*\n\n"
+                f"_{desc}_\n\n"
+                f"Senang banget kamu datang! Aku siap nemenin kamu ngobrol manis, dengerin curhat, kirim foto selfie, dan nemenin hari-harimu~ 💕"
+            )
+            with open(img_path, "rb") as f:
+                bot.send_photo(message.chat.id, f, caption=caption, parse_mode="Markdown")
+            photo_sent = True
+        except Exception as e:
+            logger.error(f"Error sending start photo: {e}")
+
+    # 2. Send feature guide & commands
+    guide_text = (
+        f"✨ **Fitur Utama Bersama {name}:**\n"
+        "• 💬 **Romance Chat**: Bebas sensor, hangat, manja, dan otomatis ikut bahasamu.\n"
+        "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'sayang pap foto dong'* atau `/pap`!\n"
+        "• 👗 **Pilihan Baju**: Pilih pakaian waifumu lewat `/outfit` (Kimono, Maid, Piyama, dll).\n"
+        "• 🎙️ **Voice Note**: Balasan suara asli wanita jernih & manis (`/voice`).\n"
+        "• ⏰ **Sapaan Otomatis**: Ucapan selamat pagi jam 7 & selamat tidur jam 10 malam (`/greetings`).\n"
+        "• 👀 **AI Vision**: Kirimkan foto kamu ke sini, waifu bisa melihat dan meresponsnya.\n\n"
+        "📌 **Perintah Cepat:**\n"
+        "• `/photo <skenario>` atau `/pap` - Minta foto dengan tombol variasi pose\n"
+        "• `/ratio` - Ganti rasio foto (3:4 potret, 9:16 wallpaper HP, 1:1, 4:3)\n"
+        "• `/outfit` - Buka lemari pakaian waifu\n"
+        "• `/persona` - Ganti karakter waifu (Runa, Akira, Hina, Shiro, Yume)\n"
+        "• `/love` - Cek skor cinta & level kasih sayang\n"
+        "• `/voice` - Atur gaya balasan suara (Selalu VN / Hanya saat kirim VN / Mute)\n"
+        "• `/greetings` - Aktifkan/matikan sapaan harian otomatis\n"
+        "• `/status` - Cek koneksi LLM & ComfyUI di PC\n"
+        "• `/reset` - Hapus memori obrolan untuk mulai topik baru\n"
+    )
+
+    if photo_sent:
+        bot.send_message(message.chat.id, guide_text, reply_markup=markup, parse_mode="Markdown")
+    else:
+        full_text = f"💖 **Halo Sayang! Aku {name}** 👋🥰\n\n" + guide_text
+        bot.reply_to(message, full_text, reply_markup=markup, parse_mode="Markdown")
 
 
 @bot.message_handler(commands=['status'])
@@ -143,7 +197,17 @@ def handle_persona(message):
         chosen = args[1].lower()
         if persona_mgr.set_active_persona(chosen):
             p = persona_mgr.get_active_persona()
-            bot.reply_to(message, f"✨ Active character switched to **{p.get('name')}**! 🥰", parse_mode="Markdown")
+            img_p = get_persona_image_path(p)
+            if img_p and os.path.exists(img_p):
+                with open(img_p, "rb") as f:
+                    bot.send_photo(
+                        message.chat.id,
+                        f,
+                        caption=f"✨ **Karakter aktif berganti ke {p.get('name')}!** 🥰\n*({p.get('archetype', 'AI Girlfriend')})*\n\n_{p.get('description')}_",
+                        parse_mode="Markdown"
+                    )
+            else:
+                bot.reply_to(message, f"✨ Active character switched to **{p.get('name')}**! 🥰", parse_mode="Markdown")
             return
         else:
             bot.reply_to(message, f"⚠️ Persona `{chosen}` was not found.")
@@ -186,6 +250,32 @@ def callback_set_persona(call):
             )
         except Exception:
             pass
+
+        img_p = get_persona_image_path(p)
+        if img_p and os.path.exists(img_p):
+            try:
+                with open(img_p, "rb") as f:
+                    bot.send_photo(
+                        call.message.chat.id,
+                        f,
+                        caption=f"💖 **Halo Sayang! Sekarang aku {p.get('name')}** 👋🥰\n*({p.get('archetype', 'AI Companion')})*\n\n_{p.get('description')}_",
+                        parse_mode="Markdown"
+                    )
+            except Exception as e:
+                logger.error(f"Error sending switched persona photo: {e}")
+
+
+@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'check_love_status'))
+def callback_quick_actions(call):
+    if not is_authorized(call.from_user.id):
+        return
+    bot.answer_callback_query(call.id)
+    if call.data == 'open_outfit_menu':
+        handle_outfit_command(call.message)
+    elif call.data == 'open_persona_menu':
+        handle_persona(call.message)
+    elif call.data == 'check_love_status':
+        handle_affection_command(call.message)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('regen_photo:'))
