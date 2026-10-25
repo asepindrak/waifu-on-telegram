@@ -92,7 +92,6 @@ Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsive
   - Undisputed community benchmark for anime girl aesthetics with vibrant coloring, sparkling detailed eyes, and clean anatomy.
   - Built-in VAE (*Baked VAE*) — no washed-out colors.
   - Fast generation speed (~3–5 seconds per photo on an RTX 3050 6GB).
-* **Alternative Model:** `AOM3A3_orangemixs.safetensors` (AbyssOrangeMix3) with `orangemix.vae.pt`.
 
 ---
 
