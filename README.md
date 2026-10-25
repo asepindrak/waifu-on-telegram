@@ -142,6 +142,9 @@ An interactive menu will open:
 | `/status` | Real-time diagnostic check of LLM (Port 8127), ComfyUI (8188), and VRAM |
 | `/photo <scene>` | Request a custom selfie scenario (e.g. `/photo relaxing in cafe`) |
 | `/pap` | Quick shortcut to request a new selfie with interactive retry button |
+| `/outfit` | Interactive wardrobe to select clothes (Kimono, Maid, Bikini, Pajamas, etc.) |
+| `/voice` | Configure voice note reply mode (Always, Match VN, or Mute) |
+| `/greetings` | Toggle automatic romantic Good Morning (07:00) & Bedtime (22:00) greetings |
 | `/love` | Check your affection score & relationship progress with your waifu |
 | `/persona` | Interactive inline button menu to switch active companion |
 | `/persona <name>` | Switch persona directly (e.g. `/persona aoi`) |

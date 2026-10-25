@@ -58,6 +58,10 @@ voice_engine = VoiceEngine(
     openai_key=os.environ.get("OPENAI_API_KEY")
 )
 
+USER_VOICE_MODES: dict = {}      # user_id -> 'always' | 'match_vn' | 'off'
+GREETINGS_ENABLED: dict = {}     # user_id -> bool
+LAST_GREETING_SENT: dict = {}    # "YYYY-MM-DD:morning" -> True
+
 def is_authorized(user_id: int) -> bool:
     """Verifies if the user is authorized to interact with the bot."""
     if not ALLOWED_USER_IDS:
@@ -80,13 +84,18 @@ def handle_welcome(message):
         "✨ **Special Features:**\n"
         "• 💬 **Romance Chat**: Uncensored, warm, and affectionate conversation.\n"
         "• 📸 **Send Selfies & Photos**: Just ask *'Send me a selfie babe'* or *'Show me what you are wearing'*.\n"
-        "• 🎙️ **Voice Notes**: Send me a voice note and I will reply with a sweet voice!\n"
+        "• 👗 **Wardrobe Selection**: Choose my outfits with `/outfit`!\n"
+        "• 🎙️ **Voice Notes**: Sweet natural voice replies (configure with `/voice`).\n"
+        "• ⏰ **Morning & Night Greetings**: Romantic daily wake-up and bedtime sapaan (`/greetings`).\n"
         "• 👀 **AI Vision**: Send me your photos; I can see and react to them.\n"
         "• 💻 **Coding Assistant**: Ask me to write or execute Python snippets.\n\n"
         "📌 **Quick Commands:**\n"
-        "• `/photo <scene>` - Request a photo with a custom scenario\n"
-        "• `/persona` - View or switch active persona via interactive buttons\n"
-        "• `/love` - Check your romantic affection level with your waifu\n"
+        "• `/photo <scene>` or `/pap` - Request a selfie with interactive retry\n"
+        "• `/outfit` - Open wardrobe to change what I wear in photos\n"
+        "• `/persona` - Switch active waifu companion with 1-tap buttons\n"
+        "• `/love` - Check our affection score & romantic bond progress\n"
+        "• `/voice` - Set voice note reply style (always, match VN, or mute)\n"
+        "• `/greetings` - Toggle automated morning & bedtime greetings\n"
         "• `/status` - Check Local LLM & ComfyUI diagnostics\n"
         "• `/reset` - Clear chat memory\n"
     )
@@ -205,6 +214,117 @@ def handle_affection_command(message):
     bot.reply_to(message, reply, parse_mode="Markdown")
 
 
+@bot.message_handler(commands=['outfit', 'wardrobe'])
+def handle_outfit_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    cur_key, cur_name = persona_mgr.get_user_outfit(message.from_user.id)
+    outfits = persona_mgr.list_outfits()
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    btns = []
+    for key, name in outfits:
+        is_cur = (key == cur_key)
+        label = f"{name} ✓" if is_cur else name
+        btns.append(types.InlineKeyboardButton(label, callback_data=f"set_outfit:{key}"))
+    markup.add(*btns)
+    
+    bot.reply_to(
+        message,
+        f"👗 **Waifu Wardrobe / Outfit Selection**\n\n"
+        f"• Current Outfit: **{cur_name}**\n\n"
+        f"Choose what outfit you'd like your waifu to wear for photos & selfies! 💕",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('set_outfit:'))
+def callback_set_outfit(call):
+    if not is_authorized(call.from_user.id):
+        return
+    key = call.data.split(":", 1)[1]
+    if persona_mgr.set_user_outfit(call.from_user.id, key):
+        _, name = persona_mgr.get_user_outfit(call.from_user.id)
+        bot.answer_callback_query(call.id, f"Outfit set to: {name}")
+        try:
+            bot.edit_message_text(
+                f"👗 **Outfit Updated!**\n\nYour waifu is now wearing **{name}** for upcoming photos! 🥰📸",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+
+@bot.message_handler(commands=['voice'])
+def handle_voice_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    cur_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton(f"🎙️ Always Reply with Voice Note {'✓' if cur_mode == 'always' else ''}", callback_data="set_voice:always"),
+        types.InlineKeyboardButton(f"🎧 Reply Voice ONLY when I send VN {'✓' if cur_mode == 'match_vn' else ''}", callback_data="set_voice:match_vn"),
+        types.InlineKeyboardButton(f"🔇 Text Only (Mute Voice Notes) {'✓' if cur_mode == 'off' else ''}", callback_data="set_voice:off"),
+    )
+    bot.reply_to(
+        message,
+        "🎙️ **Voice Note Reply Settings**\n\nChoose how your waifu should reply with voice notes:",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('set_voice:'))
+def callback_set_voice(call):
+    if not is_authorized(call.from_user.id):
+        return
+    mode = call.data.split(":", 1)[1]
+    USER_VOICE_MODES[call.from_user.id] = mode
+    labels = {
+        "always": "🎙️ Always Reply with Voice Note",
+        "match_vn": "🎧 Reply Voice ONLY when you send VN",
+        "off": "🔇 Text Only (Mute)"
+    }
+    bot.answer_callback_query(call.id, f"Mode: {mode}")
+    try:
+        bot.edit_message_text(
+            f"🎙️ Voice setting updated to:\n**{labels.get(mode, mode)}**! ✨",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            parse_mode="Markdown"
+        )
+    except Exception:
+        pass
+
+
+@bot.message_handler(commands=['greetings'])
+def handle_greetings_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    args = message.text.strip().split()
+    if len(args) > 1:
+        val = args[1].lower() in ("on", "1", "yes", "true", "aktif")
+        GREETINGS_ENABLED[message.from_user.id] = val
+    else:
+        cur = GREETINGS_ENABLED.get(message.from_user.id, True)
+        GREETINGS_ENABLED[message.from_user.id] = not cur
+
+    status_str = "ENABLED (Aktif) 🔔" if GREETINGS_ENABLED.get(message.from_user.id, True) else "DISABLED (Mati) 🔕"
+    bot.reply_to(
+        message,
+        f"⏰ **Automated Daily Greetings**: {status_str}\n\n"
+        "• 07:00 AM - Sweet Good Morning greeting & Voice Note 🌅\n"
+        "• 22:00 PM - Cozy Bedtime Good Night greeting & Voice Note 🌙\n\n"
+        "Toggle anytime with `/greetings on` or `/greetings off`.",
+        parse_mode="Markdown"
+    )
+
+
 @bot.message_handler(commands=['reset'])
 def handle_reset(message):
     if not is_authorized(message.from_user.id):
@@ -227,11 +347,22 @@ def handle_photo_command(message):
 def process_photo_request(message, user_text: str):
     """Generates and delivers consistent girlfriend photo with caption."""
     persona = persona_mgr.get_active_persona()
-    bot.send_chat_action(message.chat.id, "upload_photo")
 
-    status_msg = bot.reply_to(message, f"📸 *{persona.get('name')} is getting ready for a photo just for you, sweetheart...* 💕", parse_mode="Markdown")
+    # Support both Message and CallbackQuery objects
+    if hasattr(message, "message") and message.message:
+        chat_id = message.message.chat.id
+        user_id = message.from_user.id
+        reply_to_target = message.message
+    else:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        reply_to_target = message
 
-    visual_prompt = persona_mgr.craft_visual_prompt(user_text)
+    bot.send_chat_action(chat_id, "upload_photo")
+
+    status_msg = bot.reply_to(reply_to_target, f"📸 *{persona.get('name')} is getting ready for a photo just for you, sweetheart...* 💕", parse_mode="Markdown")
+
+    visual_prompt = persona_mgr.craft_visual_prompt(user_text, user_id=user_id)
     logger.info(f"Visual prompt crafted: {visual_prompt}")
 
     def run_gen():
@@ -240,7 +371,7 @@ def process_photo_request(message, user_text: str):
             if not img_bytes:
                 bot.edit_message_text(
                     "I'm sorry darling, my camera is acting up a little... I will try again soon! 🥺",
-                    chat_id=message.chat.id,
+                    chat_id=chat_id,
                     message_id=status_msg.message_id
                 )
                 return
@@ -253,7 +384,7 @@ def process_photo_request(message, user_text: str):
             clean_caption = caption or f"Here's a special photo just for you darling~ 🥰 ({source})"
 
             try:
-                bot.delete_message(message.chat.id, status_msg.message_id)
+                bot.delete_message(chat_id, status_msg.message_id)
             except Exception:
                 pass
 
@@ -261,16 +392,16 @@ def process_photo_request(message, user_text: str):
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("🔄 Pose Lain (New Pose)", callback_data=f"regen_photo:{user_text[:35]}"))
 
-            bot.send_photo(message.chat.id, img_bytes, caption=clean_caption, reply_markup=markup)
+            bot.send_photo(chat_id, img_bytes, caption=clean_caption, reply_markup=markup)
 
             # Increase affection on photo request
-            persona_mgr.increase_affinity(message.from_user.id, delta=2)
-            persona_mgr.add_message(message.from_user.id, "user", f"[Requested photo: {user_text}]")
-            persona_mgr.add_message(message.from_user.id, "assistant", f"[Sent selfie photo] {clean_caption}")
+            persona_mgr.increase_affinity(user_id, delta=2)
+            persona_mgr.add_message(user_id, "user", f"[Requested photo: {user_text}]")
+            persona_mgr.add_message(user_id, "assistant", f"[Sent selfie photo] {clean_caption}")
 
         except Exception as e:
             logger.error(f"Error in photo delivery: {e}")
-            bot.send_message(message.chat.id, f"⚠️ Failed to send photo: {e}")
+            bot.send_message(chat_id, f"⚠️ Failed to send photo: {e}")
 
     threading.Thread(target=run_gen, daemon=True).start()
 
@@ -380,9 +511,17 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
         bot.reply_to(message, reply_text)
 
-        if VOICE_ENABLED and (is_voice or len(reply_text) < 200):
+        # Voice response logic based on user preference
+        user_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
+        should_voice = False
+        if user_mode == "always" and VOICE_ENABLED:
+            should_voice = (is_voice or len(reply_text) < 220)
+        elif user_mode == "match_vn" and is_voice and VOICE_ENABLED:
+            should_voice = True
+
+        if should_voice:
             def send_voice():
-                vn_path = voice_engine.generate_voice_note(reply_text[:150])
+                vn_path = voice_engine.generate_voice_note(reply_text[:160])
                 if vn_path:
                     try:
                         with open(vn_path, "rb") as vn_file:
@@ -397,6 +536,69 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
         bot.reply_to(message, f"⚠️ I'm sorry babe, my local brain connection hit a bump: {e}")
 
 
+def send_scheduled_greeting(user_id: int, time_of_day: str):
+    """Sends sweet spontaneous morning/bedtime greeting."""
+    try:
+        persona = persona_mgr.get_active_persona()
+        if time_of_day == "morning":
+            prompt = "It is 7:00 AM morning. Write 1-2 sweet, cheerful, affectionate sentences wishing your partner a wonderful productive day. Use Indonesian or English naturally."
+        else:
+            prompt = "It is 10:00 PM bedtime. Write 1-2 sweet, gentle, caring sentences reminding your partner to rest, sleep tight, and have sweet dreams. Use Indonesian or English naturally."
+
+        messages = [
+            {"role": "system", "content": persona.get("system_instruction", "")},
+            {"role": "user", "content": prompt}
+        ]
+        text, _ = llm_client.chat(messages, max_tokens=150)
+        if not text:
+            text = "Good morning sweetheart! Hope your day is filled with joy and smile~ 🥰" if time_of_day == "morning" else "Good night darling, sleep tight and sweet dreams! 💕"
+
+        tag = "🌅 *Good Morning Sweetheart!*" if time_of_day == "morning" else "🌙 *Good Night Darling...*"
+        bot.send_message(user_id, f"{tag}\n\n{text}", parse_mode="Markdown")
+
+        if VOICE_ENABLED:
+            vn_path = voice_engine.generate_voice_note(text)
+            if vn_path:
+                try:
+                    with open(vn_path, "rb") as f:
+                        bot.send_voice(user_id, f)
+                finally:
+                    if os.path.exists(vn_path):
+                        os.remove(vn_path)
+    except Exception as e:
+        logger.error(f"Error sending scheduled greeting to {user_id}: {e}")
+
+
+def schedule_daily_greetings():
+    """Background scheduler checking local time for morning (07:00) & bedtime (22:00) greetings."""
+    while True:
+        try:
+            now = time.localtime()
+            today_str = time.strftime("%Y-%m-%d", now)
+            hour = now.tm_hour
+            minute = now.tm_min
+
+            # Morning check (07:00 - 07:05)
+            m_key = f"{today_str}:morning"
+            if hour == 7 and minute < 10 and m_key not in LAST_GREETING_SENT:
+                LAST_GREETING_SENT[m_key] = True
+                for uid in ALLOWED_USER_IDS:
+                    if GREETINGS_ENABLED.get(uid, True):
+                        send_scheduled_greeting(uid, "morning")
+
+            # Bedtime check (22:00 - 22:05)
+            n_key = f"{today_str}:night"
+            if hour == 22 and minute < 10 and n_key not in LAST_GREETING_SENT:
+                LAST_GREETING_SENT[n_key] = True
+                for uid in ALLOWED_USER_IDS:
+                    if GREETINGS_ENABLED.get(uid, True):
+                        send_scheduled_greeting(uid, "night")
+
+        except Exception as e:
+            logger.error(f"Scheduler loop error: {e}")
+        time.sleep(30)
+
+
 def main():
     persona = persona_mgr.get_active_persona()
     logger.info("=" * 60)
@@ -404,6 +606,10 @@ def main():
     logger.info(f"🧠 Local LLM Base URL: {LLM_BASE_URL}")
     logger.info(f"🎨 ComfyUI URL: {COMFYUI_URL}")
     logger.info("=" * 60)
+
+    # Launch daily greeting scheduler thread in background
+    threading.Thread(target=schedule_daily_greetings, daemon=True).start()
+    logger.info("✓ Daily Greetings Scheduler active (07:00 AM & 22:00 PM)")
 
     stat = llm_client.check_health()
     if stat.get("online"):

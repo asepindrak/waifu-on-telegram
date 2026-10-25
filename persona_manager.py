@@ -70,6 +70,45 @@ VIDEO_INTENT_KEYWORDS = [
     r"bikin\s*video",
 ]
 
+OUTFIT_PRESETS = {
+    "default": {
+        "name": "🌸 Default (Persona Style)",
+        "prompt": ""
+    },
+    "sweater": {
+        "name": "👚 Pastel Sweater (Cozy)",
+        "prompt": "wearing cute oversized pastel knitted sweater, cozy comfy style"
+    },
+    "maid": {
+        "name": "🎀 French Maid Dress",
+        "prompt": "wearing cute frilly black and white anime maid outfit with lace headband and apron"
+    },
+    "kimono": {
+        "name": "👘 Floral Kimono",
+        "prompt": "wearing exquisite traditional floral silk kimono with decorated obi sash, festive hairpin"
+    },
+    "pajamas": {
+        "name": "🌙 Silk Pajamas",
+        "prompt": "wearing soft pastel silk camisole and sleep shorts, cozy bedtime loungewear"
+    },
+    "bikini": {
+        "name": "🏖️ Summer Bikini",
+        "prompt": "wearing stylish fashionable two-piece bikini, confident summer beach look"
+    },
+    "school_jk": {
+        "name": "🏫 School JK Uniform",
+        "prompt": "wearing japanese anime school uniform, sailor collar, pleated skirt"
+    },
+    "gym": {
+        "name": "🏋️ Sporty Gym Wear",
+        "prompt": "wearing athletic sports bra and sleek yoga leggings, fitness activewear"
+    },
+    "dress": {
+        "name": "👗 Elegant Evening Dress",
+        "prompt": "wearing gorgeous elegant evening cocktail dress, glamorous feminine styling"
+    }
+}
+
 
 class PersonaManager:
     """Manages AI girlfriend personality, consistent appearance, memory & photo triggers."""
@@ -80,6 +119,7 @@ class PersonaManager:
         self.personas: Dict[str, Dict[str, Any]] = {}
         self.user_conversations: Dict[int, List[Dict[str, str]]] = {}
         self.user_affinity: Dict[int, int] = {}
+        self.user_outfits: Dict[int, str] = {}
         self._load_all_personas()
 
     def _load_all_personas(self):
@@ -128,19 +168,46 @@ class PersonaManager:
 
         return False, "none"
 
-    def craft_visual_prompt(self, user_text: str) -> str:
+    def list_outfits(self) -> List[Tuple[str, str]]:
+        """Returns list of (key, name) for all outfit presets."""
+        return [(k, v["name"]) for k, v in OUTFIT_PRESETS.items()]
+
+    def set_user_outfit(self, user_id: int, key: str) -> bool:
+        """Sets chosen outfit preset for user."""
+        if key in OUTFIT_PRESETS:
+            self.user_outfits[user_id] = key
+            return True
+        return False
+
+    def get_user_outfit(self, user_id: int) -> Tuple[str, str]:
+        """Returns (key, name) of active outfit for user."""
+        key = self.user_outfits.get(user_id, "default")
+        return key, OUTFIT_PRESETS.get(key, OUTFIT_PRESETS["default"])["name"]
+
+    def craft_visual_prompt(self, user_text: str, user_id: Optional[int] = None) -> str:
         """
         Builds a high-quality visual prompt maintaining persona consistency
-        combined with whatever action/scene the user mentioned.
+        combined with whatever action/scene the user mentioned and chosen outfit.
         """
         persona = self.get_active_persona()
         base_visual = persona.get("visual_traits", DEFAULT_PERSONAS["runa"]["visual_traits"])
         lower = user_text.lower()
 
+        # Check user-selected custom outfit
+        outfit_prompt = ""
+        if user_id:
+            outfit_key = self.user_outfits.get(user_id, "default")
+            if outfit_key != "default" and outfit_key in OUTFIT_PRESETS:
+                outfit_prompt = OUTFIT_PRESETS[outfit_key]["prompt"]
+
+        # If no custom outfit, use persona default outfit
+        if not outfit_prompt:
+            outfit_prompt = f"wearing {persona.get('default_outfit', 'cute casual clothes')}"
+
         # Extract context / scene hints
         scene = "sitting comfortably in modern cozy bedroom, soft ambient morning lighting"
         if any(w in lower for w in ["bed", "sleep", "night", "tidur", "kasur", "pajamas"]):
-            scene = "relaxing on bed with fluffy pillows, wearing soft silk pajamas, warm dim night bedroom lamp"
+            scene = "relaxing on bed with fluffy pillows, warm dim night bedroom lamp"
         elif any(w in lower for w in ["cafe", "coffee", "tea", "kafe", "kopi"]):
             scene = "sitting at aesthetic cafe table holding a warm beverage, beautiful bokeh background"
         elif any(w in lower for w in ["walk", "park", "garden", "outdoor", "taman", "jalan"]):
@@ -148,9 +215,9 @@ class PersonaManager:
         elif any(w in lower for w in ["beach", "ocean", "sea", "pantai"]):
             scene = "walking along tropical beach, ocean sunset horizon, gentle sea breeze"
         elif any(w in lower for w in ["bikini", "swimsuit", "seksi", "sexy", "lingerie"]):
-            scene = "wearing stylish elegant bikini, confident alluring pose, summer glow"
+            scene = "confident alluring pose, summer beach glow"
 
-        return f"{base_visual}, {scene}, looking directly into camera, phone selfie shot, detailed eyes, realistic skin texture"
+        return f"{base_visual}, {outfit_prompt}, {scene}, looking directly into camera, phone selfie shot, detailed eyes, masterpiece quality"
 
     def get_chat_history(self, user_id: int) -> List[Dict[str, str]]:
         """Returns chat history for user."""
