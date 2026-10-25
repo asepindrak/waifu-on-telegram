@@ -128,6 +128,12 @@ def handle_welcome(message):
         bot.reply_to(message, "⛔ Access denied. Your Telegram User ID is not authorized.")
         return
 
+    # Ensure command menu is registered on Telegram
+    try:
+        setup_bot_commands()
+    except Exception:
+        pass
+
     persona = persona_mgr.get_active_persona()
     name = persona.get("name", "Runa")
     archetype = persona.get("archetype", "AI Girlfriend")
@@ -831,6 +837,31 @@ def schedule_daily_greetings():
         time.sleep(30)
 
 
+def setup_bot_commands():
+    """Registers bot commands with Telegram so the Menu / Command button displays them."""
+    commands = [
+        types.BotCommand("start", "Mulai obrolan & panduan utama"),
+        types.BotCommand("pap", "Minta foto / selfie waifu"),
+        types.BotCommand("outfit", "Buka lemari pakaian & ganti baju"),
+        types.BotCommand("persona", "Ganti waifu (Runa, Akira, Hina, Shiro, Yume)"),
+        types.BotCommand("ratio", "Ganti rasio foto (3:4, 9:16, 1:1, 4:3)"),
+        types.BotCommand("love", "Cek skor cinta & status hubungan"),
+        types.BotCommand("voice", "Pengaturan balasan suara / VN"),
+        types.BotCommand("greetings", "Toggle sapaan pagi & malam otomatis"),
+        types.BotCommand("status", "Cek status server LLM & ComfyUI"),
+        types.BotCommand("reset", "Hapus riwayat obrolan (topik baru)")
+    ]
+    try:
+        bot.set_my_commands(commands)
+        try:
+            bot.set_chat_menu_button(menu_button=types.MenuButtonCommands())
+        except Exception:
+            pass
+        logger.info("✓ Telegram Bot Command menu registered successfully")
+    except Exception as e:
+        logger.warning(f"Could not register Telegram bot commands: {e}")
+
+
 def main():
     persona = persona_mgr.get_active_persona()
     logger.info("=" * 60)
@@ -838,6 +869,9 @@ def main():
     logger.info(f"🧠 Local LLM Base URL: {LLM_BASE_URL}")
     logger.info(f"🎨 ComfyUI URL: {COMFYUI_URL}")
     logger.info("=" * 60)
+
+    # Register bot command menu on Telegram
+    setup_bot_commands()
 
     # Launch daily greeting scheduler thread in background
     threading.Thread(target=schedule_daily_greetings, daemon=True).start()
