@@ -64,6 +64,42 @@ Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsive
 
 ---
 
+## 📱 Prerequisites: Telegram Bot Token & User ID
+
+Before running the installer or setup wizard, you will need two credentials from Telegram (both are 100% free and take less than 1 minute to obtain):
+
+### 1. 🤖 Create a Telegram Bot & Get Your Token
+1. Open Telegram and open [**@BotFather**](https://t.me/BotFather) (the official bot manager with a blue verification checkmark).
+2. Click **Start** or send `/start`.
+3. Send the command `/newbot`.
+4. Enter a **display name** for your companion (e.g., `Runa AI` or `My Virtual Girlfriend`).
+5. Enter a unique **username** ending with `bot` (e.g., `my_runa_waifu_bot`).
+6. **Done!** BotFather will give you your **HTTP API Bot Token** formatted like:
+   ```text
+   7123456789:AAFlKj89-xXyZ1234abcdEFGHijklmnop
+   ```
+   *(Keep this token safe; you will paste it into the setup wizard).*
+
+> 💡 **Optional Tip:** In BotFather, you can send `/setuserpic` to set your waifu's profile picture using the reference images from `personas/brief/`!
+
+---
+
+### 2. 🆔 Find Your Telegram User ID
+To protect your privacy and ensure your local PC isn't accessed by strangers, the bot strictly responds only to authorized User IDs.
+
+1. Open Telegram and search for [**@userinfobot**](https://t.me/userinfobot) (or [**@raw_data_bot**](https://t.me/raw_data_bot)).
+2. Click **Start** or send `/start`.
+3. The bot will immediately reply with your account details:
+   ```text
+   Id: 987654321
+   First: Asep
+   Lang: en
+   ```
+4. Copy that number (`987654321`). This is your `TELEGRAM_ALLOWED_USER_ID`.
+*(To authorize multiple people, separate IDs with a comma: `987654321, 123456789`).*
+
+---
+
 ## 🚀 1-Line Quick Installation
 
 Install and launch **Waifu on Telegram** with a single command directly from GitHub:
