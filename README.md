@@ -20,6 +20,50 @@
 
 ---
 
+## 🖥️ Hardware Requirements & Recommended AI Models
+
+Waifu on Telegram is engineered to run locally on consumer gaming PCs and laptops while keeping VRAM usage lean, response times quick, and photo rendering lightning-fast.
+
+### ⚙️ Hardware Specifications
+
+| Component | Minimum Requirements | Recommended Specifications |
+| :--- | :--- | :--- |
+| **GPU / VGA** | **NVIDIA GPU with 4GB - 6GB VRAM**<br>*(GTX 1650, RTX 2060, RTX 3050 Laptop)* | **NVIDIA GPU with 6GB - 8GB+ VRAM**<br>*(RTX 3050 6GB, RTX 3060, RTX 4060+)* |
+| **System RAM** | 8 GB RAM | 16 GB - 32 GB RAM |
+| **Storage** | 10 GB free space (SSD recommended) | 25 GB free space (NVMe SSD) |
+| **Operating System** | Windows 10 / 11, Linux (Ubuntu/Debian), macOS | Windows 11 (64-bit) |
+| **No-GPU Mode** | ✅ **Fully Supported!** Laptops without dedicated GPUs can run LLM on CPU with automatic Cloud Fallback for photo generation. |
+
+---
+
+### 🧠 Official Recommended AI Models
+
+Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsiveness, and high-fidelity anime aesthetics:
+
+#### 1. 💬 Chat & Roleplay Brain: **Huihui-Qwythos-9B**
+* **Model File:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf`
+* **Local Backend:** [Locally Uncensored](https://locallyuncensored.com/) / `lu-llama-server` (Port `8127`)
+* **Key Strengths:**
+  - **Zero Censorship:** Fully abliterated with Claude-Mythos roleplay fine-tuning. Highly affectionate, witty, caring, and open to romantic roleplay.
+  - **Adaptive Language Mirroring:** Seamlessly switches between Indonesian (*sayang, manja, santai*), English (*sweetheart, darling*), or Japanese.
+  - **AI Vision Support:** Paired with `Huihui-Qwythos-9B.mmproj.gguf`, enabling your waifu to see, inspect, and react to photos you send.
+  - **VRAM Usage:** ~4.5 GB - 5.5 GB in Q4_K quantization.
+
+#### 2. 🎨 Photo & Selfie Generator: **MeinaMix v12**
+* **Model File:** `meinamix_v12Final.safetensors` *(Baked VAE)*
+* **Local Backend:** ComfyUI (Port `8188`)
+* **Optimal Preset (Pre-configured in Bot):**
+  - **Aspect Ratio:** **`3:4`** (576 x 768) — the golden portrait ratio for natural anime selfies.
+  - **Quality Preset:** **High** (28 steps, CFG 7.5).
+  - **Sampler & Scheduler:** **`DPM++ 2M Karras`** with **Clip Skip 2** (`CLIPSetLastLayer: -2`).
+* **Key Strengths:**
+  - Undisputed community benchmark for anime girl aesthetics with vibrant coloring, sparkling detailed eyes, and clean anatomy.
+  - Built-in VAE (*Baked VAE*) — no washed-out colors.
+  - Fast generation speed (~3–5 seconds per photo on an RTX 3050 6GB).
+* **Alternative Model:** `AOM3A3_orangemixs.safetensors` (AbyssOrangeMix3) with `orangemix.vae.pt`.
+
+---
+
 ## 🚀 1-Line Quick Installation
 
 Install and launch **Waifu on Telegram** with a single command directly from GitHub:
@@ -60,9 +104,9 @@ waifu status
 # Open interactive configuration manager (Change Models, Bot Token, etc.)
 waifu setup
 
-# Switch AI girlfriend persona on-the-fly
+# Switch AI girlfriend persona on-the-fly (runa, akira, hina, shiro, yume)
 waifu persona runa
-waifu persona aoi
+waifu persona akira
 
 # Enable or disable autorun on system startup
 waifu autorun on
