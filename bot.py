@@ -2254,7 +2254,11 @@ def process_photo_request(target, user_text: str):
                 "content": f"[Photo taken in setting: '{detected_scene}']. Reply sending this photo to your lover with 1-2 sweet sentences:"
             })
 
-            caption, _ = llm_client.chat(caption_prompt, max_tokens=120)
+            try:
+                caption, _ = llm_client.chat(caption_prompt, max_tokens=120)
+            except Exception as e_cap:
+                logger.warning(f"Could not generate dynamic photo caption from LLM: {e_cap}")
+                caption = None
             clean_caption = caption or f"Ini foto spesial buat kamu sayang~ 🥰 ({source})"
 
             if status_msg:
