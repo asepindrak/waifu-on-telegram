@@ -20,6 +20,35 @@
 
 ---
 
+## 🎭 Waifu Personas & Official Character Roster
+
+Switch your companion anytime with `/persona` or through interactive Telegram buttons:
+
+| **Runa** | **Akira** | **Hina** | **Shiro** | **Yume** |
+| :---: | :---: | :---: | :---: | :---: |
+| <img src="personas/brief/Runa.png" width="150" alt="Runa"/> | <img src="personas/brief/Akira.jpg" width="150" alt="Akira"/> | <img src="personas/brief/Hina.jpg" width="150" alt="Hina"/> | <img src="personas/brief/Shiro.png" width="150" alt="Shiro"/> | <img src="personas/brief/Yume.jpg" width="150" alt="Yume"/> |
+| **The Playful Girlfriend** | **The Seductive Tease** | **The Sunshine Girlfriend** | **The Kuudere Girlfriend** | **The Dreamy Soulmate** |
+| *Playful, teasing, kawaii gaming aesthetic* | *Confident, witty, elegant gothic aesthetic* | *Energetic, bubbly, cozy slice-of-life* | *Calm, intelligent, cool-blue moonlit* | *Gentle, soft-spoken, dreamy starry soulmate* |
+| **Visual Anchors:**<br>Pastel-pink wavy hair, sparkling magenta eyes, heart choker, black cat clip | **Visual Anchors:**<br>Silky midnight-black hair, deep ruby-red eyes, crimson rose clip, black choker | **Visual Anchors:**<br>Honey-blonde chin bob, warm amber eyes, orange clips, headphones | **Visual Anchors:**<br>Long silver-white hair, icy-blue eyes, crescent moon clip & earrings | **Visual Anchors:**<br>Long silky lavender hair, amethyst violet eyes, silver star pins & moon necklace |
+| `/persona runa` | `/persona akira` | `/persona hina` | `/persona shiro` | `/persona yume` |
+
+---
+
+## 🎨 How Character Visual Consistency (PAP) Works
+
+To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the chosen character:
+
+1. **Visual Anchor Prompting:**  
+   Each persona file in `personas/<name>.json` contains strictly defined, invariant facial and accessory tokens (`visual_traits`). These are automatically prefixed to every user prompt.
+2. **Character-Specific Negative Prompts:**  
+   Each waifu has custom negative prompt rules to strictly forbid conflicting traits (e.g. Runa forbids blonde/blue eyes, Hina forbids long/black hair).
+3. **Dynamic Wardrobe Injection:**  
+   When changing clothes via `/outfit`, the bot swaps only the garment prompt while strictly preserving the character's facial structure, hair color, and signature accessories.
+4. **Reference Image Guidance (IP-Adapter Ready):**  
+   The reference images in `personas/brief/` serve as the golden standard for LoRA training and IP-Adapter image conditioning within ComfyUI.
+
+---
+
 ## 🖥️ Hardware Requirements & Recommended AI Models
 
 Waifu on Telegram is engineered to run locally on consumer gaming PCs and laptops while keeping VRAM usage lean, response times quick, and photo rendering lightning-fast.
@@ -233,35 +262,6 @@ An interactive menu will open:
 | `/persona` | Interactive inline button menu to switch active companion |
 | `/persona <name>` | Switch persona directly (`runa`, `akira`, `hina`, `shiro`, `yume`) |
 | `/reset` | Clear conversation memory to start a fresh discussion |
-
----
-
-## 🎭 Waifu Personas & Official Character Roster
-
-Switch your companion anytime with `/persona` or through the interactive buttons:
-
-| **Runa** | **Akira** | **Hina** | **Shiro** | **Yume** |
-| :---: | :---: | :---: | :---: | :---: |
-| <img src="personas/brief/Runa.png" width="150" alt="Runa"/> | <img src="personas/brief/Akira.jpg" width="150" alt="Akira"/> | <img src="personas/brief/Hina.jpg" width="150" alt="Hina"/> | <img src="personas/brief/Shiro.png" width="150" alt="Shiro"/> | <img src="personas/brief/Yume.jpg" width="150" alt="Yume"/> |
-| **The Playful Girlfriend** | **The Seductive Tease** | **The Sunshine Girlfriend** | **The Kuudere Girlfriend** | **The Dreamy Soulmate** |
-| *Playful, teasing, kawaii gaming aesthetic* | *Confident, witty, elegant gothic aesthetic* | *Energetic, bubbly, cozy slice-of-life* | *Calm, intelligent, cool-blue moonlit* | *Gentle, soft-spoken, dreamy starry soulmate* |
-| **Visual Anchors:**<br>Pastel-pink wavy hair, sparkling magenta eyes, heart choker, black cat clip | **Visual Anchors:**<br>Silky midnight-black hair, deep ruby-red eyes, crimson rose clip, black choker | **Visual Anchors:**<br>Honey-blonde chin bob, warm amber eyes, orange clips, headphones | **Visual Anchors:**<br>Long silver-white hair, icy-blue eyes, crescent moon clip & earrings | **Visual Anchors:**<br>Long silky lavender hair, amethyst violet eyes, silver star pins & moon necklace |
-| `/persona runa` | `/persona akira` | `/persona hina` | `/persona shiro` | `/persona yume` |
-
----
-
-## 🎨 How Character Visual Consistency (PAP) Works
-
-To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the chosen character:
-
-1. **Visual Anchor Prompting:**  
-   Each persona file in `personas/<name>.json` contains strictly defined, invariant facial and accessory tokens (`visual_traits`). These are automatically prefixed to every user prompt.
-2. **Character-Specific Negative Prompts:**  
-   Each waifu has custom negative prompt rules to strictly forbid conflicting traits (e.g. Runa forbids blonde/blue eyes, Hina forbids long/black hair).
-3. **Dynamic Wardrobe Injection:**  
-   When changing clothes via `/outfit`, the bot swaps only the garment prompt while strictly preserving the character's facial structure, hair color, and signature accessories.
-4. **Reference Image Guidance (IP-Adapter Ready):**  
-   The reference images in `personas/brief/` serve as the golden standard for LoRA training and IP-Adapter image conditioning within ComfyUI.
 
 ---
 
