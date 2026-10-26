@@ -288,6 +288,31 @@ def config_language(env_vars):
         else:
             env_vars["BOT_LANGUAGE"] = cur_lang
 
+def config_video_engine(env_vars):
+    """Configures the active Video Generation Engine (Wan 2.1, AnimateDiff, or Motion 2.5D)."""
+    print(c(BOLD + CYAN, "\n[Video Generator Engine Selection]"))
+    print("-" * 60)
+    cur_eng = env_vars.get("VIDEO_ENGINE", "wan21").lower().strip()
+    print(f"Current Video Engine: {c(BOLD + GREEN, cur_eng.upper())}\n")
+
+    print("  1) 🌟 Wan 2.1 (1.3B AI Video - Model sudah terpasang di PC kamu!)")
+    print("  2) 🌸 AnimateDiff (SD 1.5 Anime - Hemat VRAM, butuh mm_sd_v15_v2.ckpt)")
+    print("  3) ⚡ Motion 2.5D Parallax (Super Cepat 1 detik, 0 VRAM)")
+
+    choice = input(f"\nSelect Video Engine [1-3, default: 1]: ").strip()
+    if choice == "1" or choice.lower() in ("wan", "wan21", "wan2.1"):
+        env_vars["VIDEO_ENGINE"] = "wan21"
+        print(c(GREEN, "  ✓ Video Engine dipilih: Wan 2.1 1.3B 🌟"))
+    elif choice == "2" or choice.lower() in ("animatediff", "anim"):
+        env_vars["VIDEO_ENGINE"] = "animatediff"
+        print(c(GREEN, "  ✓ Video Engine dipilih: AnimateDiff (SD 1.5) 🌸"))
+    elif choice == "3" or choice.lower() in ("motion", "parallax", "2.5d"):
+        env_vars["VIDEO_ENGINE"] = "motion"
+        print(c(GREEN, "  ✓ Video Engine dipilih: Motion 2.5D Parallax ⚡"))
+    else:
+        env_vars["VIDEO_ENGINE"] = "wan21"
+        print(c(GREEN, "  ✓ Video Engine dipilih: Wan 2.1 1.3B 🌟"))
+
 def run_menu():
     env_vars = read_env()
     has_token = bool(env_vars.get("TELEGRAM_BOT_TOKEN"))
@@ -315,12 +340,13 @@ def run_menu():
         print("  [3] 🎨 Change Photo & Video Model (ComfyUI / Cloud)")
         print("  [4] 🎭 Change AI Girlfriend Persona & Voice")
         print("  [5] 🌐 Change Waifu Language (ID, EN, JA, Custom)")
-        print("  [6] 🚀 Configure Autorun at System Startup (On / Off)")
-        print("  [7] 🔄 Re-run Complete Setup Wizard")
+        print("  [6] 🎬 Choose Video Engine (Wan 2.1 / AnimateDiff / Motion 2.5D)")
+        print("  [7] 🚀 Configure Autorun at System Startup (On / Off)")
+        print("  [8] 🔄 Re-run Complete Setup Wizard")
         print("  [0] ❌ Exit / Done")
         print("-" * 70)
 
-        opt = input("Select option [0-6]: ").strip()
+        opt = input("Select option [0-8]: ").strip()
         if opt == "1":
             config_telegram_credentials(env_vars)
             write_env(env_vars)
@@ -337,9 +363,12 @@ def run_menu():
             config_language(env_vars)
             write_env(env_vars)
         elif opt == "6":
+            config_video_engine(env_vars)
+            write_env(env_vars)
+        elif opt == "7":
             auto_in = input("Enable bot automatically on PC boot (Autorun)? [Y/n, default: Y]: ").strip().lower()
             setup_autostart(enable=(auto_in != "n"))
-        elif opt == "7":
+        elif opt == "8":
             run_full_wizard()
             break
         elif opt == "0":
@@ -358,19 +387,7 @@ def run_full_wizard():
     config_llm_model(env_vars)
     config_image_model(env_vars)
 
-    print(c(BOLD + CYAN, "\n[Step 4/7: Video Generator Model Selection (Wan 2.2 / ComfyUI)]"))
-    print("-" * 60)
-    detected_vids = scan_video_models()
-    vid_options = []
-    for source, vname in detected_vids:
-        vid_options.append((f"{vname} (Local via ComfyUI)", vname))
-    vid_options.append(("Auto-detect / Cloud Fallback", "auto"))
-
-    for idx, opt in enumerate(vid_options, 1):
-        print(f"  {idx}) {opt[0]}")
-
-    choice_vid = input(f"\nSelect Video Model [1-{len(vid_options)}, default: 1]: ").strip()
-    chosen_vid_idx = int(choice_vid) - 1 if choice_vid.isdigit() and 1 <= int(choice_vid) <= len(vid_options) else 0
+    config_video_engine(env_vars)
 
     config_persona_voice(env_vars)
     config_language(env_vars)
@@ -400,6 +417,7 @@ if __name__ == "__main__":
     parser.add_argument("--backend", help="LLM Base URL")
     parser.add_argument("--autostart", choices=["yes", "no"], help="Enable autorun at startup")
     parser.add_argument("--language", "--lang", help="Waifu Language (id, en, ja, auto, or custom)")
+    parser.add_argument("--video-engine", "--vengine", choices=["wan21", "animatediff", "motion"], help="Video Generator Engine (wan21, animatediff, motion)")
     parser.add_argument("--wizard", action="store_true", help="Force run the full 7-step wizard")
     args = parser.parse_args()
 
@@ -414,6 +432,9 @@ if __name__ == "__main__":
         write_env(env_vars)
         if args.language:
             env_vars["BOT_LANGUAGE"] = args.language
+        if args.video_engine:
+            env_vars["VIDEO_ENGINE"] = args.video_engine
+            print(f"✓ Video Engine set to: {args.video_engine}")
         if args.autostart:
             setup_autostart(enable=(args.autostart == "yes"))
     elif args.wizard:

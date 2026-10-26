@@ -449,6 +449,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"🗣️ **Voice TTS**  : `{voice_engine.default_voice}`\n"
         f"🧠 **Model LLM**  : `{cur_llm}`\n"
         f"🎨 **Model Foto** : `{cur_ckpt}`\n"
+        f"🎬 **Video Engine**: `{VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)}`\n"
         f"📐 **Rasio Foto** : `{cur_ar}`\n"
         f"✨ **Kualitas**   : `{cur_q}`\n"
         f"🎵 **Musik PC**   : `Online (Port 8002)`\n"
@@ -467,6 +468,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("🧠 Model LLM / Chat", callback_data="cfg_submenu:llm"),
         types.InlineKeyboardButton("🌐 Bahasa / Language", callback_data="cfg_submenu:language"),
         types.InlineKeyboardButton("🎨 Model Foto & ComfyUI", callback_data="cfg_submenu:photo"),
+        types.InlineKeyboardButton("🎬 Video Engine (/video_engine)", callback_data="cfg_submenu:video_engine"),
         types.InlineKeyboardButton("🎭 Ganti Persona", callback_data="open_persona_menu"),
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
         types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
@@ -697,6 +699,29 @@ def callback_memory_actions(call):
 
 # Context cache for regenerating exact photo/video scenes with pose variations
 USER_LAST_PHOTO_CONTEXT: Dict[int, Dict[str, Any]] = {}
+
+# Video Generator Engine Configuration
+VIDEO_ENGINE = os.environ.get("VIDEO_ENGINE", "wan21").lower().strip()
+VIDEO_ENGINE_LABELS = {
+    "wan21": "🌟 Wan 2.1 (1.3B AI Video)",
+    "animatediff": "🌸 AnimateDiff (SD 1.5 Anime)",
+    "motion": "⚡ Motion 2.5D (Fast Parallax)"
+}
+
+def apply_video_engine_choice(key: str) -> str:
+    global VIDEO_ENGINE
+    clean_k = key.lower().strip()
+    if clean_k in ("wan", "wan21", "wan2.1"):
+        VIDEO_ENGINE = "wan21"
+    elif clean_k in ("animatediff", "anim"):
+        VIDEO_ENGINE = "animatediff"
+    else:
+        VIDEO_ENGINE = "motion"
+
+    os.environ["VIDEO_ENGINE"] = VIDEO_ENGINE
+    update_env_var("VIDEO_ENGINE", VIDEO_ENGINE)
+    return VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)
+
 
 # --- Reminders & Personal Assistant (/remind, /reminders) ---
 
@@ -1939,6 +1964,50 @@ def callback_quick_actions(call):
 
 # --- Setup Submenu Handlers ---
 
+
+def show_video_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders interactive Video Engine selection menu."""
+    cur_label = VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)
+    text = (
+        f"🎬 **PILIH ENGINE GENERATOR VIDEO WAIFU**\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Pilih teknologi yang digunakan waifu saat kamu meminta video gerak (`/video` atau tombol *Bikin Video Gerak*):\n\n"
+        f"📌 **Status Aktif Saat Ini**: **{cur_label}**\n\n"
+        f"1. 🌟 **Wan 2.1 1.3B** *(Model Terdeteksi di PC kamu!)*\n"
+        f"   • Model AI Video canggih dari Alibaba Wanx.\n"
+        f"   • File `wan2.1_t2v_1.3B_bf16.safetensors` & text encoder sudah siap di ComfyUI.\n\n"
+        f"2. 🌸 **AnimateDiff (SD 1.5 Anime)**\n"
+        f"   • Khusus anime SD 1.5 (MeinaMix).\n"
+        f"   • Hemat VRAM (~4GB). Butuh motion module `mm_sd_v15_v2.ckpt` di folder AnimateDiff.\n\n"
+        f"3. ⚡ **Motion 2.5D Parallax (Fast & 0 VRAM)**\n"
+        f"   • Animasi langsung dari foto dalam 1 detik.\n"
+        f"   • 100% konsisten, ringan, dan tidak membebani kartu grafis.\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 _Pilih salah satu opsi di bawah ini:_"
+    )
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton(f"{'✅ ' if VIDEO_ENGINE == 'wan21' else ''}🌟 Wan 2.1 (1.3B AI Video)", callback_data="cfg_set_vengine:wan21"),
+        types.InlineKeyboardButton(f"{'✅ ' if VIDEO_ENGINE == 'animatediff' else ''}🌸 AnimateDiff (SD 1.5 Anime)", callback_data="cfg_set_vengine:animatediff"),
+        types.InlineKeyboardButton(f"{'✅ ' if VIDEO_ENGINE == 'motion' else ''}⚡ Motion 2.5D (Fast Parallax)", callback_data="cfg_set_vengine:motion"),
+        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+@bot.message_handler(commands=['video_engine', 'vengine', 'videoengine'])
+def handle_video_engine_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    show_video_engine_menu(message.chat.id, message.from_user.id, reply_to_message_id=message.message_id)
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_submenu:'))
 def callback_cfg_submenus(call):
     if not is_authorized(call.from_user.id):
@@ -1959,6 +2028,8 @@ def callback_cfg_submenus(call):
         show_voice_settings_menu(chat_id, user_id, message_to_edit=mid)
     elif sub == "language":
         show_language_menu(chat_id, user_id, message_to_edit=mid)
+    elif sub == "video_engine":
+        show_video_engine_menu(chat_id, user_id, message_to_edit=mid)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_toggle:'))
@@ -1984,6 +2055,16 @@ def callback_cfg_toggles(call):
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_llm:'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_vengine:'))
+def callback_set_vengine(call):
+    if not is_authorized(call.from_user.id):
+        return
+    key = call.data.split(":", 1)[1]
+    label = apply_video_engine_choice(key)
+    bot.answer_callback_query(call.id, f"Video Engine: {label}")
+    show_video_engine_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
 def callback_set_llm(call):
     if not is_authorized(call.from_user.id):
         return
@@ -3860,6 +3941,7 @@ def setup_bot_commands():
         types.BotCommand("ratio", "📐 Ganti rasio foto (3:4, 9:16, 1:1, 4:3)"),
         types.BotCommand("quality", "✨ Atur kualitas foto (Ultra/High/Fast)"),
         types.BotCommand("voice", "🎙️ Pengaturan balasan suara / VN"),
+        types.BotCommand("video_engine", "🎬 Pilih generator video (Wan 2.1 / AnimateDiff / Motion)"),
         types.BotCommand("love", "💖 Cek skor cinta & status hubungan"),
         types.BotCommand("greetings", "⏰ Toggle sapaan harian (Pagi, Siang, Malam)"),
         types.BotCommand("chatting", "💬 Toggle inisiatif chat duluan dari waifu"),

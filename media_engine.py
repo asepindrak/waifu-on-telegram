@@ -391,17 +391,24 @@ class MediaEngine:
             logger.error("imageio not installed. Cannot render video.")
             return None, "Failed (Missing imageio)"
 
-        # 1. Obtain base character frame (from provided photo or freshly rendered)
+        # 1. Obtain base character frame according to selected VIDEO_ENGINE
+        engine = os.environ.get("VIDEO_ENGINE", "wan21").lower().strip()
         if base_image_bytes:
             img_bytes = base_image_bytes
-            source = "Animasi Foto"
+            engine_label = "Wan 2.1" if engine == "wan21" else ("AnimateDiff" if engine == "animatediff" else "Motion 2.5D")
+            source = f"Animasi Foto ({engine_label})"
         else:
-            img_bytes, source = self.generate_photo(
+            img_bytes, photo_src = self.generate_photo(
                 visual_prompt=visual_prompt,
                 negative_prompt=negative_prompt,
                 aspect_ratio=aspect_ratio or "3:4",
                 quality=quality
             )
+            if img_bytes:
+                engine_label = "Wan 2.1 1.3B" if engine == "wan21" else ("AnimateDiff SD1.5" if engine == "animatediff" else "Motion 2.5D")
+                source = f"{engine_label} ({photo_src})"
+            else:
+                source = "Failed"
         if not img_bytes:
             return None, "Failed (Photo Generation)"
 
