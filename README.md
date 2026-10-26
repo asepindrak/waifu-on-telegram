@@ -230,7 +230,11 @@ waifu autorun off
 # Inspect recent bot activity logs
 waifu logs
 
-# Pull latest updates from GitHub & restart bot
+# Check and manage AI models & ComfyUI extensions
+waifu models
+waifu models download animatediff_v2
+
+# Pull latest updates (source code, Python libs, Node pkgs, & AI models) & restart bot
 waifu update
 
 # Restart bot in background
