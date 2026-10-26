@@ -2135,8 +2135,19 @@ def callback_regen_video(call):
     if scenario == "last" and user_id in USER_LAST_PHOTO_CONTEXT:
         last = USER_LAST_PHOTO_CONTEXT[user_id]
         orig_text = last.get("user_text", "")
-        bot.answer_callback_query(call.id, "🎬 Lagi merekam video...")
-        process_video_request(call, orig_text)
+        img_bytes = last.get("img_bytes")
+        scene = last.get("detected_scene")
+        outfit = last.get("outfit_label")
+        is_nude = last.get("is_nude")
+        bot.answer_callback_query(call.id, "🎬 Merekam video dari foto...")
+        process_video_request(
+            call,
+            orig_text,
+            base_image_bytes=img_bytes,
+            scene_override=scene,
+            outfit_override=outfit,
+            is_nude_override=is_nude
+        )
         return
 
     bot.answer_callback_query(call.id, "🎬 Lagi merekam video...")
@@ -2459,6 +2470,9 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                     aspect_ratio=u_ar,
                     quality=u_qual
                 )
+            if img_bytes:
+                USER_LAST_PHOTO_CONTEXT[user_id]["img_bytes"] = img_bytes
+
             if not img_bytes:
                 err_detail = getattr(media_engine, "last_error", None) or "ComfyUI tidak memberikan respon."
                 fail_text = (
@@ -2588,7 +2602,14 @@ def handle_video_command(message):
     process_video_request(message, user_prompt)
 
 
-def process_video_request(target, user_text: str):
+def process_video_request(
+    target,
+    user_text: str,
+    base_image_bytes: Optional[bytes] = None,
+    scene_override: Optional[str] = None,
+    outfit_override: Optional[str] = None,
+    is_nude_override: Optional[bool] = None
+):
     """Generates and delivers consistent girlfriend animated video clip with caption and voice."""
     persona = persona_mgr.get_active_persona()
 
@@ -2617,11 +2638,26 @@ def process_video_request(target, user_text: str):
         except Exception as e_send:
             logger.warning(f"Could not send video status message: {e_send}")
 
-    detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client)
+    history = persona_mgr.get_chat_history(user_id)
+    detected_scene = scene_override or persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
     visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
-        user_text, user_id=user_id, scene_override=detected_scene
+        user_text, user_id=user_id, scene_override=detected_scene, history=history
     )
-    logger.info(f"Video visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
+    if outfit_override:
+        outfit_label = outfit_override
+    if is_nude_override is not None:
+        is_nude = is_nude_override
+
+    logger.info(f"Video visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude}, Has Base Img: {bool(base_image_bytes)})")
+
+    # Save exact scenario context so subsequent requests preserve full details
+    USER_LAST_PHOTO_CONTEXT[user_id] = {
+        "user_text": user_text,
+        "detected_scene": detected_scene,
+        "outfit_label": outfit_label,
+        "is_nude": is_nude,
+        "img_bytes": base_image_bytes
+    }
 
     def run_video_gen():
         try:
@@ -2633,12 +2669,13 @@ def process_video_request(target, user_text: str):
                 u_ar = USER_RATIOS.get(user_id, "3:4")
                 u_qual = USER_QUALITIES.get(user_id, "high")
                 video_bytes, source = media_engine.generate_video(
-                    visual_prompt,
+                    visual_prompt=visual_prompt,
                     negative_prompt=neg_p,
                     aspect_ratio=u_ar,
                     quality=u_qual,
                     duration=3.0,
-                    fps=24
+                    fps=24,
+                    base_image_bytes=base_image_bytes
                 )
 
             if not video_bytes:

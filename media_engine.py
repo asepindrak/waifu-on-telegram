@@ -366,12 +366,13 @@ class MediaEngine:
 
     def generate_video(
         self,
-        visual_prompt: str,
+        visual_prompt: str = "",
         negative_prompt: Optional[str] = None,
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None,
         duration: float = 3.0,
-        fps: int = 24
+        fps: int = 24,
+        base_image_bytes: Optional[bytes] = None
     ) -> Tuple[Optional[bytes], str]:
         """
         Generates smooth dynamic video animation clip (H.264 MP4) featuring the waifu.
@@ -390,13 +391,17 @@ class MediaEngine:
             logger.error("imageio not installed. Cannot render video.")
             return None, "Failed (Missing imageio)"
 
-        # 1. Generate base character frame with full visual prompt
-        img_bytes, source = self.generate_photo(
-            visual_prompt=visual_prompt,
-            negative_prompt=negative_prompt,
-            aspect_ratio=aspect_ratio or "3:4",
-            quality=quality
-        )
+        # 1. Obtain base character frame (from provided photo or freshly rendered)
+        if base_image_bytes:
+            img_bytes = base_image_bytes
+            source = "Animasi Foto"
+        else:
+            img_bytes, source = self.generate_photo(
+                visual_prompt=visual_prompt,
+                negative_prompt=negative_prompt,
+                aspect_ratio=aspect_ratio or "3:4",
+                quality=quality
+            )
         if not img_bytes:
             return None, "Failed (Photo Generation)"
 
