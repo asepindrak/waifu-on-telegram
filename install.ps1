@@ -6,8 +6,8 @@ $ErrorActionPreference = "Stop"
 
 function Write-GradientHeader {
     Write-Host "====================================================================" -ForegroundColor Magenta
-    $ver = if (Test-Path "VERSION") { (Get-Content "VERSION").Trim() } else { "1.6.8" }
-    Write-Host "   💖 WAIFU ON TELEGRAM v$ver - Windows One-Click All-in-One Installer 🌸   " -ForegroundColor Magenta
+    $ver = if (Test-Path "VERSION") { (Get-Content "VERSION").Trim() } else { "1.6.17" }
+    Write-Host "   WAIFU ON TELEGRAM v$ver - Windows One-Click All-in-One Installer   " -ForegroundColor Magenta
     Write-Host "====================================================================" -ForegroundColor Magenta
     Write-Host ""
 }
@@ -21,11 +21,12 @@ function Download-FileWithProgress {
     if (Test-Path $DestinationPath) {
         $size = (Get-Item $DestinationPath).Length
         if ($size -gt 1024*1024) {
-            Write-Host "  ✓ $Description already downloaded: $DestinationPath ($([math]::Round($size / 1MB, 1)) MB)" -ForegroundColor Green
+            $sizeMb = [math]::Round($size / 1MB, 1)
+            Write-Host "  [OK] $Description already downloaded: $DestinationPath ($sizeMb MB)" -ForegroundColor Green
             return $true
         }
     }
-    Write-Host "  ⏳ Downloading $Description..." -ForegroundColor Yellow
+    Write-Host "  >> Downloading $Description..." -ForegroundColor Yellow
     Write-Host "     Source: $Url" -ForegroundColor DarkGray
     Write-Host "     Dest  : $DestinationPath" -ForegroundColor DarkGray
 
@@ -46,11 +47,12 @@ function Download-FileWithProgress {
         }
         if (Test-Path $DestinationPath) {
             $fSize = (Get-Item $DestinationPath).Length
-            Write-Host "  ✓ $Description downloaded successfully ($([math]::Round($fSize / 1MB, 1)) MB)" -ForegroundColor Green
+            $fSizeMb = [math]::Round($fSize / 1MB, 1)
+            Write-Host "  [OK] $Description downloaded successfully ($fSizeMb MB)" -ForegroundColor Green
             return $true
         }
     } catch {
-        Write-Host "  ⚠️ Download failed: $_" -ForegroundColor Red
+        Write-Host "  [!] Download failed: $_" -ForegroundColor Red
         return $false
     }
     return $false
@@ -61,7 +63,7 @@ Write-GradientHeader
 # 1. Target Directory & Clone / Download
 $repoUrl = "https://github.com/asepindrak/waifu-on-telegram.git"
 $zipUrl = "https://github.com/asepindrak/waifu-on-telegram/archive/refs/heads/main.zip"
-$defaultInstallDir = Join-Path $env:USERPROFILE "waifu-on-telegram"
+$defaultInstallDir = "$env:USERPROFILE\waifu-on-telegram"
 
 if ((Test-Path "bot.py") -and (Test-Path "setup.py")) {
     $installDir = (Get-Location).Path
@@ -70,11 +72,11 @@ if ((Test-Path "bot.py") -and (Test-Path "setup.py")) {
     $installDir = $defaultInstallDir
     Write-Host "[1/8] Target installation directory: $installDir" -ForegroundColor Cyan
 
-    if (Test-Path (Join-Path $installDir ".git")) {
+    if (Test-Path "$installDir\.git") {
         Write-Host "  Updating existing Git repository..." -ForegroundColor Yellow
         Set-Location $installDir
         try { git pull --quiet } catch {}
-    } elseif (Test-Path (Join-Path $installDir "bot.py")) {
+    } elseif (Test-Path "$installDir\bot.py") {
         Write-Host "  Project folder exists. Using existing files..." -ForegroundColor Green
         Set-Location $installDir
     } else {
@@ -84,12 +86,12 @@ if ((Test-Path "bot.py") -and (Test-Path "setup.py")) {
             Set-Location $installDir
         } else {
             Write-Host "  Git not found. Downloading project ZIP archive..." -ForegroundColor Yellow
-            $tempZip = Join-Path $env:TEMP "waifu-on-telegram-main.zip"
+            $tempZip = "$env:TEMP\waifu-on-telegram-main.zip"
             Invoke-RestMethod -Uri $zipUrl -OutFile $tempZip
-            $tempExtract = Join-Path $env:TEMP "waifu-on-telegram-extract"
+            $tempExtract = "$env:TEMP\waifu-on-telegram-extract"
             if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force }
             Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
-            $extractedRoot = Join-Path $tempExtract "waifu-on-telegram-main"
+            $extractedRoot = "$tempExtract\waifu-on-telegram-main"
             if (Test-Path $extractedRoot) {
                 Move-Item -Path $extractedRoot -Destination $installDir -Force
             }
@@ -113,14 +115,14 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     }
 }
 $pyVer = & $py --version 2>&1
-Write-Host "  ✓ Python: $pyVer" -ForegroundColor Green
+Write-Host "  [OK] Python: $pyVer" -ForegroundColor Green
 
-# 3. Install Python Dependencies
+# 3. Install Python Requirements
 Write-Host "`n[3/8] Installing Python requirements..." -ForegroundColor Cyan
 & $py -m pip install -r requirements.txt --quiet --disable-pip-version-check
-Write-Host "  ✓ Dependencies installed successfully." -ForegroundColor Green
+Write-Host "  [OK] Dependencies installed successfully." -ForegroundColor Green
 
-# 4. Check & Setup Local LLM (Locally Uncensored / llama-server)
+# 4. Check Local LLM Backend (Locally Uncensored / Ollama / llama-server)
 Write-Host "`n[4/8] Checking Local LLM Backend (Chat Engine)..." -ForegroundColor Cyan
 $llmOnline = $false
 foreach ($port in @(8127, 11434, 1234)) {
@@ -129,113 +131,111 @@ foreach ($port in @(8127, 11434, 1234)) {
         $tcp.Connect("127.0.0.1", $port)
         $tcp.Close()
         $llmOnline = $true
-        Write-Host "  ✓ Local LLM Server detected active on port $port!" -ForegroundColor Green
+        Write-Host "  [OK] Local LLM Server detected active on port $port!" -ForegroundColor Green
         break
     } catch {}
 }
 
 if (-not $llmOnline) {
-    # Check if Locally Uncensored models exist
-    $luDir = Join-Path $env:APPDATA "Locally Uncensored\models"
+    $luDir = "$env:APPDATA\Locally Uncensored\models"
     $localGguf = @()
     if (Test-Path $luDir) {
         $localGguf = Get-ChildItem -Path $luDir -Filter "*.gguf" -ErrorAction SilentlyContinue
     }
     if ($localGguf.Count -gt 0) {
-        Write-Host "  ✓ Locally Uncensored model found: $($localGguf[0].Name)" -ForegroundColor Green
+        $sampleGguf = $localGguf[0].Name
+        Write-Host "  [OK] Locally Uncensored model found: $sampleGguf" -ForegroundColor Green
     } else {
-        Write-Host "  ℹ No local LLM currently running on ports 8127/11434/1234." -ForegroundColor Yellow
-        $dlLlm = Read-Host "  Would you like to auto-download Portable llama-server + Uncensored GGUF Model (~4.5 GB)? [Y/n, default: Y]"
-        if ($dlLlm.Trim().ToLower() -ne "n") {
-            $llmToolsDir = Join-Path $installDir "tools\llama-server"
-            $llmModelDir = Join-Path $installDir "models\llm"
-            New-Item -ItemType Directory -Force -Path $llmToolsDir | Out-Null
-            New-Item -ItemType Directory -Force -Path $llmModelDir | Out-Null
-
-            # 1. Download portable llama-server binary
-            $llamaZipUrl = "https://github.com/ggerganov/llama.cpp/releases/download/b4800/llama-b4800-bin-win-cuda-cu12.4-x64.zip"
-            $llamaZipDest = Join-Path $llmToolsDir "llama-server.zip"
-            $ok = Download-FileWithProgress -Url $llamaZipUrl -DestinationPath $llamaZipDest -Description "Portable llama-server (CUDA GPU Accelerated)"
-            if ($ok) {
-                Expand-Archive -Path $llamaZipDest -DestinationPath $llmToolsDir -Force
-                Remove-Item -Path $llamaZipDest -Force -ErrorAction SilentlyContinue
-            }
-
-            # 2. Download Uncensored Qwen2.5-7B
-            $ggufUrl = "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf"
-            $ggufDest = Join-Path $llmModelDir "Qwen2.5-7B-Instruct-Q4_K_M.gguf"
-            Download-FileWithProgress -Url $ggufUrl -DestinationPath $ggufDest -Description "Uncensored LLM GGUF Model (~4.5 GB)"
-
-            # Create quick start script for LLM server
-            $startLlmScript = "@echo off`r`ncd /d `"%~dp0`"`r`ntools\\llama-server\\llama-server.exe -m models\\llm\\Qwen2.5-7B-Instruct-Q4_K_M.gguf --port 8127 -ngl 99 -c 8192`r`npause"
-            Set-Content -Path (Join-Path $installDir "start_llm.bat") -Value $startLlmScript -Force
-            Write-Host "  ✓ Created 'start_llm.bat' launcher for Local LLM." -ForegroundColor Green
-        }
+        Write-Host "  [INFO] No local LLM currently active on port 8127. (Will connect when Locally Uncensored is launched)." -ForegroundColor DarkGray
     }
 }
 
 # 5. Check & Setup ComfyUI & Models (MeinaMix & AnimateDiff)
 Write-Host "`n[5/8] Checking ComfyUI & Generative Models (Photos & Videos)..." -ForegroundColor Cyan
-$comfyDirs = @(
-    Join-Path $env:LOCALAPPDATA "Comfy-Desktop\ComfyUI-Installs\ComfyUI\ComfyUI",
-    Join-Path $env:LOCALAPPDATA "Comfy-Desktop\ComfyUI-Shared",
-    "C:\ComfyUI",
-    (Join-Path $env:USERPROFILE "ComfyUI"),
-    (Join-Path $installDir "tools\ComfyUI")
-)
 $foundComfy = $null
-foreach ($cd in $comfyDirs) {
-    if (Test-Path (Join-Path $cd "models")) {
-        $foundComfy = $cd
-        break
+
+# 5.1 Check running process on port 8188 first
+try {
+    $procCmd = Get-NetTCPConnection -LocalPort 8188 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -First 1 | ForEach-Object { (Get-CimInstance Win32_Process -Filter "ProcessId = $_" -ErrorAction SilentlyContinue).CommandLine }
+    if ($procCmd) {
+        foreach ($part in ($procCmd -split '"')) {
+            $part = $part.Trim()
+            if ($part -like "*main.py*" -or $part -like "*ComfyUI*" -or $part -like "*.venv*") {
+                $p = Split-Path -Parent $part
+                for ($lvl = 0; $lvl -lt 3; $lvl++) {
+                    if (Test-Path "$p\models") {
+                        $foundComfy = $p
+                        break
+                    }
+                    $p = Split-Path -Parent $p
+                }
+                if ($foundComfy) { break }
+            }
+        }
+    }
+} catch {}
+
+# 5.2 Check candidate folders across drives
+if (-not $foundComfy) {
+    $comfyDirs = @(
+        "$env:LOCALAPPDATA\Comfy-Desktop\ComfyUI-Installs\ComfyUI\ComfyUI",
+        "$env:LOCALAPPDATA\Comfy-Desktop\ComfyUI-Shared",
+        "C:\ComfyUI",
+        "D:\ComfyUI",
+        "E:\ComfyUI",
+        "$env:USERPROFILE\ComfyUI",
+        "$env:USERPROFILE\ComfyUI_windows_portable\ComfyUI",
+        "$installDir\tools\ComfyUI"
+    )
+    foreach ($cd in $comfyDirs) {
+        if ($cd -and (Test-Path "$cd\models")) {
+            $foundComfy = $cd
+            break
+        }
     }
 }
 
 if ($foundComfy) {
-    Write-Host "  ✓ ComfyUI installation detected at: $foundComfy" -ForegroundColor Green
+    Write-Host "  [OK] ComfyUI installation detected at: $foundComfy" -ForegroundColor Green
 
-    # Check Anime Checkpoint (MeinaMix)
-    $ckptDir = Join-Path $foundComfy "models\checkpoints"
+    # Check Anime Checkpoint (MeinaMix or similar)
+    $ckptDir = "$foundComfy\models\checkpoints"
     $hasCkpt = $false
     if (Test-Path $ckptDir) {
-        $ckpts = Get-ChildItem -Path $ckptDir -Include "*.safetensors", "*.ckpt" -Recurse -ErrorAction SilentlyContinue
+        $ckpts = Get-ChildItem -Path $ckptDir -Filter "*.safetensors" -Recurse -ErrorAction SilentlyContinue
         if ($ckpts.Count -gt 0) {
             $hasCkpt = $true
-            Write-Host "  ✓ Checkpoints detected ($($ckpts.Count) models found, e.g. $($ckpts[0].Name))" -ForegroundColor Green
+            $ckptCount = $ckpts.Count
+            $sampleName = $ckpts[0].Name
+            Write-Host "  [OK] Anime Checkpoints detected: $ckptCount models found (e.g. $sampleName)" -ForegroundColor Green
         }
     }
     if (-not $hasCkpt) {
         $dlCkpt = Read-Host "  Anime Checkpoint model not found. Auto-download MeinaMix SD 1.5 (~2 GB)? [Y/n, default: Y]"
         if ($dlCkpt.Trim().ToLower() -ne "n") {
             $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
-            $meinaDest = Join-Path $ckptDir "MeinaMix_v11.safetensors"
+            $meinaDest = "$ckptDir\MeinaMix_v11.safetensors"
             Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11 Anime SD 1.5 (~2 GB)"
         }
     }
 
     # Check AnimateDiff Motion Module (mm_sd_v15_v2.ckpt)
-    $animDir = Join-Path $foundComfy "custom_nodes\ComfyUI-AnimateDiff-Evolved\models"
-    $animDirAlt = Join-Path $foundComfy "models\animatediff_models"
-    $hasAnim = (Test-Path (Join-Path $animDir "mm_sd_v15_v2.ckpt")) -or (Test-Path (Join-Path $animDirAlt "mm_sd_v15_v2.ckpt"))
+    $animDir = "$foundComfy\custom_nodes\ComfyUI-AnimateDiff-Evolved\models"
+    $animDirAlt = "$foundComfy\models\animatediff_models"
+    $hasAnim = (Test-Path "$animDir\mm_sd_v15_v2.ckpt") -or (Test-Path "$animDirAlt\mm_sd_v15_v2.ckpt")
     if ($hasAnim) {
-        Write-Host "  ✓ AnimateDiff motion module detected (mm_sd_v15_v2.ckpt)" -ForegroundColor Green
+        Write-Host "  [OK] AnimateDiff motion module detected (mm_sd_v15_v2.ckpt)" -ForegroundColor Green
     } else {
-        $dlAnim = Read-Host "  AnimateDiff motion module missing. Auto-download mm_sd_v15_v2.ckpt (~1.8 GB)? [Y/n, default: Y]"
-        if ($dlAnim.Trim().ToLower() -ne "n") {
-            $targetAnimDir = if (Test-Path (Join-Path $foundComfy "custom_nodes\ComfyUI-AnimateDiff-Evolved")) { $animDir } else { $animDirAlt }
-            $animUrl = "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15_v2.ckpt"
-            $animDest = Join-Path $targetAnimDir "mm_sd_v15_v2.ckpt"
-            Download-FileWithProgress -Url $animUrl -DestinationPath $animDest -Description "AnimateDiff Motion Module mm_sd_v15_v2.ckpt (~1.8 GB)"
-        }
+        Write-Host "  [INFO] AnimateDiff motion module is optional (Lazy Auto-Downloader will handle it on demand)." -ForegroundColor DarkGray
     }
 } else {
-    Write-Host "  ℹ ComfyUI not detected locally." -ForegroundColor Yellow
+    Write-Host "  [INFO] ComfyUI not detected locally." -ForegroundColor Yellow
     $dlComfy = Read-Host "  Would you like to auto-download official ComfyUI Windows Portable (~1.4 GB)? [Y/n, default: Y]"
     if ($dlComfy.Trim().ToLower() -ne "n") {
-        $comfyToolDir = Join-Path $installDir "tools\ComfyUI"
+        $comfyToolDir = "$installDir\tools\ComfyUI"
         New-Item -ItemType Directory -Force -Path $comfyToolDir | Out-Null
         $comfyZipUrl = "https://github.com/comfyanonymous/ComfyUI/releases/latest/download/ComfyUI_windows_portable_nvidia.7z"
-        $comfyZipDest = Join-Path $installDir "tools\ComfyUI_portable.7z"
+        $comfyZipDest = "$installDir\tools\ComfyUI_portable.7z"
         $ok = Download-FileWithProgress -Url $comfyZipUrl -DestinationPath $comfyZipDest -Description "ComfyUI Windows Portable (~1.4 GB)"
         if ($ok) {
             Write-Host "  Extracting ComfyUI Portable..." -ForegroundColor Yellow
@@ -247,9 +247,9 @@ if ($foundComfy) {
             Remove-Item -Path $comfyZipDest -Force -ErrorAction SilentlyContinue
 
             # Download MeinaMix anime checkpoint
-            $ckptDir = Join-Path $comfyToolDir "ComfyUI\models\checkpoints"
+            $ckptDir = "$comfyToolDir\ComfyUI\models\checkpoints"
             $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
-            $meinaDest = Join-Path $ckptDir "MeinaMix_v11.safetensors"
+            $meinaDest = "$ckptDir\MeinaMix_v11.safetensors"
             Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11 Anime SD 1.5 (~2 GB)"
         }
     }
@@ -258,44 +258,44 @@ if ($foundComfy) {
 # 6. Check Node.js for Music Remote (Optional)
 Write-Host "`n[6/8] Checking Node.js for PC Music Remote..." -ForegroundColor Cyan
 if (Get-Command node -ErrorAction SilentlyContinue) {
-    Write-Host "  ✓ Node.js found: $(node -v). Installing npm packages..." -ForegroundColor Green
-    npm install --silent
+    $nodeVer = & node -v
+    Write-Host "  [OK] Node.js found: $nodeVer. Installing npm dependencies..." -ForegroundColor Green
+    & npm install --no-audit --no-fund --silent
 } else {
-    Write-Host "  ℹ Node.js not detected. Music remote feature will be disabled (chat & photos remain functional)." -ForegroundColor Yellow
+    Write-Host "  [INFO] Node.js not detected. PC Music remote feature disabled (all other features 100% active)." -ForegroundColor DarkGray
 }
 
-# 7. Register Global CLI Commands (waifu, pacar-ai) in User PATH
-Write-Host "`n[7/8] Registering global CLI commands (waifu, pacar-ai)..." -ForegroundColor Cyan
-$userBin = Join-Path $env:USERPROFILE ".local\bin"
-New-Item -ItemType Directory -Force -Path $userBin | Out-Null
+# 7. Register Global CLI Commands ('waifu')
+Write-Host "`n[7/8] Registering Global CLI Command 'waifu'..." -ForegroundColor Cyan
+$userBin = "$env:USERPROFILE\.local\bin"
+if (-not (Test-Path $userBin)) { New-Item -ItemType Directory -Force -Path $userBin | Out-Null }
 
-$cliPy = Join-Path $installDir "bin\cli.py"
+$cliPy = "$installDir\bin\cli.py"
 $cmdScript = "@echo off`r`npython `"$cliPy`" %*"
-Set-Content -Path (Join-Path $userBin "waifu.cmd") -Value $cmdScript -Force
-Set-Content -Path (Join-Path $userBin "pacar-ai.cmd") -Value $cmdScript -Force
+Set-Content -Path "$userBin\waifu.cmd" -Value $cmdScript -Force
+Set-Content -Path "$userBin\pacar-ai.cmd" -Value $cmdScript -Force
 
+# Add to User PATH if not present
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($userPath -notlike "*$userBin*") {
-    [Environment]::SetEnvironmentVariable("Path", "$userPath;$userBin", "User")
-    $env:Path = "$env:Path;$userBin"
-    Write-Host "  ✓ Added $userBin to system PATH." -ForegroundColor Green
+    [Environment]::SetEnvironmentVariable("Path", "$userBin;$userPath", "User")
+    $env:Path = "$userBin;$env:Path"
+    Write-Host "  [OK] Added '$userBin' to User PATH." -ForegroundColor Green
 }
-Write-Host "  ✓ Global CLI registered: 'waifu', 'pacar-ai'" -ForegroundColor Green
+Write-Host "  [OK] Global CLI 'waifu' registered successfully." -ForegroundColor Green
 
-# 8. Run Configuration Wizard (Interactive Model & Autorun Setup)
-Write-Host "`n[8/8] Launching Interactive Setup Wizard..." -ForegroundColor Cyan
-& $py setup.py --wizard
+# 8. Interactive Configuration Wizard
+Write-Host "`n[8/8] Starting Interactive Configuration Manager..." -ForegroundColor Cyan
+& $py setup.py
 
-Write-Host ""
+Write-Host "`n====================================================================" -ForegroundColor Green
+Write-Host "  Installation completed successfully!" -ForegroundColor Green
+Write-Host "  You can start your bot anytime using the command:" -ForegroundColor Cyan
+Write-Host "    waifu start --daemon" -ForegroundColor Yellow
+Write-Host "  To inspect system status: waifu status" -ForegroundColor Cyan
 Write-Host "====================================================================" -ForegroundColor Green
-Write-Host "  🎉 INSTALLATION COMPLETE! Waifu on Telegram is ready to run." -ForegroundColor Green
-Write-Host "  Global CLI : waifu start / waifu status / waifu setup" -ForegroundColor Cyan
-Write-Host "  Quick Run  : Double-click 'start.bat' or run 'waifu start'" -ForegroundColor Cyan
-Write-Host "  Folder Root: $installDir" -ForegroundColor Cyan
-Write-Host "====================================================================" -ForegroundColor Green
-Write-Host ""
-$startNow = Read-Host "Would you like to start the bot right now? [Y/n, default: Y]"
+
+$startNow = Read-Host "`nWould you like to start the bot right now? [Y/n, default: Y]"
 if ($startNow.Trim().ToLower() -ne "n") {
-    Write-Host "Starting bot in background (Daemon Mode)..." -ForegroundColor Cyan
-    & (Join-Path $userBin "waifu.cmd") start --daemon
+    & "$userBin\waifu.cmd" start --daemon
 }
