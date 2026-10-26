@@ -91,21 +91,44 @@ def detect_comfyui_dir() -> Optional[str]:
     local_app_data = os.environ.get("LOCALAPPDATA", os.path.join(user_home, "AppData", "Local"))
 
     candidate_paths = [
-        # Comfy-Desktop official install
+        # Comfy-Desktop official install (Windows)
         os.path.join(local_app_data, "Comfy-Desktop", "ComfyUI-Installs", "ComfyUI", "ComfyUI"),
         # Portable Windows ComfyUI
         os.path.join(user_home, "ComfyUI_windows_portable", "ComfyUI"),
         "C:\\ComfyUI_windows_portable\\ComfyUI",
         "D:\\ComfyUI_windows_portable\\ComfyUI",
         "E:\\ComfyUI_windows_portable\\ComfyUI",
-        # Standard user folder
+        # macOS paths
+        os.path.join(user_home, "Library", "Application Support", "ComfyUI"),
+        "/Applications/ComfyUI.app/Contents/Resources/ComfyUI",
+        # Linux paths
+        os.path.join(user_home, ".local", "share", "ComfyUI"),
+        "/opt/ComfyUI",
+        "/var/lib/ComfyUI",
+        # Standard user folder (macOS / Linux / Windows)
         os.path.join(user_home, "ComfyUI"),
         os.path.join(user_home, "comfyui"),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "ComfyUI")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "ComfyUI"))
     ]
 
-    # 2. Check running process on Windows if candidate paths haven't matched
+    # 2. Check running process across Windows, Linux, and macOS
+    if platform.system() != "Windows":
+        try:
+            # Check listening port 8188 via lsof
+            lsof_bin = shutil.which("lsof")
+            if lsof_bin:
+                pid_out = subprocess.run([lsof_bin, "-i", ":8188", "-sTCP:LISTEN", "-t"], capture_output=True, text=True, timeout=3).stdout.strip()
+                if pid_out:
+                    pid = pid_out.splitlines()[0].strip()
+                    # Check cwd of process
+                    proc_cwd = os.path.realpath(f"/proc/{pid}/cwd") if os.path.exists(f"/proc/{pid}/cwd") else None
+                    if proc_cwd and os.path.exists(os.path.join(proc_cwd, "models")):
+                        _COMFYUI_DIR_CACHE = proc_cwd
+                        return _COMFYUI_DIR_CACHE
+        except Exception:
+            pass
+
     if platform.system() == "Windows":
         try:
             ps_script = 'Get-NetTCPConnection -LocalPort 8188 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -First 1 | ForEach-Object { (Get-CimInstance Win32_Process -Filter "ProcessId = $_").CommandLine }'

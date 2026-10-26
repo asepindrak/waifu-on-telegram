@@ -70,6 +70,16 @@ EOF
 chmod +x "$HOME/.local/bin/waifu"
 cp -f "$HOME/.local/bin/waifu" "$HOME/.local/bin/pacar-ai"
 
+# Ensure ~/.local/bin is in PATH for current & future shell sessions
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+    for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile"; do
+        if [ -f "$rc" ] && ! grep -q ".local/bin" "$rc"; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+        fi
+    done
+fi
+
 # 6. Launch interactive setup wizard (Models, Language, Video Engine & Autorun)
 echo "[6/6] Launching Interactive Setup Wizard..."
 $PY setup.py --wizard

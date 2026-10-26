@@ -65,14 +65,21 @@ def write_env(env_vars):
     print(c(GREEN, f"\n✓ Configuration successfully saved to: {ENV_FILE}"))
 
 def scan_local_llm_models():
-    """Scans Locally Uncensored and local model directories."""
+    """Scans Locally Uncensored and local model directories across Windows, Linux, and macOS."""
     models = []
-    # 1. Locally Uncensored AppData models folder
-    lu_dir = os.path.expandvars(r"%APPDATA%\Locally Uncensored\models")
-    if os.path.exists(lu_dir):
-        for f in os.listdir(lu_dir):
-            if f.endswith(".gguf") and not f.endswith(".mmproj.gguf"):
-                models.append(("Locally Uncensored", f, os.path.join(lu_dir, f)))
+    user_home = os.path.expanduser("~")
+    # Cross-platform Locally Uncensored paths
+    candidate_lu_dirs = [
+        os.path.expandvars(r"%APPDATA%\Locally Uncensored\models"),
+        os.path.join(user_home, "Library", "Application Support", "Locally Uncensored", "models"),
+        os.path.join(user_home, ".local", "share", "Locally Uncensored", "models"),
+        os.path.join(user_home, ".config", "Locally Uncensored", "models")
+    ]
+    for lu_dir in candidate_lu_dirs:
+        if os.path.exists(lu_dir):
+            for f in os.listdir(lu_dir):
+                if f.endswith(".gguf") and not f.endswith(".mmproj.gguf"):
+                    models.append(("Locally Uncensored", f, os.path.join(lu_dir, f)))
 
     # 2. Query running Ollama tags if active
     try:
@@ -87,13 +94,19 @@ def scan_local_llm_models():
     return models
 
 def scan_image_models():
-    """Scans ComfyUI checkpoints and model folders."""
+    """Scans ComfyUI checkpoints and model folders across Windows, Linux, and macOS."""
     ckpts = []
-    search_dirs = [
+    comfy_dir = asset_manager.detect_comfyui_dir() if asset_manager else None
+    search_dirs = []
+    if comfy_dir:
+        search_dirs.append(os.path.join(comfy_dir, "models", "checkpoints"))
+    user_home = os.path.expanduser("~")
+    search_dirs.extend([
         os.path.expandvars(r"%LOCALAPPDATA%\Comfy-Desktop\ComfyUI-Installs\ComfyUI\ComfyUI\models\checkpoints"),
-        os.path.expandvars(r"%LOCALAPPDATA%\Comfy-Desktop\ComfyUI-Shared\models\checkpoints"),
-        os.path.expandvars(r"%USERPROFILE%\OneDrive\Documents\ComfyUI_windows_portable_nvidia\ComfyUI_windows_portable\ComfyUI\models\checkpoints"),
-    ]
+        os.path.join(user_home, "ComfyUI", "models", "checkpoints"),
+        os.path.join(user_home, "Library", "Application Support", "ComfyUI", "models", "checkpoints"),
+        os.path.join(user_home, ".local", "share", "ComfyUI", "models", "checkpoints")
+    ])
     for d in search_dirs:
         if os.path.exists(d):
             for f in os.listdir(d):
@@ -131,6 +144,35 @@ def setup_autostart(enable: bool = True):
                 print(c(GREEN, f"✓ Autorun at Startup has been {status}."))
             except Exception as e:
                 print(c(YELLOW, f"⚠️ Failed to configure autorun: {e}"))
+    elif platform.system() == "Darwin": # macOS
+        plist_path = os.path.expanduser("~/Library/LaunchAgents/com.waifu.telegram.plist")
+        if enable:
+            os.makedirs(os.path.dirname(plist_path), exist_ok=True)
+            sh_path = os.path.join(SCRIPT_DIR, "start_services.sh")
+            plist_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.waifu.telegram</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>{sh_path}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>'''
+            with open(plist_path, "w", encoding="utf-8") as f:
+                f.write(plist_content)
+            subprocess.run(["launchctl", "load", plist_path], capture_output=True)
+            print(c(GREEN, "✓ Autorun at Startup enabled via macOS LaunchAgent."))
+        else:
+            if os.path.exists(plist_path):
+                subprocess.run(["launchctl", "unload", plist_path], capture_output=True)
+                os.remove(plist_path)
+            print(c(GREEN, "✓ Autorun at Startup disabled on macOS."))
     elif platform.system() == "Linux":
         cron_job = f"@reboot cd {SCRIPT_DIR} && bash start_services.sh >/dev/null 2>&1\n"
         try:

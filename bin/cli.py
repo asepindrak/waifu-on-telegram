@@ -122,6 +122,13 @@ def cmd_start(daemon: bool = False):
                 print(c(GREEN, "✓ Waifu is running silently in the background (Daemon Mode)!"))
                 print(c(DIM, "  Use 'waifu status' to inspect or 'waifu stop' to terminate."))
                 return
+        else:
+            sh_script = os.path.join(PROJECT_ROOT, "start_services.sh")
+            if os.path.exists(sh_script):
+                subprocess.run(["bash", sh_script])
+                print(c(GREEN, "✓ Waifu is running in background (Daemon Mode via start_services.sh)!"))
+                print(c(DIM, "  Use 'waifu status' to inspect or 'waifu stop' to terminate."))
+                return
 
         with open(LOG_FILE, "a", encoding="utf-8") as log_out:
             p = subprocess.Popen(
@@ -151,12 +158,18 @@ def cmd_stop():
         subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True)
         subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq Waifu Music Server*"], capture_output=True)
     else:
-        pid = get_running_pid()
-        if pid:
-            try:
-                os.kill(pid, 15)
-            except Exception:
-                pass
+        stop_sh = os.path.join(PROJECT_ROOT, "stop_services.sh")
+        if os.path.exists(stop_sh):
+            subprocess.run(["bash", stop_sh], capture_output=True)
+        else:
+            pid = get_running_pid()
+            if pid:
+                try:
+                    os.kill(pid, 15)
+                except Exception:
+                    pass
+            subprocess.run(["pkill", "-f", "python.*bot.py"], capture_output=True)
+            subprocess.run(["pkill", "-f", "node.*music_player_server.js"], capture_output=True)
 
     if os.path.exists(PID_FILE):
         try:
