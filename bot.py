@@ -695,6 +695,9 @@ def callback_memory_actions(call):
         show_memory_dashboard(chat_id, user_id, message_to_edit=mid)
 
 
+# Context cache for regenerating exact photo/video scenes with pose variations
+USER_LAST_PHOTO_CONTEXT: Dict[int, Dict[str, Any]] = {}
+
 # --- Reminders & Personal Assistant (/remind, /reminders) ---
 
 def render_reminders_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarkup]:
@@ -2097,6 +2100,25 @@ def callback_regen_photo(call):
         return
 
     scenario = call.data.split(":", 1)[1]
+    user_id = call.from_user.id
+
+    if scenario == "last" and user_id in USER_LAST_PHOTO_CONTEXT:
+        last = USER_LAST_PHOTO_CONTEXT[user_id]
+        orig_text = last.get("user_text", "")
+        import random
+        pose_variations = [
+            "different cute pose, tilting head slightly, smiling at camera",
+            "alternate playful pose, sweet charming smile, dynamic angle",
+            "different selfie angle, soft gentle blush, looking directly at viewer",
+            "side angle view, candid natural movement, expressive eyes",
+            "different angle shot, radiant natural smile, dynamic camera angle"
+        ]
+        variation = random.choice(pose_variations)
+        regen_text = f"{orig_text}, {variation}" if orig_text else variation
+        bot.answer_callback_query(call.id, "🔄 Mengambil pose lain...")
+        process_photo_request(call, regen_text)
+        return
+
     bot.answer_callback_query(call.id, "📸 Mengambil foto...")
     process_photo_request(call, scenario)
 
@@ -2108,6 +2130,15 @@ def callback_regen_video(call):
         return
 
     scenario = call.data.split(":", 1)[1]
+    user_id = call.from_user.id
+
+    if scenario == "last" and user_id in USER_LAST_PHOTO_CONTEXT:
+        last = USER_LAST_PHOTO_CONTEXT[user_id]
+        orig_text = last.get("user_text", "")
+        bot.answer_callback_query(call.id, "🎬 Lagi merekam video...")
+        process_video_request(call, orig_text)
+        return
+
     bot.answer_callback_query(call.id, "🎬 Lagi merekam video...")
     process_video_request(call, scenario)
 
@@ -2405,6 +2436,14 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
     )
     logger.info(f"Visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
 
+    # Save exact scenario context so 'Pose Lain' never loses outfit or setting
+    USER_LAST_PHOTO_CONTEXT[user_id] = {
+        "user_text": user_text,
+        "detected_scene": detected_scene,
+        "outfit_label": outfit_label,
+        "is_nude": is_nude
+    }
+
     def run_gen():
         try:
             with ChatActionLoop(bot, chat_id, "upload_photo"):
@@ -2498,8 +2537,8 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
 
             markup = types.InlineKeyboardMarkup(row_width=2)
             markup.add(
-                types.InlineKeyboardButton("🔄 Pose Lain", callback_data=f"regen_photo:{detected_scene[:30]}"),
-                types.InlineKeyboardButton("🎬 Bikin Video Gerak", callback_data=f"regen_video:{detected_scene[:30]}")
+                types.InlineKeyboardButton("🔄 Pose Lain", callback_data="regen_photo:last"),
+                types.InlineKeyboardButton("🎬 Bikin Video Gerak", callback_data="regen_video:last")
             )
 
             # Optimize image bytes before sending to Telegram to prevent read timeout
@@ -2667,8 +2706,8 @@ def process_video_request(target, user_text: str):
 
             markup = types.InlineKeyboardMarkup(row_width=2)
             markup.add(
-                types.InlineKeyboardButton("🔄 Rekam Video Lagi", callback_data=f"regen_video:{detected_scene[:30]}"),
-                types.InlineKeyboardButton("📸 Minta Foto Saja", callback_data=f"regen_photo:{detected_scene[:30]}")
+                types.InlineKeyboardButton("🔄 Rekam Video Lagi", callback_data="regen_video:last"),
+                types.InlineKeyboardButton("📸 Minta Foto Saja", callback_data="regen_photo:last")
             )
             markup.add(
                 types.InlineKeyboardButton("🎵 Remote Musik PC", callback_data="open_music_menu")

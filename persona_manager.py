@@ -477,7 +477,7 @@ class PersonaManager:
         # 3. Explicit Towel Intent
         TOWEL_KEYWORDS = [
             "handuk", "habis mandi", "selesai mandi", "after bath", "after shower",
-            "towel", "kamar mandi", "basah"
+            "towel", "kamar mandi", "basah", "bathroom", "shower", "bath", "steam"
         ]
         if any(k in lower for k in TOWEL_KEYWORDS):
             return (
@@ -532,9 +532,14 @@ class PersonaManager:
             return (ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
 
         # Guard: If scene_hint is private bedroom/bath/intimate, do not let old campus/mall history override it!
-        if scene_hint and any(priv in scene_hint.lower() for priv in ["bed", "bedroom", "bath", "steam", "intimate", "kasur", "sensual"]):
+        if scene_hint and any(priv in scene_hint.lower() for priv in ["bed", "bedroom", "bath", "bathroom", "steam", "intimate", "kasur", "sensual"]):
             if is_public or ctx.get("is_public"):
-                preset = OUTFIT_PRESETS.get("romantic" if any(r in scene_hint.lower() for r in ["romantic", "sensual", "intimate"]) else "pajamas", OUTFIT_PRESETS["default"])
+                if any(b in scene_hint.lower() for b in ["bath", "bathroom", "steam", "mandi"]):
+                    preset = OUTFIT_PRESETS["towel"]
+                elif any(r in scene_hint.lower() for r in ["romantic", "sensual", "intimate"]):
+                    preset = OUTFIT_PRESETS["romantic"]
+                else:
+                    preset = OUTFIT_PRESETS["pajamas"]
                 return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
 
         # If there is a specific active conversational scenario, prioritize the activity's realistic attire!

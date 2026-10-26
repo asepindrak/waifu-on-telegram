@@ -191,7 +191,7 @@ def detect_contextual_activity_and_outfit(
             }
 
         # 1. Shower / Mandi Context
-        if any(k in t for k in ["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath"]):
+        if any(k in t for k in ["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath", "bathroom", "steam"]):
             return {
                 "activity": "baru beres mandi / keramas",
                 "scene": "standing in modern bathroom with soft steam, bare shoulders, post-shower glow, damp hair, bathroom mirror",
