@@ -2330,7 +2330,22 @@ def handle_photo_command(message):
         process_photo_request(message, scenario)
 
 
-def process_photo_request(target, user_text: str):
+def is_user_expressing_doubt(text: str) -> bool:
+    """Detects if user expresses doubt, disbelief, or challenges waifu's claims."""
+    lower = text.lower()
+    DOUBT_PATTERNS = [
+        r"\bbohong\b", r"\bboong\b", r"\bdusta\b", r"\bngibul\b", r"\bhoax\b",
+        r"\b(ga|gak|ngga|nggak|tidak|mana)\s*percaya\b",
+        r"\bmana\s*bukti(nya)?\b", r"\bbukti(in|kan)\b",
+        r"\bmasa\s*(sih|iya|\?)\b",
+        r"\byakin\b", r"\bserius\b", r"\bbeneran\b",
+        r"\bpaling(an)?\s*(kamu|lagi)\b", r"\bpasti\s*lagi\b",
+        r"\bsotoy\b", r"\bgamau\s*percaya\b",
+        r"\bliar\b", r"\bly(ing)?\b", r"\bprove\s*it\b", r"\bno\s*way\b"
+    ]
+    return any(re.search(pat, lower) for pat in DOUBT_PATTERNS)
+
+def process_photo_request(target, user_text: str, is_proof: bool = False):
     """Generates and delivers consistent girlfriend photo with caption matching conversation context."""
     persona = persona_mgr.get_active_persona()
 
@@ -2350,7 +2365,10 @@ def process_photo_request(target, user_text: str):
     bot.send_chat_action(chat_id, "upload_photo")
 
     status_msg = None
-    status_text = f"📸 *{persona.get('name')} sedang menyiapkan foto spesial untukmu, sayang...* 💕"
+    if is_proof:
+        status_text = f"📸 *{persona.get('name')} lagi fotoin bukti buat kamu...* 😜"
+    else:
+        status_text = f"📸 *{persona.get('name')} sedang menyiapkan foto spesial untukmu, sayang...* 💕"
     try:
         status_msg = bot.reply_to(reply_to_target, status_text, parse_mode="Markdown")
     except Exception:
@@ -2408,13 +2426,18 @@ def process_photo_request(target, user_text: str):
                     "and deeply in love. Remind them gently that this special view is just between the two of you."
                 )
 
+            if is_proof:
+                cap_guide = f" You just took a quick selfie photo to prove your whereabouts/activity to your boyfriend who was doubting you. Write 1 playful, affectionate sentence teasing him for not believing you (e.g. 'Tuh kan beneran, liat sendiri nih biar percaya! 😜'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
+            else:
+                cap_guide = f" You just took a selfie for your partner. Write 1-2 sweet, affectionate sentences as your photo caption. {persona_mgr.get_language_directive(BOT_LANGUAGE)} Naturally reference what you were just doing or talking about in the ongoing chat."
+
             caption_prompt = [
                 {
                     "role": "system",
                     "content": (
                         persona.get("system_instruction", "") +
                         nude_guidance +
-                        f" You just took a selfie for your partner. Write 1-2 sweet, affectionate sentences as your photo caption. {persona_mgr.get_language_directive(BOT_LANGUAGE)} Naturally reference what you were just doing or talking about in the ongoing chat."
+                        cap_guide
                     )
                 }
             ]
@@ -2433,7 +2456,10 @@ def process_photo_request(target, user_text: str):
             if is_nude:
                 fallback_caption = f"Khusus buat kamu ya sayang, jangan diliatin ke siapa-siapa lho... Malu banget tapi aku sayang kamu~ 🙈💕 ({source})"
             else:
-                fallback_caption = f"Ini foto spesial buat kamu sayang~ 🥰 ({source})"
+                if is_proof:
+                    fallback_caption = f"Tuh kan beneran, liat sendiri nih biar percaya! 😜 ({source})"
+                else:
+                    fallback_caption = f"Ini foto spesial buat kamu sayang~ 🥰 ({source})"
             clean_caption = caption or fallback_caption
 
             if status_msg:
@@ -3128,7 +3154,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 f" KEGIATAN MAHASISWI HARI INI: Jam {cur_hour:02d}:00, kegiatanmu saat ini: {routine['activity_desc']}. "
                 f"Kamu adalah mahasiswi ({p_prof['major']}). "
                 "PANDUAN PENTING: Jawab pesan pasanganmu secara wajar, santai, dan relevan dengan topik serta kehidupan mahasiswimu. "
-                "Jangan lebay, jangan bersikap hiperbola atau teatrikal. Jawab langsung maksimal 1-3 kalimat seperti chat asli."
+                "Jangan lebay, jangan bersikap hiperbola atau teatrikal. Jawab langsung maksimal 1-3 kalimat seperti chat asli.\n"
+                "INISIATIF KIRIM PAP (FOTO BUKTI): Jika pacarmu meragukan keberadaanmu, tidak percaya, menuduhmu bohong ('ah bohong', 'mana buktinya', 'ga percaya', dll), atau jika kamu ingin menunjukkan kegiatan/outfitmu secara spontan, kamu HARUS berinisiatif membuktikannya! Tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dan katakan bahwa kamu sedang memfoto/mengirimkan foto bukti agar dia percaya (misal: 'Beneran tauu! Nih aku fotoin biar kamu percaya haha 😜 [ACTION: SEND_PAP]')."
             )
             mem_context = memory_engine.format_memory_context(message.from_user.id)
             if mem_context:
@@ -3155,12 +3182,37 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
             if not reply_text or not reply_text.strip():
                 reply_text = "Aku dengerin kok, lagi mikirin apa nih?"
 
+            # Check if waifu takes initiative to send spontaneous PAP / proof photo
+            has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
+            has_doubt = is_user_expressing_doubt(user_text)
+            has_proof_phrase = any(phrase in reply_text.lower() for phrase in [
+                "nih aku fotoin", "nih buktinya", "liat sendiri", "aku pap", "nih fotonya",
+                "nih aku pap", "aku kirim foto", "nih liat langsung", "aku fotoin ya", "tuh kan"
+            ])
+
+            should_send_proof_photo = has_action_tag or (has_doubt and any(kw in reply_text.lower() for kw in ["nih", "bukti", "foto", "liat", "percaya", "beneran"])) or has_proof_phrase
+
+            # Clean action tag from text so user only sees natural dialogue
+            clean_reply = re.sub(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", "", reply_text, flags=re.IGNORECASE).strip()
+            if not clean_reply:
+                clean_reply = "Beneran tauu! Nih aku fotoin biar kamu percaya haha 😜"
+
             new_aff = persona_mgr.increase_affinity(message.from_user.id, delta=1)
             memory_engine.set_affinity(message.from_user.id, new_aff)
             persona_mgr.add_message(message.from_user.id, "user", user_text)
-            persona_mgr.add_message(message.from_user.id, "assistant", reply_text)
+            persona_mgr.add_message(message.from_user.id, "assistant", clean_reply)
 
-            bot.reply_to(message, reply_text)
+            bot.reply_to(message, clean_reply)
+
+            if should_send_proof_photo:
+                def _send_spontaneous_proof():
+                    try:
+                        time.sleep(1.5)  # Natural human pause as if snapping a quick selfie
+                        process_photo_request(message, user_text="foto bukti kegiatan dan lokasi saat ini", is_proof=True)
+                    except Exception as e_proof:
+                        logger.error(f"Error sending spontaneous proof photo: {e_proof}")
+
+                threading.Thread(target=_send_spontaneous_proof, daemon=True).start()
 
             # Auto-diary entry every 6 turns
             if len(history) > 0 and len(history) % 6 == 0:
