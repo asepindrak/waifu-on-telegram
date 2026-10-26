@@ -250,6 +250,44 @@ def config_persona_voice(env_vars):
     else:
         env_vars["VOICE_NAME"] = "en-US-AnaNeural"
 
+def config_language(env_vars):
+    print(c(BOLD + CYAN, "\n[Step: AI Girlfriend Language Selection]"))
+    print("-" * 60)
+    print("Pilih bahasa utama yang digunakan oleh Waifu saat mengobrol:")
+    print("  1) 🇮🇩 Bahasa Indonesia (Santai, mesra, manja - Rekomendasi)")
+    print("  2) 🇬🇧 English (Sweet, affectionate girlfriend)")
+    print("  3) 🇯🇵 Japanese / 日本語 (Kawaii anime girlfriend style)")
+    print("  4) 🌐 Auto-detect (Otomatis ikuti bahasa percakapan)")
+    print("  5) ✏️ Custom Language (Input bahasa lain: Spanish, Korean, Sunda, dll.)")
+
+    cur_lang = env_vars.get("BOT_LANGUAGE", "id")
+    choice = input(f"\nPilih bahasa [1-5, default saat ini '{cur_lang}']: ").strip()
+    if choice == "1" or (not choice and cur_lang == "id"):
+        env_vars["BOT_LANGUAGE"] = "id"
+        print(c(GREEN, "  ✓ Bahasa dipilih: Bahasa Indonesia 🇮🇩"))
+    elif choice == "2":
+        env_vars["BOT_LANGUAGE"] = "en"
+        print(c(GREEN, "  ✓ Language selected: English 🇬🇧"))
+    elif choice == "3":
+        env_vars["BOT_LANGUAGE"] = "ja"
+        print(c(GREEN, "  ✓ 言語選択: Japanese (日本語) 🇯🇵"))
+    elif choice == "4":
+        env_vars["BOT_LANGUAGE"] = "auto"
+        print(c(GREEN, "  ✓ Bahasa dipilih: Auto-detect (Ikuti chat) 🌐"))
+    elif choice == "5":
+        custom = input("Masukkan nama bahasa yang kamu inginkan (misal: Spanish, Korean, Sunda, Jawa): ").strip()
+        if custom:
+            env_vars["BOT_LANGUAGE"] = custom.title()
+            print(c(GREEN, f"  ✓ Bahasa dipilih: {custom.title()} ✏️"))
+        else:
+            env_vars["BOT_LANGUAGE"] = "id"
+    else:
+        if choice.isalpha():
+            env_vars["BOT_LANGUAGE"] = choice.title()
+            print(c(GREEN, f"  ✓ Bahasa dipilih: {choice.title()} ✏️"))
+        else:
+            env_vars["BOT_LANGUAGE"] = cur_lang
+
 def run_menu():
     env_vars = read_env()
     has_token = bool(env_vars.get("TELEGRAM_BOT_TOKEN"))
@@ -270,13 +308,15 @@ def run_menu():
         print(c(CYAN, f"  • Chat LLM    : {env_vars.get('LLM_MODEL', 'default')} ({env_vars.get('LLM_BASE_URL', '')})"))
         print(c(CYAN, f"  • Photo Engine: {env_vars.get('COMFYUI_URL', 'Disabled')} (Fallback: {env_vars.get('MEDIA_FALLBACK_CLOUD')})"))
         print(c(CYAN, f"  • Persona     : {env_vars.get('DEFAULT_PERSONA', 'runa').title()} | Voice: {env_vars.get('VOICE_NAME', '')}"))
+        print(c(CYAN, f"  • Language    : {env_vars.get('BOT_LANGUAGE', 'id')}"))
         print("-" * 70)
         print("  [1] 🤖 Change Telegram Bot Token / Allowed User ID")
         print("  [2] 🧠 Change Chat / LLM Model (Scan new models)")
         print("  [3] 🎨 Change Photo & Video Model (ComfyUI / Cloud)")
         print("  [4] 🎭 Change AI Girlfriend Persona & Voice")
-        print("  [5] 🚀 Configure Autorun at System Startup (On / Off)")
-        print("  [6] 🔄 Re-run Complete 7-Step Setup Wizard")
+        print("  [5] 🌐 Change Waifu Language (ID, EN, JA, Custom)")
+        print("  [6] 🚀 Configure Autorun at System Startup (On / Off)")
+        print("  [7] 🔄 Re-run Complete Setup Wizard")
         print("  [0] ❌ Exit / Done")
         print("-" * 70)
 
@@ -294,9 +334,12 @@ def run_menu():
             config_persona_voice(env_vars)
             write_env(env_vars)
         elif opt == "5":
+            config_language(env_vars)
+            write_env(env_vars)
+        elif opt == "6":
             auto_in = input("Enable bot automatically on PC boot (Autorun)? [Y/n, default: Y]: ").strip().lower()
             setup_autostart(enable=(auto_in != "n"))
-        elif opt == "6":
+        elif opt == "7":
             run_full_wizard()
             break
         elif opt == "0":
@@ -330,6 +373,7 @@ def run_full_wizard():
     chosen_vid_idx = int(choice_vid) - 1 if choice_vid.isdigit() and 1 <= int(choice_vid) <= len(vid_options) else 0
 
     config_persona_voice(env_vars)
+    config_language(env_vars)
 
     print(c(BOLD + CYAN, "\n[Step 6/7: PC Music Remote Player (YouTube Music)]"))
     print("-" * 60)
@@ -355,6 +399,7 @@ if __name__ == "__main__":
     parser.add_argument("--user", help="Allowed Telegram User ID")
     parser.add_argument("--backend", help="LLM Base URL")
     parser.add_argument("--autostart", choices=["yes", "no"], help="Enable autorun at startup")
+    parser.add_argument("--language", "--lang", help="Waifu Language (id, en, ja, auto, or custom)")
     parser.add_argument("--wizard", action="store_true", help="Force run the full 7-step wizard")
     args = parser.parse_args()
 
@@ -367,6 +412,8 @@ if __name__ == "__main__":
         if args.backend:
             env_vars["LLM_BASE_URL"] = args.backend
         write_env(env_vars)
+        if args.language:
+            env_vars["BOT_LANGUAGE"] = args.language
         if args.autostart:
             setup_autostart(enable=(args.autostart == "yes"))
     elif args.wizard:

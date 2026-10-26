@@ -188,6 +188,90 @@ def cmd_autorun(action: str):
     else:
         print(c(YELLOW, f"Autorun set to: {'ENABLED' if enable else 'DISABLED'}"))
 
+def cmd_language(lang_arg: str = None):
+    print_banner()
+    env_file = os.path.join(PROJECT_ROOT, ".env")
+    if not os.path.exists(env_file):
+        print(c(RED, "File .env not found. Please run 'waifu setup' first."))
+        return
+
+    with open(env_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    target_lang = None
+    display = ""
+    if lang_arg:
+        low = lang_arg.strip().lower()
+        if low in ("id", "indonesia", "indonesian", "bahasa"):
+            target_lang = "id"
+            display = "Bahasa Indonesia 🇮🇩"
+        elif low in ("en", "english"):
+            target_lang = "en"
+            display = "English 🇬🇧"
+        elif low in ("ja", "jp", "japan", "japanese", "nihongo"):
+            target_lang = "ja"
+            display = "Japanese (日本語) 🇯🇵"
+        elif low in ("auto", "adaptive"):
+            target_lang = "auto"
+            display = "Auto-detect (Ikuti Bahasa Chat) 🌐"
+        else:
+            target_lang = lang_arg.strip().title()
+            display = f"{target_lang} ✏️"
+    else:
+        print(c(BOLD + CYAN, "🌐 WAIFU LANGUAGE CONFIGURATION"))
+        print("-" * 55)
+        print("Pilih bahasa utama yang digunakan oleh Waifu:")
+        print("  1) 🇮🇩 Bahasa Indonesia (id)")
+        print("  2) 🇬🇧 English (en)")
+        print("  3) 🇯🇵 Japanese / 日本語 (ja)")
+        print("  4) 🌐 Auto-detect / Ikuti chat (auto)")
+        print("  5) ✏️ Custom Language (input bahasa lain)")
+        choice = input(c(BOLD + YELLOW, "\nPilih bahasa [1-5]: ")).strip()
+        if choice == "1":
+            target_lang = "id"
+            display = "Bahasa Indonesia 🇮🇩"
+        elif choice == "2":
+            target_lang = "en"
+            display = "English 🇬🇧"
+        elif choice == "3":
+            target_lang = "ja"
+            display = "Japanese (日本語) 🇯🇵"
+        elif choice == "4":
+            target_lang = "auto"
+            display = "Auto-detect (Ikuti Bahasa Chat) 🌐"
+        elif choice == "5":
+            c_input = input("Masukkan nama bahasa (misal: Spanish, Korean, Sunda, Jawa): ").strip()
+            if c_input:
+                target_lang = c_input.title()
+                display = f"{target_lang} ✏️"
+            else:
+                target_lang = "id"
+                display = "Bahasa Indonesia 🇮🇩"
+        else:
+            if choice.isalpha():
+                target_lang = choice.title()
+                display = f"{target_lang} ✏️"
+            else:
+                target_lang = "id"
+                display = "Bahasa Indonesia 🇮🇩"
+
+    import re
+    if re.search(r"^BOT_LANGUAGE=.*", content, re.M):
+        new_content = re.sub(r"^BOT_LANGUAGE=.*", f"BOT_LANGUAGE={target_lang}", content, flags=re.M)
+    else:
+        new_content = content + f"\nBOT_LANGUAGE={target_lang}\n"
+
+    with open(env_file, "w", encoding="utf-8") as f:
+        f.write(new_content)
+
+    print(c(BOLD + GREEN, f"\n✓ Waifu Language successfully set to: {display}"))
+    is_running = get_running_pid() is not None
+    if is_running:
+        print(c(CYAN, "Restarting bot to apply changes..."))
+        cmd_restart(daemon=True)
+    else:
+        print(c(DIM, "Run 'waifu start' to begin chatting in your chosen language!\n"))
+
 def cmd_persona(name: str):
     env_file = os.path.join(PROJECT_ROOT, ".env")
     if not os.path.exists(env_file):
@@ -292,7 +376,7 @@ def main():
         return
 
     parser = argparse.ArgumentParser(description="💖 Waifu on Telegram CLI", add_help=False)
-    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "logs", "update", "uninstall", "release", "version", "--version", "-v", "help"])
+    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "language", "lang", "logs", "update", "uninstall", "release", "version", "--version", "-v", "help"])
     parser.add_argument("arg", nargs="?", default=None)
     parser.add_argument("--daemon", "-d", action="store_true", help="Run bot silently in background")
     args = parser.parse_args()
@@ -314,6 +398,8 @@ def main():
     elif cmd == "persona":
         p_name = args.arg or "runa"
         cmd_persona(p_name)
+    elif cmd in ("language", "lang"):
+        cmd_language(args.arg)
     elif cmd == "logs":
         cmd_logs()
     elif cmd == "update":
@@ -334,6 +420,7 @@ def main():
         print("  waifu setup              - Open interactive configuration manager")
         print("  waifu update             - Pull latest updates & restart services")
         print("  waifu persona <name>     - Switch persona (runa, akira, hina, shiro, yume)")
+        print("  waifu language [id|en|ja] - Change waifu language (ID, EN, JA, or Custom)")
         print("  waifu autorun [on|off]   - Configure autorun on system startup")
         print("  waifu logs               - Inspect recent log activity")
         print("  waifu uninstall          - Complete uninstallation and cleanup wizard")

@@ -223,9 +223,68 @@ class PersonaManager:
                     except Exception as e:
                         logger.error(f"Error loading persona {fname}: {e}")
 
-    def get_active_persona(self) -> Dict[str, Any]:
-        """Returns the currently active persona."""
-        return self.personas.get(self.active_key, DEFAULT_PERSONAS["runa"])
+    @staticmethod
+    def get_language_directive(lang: Optional[str] = None) -> str:
+        """Returns a strict language constraint instruction for the LLM."""
+        cur_lang = (lang or os.environ.get("BOT_LANGUAGE", "id")).strip()
+        low = cur_lang.lower()
+        if low in ("id", "indonesia", "indonesian", "bahasa"):
+            return (
+                "STRICT LANGUAGE DIRECTIVE: You MUST speak, converse, and reply EXCLUSIVELY in natural, sweet, affectionate casual Indonesian (Bahasa Indonesia). "
+                "NEVER mix in English, Japanese, or any other languages under any circumstances. "
+                "Use affectionate Indonesian girlfriend expressions (calling them 'sayang' or 'manisku', using cute informal words like 'aku', 'kamu', 'banget', 'ya~', 'dong~')."
+            )
+        elif low in ("en", "english"):
+            return (
+                "STRICT LANGUAGE DIRECTIVE: You MUST speak, converse, and reply EXCLUSIVELY in natural, sweet, affectionate English. "
+                "NEVER mix in Indonesian, Japanese, or other languages. "
+                "Use sweet English girlfriend expressions (calling them 'sweetheart', 'babe', 'darling', 'honey', 'my love')."
+            )
+        elif low in ("ja", "jp", "japan", "japanese", "nihongo"):
+            return (
+                "STRICT LANGUAGE DIRECTIVE: You MUST speak, converse, and reply EXCLUSIVELY in natural, cute, affectionate Japanese (日本語). "
+                "NEVER mix in English, Indonesian, or other languages. "
+                "Use cute anime girlfriend speech patterns (e.g. ～だよ, ～ね, ～の, 大好き, あなた, ～くん)."
+            )
+        elif low in ("auto", "adaptive"):
+            return (
+                "LANGUAGE DIRECTIVE: Automatically and seamlessly match the exact language used by the user in the ongoing conversation. "
+                "Always remain completely consistent and do NOT mix languages in a single response."
+            )
+        else:
+            return (
+                f"STRICT LANGUAGE DIRECTIVE: You MUST speak, converse, and reply EXCLUSIVELY in natural, sweet, affectionate {cur_lang}. "
+                f"NEVER mix in other languages under any circumstances. Maintain your loving girlfriend persona entirely in {cur_lang}."
+            )
+
+    @staticmethod
+    def get_language_display_name(lang: Optional[str] = None) -> str:
+        """Returns friendly human-readable display name for language."""
+        cur_lang = (lang or os.environ.get("BOT_LANGUAGE", "id")).strip()
+        low = cur_lang.lower()
+        if low in ("id", "indonesia", "indonesian", "bahasa"):
+            return "Bahasa Indonesia 🇮🇩"
+        elif low in ("en", "english"):
+            return "English 🇬🇧"
+        elif low in ("ja", "jp", "japan", "japanese", "nihongo"):
+            return "Japanese (日本語) 🇯🇵"
+        elif low in ("auto", "adaptive"):
+            return "Auto-detect (Ikuti Chat) 🌐"
+        else:
+            return f"{cur_lang.title()} ✏️"
+
+    def get_active_persona(self, lang: Optional[str] = None) -> Dict[str, Any]:
+        """Returns the currently active persona with strict language enforcement injected."""
+        base = self.personas.get(self.active_key, DEFAULT_PERSONAS["runa"]).copy()
+        raw_inst = base.get("system_instruction", "")
+        # Remove any old generic language rule that might confuse local LLMs
+        clean_inst = re.sub(r"IMPORTANT LANGUAGE RULE:[^.]*\.[^.]*\.[^.]*\.", "", raw_inst).strip()
+        if "IMPORTANT LANGUAGE RULE:" in clean_inst:
+            clean_inst = re.sub(r"IMPORTANT LANGUAGE RULE:.*?(?=(\. [A-Z]|$))", "", clean_inst).strip()
+        
+        lang_rule = self.get_language_directive(lang)
+        base["system_instruction"] = f"{clean_inst} {lang_rule}"
+        return base
 
     def set_active_persona(self, key: str) -> bool:
         """Switches active persona key."""

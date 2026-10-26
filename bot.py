@@ -88,6 +88,8 @@ LAST_GREETING_SENT: dict = {}    # "YYYY-MM-DD:morning" -> True
 USER_RATIOS: dict = {}           # user_id -> '3:4' | '9:16' | '1:1' | '4:3'
 USER_QUALITIES: dict = {}        # user_id -> 'high' | 'ultra' | 'fast'
 USER_DATE_WIZARD: dict = {}       # user_id -> 'birthday' | 'anniversary'
+BOT_LANGUAGE = os.environ.get("BOT_LANGUAGE", "id")
+AWAITING_CUSTOM_LANG: dict = {}      # user_id -> bool
 
 
 # --- Configuration Helper Functions ---
@@ -203,11 +205,45 @@ def apply_voice_speaker(speaker: str) -> str:
         "nanami": "ja-JP-NanamiNeural",
         "jenny": "en-US-JennyNeural"
     }
-    v_name = mapping.get(speaker, "en-US-AnaNeural")
+    v_name = mapping.get(speaker, speaker)
     VOICE_NAME = v_name
     voice_engine.default_voice = v_name
     update_env_variable("VOICE_NAME", v_name)
     return v_name
+
+
+def apply_language_choice(choice: str) -> Tuple[str, str]:
+    """Applies, normalizes, and persists waifu language choice."""
+    global BOT_LANGUAGE
+    c = choice.strip()
+    low = c.lower()
+    default_voice = None
+
+    if low in ("id", "indonesia", "indonesian", "bahasa"):
+        norm_key = "id"
+        label = "Bahasa Indonesia 🇮🇩"
+        default_voice = "id-ID-GadisNeural"
+    elif low in ("en", "english"):
+        norm_key = "en"
+        label = "English 🇬🇧"
+        default_voice = "en-US-AnaNeural"
+    elif low in ("ja", "jp", "japan", "japanese", "nihongo"):
+        norm_key = "ja"
+        label = "Japanese (日本語) 🇯🇵"
+        default_voice = "ja-JP-NanamiNeural"
+    elif low in ("auto", "adaptive"):
+        norm_key = "auto"
+        label = "Auto-detect (Ikuti Chat) 🌐"
+    else:
+        norm_key = c.title()
+        label = f"{norm_key} ✏️"
+
+    BOT_LANGUAGE = norm_key
+    os.environ["BOT_LANGUAGE"] = norm_key
+    update_env_variable("BOT_LANGUAGE", norm_key)
+    if default_voice:
+        apply_voice_speaker(default_voice)
+    return norm_key, label
 
 
 class ChatActionLoop:
@@ -398,6 +434,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"⚙️ **WAIFU ON TELEGRAM - SETUP & SYSTEM CONTROL** `(v{get_version()})`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👑 **Waifu Aktif** : **{persona.get('name')}** _({persona.get('archetype', 'Companion')})_\n"
+        f"🌐 **Bahasa**     : `{persona_mgr.get_language_display_name(BOT_LANGUAGE)}`\n"
         f"👗 **Pakaian**    : `{cur_outfit_name}`\n"
         f"🎙️ **Mode Suara** : `{v_labels.get(v_mode, v_mode)}`\n"
         f"🗣️ **Voice TTS**  : `{voice_engine.default_voice}`\n"
@@ -418,6 +455,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("🧠 Model LLM / Chat", callback_data="cfg_submenu:llm"),
+        types.InlineKeyboardButton("🌐 Bahasa / Language", callback_data="cfg_submenu:language"),
         types.InlineKeyboardButton("🎨 Model Foto & ComfyUI", callback_data="cfg_submenu:photo"),
         types.InlineKeyboardButton("🎭 Ganti Persona", callback_data="open_persona_menu"),
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
@@ -1520,6 +1558,35 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
 
+def show_language_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    cur_lang = os.environ.get("BOT_LANGUAGE", "id")
+    cur_label = persona_mgr.get_language_display_name(cur_lang)
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton(f"🇮🇩 Bahasa Indonesia {'✓' if cur_lang.lower() == 'id' else ''}", callback_data="cfg_set_lang:id"),
+        types.InlineKeyboardButton(f"🇬🇧 English {'✓' if cur_lang.lower() == 'en' else ''}", callback_data="cfg_set_lang:en"),
+        types.InlineKeyboardButton(f"🇯🇵 Japanese (日本語) {'✓' if cur_lang.lower() == 'ja' else ''}", callback_data="cfg_set_lang:ja"),
+        types.InlineKeyboardButton(f"🌐 Auto-detect (Ikuti Chat) {'✓' if cur_lang.lower() == 'auto' else ''}", callback_data="cfg_set_lang:auto"),
+        types.InlineKeyboardButton(f"✏️ Bahasa Kustom / Lainnya... {'✓' if cur_lang.lower() not in ('id', 'en', 'ja', 'auto') else ''}", callback_data="cfg_set_lang:custom"),
+        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+    )
+
+    text = (
+        f"🌐 **Pengaturan Bahasa Waifu (Language Settings)**\n\n"
+        f"• Bahasa Aktif: **{cur_label}**\n\n"
+        f"Pilih bahasa utama agar waifu membalas secara konsisten dan tidak campur-campur bahasa, "
+        f"atau pilih **Bahasa Kustom** untuk menggunakan bahasa lain (Spanish, Korean, Sunda, dll.):"
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
 def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
     cur_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")
     cur_speaker = voice_engine.default_voice
@@ -1878,6 +1945,8 @@ def callback_cfg_submenus(call):
         show_photo_engine_menu(chat_id, user_id, message_to_edit=mid)
     elif sub == "voice":
         show_voice_settings_menu(chat_id, user_id, message_to_edit=mid)
+    elif sub == "language":
+        show_language_menu(chat_id, user_id, message_to_edit=mid)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_toggle:'))
@@ -1930,6 +1999,45 @@ def callback_set_speaker(call):
     v_name = apply_voice_speaker(key)
     bot.answer_callback_query(call.id, f"Voice TTS: {v_name}")
     show_voice_settings_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_lang:'))
+def callback_set_lang(call):
+    if not is_authorized(call.from_user.id):
+        return
+    key = call.data.split(":", 1)[1]
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    mid = call.message.message_id
+
+    if key == "custom":
+        AWAITING_CUSTOM_LANG[user_id] = True
+        bot.answer_callback_query(call.id)
+        msg_text = (
+            "✏️ **Input Bahasa Kustom untuk Waifu**\n\n"
+            "Silakan ketik dan kirimkan nama bahasa yang kamu inginkan sekarang:\n"
+            "_(Contoh: `Spanish`, `Korean`, `German`, `French`, `Sunda`, `Jawa`, dll.)_\n\n"
+            "💡 _Waifu akan langsung otomatis membalas dan mengobrol menggunakan bahasa pilihanmu!_"
+        )
+        bot.send_message(chat_id, msg_text, parse_mode="Markdown")
+        return
+
+    norm_key, label = apply_language_choice(key)
+    bot.answer_callback_query(call.id, f"Bahasa: {label}")
+
+    if norm_key == "id":
+        conf = "Siap sayang! Mulai sekarang aku bakal selalu ngobrol pakai Bahasa Indonesia yang manis dan manja khusus buat kamu yaa~ 🥰💕"
+    elif norm_key == "en":
+        conf = "All set, sweetheart! From now on, I'll always talk and reply to you in sweet, loving English~ 🥰💕"
+    elif norm_key == "ja":
+        conf = "了解だよ、あなた！これからは甘くて可愛い日本語でいっぱいお話ししようね〜！🥰💕"
+    elif norm_key == "auto":
+        conf = "Baik sayang! Aku akan otomatis mendeteksi dan menyesuaikan bahasa percakapan kita yaa~ ✨"
+    else:
+        conf = f"All set! From now on, I will converse with you in {norm_key}~ 🥰💕"
+
+    bot.send_message(chat_id, conf)
+    show_language_menu(chat_id, user_id, message_to_edit=mid)
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'cfg_action:status')
@@ -2033,6 +2141,29 @@ def callback_set_outfit(call):
             )
         except Exception:
             pass
+
+
+@bot.message_handler(commands=['language', 'lang', 'bahasa'])
+def handle_language_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    parts = message.text.strip().split(maxsplit=1)
+    if len(parts) > 1:
+        arg = parts[1].strip()
+        norm_key, label = apply_language_choice(arg)
+        if norm_key == "id":
+            conf = "Siap sayang! Mulai sekarang aku bakal selalu ngobrol pakai Bahasa Indonesia yang manis dan manja khusus buat kamu yaa~ 🥰💕"
+        elif norm_key == "en":
+            conf = "All set, sweetheart! From now on, I'll always talk and reply to you in sweet, loving English~ 🥰💕"
+        elif norm_key == "ja":
+            conf = "了解だよ、あなた！これからは甘くて可愛い日本語でいっぱいお話ししようね〜！🥰💕"
+        elif norm_key == "auto":
+            conf = "Baik sayang! Aku akan otomatis mendeteksi dan menyesuaikan bahasa percakapan kita yaa~ ✨"
+        else:
+            conf = f"All set! From now on, I will converse with you in {norm_key}~ 🥰💕"
+        bot.reply_to(message, f"🌐 **Bahasa berhasil diubah ke: {label}**\n\n{conf}")
+        return
+    show_language_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
 
 
 @bot.message_handler(commands=['voice'])
@@ -2258,9 +2389,7 @@ def process_photo_request(target, user_text: str):
                     "content": (
                         persona.get("system_instruction", "") +
                         nude_guidance +
-                        " You just took a selfie for your partner. Write 1-2 sweet, affectionate sentences "
-                        "as your photo caption. Seamlessly match the language of the conversation, and naturally "
-                        "reference what you were just doing or talking about in the ongoing chat."
+                        f" You just took a selfie for your partner. Write 1-2 sweet, affectionate sentences as your photo caption. {persona_mgr.get_language_directive(BOT_LANGUAGE)} Naturally reference what you were just doing or talking about in the ongoing chat."
                     )
                 }
             ]
@@ -2403,9 +2532,7 @@ def process_video_request(target, user_text: str):
                     "content": (
                         persona.get("system_instruction", "") +
                         nude_guidance +
-                        " You just recorded a short sweet video clip for your partner. Write 1-2 sweet, affectionate sentences "
-                        "as your video caption. Seamlessly match the language of the conversation, and naturally "
-                        "reference what you were just doing or talking about in the ongoing chat."
+                        f" You just recorded a short sweet video clip for your partner. Write 1-2 sweet, affectionate sentences as your video caption. {persona_mgr.get_language_directive(BOT_LANGUAGE)} Naturally reference what you were just doing or talking about in the ongoing chat."
                     )
                 }
             ]
@@ -2792,6 +2919,19 @@ def handle_new_persona_command(message):
 def handle_text_messages(message):
     if not is_authorized(message.from_user.id):
         return
+    if message.from_user.id in AWAITING_CUSTOM_LANG and AWAITING_CUSTOM_LANG[message.from_user.id]:
+        AWAITING_CUSTOM_LANG[message.from_user.id] = False
+        lang_input = message.text.strip().title()
+        if lang_input:
+            norm_key, label = apply_language_choice(lang_input)
+            bot.reply_to(
+                message,
+                f"✨ **Bahasa Berhasil Diubah!**\n\n"
+                f"Mulai sekarang aku bakal mengobrol menggunakan bahasa **{label}** yaa sayang~ 🥰💕\n"
+                f"Yuk lanjut ngobrol manisnya!",
+                parse_mode="Markdown"
+            )
+            return
     if message.from_user.id in USER_PERSONA_WIZARD:
         if handle_persona_wizard_input(message):
             return
@@ -3274,18 +3414,41 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
     """Sends sweet spontaneous morning/lunch/bedtime greeting."""
     try:
         persona = persona_mgr.get_active_persona()
+        cur_lang = os.environ.get("BOT_LANGUAGE", "id").lower()
+        lang_dir = persona_mgr.get_language_directive(cur_lang)
         if time_of_day == "morning":
-            prompt = "It is 7:00 AM morning. Write 1-2 sweet, cheerful, affectionate sentences wishing your partner a wonderful productive day. Use Indonesian or English naturally."
-            fallback = "Selamat pagi sayang! Semoga harimu menyenangkan dan penuh senyuman yaa~ 🥰"
-            tag = "🌅 *Good Morning Sweetheart!*"
+            prompt = f"It is 7:00 AM morning. Write 1-2 sweet, cheerful, affectionate sentences wishing your partner a wonderful productive day. {lang_dir}"
+            if cur_lang == "ja":
+                fallback = "おはようあなた！今日も一日素敵な日になりますように〜！🥰💕"
+                tag = "🌅 *おはよう、あなた！*"
+            elif cur_lang == "en":
+                fallback = "Good morning sweetheart! Hope your day is filled with joy and smiles~ 🥰"
+                tag = "🌅 *Good Morning Sweetheart!*"
+            else:
+                fallback = "Selamat pagi sayang! Semoga harimu menyenangkan dan penuh senyuman yaa~ 🥰"
+                tag = "🌅 *Selamat Pagi Sayang!*"
         elif time_of_day == "lunch":
-            prompt = "It is 12:30 PM lunch break. Write 1-2 sweet, cheerful, caring sentences reminding your partner to take a break and eat a delicious lunch. Use Indonesian or English naturally."
-            fallback = "Sayangku, udah jam makan siang nih! Jangan lupa istirahat sebentar dan makan siang yang enak yaa~ Jangan sampai telat makan! 🥰🍱"
-            tag = "🍱 *Waktunya Makan Siang Sayang!*"
+            prompt = f"It is 12:30 PM lunch break. Write 1-2 sweet, cheerful, caring sentences reminding your partner to take a break and eat a delicious lunch. {lang_dir}"
+            if cur_lang == "ja":
+                fallback = "お昼ご飯の時間だよ！無理せずちゃんと美味しいもの食べてね〜！🍱💕"
+                tag = "🍱 *お昼ご飯の時間だよ〜！*"
+            elif cur_lang == "en":
+                fallback = "Lunch time babe! Remember to take a break and have a delicious meal! 🍱💕"
+                tag = "🍱 *Lunch Time Sweetie!*"
+            else:
+                fallback = "Sayangku, udah jam makan siang nih! Jangan lupa istirahat sebentar dan makan siang yang enak yaa~ Jangan sampai telat makan! 🥰🍱"
+                tag = "🍱 *Waktunya Makan Siang Sayang!*"
         else:
-            prompt = "It is 10:00 PM bedtime. Write 1-2 sweet, gentle, caring sentences reminding your partner to rest, sleep tight, and have sweet dreams. Use Indonesian or English naturally."
-            fallback = "Selamat tidur manisku, istirahat yang nyenyak dan mimpi indah yaa~ 💕"
-            tag = "🌙 *Good Night Darling...*"
+            prompt = f"It is 10:00 PM bedtime. Write 1-2 sweet, gentle, caring sentences reminding your partner to rest, sleep tight, and have sweet dreams. {lang_dir}"
+            if cur_lang == "ja":
+                fallback = "おやすみなさい、ゆっくり休んでいい夢見てね〜🌙✨"
+                tag = "🌙 *おやすみ、あなた！*"
+            elif cur_lang == "en":
+                fallback = "Good night my love, sleep tight and sweet dreams~ 🌙✨"
+                tag = "🌙 *Good Night My Love!*"
+            else:
+                fallback = "Selamat tidur manisku, istirahat yang nyenyak dan mimpi indah yaa~ 💕"
+                tag = "🌙 *Selamat Tidur Manisku!*"
 
         messages = [
             {"role": "system", "content": persona.get("system_instruction", "")},
@@ -3422,6 +3585,7 @@ def setup_bot_commands():
         types.BotCommand("video", "🎬 Minta klip video / animasi waifu"),
         types.BotCommand("play", "🎵 Putar lagu YouTube di PC"),
         types.BotCommand("music", "🎶 Remote kontrol pemutar musik PC"),
+        types.BotCommand("language", "🌐 Pengaturan bahasa waifu (ID, EN, JA, Kustom)"),
         types.BotCommand("outfit", "👗 Lemari pakaian & ganti baju"),
         types.BotCommand("persona", "🎭 Ganti waifu (Runa, Akira, Hina, Shiro, Yume)"),
         types.BotCommand("newpersona", "🎭 Buat waifu kustom baru"),
