@@ -11,6 +11,26 @@ logger = logging.getLogger(__name__)
 
 # Registry of AI Models, Custom Nodes, and Third-Party Dependencies
 ASSET_REGISTRY = {
+    "qwythos_9b": {
+        "name": "Huihui-Qwythos 9B Claude-Mythos (Uncensored LLM)",
+        "type": "llm_model",
+        "filename": "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf",
+        "patterns": ["*Qwythos*9B*.gguf", "*Mythos*9B*.gguf", "*Qwythos*.gguf"],
+        "size_mb": 5512,
+        "url": "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf",
+        "description": "Model chat/roleplay uncensored terbaik (Abliterated Claude-Mythos reasoning, 1M context).",
+        "required_for": "Otak Utama Chat & Roleplay Waifu (Locally Uncensored)"
+    },
+    "qwythos_vision": {
+        "name": "Huihui-Qwythos Vision Adapter (mmproj)",
+        "type": "llm_model",
+        "filename": "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf",
+        "patterns": ["*Qwythos*mmproj*.gguf", "*mmproj-model-bf16*.gguf", "*mmproj*.gguf"],
+        "size_mb": 879,
+        "url": "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf",
+        "description": "Vision projector agar waifu bisa melihat dan mengomentari foto dari user.",
+        "required_for": "Fitur Vision (Melihat Foto dari User)"
+    },
     "meinamix": {
         "name": "MeinaMix Anime SD 1.5 Checkpoint",
         "type": "model",
@@ -71,6 +91,33 @@ ASSET_REGISTRY = {
 }
 
 _COMFYUI_DIR_CACHE: Optional[str] = None
+
+def detect_locally_uncensored_dir() -> str:
+    """Resolves cross-platform models directory for Locally Uncensored."""
+    env_dir = os.environ.get("LOCALLY_UNCENSORED_DIR")
+    if env_dir and os.path.isdir(env_dir):
+        return os.path.abspath(env_dir)
+
+    user_home = os.path.expanduser("~")
+    candidates = []
+    if platform.system() == "Windows":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            candidates.append(os.path.join(appdata, "Locally Uncensored", "models"))
+        candidates.append(os.path.join(user_home, "AppData", "Roaming", "Locally Uncensored", "models"))
+    elif platform.system() == "Darwin":
+        candidates.append(os.path.join(user_home, "Library", "Application Support", "Locally Uncensored", "models"))
+    else: # Linux
+        candidates.append(os.path.join(user_home, ".config", "Locally Uncensored", "models"))
+        candidates.append(os.path.join(user_home, ".local", "share", "Locally Uncensored", "models"))
+    candidates.append(os.path.join(user_home, ".locally-uncensored", "models"))
+
+    for c in candidates:
+        if os.path.exists(c):
+            return os.path.abspath(c)
+    # Default to standard path
+    return os.path.abspath(candidates[0])
+
 
 def detect_comfyui_dir() -> Optional[str]:
     """
@@ -170,6 +217,37 @@ def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:
         return None
 
     spec = dict(ASSET_REGISTRY[asset_key])
+    if spec.get("type") == "llm_model":
+        target_dir = detect_locally_uncensored_dir()
+        spec["target_dir"] = target_dir
+        spec["target_path"] = os.path.join(target_dir, spec["filename"])
+        found_file = None
+        found_size = 0
+        if os.path.isdir(target_dir):
+            p = os.path.join(target_dir, spec["filename"])
+            if os.path.isfile(p) and os.path.getsize(p) > (10 * 1024 * 1024):
+                found_file = p
+                found_size = os.path.getsize(p)
+            elif "patterns" in spec:
+                for pat in spec["patterns"]:
+                    matches = glob.glob(os.path.join(target_dir, pat))
+                    for m in matches:
+                        if os.path.isfile(m) and os.path.getsize(m) > (10 * 1024 * 1024):
+                            found_file = m
+                            found_size = os.path.getsize(m)
+                            break
+                    if found_file:
+                        break
+        if found_file:
+            spec["installed"] = True
+            spec["target_path"] = found_file
+            spec["current_size_mb"] = round(found_size / (1024 * 1024), 1)
+        else:
+            spec["installed"] = False
+            spec["current_size_mb"] = 0
+        spec["status"] = "installed" if spec["installed"] else "missing"
+        return spec
+
     comfy_dir = detect_comfyui_dir()
     
     if not comfy_dir:

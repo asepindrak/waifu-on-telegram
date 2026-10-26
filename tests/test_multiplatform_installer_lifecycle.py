@@ -47,7 +47,7 @@ class TestMultiplatformInstallerLifecycle(unittest.TestCase):
     # =========================================================================
     def test_case_1_fresh_install_zero_prerequisites(self):
         """Case 1: System has no ComfyUI, no LLM models, and no downloaded assets."""
-        with patch.dict(os.environ, {"COMFYUI_DIR": "", "COMFYUI_PATH": "", "LOCALAPPDATA": os.path.join(self.mock_home, "AppData", "Local"), "HOME": self.mock_home, "USERPROFILE": self.mock_home}):
+        with patch.dict(os.environ, {"COMFYUI_DIR": "", "COMFYUI_PATH": "", "LOCALLY_UNCENSORED_DIR": os.path.join(self.mock_home, "NonExistentModels"), "APPDATA": os.path.join(self.mock_home, "AppData", "Roaming"), "LOCALAPPDATA": os.path.join(self.mock_home, "AppData", "Local"), "HOME": self.mock_home, "USERPROFILE": self.mock_home}):
             with patch("os.path.expanduser", return_value=self.mock_home):
                 with patch("shutil.which", return_value=None):
                     with patch("subprocess.run") as mock_sub:
