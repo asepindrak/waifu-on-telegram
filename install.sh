@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Waifu on Telegram - 1-Line Universal Linux/macOS Installer
+# Waifu on Telegram - 1-Line Universal Linux/macOS Auto-Installer
 # Compatible with: curl -fsSL https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/install.sh | bash
 # ==============================================================================
 set -e
 
 echo "===================================================================="
-VER=$(cat VERSION 2>/dev/null || echo "1.1.0")
+VER=$(cat VERSION 2>/dev/null || echo "1.6.8")
 echo "       💖 WAIFU ON TELEGRAM v$VER - Linux/macOS 1-Line Installer 🤖       "
 echo "===================================================================="
 echo ""
@@ -17,10 +17,10 @@ DEFAULT_INSTALL_DIR="$HOME/waifu-on-telegram"
 # 1. Target Directory & Clone
 if [ -f "bot.py" ] && [ -f "setup.py" ]; then
     INSTALL_DIR="$(pwd)"
-    echo "[1/5] Running inside project folder: $INSTALL_DIR"
+    echo "[1/6] Running inside project folder: $INSTALL_DIR"
 else
     INSTALL_DIR="$DEFAULT_INSTALL_DIR"
-    echo "[1/5] Target directory: $INSTALL_DIR"
+    echo "[1/6] Target directory: $INSTALL_DIR"
     if [ -d "$INSTALL_DIR/.git" ]; then
         echo "  Updating repository..."
         cd "$INSTALL_DIR"
@@ -36,7 +36,7 @@ else
 fi
 
 # 2. Check Python
-echo "[2/5] Checking Python environment..."
+echo "[2/6] Checking Python environment..."
 if command -v python3 &>/dev/null; then
     PY="python3"
 elif command -v python &>/dev/null; then
@@ -48,11 +48,20 @@ fi
 echo "  ✓ Python: $($PY --version)"
 
 # 3. Install dependencies
-echo "[3/5] Installing Python dependencies..."
+echo "[3/6] Installing Python dependencies..."
 $PY -m pip install -r requirements.txt --quiet --disable-pip-version-check
 
-# 4. Register global CLI script
-echo "[4/5] Registering global CLI 'waifu' in ~/.local/bin..."
+# 4. Check Node.js for PC Music Remote
+echo "[4/6] Checking Node.js for Music Remote..."
+if command -v node &>/dev/null; then
+    echo "  ✓ Node.js found: $(node -v). Installing npm packages..."
+    npm install --silent
+else
+    echo "  ℹ Node.js not detected. Music remote feature will be disabled (chat & photos remain functional)."
+fi
+
+# 5. Register global CLI script
+echo "[5/6] Registering global CLI 'waifu' in ~/.local/bin..."
 mkdir -p "$HOME/.local/bin"
 cat <<EOF > "$HOME/.local/bin/waifu"
 #!/usr/bin/env bash
@@ -61,13 +70,13 @@ EOF
 chmod +x "$HOME/.local/bin/waifu"
 cp -f "$HOME/.local/bin/waifu" "$HOME/.local/bin/pacar-ai"
 
-# 5. Launch interactive setup wizard (7 Steps: Models & Autorun)
-echo "[5/5] Launching Interactive Setup Wizard..."
+# 6. Launch interactive setup wizard (Models, Language, Video Engine & Autorun)
+echo "[6/6] Launching Interactive Setup Wizard..."
 $PY setup.py --wizard
 
 echo ""
 echo "===================================================================="
-echo "  🎉 Installation complete! Use: waifu start --daemon"
+echo "  🎉 Installation complete! Waifu on Telegram is ready."
 echo "  Global CLI: waifu start / waifu status / waifu setup"
 echo "  Installation folder: $INSTALL_DIR"
 echo "===================================================================="
