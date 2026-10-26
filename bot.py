@@ -2286,7 +2286,7 @@ SCENARIO_PROMPTS = {
     "cafe": "sitting at a cozy aesthetic cafe, holding warm ceramic coffee cup, soft daylight, gentle smile",
     "kitchen": "cooking breakfast in kitchen, wearing cute apron, smiling looking at camera",
     "park": "strolling in a sunny flower garden park, cherry blossoms, wind blowing hair, happy expression",
-    "pajamas": "wearing cute comfy silk pajamas, sitting on bed hugging a plushie, warm evening soft lights",
+    "pajamas": "wearing cute comfy silk pajamas, sitting on bed hugging a soft pillow, warm evening soft lights",
     "beach": "vacation at tropical beach, warm sunset golden hour, ocean waves, breezy summer sundress",
     "school": "classroom setting, wearing cute Japanese school uniform, holding textbooks, shy sweet blushing smile",
     "sensual": "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer",

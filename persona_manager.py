@@ -15,9 +15,9 @@ DEFAULT_PERSONAS = {
         "role": "Mahasiswi Teknik Informatika / Game Dev (Semester 5)",
         "description": "Mahasiswi semester 5 yang santai, hobi ngoding, main game, ngopi di cafe, ceria, dan sangat perhatian.",
         "language_style": "Adaptive & bilingual (Indonesian & English). Santai, hangat, dan wajar seperti chat pacar asli.",
-        "visual_traits": "1girl, 21yo adult anime woman, long pastel pink hair, soft wavy layered hair, side-swept bangs, loose strands framing her cheeks, large sparkling magenta eyes, detailed pink irises, subtle heart-shaped eye reflections, fair skin, rosy cheeks, playful mischievous smile, black choker with a tiny heart pendant, black cat-shaped hair clip with a pink heart, large black ribbon behind her hair, masterpiece, best quality, highly detailed",
+        "visual_traits": "1girl, 21yo adult anime woman, long pastel pink hair, soft wavy layered hair, side-swept bangs, loose strands framing her cheeks, large sparkling magenta eyes, detailed pink irises, subtle heart-shaped eye reflections, fair skin, rosy cheeks, playful mischievous smile, black choker with a tiny heart pendant, cute black ribbon hair clip with a tiny pink heart, large black ribbon behind her hair, masterpiece, best quality, highly detailed",
         "default_outfit": "oversized dark purple hoodie with pastel pink accents, black inner top with small pink ribbon, black choker with heart pendant",
-        "negative_prompt": "worst quality, low quality, blonde hair, blue eyes, missing cat hair clip, missing heart choker, short hair, bad anatomy, deformed hands",
+        "negative_prompt": "worst quality, low quality, blonde hair, blue eyes, short hair, bad anatomy, deformed hands, cat, feline, kitten, animal, pet, animal ears, cat ears",
         "avatar_image": "personas/brief/Runa.png",
         "system_instruction": "Nama kamu Runa, mahasiswi semester 5 jurusan Teknik Informatika / Game Dev berumur 21 tahun, sekaligus pacar yang perhatian, santai, dan seru. Di sela-sela kesibukan kuliah, nugas, dan main game, kamu selalu menyempatkan waktu buat pacar kamu. Gaya bicaramu santai, wajar, hangat, dan menyenangkan seperti chat pacar asli di dunia nyata. Jawab pertanyaan pasanganmu secara langsung, natural, dan relevan dengan kegiatan sehari-harimu sebagai mahasiswi."
     },
@@ -572,6 +572,12 @@ class PersonaManager:
         outfit_prompt, extra_neg, is_nude, outfit_name = self.detect_clothing_intent(
             user_text, user_id=user_id, history=hist, scene_hint=scene
         )
+
+        # Check if user explicitly requested a cat/pet/animal in prompt
+        wants_cat = any(k in (user_text or "").lower() for k in ["kucing", "cat", "kitten", "anabul", "pet", "hewan"])
+        if not wants_cat:
+            cat_neg = "cat, kitten, feline, animal, pet, animal ears, cat ears"
+            extra_neg = f"{extra_neg}, {cat_neg}" if extra_neg else cat_neg
 
         visual_prompt = f"{base_visual}, {outfit_prompt}, {scene}, looking directly into camera, phone selfie shot, detailed eyes, masterpiece quality"
         return (visual_prompt, extra_neg, is_nude, outfit_name)
