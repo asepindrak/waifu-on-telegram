@@ -20,6 +20,7 @@ import subprocess
 import argparse
 import platform
 import json
+import shutil
 
 # Terminal Colors
 CYAN = "\033[96m"
@@ -335,8 +336,10 @@ def cmd_update():
     print(c(CYAN, f"🔄 Checking updates (Current Version: v{cur_v})..."))
     is_running = get_running_pid() is not None
 
+    # Step 1: Git pull latest changes
     git_dir = os.path.join(PROJECT_ROOT, ".git")
     if os.path.exists(git_dir):
+        print(c(CYAN, "📥 [1/3] Pulling latest repository updates from GitHub..."))
         try:
             res = subprocess.run(["git", "pull", "--tags"], cwd=PROJECT_ROOT, capture_output=True, text=True)
             if res.returncode == 0:
@@ -344,31 +347,66 @@ def cmd_update():
                 if res.stdout.strip():
                     print(c(DIM, "    " + res.stdout.strip().replace("\n", "\n    ")))
             else:
-                print(c(YELLOW, f"  ℹ Git notice: {res.stderr.strip() or 'Already up to date'}"))
+                notice = res.stderr.strip() or "Already up to date"
+                print(c(YELLOW, f"  ℹ Git notice: {notice}"))
         except Exception as e:
             print(c(YELLOW, f"  ⚠️ Git pull error: {e}"))
     else:
-        print(c(YELLOW, "  Project directory is not a Git clone. Using 1-line installer to update..."))
+        print(c(YELLOW, "  Project directory is not a Git clone. Please run the 1-click installer to update."))
 
+    # Step 2: Auto check and install Python dependencies
     req_txt = os.path.join(PROJECT_ROOT, "requirements.txt")
     if os.path.exists(req_txt):
-        print(c(CYAN, "📦 Verifying dependencies..."))
+        print(c(CYAN, "📦 [2/3] Checking and updating Python libraries (pip install -r requirements.txt)..."))
         try:
-            subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_txt, "--quiet", "--disable-pip-version-check"], cwd=PROJECT_ROOT)
-            print(c(GREEN, "  ✓ Python dependencies are up to date."))
-        except Exception:
-            pass
+            res = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "-r", req_txt, "--disable-pip-version-check"],
+                cwd=PROJECT_ROOT,
+                capture_output=True,
+                text=True
+            )
+            if res.returncode == 0:
+                print(c(GREEN, "  ✓ All Python libraries verified and up to date."))
+            else:
+                notice = res.stderr.strip() or res.stdout.strip()[-200:]
+                print(c(YELLOW, f"  ⚠️ pip notice: {notice}"))
+        except Exception as e:
+            print(c(RED, f"  ❌ Error updating Python libraries: {e}"))
+
+    # Step 3: Auto check Node.js dependencies for music remote
+    pkg_json = os.path.join(PROJECT_ROOT, "package.json")
+    if os.path.exists(pkg_json):
+        print(c(CYAN, "🎵 [3/3] Checking Node.js dependencies for YouTube music remote..."))
+        npm_cmd = shutil.which("npm")
+        if npm_cmd:
+            try:
+                res = subprocess.run(
+                    [npm_cmd, "install", "--no-audit", "--no-fund", "--silent"],
+                    cwd=PROJECT_ROOT,
+                    shell=(platform.system() == "Windows"),
+                    capture_output=True,
+                    text=True
+                )
+                if res.returncode == 0:
+                    print(c(GREEN, "  ✓ Node.js dependencies (ytmusic-api, etc.) verified and up to date."))
+                else:
+                    print(c(YELLOW, f"  ⚠️ npm notice: {res.stderr.strip()}"))
+            except Exception as e:
+                print(c(YELLOW, f"  ⚠️ npm error: {e}"))
+        else:
+            print(c(DIM, "  ℹ Node.js/npm not installed. (Optional: only needed for YouTube music playback)"))
 
     new_v = get_version()
     if new_v != cur_v:
         print(c(BOLD + GREEN, f"\n🎉 Successfully updated Waifu on Telegram from v{cur_v} to v{new_v}!"))
     else:
-        print(c(BOLD + GREEN, f"\n🎉 Waifu on Telegram is up to date (v{new_v})!"))
+        print(c(BOLD + GREEN, f"\n🎉 Waifu on Telegram is already at latest version (v{new_v})!"))
+
     if is_running:
-        print(c(CYAN, "Restarting bot to apply all updates..."))
+        print(c(CYAN, "\n🔄 Restarting bot daemon to apply all changes cleanly..."))
         cmd_restart(daemon=True)
     else:
-        print(c(DIM, "Start your bot anytime with: waifu start --daemon\n"))
+        print(c(DIM, "\nStart your bot anytime with: waifu start --daemon\n"))
 
 def main():
     if any(a in sys.argv[1:] for a in ("-v", "--version", "version")):
