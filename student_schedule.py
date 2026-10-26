@@ -169,113 +169,141 @@ def detect_contextual_activity_and_outfit(
     persona_key: str = "runa"
 ) -> Dict[str, Any]:
     """
-    Intelligently analyzes the ongoing conversation to determine:
+    Intelligently analyzes the user's explicit request and ongoing conversation to determine:
     1. What the waifu is currently doing (activity).
     2. Where she is located (scene).
     3. What she should be wearing (outfit), strictly preventing lingerie/nude in public!
     """
-    combined_text = (user_text + " " + " ".join(history_turns or [])).lower()
     profile = STUDENT_PROFILES.get(persona_key.lower(), STUDENT_PROFILES["runa"])
 
-    # 1. Shower / Mandi Context
-    if any(k in combined_text for k in ["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath"]):
-        return {
-            "activity": "baru beres mandi / keramas",
-            "scene": "standing in modern bathroom with soft steam, bare shoulders, post-shower glow, damp hair, bathroom mirror",
-            "outfit_prompt": "(wearing only a soft bath towel wrapped around chest:1.4), bare shoulders, wet skin, damp hair",
-            "outfit_negative": "clothes, shirt, pants, coat, hoodie, jeans, jacket, sweater",
-            "outfit_name": "🚿 Handuk Mandi (After Shower)",
-            "is_public": False
-        }
+    def match_scenario(text: str) -> Optional[Dict[str, Any]]:
+        t = text.lower()
 
-    # 2. Shopping Mall / Jalan-jalan Context
-    if any(k in combined_text for k in ["mall", "shopping", "belanja", "bioskop", "nonton", "pameran", "jalan-jalan", "hangout"]):
-        return {
-            "activity": "lagi jalan-jalan di mall",
-            "scene": "walking in vibrant illuminated shopping mall, modern storefronts, dynamic ambient lighting",
-            "outfit_prompt": profile["mall_outfit"],
-            "outfit_negative": "bikini, lingerie, swimwear, naked, exposed chest, towel",
-            "outfit_name": "🛍️ Trendy Mall Hangout",
-            "is_public": True
-        }
+        # 0. Romantic / Intimate Bedroom Context (Highest Priority for explicit PAP requests)
+        if any(k in t for k in ["sensual", "romantic", "romantis", "intimate", "mesra", "bedroom setting", "loving gaze"]):
+            return {
+                "activity": "lagi santai romantis di kamar",
+                "scene": "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer",
+                "outfit_prompt": "(wearing alluring romantic silk slip dress with delicate lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+                "outfit_negative": "campus, backpack, casual college clothes, classroom, hoodie, outdoor clothes, jeans, winter clothes",
+                "outfit_name": "💋 Pakaian Romantis (Silk Slip Dress)",
+                "is_public": False
+            }
 
-    # 3. Campus / Kuliah / Perpustakaan Context
-    if any(k in combined_text for k in ["kampus", "kuliah", "kelas", "dosen", "makul", "tugas", "skripsi"]):
-        return {
-            "activity": "lagi di kampus kuliah",
-            "scene": "sitting at desk in modern university lecture hall, college campus classroom background",
-            "outfit_prompt": profile["campus_outfit"],
-            "outfit_negative": "bikini, lingerie, swimwear, naked, exposed chest, towel",
-            "outfit_name": "🎓 Pakaian Kuliah Mahasiswi",
-            "is_public": True
-        }
+        # 1. Shower / Mandi Context
+        if any(k in t for k in ["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath"]):
+            return {
+                "activity": "baru beres mandi / keramas",
+                "scene": "standing in modern bathroom with soft steam, bare shoulders, post-shower glow, damp hair, bathroom mirror",
+                "outfit_prompt": "(wearing only a soft bath towel wrapped around chest:1.4), bare shoulders, wet skin, damp hair",
+                "outfit_negative": "clothes, shirt, pants, coat, hoodie, jeans, jacket, sweater",
+                "outfit_name": "🚿 Handuk Mandi (After Shower)",
+                "is_public": False
+            }
 
-    if any(k in combined_text for k in ["perpus", "perpustakaan", "library", "buku", "belajar"]):
-        return {
-            "activity": "lagi belajar di perpustakaan kampus",
-            "scene": "sitting at wooden study desk in quiet university library, bookshelves, open study books, soft lamp",
-            "outfit_prompt": profile["campus_outfit"],
-            "outfit_negative": "bikini, lingerie, swimwear, naked, exposed chest, towel",
-            "outfit_name": "📚 Mahasiswi di Perpustakaan",
-            "is_public": True
-        }
+        # 2. Sleep / Bed / Kamar Context
+        if any(k in t for k in ["tidur", "rebahan", "kasur", "piyama", "pajamas", "ngantuk", "mimpi", "kamar", "bantal"]):
+            return {
+                "activity": "lagi rebahan di kasur kamar",
+                "scene": "relaxing on bed with fluffy pillows, warm dim night bedroom lamp, cozy intimate bedroom",
+                "outfit_prompt": "(wearing soft pastel silk camisole and sleep shorts:1.35), bedtime loungewear",
+                "outfit_negative": "hoodie, jacket, coat, outdoor clothes, jeans, campus",
+                "outfit_name": "🌙 Silk Pajamas",
+                "is_public": False
+            }
 
-    # 4. Cafe / Nongkrong / Kopi Context
-    if any(k in combined_text for k in ["cafe", "kafe", "kopi", "coffee", "boba", "matcha", "nongkrong", "starbucks"]):
-        return {
-            "activity": "lagi nongkrong santai di cafe",
-            "scene": "sitting at aesthetic cafe table holding a warm beverage, beautiful bokeh background",
-            "outfit_prompt": profile["cafe_outfit"],
-            "outfit_negative": "bikini, lingerie, swimwear, naked, towel",
-            "outfit_name": "☕ Cozy Cafe Knit",
-            "is_public": True
-        }
+        # 3. Kitchen / Masak Context
+        if any(k in t for k in ["dapur", "masak", "sarapan", "dinner", "lunch", "baking", "kitchen"]):
+            return {
+                "activity": "lagi masak di dapur",
+                "scene": "standing in modern cozy kitchen preparing food, warm domestic lighting",
+                "outfit_prompt": "(wearing cute oversized pastel knitted sweater:1.35), cozy comfy style",
+                "outfit_negative": "bikini, lingerie, swimwear, naked",
+                "outfit_name": "🍳 Cozy Kitchen Sweater",
+                "is_public": False
+            }
 
-    # 5. Gym / Olahraga Context
-    if any(k in combined_text for k in ["gym", "workout", "olahraga", "fitness", "yoga", "jogging", "lari"]):
-        return {
-            "activity": "lagi olahraga / gym",
-            "scene": "bright modern gym studio, fitness training equipment background",
-            "outfit_prompt": "(wearing athletic sports bra and sleek yoga leggings:1.35), fitness activewear",
-            "outfit_negative": "dress, hoodie, skirt, coat, bikini, naked",
-            "outfit_name": "🏋️ Sporty Gym Activewear",
-            "is_public": True
-        }
+        # 4. Beach / Pool / Renang Context
+        if any(k in t for k in ["pantai", "beach", "laut", "kolam", "renang", "swimming"]):
+            return {
+                "activity": "lagi di pantai / kolam renang",
+                "scene": "walking along tropical beach, ocean sunset horizon, gentle sea breeze",
+                "outfit_prompt": "(wearing fashionable two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel",
+                "outfit_negative": "clothes, casual clothes, hoodie, sweater, jacket, shirt, pants, coat, pajamas",
+                "outfit_name": "🏖️ Summer Bikini",
+                "is_public": True
+            }
 
-    # 6. Beach / Pool / Renang Context
-    if any(k in combined_text for k in ["pantai", "beach", "laut", "kolam", "renang", "swimming"]):
-        return {
-            "activity": "lagi di pantai / kolam renang",
-            "scene": "walking along tropical beach, ocean sunset horizon, gentle sea breeze",
-            "outfit_prompt": "(wearing fashionable two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel",
-            "outfit_negative": "clothes, casual clothes, hoodie, sweater, jacket, shirt, pants, coat, pajamas",
-            "outfit_name": "🏖️ Summer Bikini",
-            "is_public": True
-        }
+        # 5. Cafe / Nongkrong / Kopi Context
+        if any(k in t for k in ["cafe", "kafe", "kopi", "coffee", "boba", "matcha", "nongkrong", "starbucks"]):
+            return {
+                "activity": "lagi nongkrong santai di cafe",
+                "scene": "sitting at aesthetic cafe table holding a warm beverage, beautiful bokeh background",
+                "outfit_prompt": profile["cafe_outfit"],
+                "outfit_negative": "bikini, lingerie, swimwear, naked, towel",
+                "outfit_name": "☕ Cozy Cafe Knit",
+                "is_public": True
+            }
 
-    # 7. Sleep / Bed / Malam Context
-    if any(k in combined_text for k in ["tidur", "rebahan", "kasur", "piyama", "pajamas", "ngantuk", "mimpi"]):
-        return {
-            "activity": "lagi rebahan di kasur kamar kos",
-            "scene": "relaxing on bed with fluffy pillows, warm dim night bedroom lamp, cozy intimate bedroom",
-            "outfit_prompt": "(wearing soft pastel silk camisole and sleep shorts:1.35), bedtime loungewear",
-            "outfit_negative": "hoodie, jacket, coat, outdoor clothes, jeans",
-            "outfit_name": "🌙 Silk Pajamas",
-            "is_public": False
-        }
+        # 6. Shopping Mall / Jalan-jalan Context
+        if any(k in t for k in ["mall", "shopping", "belanja", "bioskop", "nonton", "pameran", "jalan-jalan", "hangout"]):
+            return {
+                "activity": "lagi jalan-jalan di mall",
+                "scene": "walking in vibrant illuminated shopping mall, modern storefronts, dynamic ambient lighting",
+                "outfit_prompt": profile["mall_outfit"],
+                "outfit_negative": "bikini, lingerie, swimwear, naked, exposed chest, towel",
+                "outfit_name": "🛍️ Trendy Mall Hangout",
+                "is_public": True
+            }
 
-    # 8. Kitchen / Masak Context
-    if any(k in combined_text for k in ["dapur", "masak", "sarapan", "dinner", "lunch", "baking"]):
-        return {
-            "activity": "lagi masak di dapur kos",
-            "scene": "standing in modern cozy kitchen preparing food, warm domestic lighting",
-            "outfit_prompt": "(wearing cute oversized pastel knitted sweater:1.35), cozy comfy style",
-            "outfit_negative": "bikini, lingerie, swimwear, naked",
-            "outfit_name": "🍳 Cozy Kitchen Sweater",
-            "is_public": False
-        }
+        # 7. Gym / Olahraga Context
+        if any(k in t for k in ["gym", "workout", "olahraga", "fitness", "yoga", "jogging", "lari"]):
+            return {
+                "activity": "lagi olahraga / gym",
+                "scene": "bright modern gym studio, fitness training equipment background",
+                "outfit_prompt": "(wearing athletic sports bra and sleek yoga leggings:1.35), fitness activewear",
+                "outfit_negative": "dress, hoodie, skirt, coat, bikini, naked",
+                "outfit_name": "🏋️ Sporty Gym Activewear",
+                "is_public": True
+            }
 
-    # Fallback to current real-world hour schedule
+        # 8. Campus / Kuliah Context (Excludes general 'tugas' to avoid overriding home homework)
+        if any(k in t for k in ["kampus", "kuliah", "kelas", "dosen", "makul", "skripsi", "lab", "praktikum"]):
+            return {
+                "activity": "lagi di kampus kuliah",
+                "scene": "sitting at desk in modern university lecture hall, college campus classroom background",
+                "outfit_prompt": profile["campus_outfit"],
+                "outfit_negative": "bikini, lingerie, swimwear, naked, exposed chest, towel",
+                "outfit_name": "🎓 Pakaian Kuliah Mahasiswi",
+                "is_public": True
+            }
+
+        # 9. Library / Perpustakaan Context
+        if any(k in t for k in ["perpus", "perpustakaan", "library"]):
+            return {
+                "activity": "lagi belajar di perpustakaan kampus",
+                "scene": "sitting at wooden study desk in quiet university library, bookshelves, open study books, soft lamp",
+                "outfit_prompt": profile["campus_outfit"],
+                "outfit_negative": "bikini, lingerie, swimwear, naked, exposed chest, towel",
+                "outfit_name": "📚 Mahasiswi di Perpustakaan",
+                "is_public": True
+            }
+
+        return None
+
+    # Step A: Check current user_text explicitly FIRST!
+    res = match_scenario(user_text)
+    if res:
+        return res
+
+    # Step B: If user query has no explicit activity, inspect recent chat history (newest first)
+    if history_turns:
+        for turn in reversed(history_turns[-5:]):
+            res = match_scenario(turn)
+            if res:
+                return res
+
+    # Step C: Fallback to real-world hourly routine schedule
     cur_hour = time.localtime().tm_hour
     routine = get_hourly_routine(cur_hour, persona_key=persona_key)
     return {

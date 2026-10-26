@@ -176,6 +176,11 @@ OUTFIT_PRESETS = {
         "prompt": "(wearing delicate sheer black lace lingerie:1.4), detailed lace bra, matching lace panties, bare midriff, exposed stomach, seductive cleavage, alluring intimate styling",
         "negative": "clothes, casual clothes, hoodie, pants, coat, jeans, sweater, jacket"
     },
+    "romantic": {
+        "name": "💋 Pakaian Romantis (Silk Slip Dress)",
+        "prompt": "(wearing alluring romantic silk slip dress with delicate lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+        "negative": "campus, backpack, casual college clothes, classroom, hoodie, outdoor clothes, jeans, winter clothes"
+    },
     "nude": {
         "name": "🔞 Tanpa Busana (Full Nude)",
         "prompt": "(completely nude:1.45), (bare body:1.4), full body nude, detailed nipples, natural breasts, navel, bare stomach, thighs, intimate bedroom atmosphere, seductive erotic styling",
@@ -251,6 +256,7 @@ class PersonaManager:
                 "GAYA BICARA NATURAL & REALISTIS (ANTI-LEBAY): Bicara wajar seperti pacar asli di dunia nyata saat chatting via pesan singkat. "
                 "Jawab pertanyaan pasanganmu secara langsung, relevan, dan masuk akal. "
                 "DILARANG KERAS bersikap lebay, teatrikal, alay, atau berlebihan (HINDARI monolog anime fiksi yang aneh, hindari desahan/ekspresi cringe seperti 'huh!', 'ih~', 'ya~' berlebihan). "
+                "DILARANG KERAS bergaya seperti YouTuber, vlogger, selebgram, atau broadcast ke publik (DILARANG pakai kata 'gaes', 'guys', 'teman-teman', 'halo semua', 'intip aja yuk', 'konten', 'vlog', 'makasih udah nungguin'). Ini adalah chat pribadi 1-on-1 dengan pacarmu. "
                 "Gunakan 'aku' dan 'kamu'. Panggilan sayang boleh digunakan sesekali dengan wajar ('sayang'), TETAPI JANGAN gunakan panggilan kuno/kaku/cringe seperti 'manisku' atau 'tuanku'. "
                 "Panjang respon cukup 1-3 kalimat santai dan to the point."
             )
@@ -373,6 +379,8 @@ class PersonaManager:
 
         # Keyword mapping for common anime / girlfriend situations
         SCENE_PATTERNS = [
+            (["sensual", "romantic", "romantis", "intimate", "mesra"],
+             "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer"),
             (["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath"],
              "standing in modern bathroom with soft steam, post-shower glow, bathroom mirror"),
             (["bed", "sleep", "night", "tidur", "kasur", "pajamas", "rebahan", "bangun", "selimut", "bantal"],
@@ -440,6 +448,19 @@ class PersonaManager:
                 OUTFIT_PRESETS["nude"]["name"]
             )
 
+        # 1.5. Explicit Romantic / Sensual Intent
+        ROMANTIC_KEYWORDS = [
+            "sensual", "romantic", "romantis", "intimate", "mesra", "kiss",
+            "bedroom setting", "loving gaze", "seksi", "sexy"
+        ]
+        if any(k in lower for k in ROMANTIC_KEYWORDS):
+            return (
+                OUTFIT_PRESETS["romantic"]["prompt"],
+                OUTFIT_PRESETS["romantic"].get("negative", ""),
+                False,
+                OUTFIT_PRESETS["romantic"]["name"]
+            )
+
         # 2. Explicit Lingerie / Underwear Intent
         LINGERIE_KEYWORDS = [
             "lingerie", "underwear", "pakaian dalam", "bh", "bra", "celana dalam",
@@ -468,6 +489,7 @@ class PersonaManager:
 
         # 4. Other Preset Outfits explicitly requested in user_text
         DYNAMIC_PRESET_KEYWORDS = [
+            ("romantic", ["romantic", "romantis", "sensual", "intimate", "mesra"]),
             ("bikini", ["bikini", "swimsuit", "baju renang", "renang", "pantai"]),
             ("pajamas", ["piyama", "pajamas", "baju tidur", "camisole", "tidur"]),
             ("campus_casual", ["baju kuliah", "kampus", "kuliah", "campus"]),
@@ -508,6 +530,12 @@ class PersonaManager:
         if is_public and outfit_key in ("nude", "lingerie"):
             logger.info(f"Safety guard: Overriding persistent {outfit_key} with {ctx['outfit_name']} for public location.")
             return (ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
+
+        # Guard: If scene_hint is private bedroom/bath/intimate, do not let old campus/mall history override it!
+        if scene_hint and any(priv in scene_hint.lower() for priv in ["bed", "bedroom", "bath", "steam", "intimate", "kasur", "sensual"]):
+            if is_public or ctx.get("is_public"):
+                preset = OUTFIT_PRESETS.get("romantic" if any(r in scene_hint.lower() for r in ["romantic", "sensual", "intimate"]) else "pajamas", OUTFIT_PRESETS["default"])
+                return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
 
         # If there is a specific active conversational scenario, prioritize the activity's realistic attire!
         if has_specific_scenario:

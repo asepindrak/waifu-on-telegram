@@ -2349,6 +2349,23 @@ def is_user_expressing_doubt(text: str) -> bool:
     ]
     return any(re.search(pat, lower) for pat in DOUBT_PATTERNS)
 
+
+def sanitize_chat_caption(text: Optional[str], fallback: str) -> str:
+    """Cleans up influencer, YouTuber, vlogger, and cringe artifacts from LLM captions."""
+    if not text:
+        return fallback
+    clean = text.strip()
+    if (clean.startswith('"') and clean.endswith('"')) or (clean.startswith("'") and clean.endswith("'")):
+        clean = clean[1:-1].strip()
+    # Strip social media greetings & broadcast phrases
+    clean = re.sub(r'^(?:sori\s+gaes|halo\s+gaes|hai\s+gaes|gaes|guys|temen-temen|teman-teman)[,\s!.]*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\b(?:intip\s+aja\s+yuk|intip\s+yuk|stay\s+tuned|pantau\s+terus)\b[,\s!.]*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\b(?:makasih\s+udah\s+sabar\s+tungguin\s+aku|makasih\s+udah\s+nungguin\s+aku|tungguin\s+aku)\s+di\s+semester\s+\w+\s+ini[,\s!.]*', '', clean, flags=re.IGNORECASE)
+    clean = clean.strip()
+    if not clean or len(clean) < 3:
+        return fallback
+    return clean[0].upper() + clean[1:]
+
 def process_photo_request(target, user_text: str, is_proof: bool = False):
     """Generates and delivers consistent girlfriend photo with caption matching conversation context."""
     persona = persona_mgr.get_active_persona()
@@ -2431,9 +2448,16 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                 )
 
             if is_proof:
-                cap_guide = f" You just took a quick selfie photo to prove your whereabouts/activity to your boyfriend who was doubting you. Write 1 playful, affectionate sentence teasing him for not believing you (e.g. 'Tuh kan beneran, liat sendiri nih biar percaya! 😜'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
+                cap_guide = (
+                    f" You just took a quick selfie photo to prove your whereabouts to your boyfriend who was doubting you. "
+                    f"Write 1 natural, casual sentence teasing him for doubting you (e.g. 'Tuh kan beneran, liat sendiri nih biar percaya! 😜'). "
+                    f"STRICT: Chat 1-on-1 with boyfriend. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip yuk'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
+                )
             else:
-                cap_guide = f" You just took a selfie for your partner. Write 1-2 sweet, affectionate sentences as your photo caption. {persona_mgr.get_language_directive(BOT_LANGUAGE)} Naturally reference what you were just doing or talking about in the ongoing chat."
+                cap_guide = (
+                    f" You just took a photo to send to your boyfriend. Write 1 natural, casual Indonesian girlfriend chat sentence accompanying the photo. "
+                    f"STRICT: Chat 1-on-1 with boyfriend. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip yuk'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
+                )
 
             caption_prompt = [
                 {
@@ -2448,7 +2472,7 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
             caption_prompt.extend(clean_recent_turns)
             caption_prompt.append({
                 "role": "user",
-                "content": f"[Photo taken in setting: '{detected_scene}', wearing: '{outfit_label}']. Reply sending this photo to your lover with 1-2 sweet sentences:"
+                "content": f"[Sending photo to boyfriend. Setting: '{detected_scene}', wearing: '{outfit_label}']. Write 1 natural girlfriend chat sentence:"
             })
 
             try:
@@ -2464,7 +2488,7 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                     fallback_caption = f"Tuh kan beneran, liat sendiri nih biar percaya! 😜 ({source})"
                 else:
                     fallback_caption = f"Ini fotonya yaa ({source})"
-            clean_caption = caption or fallback_caption
+            clean_caption = sanitize_chat_caption(caption, fallback_caption)
 
             if status_msg:
                 try:
@@ -2604,20 +2628,24 @@ def process_video_request(target, user_text: str):
                     "React with blushing sweetness and playful intimacy, feeling happily in love. "
                 )
 
+            vid_guide = (
+                f" You just recorded a short private video clip to send directly to your boyfriend. Write 1 natural, casual Indonesian girlfriend chat sentence accompanying this video. "
+                f"STRICT: Chat 1-on-1 with boyfriend. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip aja yuk', 'makasih udah nungguin'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
+            )
             caption_prompt = [
                 {
                     "role": "system",
                     "content": (
                         persona.get("system_instruction", "") +
                         nude_guidance +
-                        f" You just recorded a short sweet video clip for your partner. Write 1-2 sweet, affectionate sentences as your video caption. {persona_mgr.get_language_directive(BOT_LANGUAGE)} Naturally reference what you were just doing or talking about in the ongoing chat."
+                        vid_guide
                     )
                 }
             ]
             caption_prompt.extend(clean_recent_turns)
             caption_prompt.append({
                 "role": "user",
-                "content": f"[Video clip recorded in setting: '{detected_scene}', wearing: '{outfit_label}']. Reply sending this video to your lover with 1-2 sweet sentences:"
+                "content": f"[Sending private video to boyfriend. Setting: '{detected_scene}', wearing: '{outfit_label}']. Write 1 natural girlfriend chat sentence:"
             })
 
             try:
@@ -2629,7 +2657,7 @@ def process_video_request(target, user_text: str):
                 fallback_caption = f"Ini videonya yaa ({source})"
             else:
                 fallback_caption = f"Ini videonya yaa ({source})"
-            clean_caption = caption or fallback_caption
+            clean_caption = sanitize_chat_caption(caption, fallback_caption)
 
             if status_msg:
                 try:
