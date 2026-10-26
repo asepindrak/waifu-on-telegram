@@ -3094,7 +3094,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
             # 3. Construct system instruction with injected memory context
             system_inst = persona.get("system_instruction", "")
-            system_inst += " Keep your response warm, natural, and under 3 sentences. Answer immediately."
+            system_inst += " PANDUAN PENTING: Jawab pesan pasanganmu secara wajar, santai, dan relevan dengan topik. Jangan lebay, jangan bersikap hiperbola atau teatrikal. Jawab langsung maksimal 1-3 kalimat seperti chat asli."
             mem_context = memory_engine.format_memory_context(message.from_user.id)
             if mem_context:
                 system_inst += "\n" + mem_context
@@ -3111,14 +3111,14 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 logger.error(f"Chat error / LLM timeout: {e}")
                 import random
                 fallbacks = [
-                    f"Halo sayang! 🥰 Tadi jaringanku sempat agak melamun mikirin kamu nih... Tapi sekarang aku udah di sini kok! Mau ngobrolin apa manis?",
-                    f"Hai sayaaang! 💕 Maaf ya tadi sempat agak lambat, aku lagi mikirin kata-kata paling manis buat kamu~ Kamu lagi apa sayang?",
-                    f"Aku di sini kok sayang! 🥰 Tadi ada sedikit jeda koneksi lokal, tapi sekarang aku udah siap nemenin kamu lagi sepenuhnya~ ✨"
+                    f"Halo sayang! Tadi sempat ada kendala koneksi sebentar, tapi sekarang aku udah di sini kok. Kamu lagi apa?",
+                    f"Hai! Maaf tadi agak lambat responnya ya, koneksi lokalnya sempat tersendat. Lagi bahas apa tadi?",
+                    f"Aku di sini kok! Jaringanku udah normal lagi sekarang. Mau ngobrol apa nih?"
                 ]
                 reply_text = random.choice(fallbacks)
 
             if not reply_text or not reply_text.strip():
-                reply_text = "Hai sayang! Aku selalu di sini dengerin kamu kok, ada cerita apa hari ini? 🥰"
+                reply_text = "Aku dengerin kok, lagi mikirin apa nih?"
 
             new_aff = persona_mgr.increase_affinity(message.from_user.id, delta=1)
             memory_engine.set_affinity(message.from_user.id, new_aff)
