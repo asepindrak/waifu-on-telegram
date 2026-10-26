@@ -22,6 +22,7 @@ from code_runner import CodeRunner
 from memory_engine import MemoryEngine
 from reminder_engine import ReminderEngine
 from anniversary_engine import AnniversaryEngine
+import asset_manager
 from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
@@ -2054,7 +2055,6 @@ def callback_cfg_toggles(call):
         show_setup_dashboard(chat_id, user_id, message_to_edit=mid)
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_llm:'))
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_vengine:'))
 def callback_set_vengine(call):
     if not is_authorized(call.from_user.id):
@@ -2062,9 +2062,17 @@ def callback_set_vengine(call):
     key = call.data.split(":", 1)[1]
     label = apply_video_engine_choice(key)
     bot.answer_callback_query(call.id, f"Video Engine: {label}")
+
+    # Check if selected engine has missing assets
+    is_ready, missing = asset_manager.ensure_video_engine_assets(key)
+    if not is_ready and missing:
+        prompt_missing_asset_download(call.message.chat.id, call.from_user.id, missing, message_to_edit=call.message.message_id)
+        return
+
     show_video_engine_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
 
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_llm:'))
 def callback_set_llm(call):
     if not is_authorized(call.from_user.id):
         return
@@ -2072,6 +2080,122 @@ def callback_set_llm(call):
     label = apply_llm_choice(key)
     bot.answer_callback_query(call.id, f"LLM: {label}")
     show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+def prompt_missing_asset_download(chat_id: int, user_id: int, missing_keys: List[str], status_msg=None, message_to_edit: Optional[int] = None):
+    first_key = missing_keys[0]
+    info = asset_manager.get_asset_info(first_key) or {}
+    name = info.get("name", first_key)
+    size_mb = info.get("size_mb", 0)
+
+    text = (
+        f"💡 **Model Diperlukan untuk Video Engine**\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Engine video yang kamu pilih memerlukan model tambahan:\n"
+        f"• **{name}** (~{size_mb} MB)\n\n"
+        f"Model ini belum terpasang di folder ComfyUI kamu. "
+        f"Apakah kamu ingin aku mengunduhnya secara otomatis sekarang?"
+    )
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton(f"📥 Unduh Otomatis (~{size_mb} MB)", callback_data=f"dl_asset:{first_key}"),
+        types.InlineKeyboardButton("⚡ Pakai Motion 2.5D Dulu (Tanpa Download)", callback_data="cfg_fallback_motion"),
+        types.InlineKeyboardButton("❌ Batal", callback_data="cancel_dl_prompt")
+    )
+    target_mid = message_to_edit or (status_msg.message_id if status_msg else None)
+    if target_mid:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=target_mid, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('dl_asset:'))
+def callback_dl_asset(call):
+    if not is_authorized(call.from_user.id):
+        return
+    asset_key = call.data.split(":", 1)[1]
+    info = asset_manager.get_asset_info(asset_key) or {}
+    name = info.get("name", asset_key)
+    chat_id = call.message.chat.id
+    mid = call.message.message_id
+
+    try:
+        msg_loading = (
+            f"⏳ **Sedang Mengunduh {name}...**\n\n"
+            f"Proses unduh ke ComfyUI berjalan di latar belakang. "
+            f"Waktu download bervariasi sesuai kecepatan internetmu.\n\n"
+            f"💡 _Kamu bisa tetap ngobrol santai denganku selagi proses berlangsung ya sayang!_ 🥰"
+        )
+        bot.edit_message_text(
+            msg_loading,
+            chat_id=chat_id,
+            message_id=mid,
+            parse_mode="Markdown"
+        )
+    except Exception:
+        pass
+    def download_worker():
+        ok = asset_manager.download_asset(asset_key)
+        if "animatediff" in asset_key:
+            asset_manager.install_custom_node("animatediff_node")
+
+        if ok:
+            msg_ok = (
+                f"🎉 **{name} Berhasil Dipasang!** 💕\n\n"
+                f"Model sudah siap di ComfyUI. Sekarang kamu bisa langsung klik tombol *🎬 Bikin Video Gerak* lagi kapan saja!"
+            )
+            bot.send_message(chat_id, msg_ok, parse_mode="Markdown")
+        else:
+            msg_fail = (
+                f"⚠️ *Gagal Mengunduh {name}*\n\n"
+                f"Koneksi terputus atau ComfyUI tidak ditemukan. "
+                f"Kamu juga bisa mengunduhnya lewat terminal dengan perintah:\n"
+                f"`waifu models download {asset_key}`"
+            )
+            bot.send_message(chat_id, msg_fail, parse_mode="Markdown")
+    threading.Thread(target=download_worker, daemon=True).start()
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'cfg_fallback_motion')
+def callback_cfg_fallback_motion(call):
+    if not is_authorized(call.from_user.id):
+        return
+    apply_video_engine_choice("motion")
+    bot.answer_callback_query(call.id, "Engine dialihkan ke Motion 2.5D (Instant)")
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    last_ctx = USER_LAST_PHOTO_CONTEXT.get(user_id)
+    if last_ctx and last_ctx.get("img_bytes"):
+        try:
+            bot.edit_message_text("⚡ Membuat animasi instan dengan Motion 2.5D...", chat_id=chat_id, message_id=call.message.message_id)
+        except Exception:
+            pass
+        generate_video_action(
+            chat_id=chat_id,
+            user_id=user_id,
+            user_text=last_ctx.get("user_text", ""),
+            base_image_bytes=last_ctx.get("img_bytes"),
+            detected_scene=last_ctx.get("detected_scene", "kamar santai"),
+            outfit_label=last_ctx.get("outfit_label", "pakaian santai"),
+            is_nude_override=last_ctx.get("is_nude", False)
+        )
+    else:
+        try:
+            bot.edit_message_text("✅ Engine video diubah ke *Motion 2.5D*. Silakan coba tombol video pada foto waifu ya!", chat_id=chat_id, message_id=call.message.message_id, parse_mode="Markdown")
+        except Exception:
+            pass
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'cancel_dl_prompt')
+def callback_cancel_dl(call):
+    bot.answer_callback_query(call.id, "Dibatalkan")
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_ckpt:'))
@@ -2742,6 +2866,12 @@ def process_video_request(
 
     def run_video_gen():
         try:
+            # Check model asset readiness before initiating render
+            is_ready, missing = asset_manager.ensure_video_engine_assets(VIDEO_ENGINE)
+            if not is_ready and missing:
+                prompt_missing_asset_download(chat_id, user_id, missing, status_msg=status_msg)
+                return
+
             with ChatActionLoop(bot, chat_id, "upload_video"):
                 neg_p = persona.get("negative_prompt", "")
                 if extra_neg:

@@ -1,3 +1,8 @@
+try:
+    import asset_manager
+except ImportError:
+    asset_manager = None
+
 #!/usr/bin/env python3
 """
 💖 WAIFU ON TELEGRAM - Interactive Setup & Reconfiguration CLI
@@ -313,6 +318,58 @@ def config_video_engine(env_vars):
         env_vars["VIDEO_ENGINE"] = "wan21"
         print(c(GREEN, "  ✓ Video Engine dipilih: Wan 2.1 1.3B 🌟"))
 
+def manage_models_menu():
+    if not asset_manager:
+        print(c(RED, "asset_manager module not found."))
+        return
+
+    while True:
+        print(c(BOLD + CYAN, "\n" + "=" * 70))
+        print(c(BOLD + CYAN, "       📦 AI ASSETS & MODELS MANAGER (ComfyUI Extensions)       "))
+        print(c(BOLD + CYAN, "=" * 70))
+        comfy_dir = asset_manager.detect_comfyui_dir()
+        print(c(DIM, f"ComfyUI Directory: {comfy_dir or 'Not detected'}\n"))
+
+        assets = asset_manager.check_all_assets()
+        keys = list(assets.keys())
+        for idx, k in enumerate(keys, 1):
+            info = assets[k]
+            inst = info.get("installed", False)
+            tag = c(GREEN, "[TERPASANG]") if inst else c(YELLOW, "[BELUM ADA]")
+            sz = f"({info.get('current_size_mb', 0)} MB)" if inst else f"(~{info.get('size_mb', 0)} MB)"
+            print(f"  [{idx}] {tag} {info.get('name')} {sz}")
+            print(c(DIM, f"      Fungsi: {info.get('required_for', '-')}"))
+
+        print("-" * 70)
+        print("  [D] 📥 Download Semua Model & Ekstensi yang Belum Terpasang")
+        print("  [0] 🔙 Kembali ke Menu Utama")
+        print("-" * 70)
+
+        sel = input("Pilih nomor model untuk diunduh [1-5, D, 0]: ").strip().lower()
+        if sel in ("0", "b", "exit", "q"):
+            break
+        elif sel == "d":
+            for k, info in assets.items():
+                if not info.get("installed"):
+                    print(c(CYAN, f"\nMemproses {info.get('name')}..."))
+                    if info.get("type") == "custom_node":
+                        asset_manager.install_custom_node(k)
+                    else:
+                        asset_manager.download_asset(k)
+            print(c(GREEN, "\n✓ Semua proses download selesai."))
+        elif sel.isdigit() and 1 <= int(sel) <= len(keys):
+            chosen_k = keys[int(sel) - 1]
+            info = assets[chosen_k]
+            print(c(CYAN, f"\nMemproses {info.get('name')}..."))
+            if info.get("type") == "custom_node":
+                ok = asset_manager.install_custom_node(chosen_k)
+            else:
+                ok = asset_manager.download_asset(chosen_k)
+            if ok:
+                print(c(GREEN, f"✓ Berhasil memasang {info.get('name')}!"))
+            else:
+                print(c(RED, f"❌ Gagal mengunduh {info.get('name')}."))
+
 def run_menu():
     env_vars = read_env()
     has_token = bool(env_vars.get("TELEGRAM_BOT_TOKEN"))
@@ -341,12 +398,13 @@ def run_menu():
         print("  [4] 🎭 Change AI Girlfriend Persona & Voice")
         print("  [5] 🌐 Change Waifu Language (ID, EN, JA, Custom)")
         print("  [6] 🎬 Choose Video Engine (Wan 2.1 / AnimateDiff / Motion 2.5D)")
-        print("  [7] 🚀 Configure Autorun at System Startup (On / Off)")
-        print("  [8] 🔄 Re-run Complete Setup Wizard")
+        print("  [7] 📦 AI Assets & Models Manager (Download / Verify Models)")
+        print("  [8] 🚀 Configure Autorun at System Startup (On / Off)")
+        print("  [9] 🔄 Re-run Complete Setup Wizard")
         print("  [0] ❌ Exit / Done")
         print("-" * 70)
 
-        opt = input("Select option [0-8]: ").strip()
+        opt = input("Select option [0-9]: ").strip()
         if opt == "1":
             config_telegram_credentials(env_vars)
             write_env(env_vars)
@@ -366,9 +424,11 @@ def run_menu():
             config_video_engine(env_vars)
             write_env(env_vars)
         elif opt == "7":
+            manage_models_menu()
+        elif opt == "8":
             auto_in = input("Enable bot automatically on PC boot (Autorun)? [Y/n, default: Y]: ").strip().lower()
             setup_autostart(enable=(auto_in != "n"))
-        elif opt == "8":
+        elif opt == "9":
             run_full_wizard()
             break
         elif opt == "0":

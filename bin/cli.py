@@ -22,6 +22,8 @@ import platform
 import json
 import shutil
 
+
+
 # Terminal Colors
 CYAN = "\033[96m"
 GREEN = "\033[92m"
@@ -36,8 +38,16 @@ def c(color, text):
     return f"{color}{text}{RESET}"
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 PID_FILE = os.path.join(PROJECT_ROOT, "bot.pid")
 LOG_FILE = os.path.join(PROJECT_ROOT, "bot.log")
+
+try:
+    import asset_manager
+except ImportError:
+    asset_manager = None
 
 def get_version() -> str:
     v_file = os.path.join(PROJECT_ROOT, "VERSION")
@@ -330,6 +340,57 @@ def cmd_release(version_arg: str = None):
     else:
         print(c(RED, "scripts/release.py not found."))
 
+def cmd_models(subcmd=None, target=None):
+    print_banner()
+    if not asset_manager:
+        print(c(RED, "asset_manager module not found."))
+        return
+
+    comfy_dir = asset_manager.detect_comfyui_dir()
+    print(c(BOLD + CYAN, "📦 WAIFU ON TELEGRAM - AI ASSETS & MODELS MANAGER"))
+    print(c(DIM, f"ComfyUI Directory: {comfy_dir or 'Not Detected (Please start ComfyUI)'}\n"))
+
+    if subcmd in ("download", "dl", "get"):
+        if not target:
+            print(c(YELLOW, "Please specify which model to download."))
+            print("Available keys: " + ", ".join(asset_manager.ASSET_REGISTRY.keys()))
+            return
+        target = target.lower().strip()
+        info = asset_manager.get_asset_info(target)
+        if not info:
+            print(c(RED, f"Unknown asset key: '{target}'. Available: {list(asset_manager.ASSET_REGISTRY.keys())}"))
+            return
+        if info.get("type") == "custom_node":
+            print(c(CYAN, f"Cloning custom node: {info.get('name')}..."))
+            ok = asset_manager.install_custom_node(target)
+            if ok:
+                print(c(GREEN, f"✓ Custom node '{info.get('name')}' successfully installed!"))
+            else:
+                print(c(RED, f"❌ Failed to install custom node '{info.get('name')}'. Check Git installation."))
+        else:
+            print(c(CYAN, f"⏳ Downloading model: {info.get('name')} (~{info.get('size_mb')} MB)..."))
+            print(c(DIM, f"Target: {info.get('target_path')}"))
+            ok = asset_manager.download_asset(target)
+            if ok:
+                print(c(GREEN, f"✓ Model '{info.get('name')}' downloaded and verified successfully!"))
+            else:
+                print(c(RED, f"❌ Download failed for '{info.get('name')}'. Please check your internet connection."))
+        return
+
+    # List all assets
+    assets = asset_manager.check_all_assets()
+    for key, info in assets.items():
+        installed = info.get("installed", False)
+        status_tag = c(GREEN, "[INSTALLED]") if installed else c(YELLOW, "[MISSING]  ")
+        size_str = f"({info.get('current_size_mb', 0)} MB)" if installed else f"(~{info.get('size_mb', 0)} MB required)"
+        print(f"  {status_tag} {c(BOLD, key)}: {info.get('name')} {size_str}")
+        print(c(DIM, f"             Target: {info.get('target_path') or info.get('target_dir')}"))
+        print(c(DIM, f"             Used for: {info.get('required_for', '-')}\n"))
+
+    print(c(CYAN, "Commands:"))
+    print(c(DIM, "  waifu models download <key>  - Download specific model/extension"))
+    print(c(DIM, "  Example: waifu models download animatediff_v2\n"))
+
 def cmd_update():
     print_banner()
     cur_v = get_version()
@@ -339,7 +400,7 @@ def cmd_update():
     # Step 1: Git pull latest changes
     git_dir = os.path.join(PROJECT_ROOT, ".git")
     if os.path.exists(git_dir):
-        print(c(CYAN, "📥 [1/3] Pulling latest repository updates from GitHub..."))
+        print(c(CYAN, "📥 [1/4] Pulling latest repository updates from GitHub..."))
         try:
             res = subprocess.run(["git", "pull", "--tags"], cwd=PROJECT_ROOT, capture_output=True, text=True)
             if res.returncode == 0:
@@ -357,7 +418,7 @@ def cmd_update():
     # Step 2: Auto check and install Python dependencies
     req_txt = os.path.join(PROJECT_ROOT, "requirements.txt")
     if os.path.exists(req_txt):
-        print(c(CYAN, "📦 [2/3] Checking and updating Python libraries (pip install -r requirements.txt)..."))
+        print(c(CYAN, "📦 [2/4] Checking and updating Python libraries (pip install -r requirements.txt)..."))
         try:
             res = subprocess.run(
                 [sys.executable, "-m", "pip", "install", "-r", req_txt, "--disable-pip-version-check"],
@@ -376,7 +437,7 @@ def cmd_update():
     # Step 3: Auto check Node.js dependencies for music remote
     pkg_json = os.path.join(PROJECT_ROOT, "package.json")
     if os.path.exists(pkg_json):
-        print(c(CYAN, "🎵 [3/3] Checking Node.js dependencies for YouTube music remote..."))
+        print(c(CYAN, "🎵 [3/4] Checking Node.js dependencies for YouTube music remote..."))
         npm_cmd = shutil.which("npm")
         if npm_cmd:
             try:
@@ -396,6 +457,22 @@ def cmd_update():
         else:
             print(c(DIM, "  ℹ Node.js/npm not installed. (Optional: only needed for YouTube music playback)"))
 
+    # Step 4: Auto check ComfyUI extensions & AI models
+    if asset_manager:
+        print(c(CYAN, "🧩 [4/4] Checking ComfyUI extensions & AI models..."))
+        comfy_dir = asset_manager.detect_comfyui_dir()
+        if comfy_dir:
+            assets = asset_manager.check_all_assets()
+            missing = [k for k, v in assets.items() if not v.get("installed")]
+            if missing:
+                print(c(YELLOW, f"  ℹ ComfyUI detected at: {comfy_dir}"))
+                print(c(YELLOW, f"  ℹ Optional models available for download: {', '.join(missing)}"))
+                print(c(DIM, "    (Run 'waifu models' to view details or 'waifu models download <key>' to install)"))
+            else:
+                print(c(GREEN, "  ✓ All core AI models & ComfyUI extensions are verified."))
+        else:
+            print(c(DIM, "  ℹ ComfyUI directory not detected yet (will auto-check when ComfyUI is launched)."))
+
     new_v = get_version()
     if new_v != cur_v:
         print(c(BOLD + GREEN, f"\n🎉 Successfully updated Waifu on Telegram from v{cur_v} to v{new_v}!"))
@@ -414,7 +491,7 @@ def main():
         return
 
     parser = argparse.ArgumentParser(description="💖 Waifu on Telegram CLI", add_help=False)
-    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "language", "lang", "logs", "update", "uninstall", "release", "version", "--version", "-v", "help"])
+    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "language", "lang", "logs", "models", "model", "assets", "update", "uninstall", "release", "version", "--version", "-v", "help"])
     parser.add_argument("arg", nargs="?", default=None)
     parser.add_argument("--daemon", "-d", action="store_true", help="Run bot silently in background")
     args = parser.parse_args()
@@ -440,6 +517,11 @@ def main():
         cmd_language(args.arg)
     elif cmd == "logs":
         cmd_logs()
+    elif cmd in ("models", "model", "assets"):
+        sub = args.arg
+        # If there are additional arguments, e.g. waifu models download animatediff_v2
+        remaining = sys.argv[3] if len(sys.argv) > 3 else None
+        cmd_models(sub, remaining)
     elif cmd == "update":
         cmd_update()
     elif cmd == "release":
@@ -457,6 +539,7 @@ def main():
         print("  waifu status             - Check diagnostics for LLM, ComfyUI, & process")
         print("  waifu setup              - Open interactive configuration manager")
         print("  waifu update             - Pull latest updates & restart services")
+        print("  waifu models [dl <name>] - Manage AI models & ComfyUI extensions")
         print("  waifu persona <name>     - Switch persona (runa, akira, hina, shiro, yume)")
         print("  waifu language [id|en|ja] - Change waifu language (ID, EN, JA, or Custom)")
         print("  waifu autorun [on|off]   - Configure autorun on system startup")
