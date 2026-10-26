@@ -349,7 +349,7 @@ def handle_welcome(message):
                 f"💖 **Halo Sayang! Aku {name}** 👋🥰\n"
                 f"*({archetype})*\n\n"
                 f"_{desc}_\n\n"
-                f"Senang banget kamu datang! Aku siap nemenin kamu ngobrol manis, dengerin curhat, kirim foto selfie, dan nemenin hari-harimu~ 💕"
+                f"Senang kamu datang! Aku siap nemenin kamu ngobrol santai, kirim foto selfie, dan nemenin hari-harimu~ ✨"
             )
             with open(img_path, "rb") as f:
                 bot.send_photo(message.chat.id, f, caption=caption, parse_mode="Markdown")
@@ -365,14 +365,14 @@ def handle_welcome(message):
         "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'sayang pap foto dong'* atau `/pap` untuk membuka menu pose interaktif!\n"
         "• 🎵 **Remote Musik PC**: Putar lagu YouTube di PC langsung dari Telegram (`/play`, `/pause`, `/next`)!\n"
         "• 👗 **Pilihan Baju**: Pilih pakaian waifumu lewat `/outfit` (Kimono, Maid, Piyama, dll).\n"
-        "• 🎙️ **Voice Note**: Balasan suara asli wanita jernih & manis (`/voice`).\n"
+        "• 🎙️ **Voice Note**: Balasan suara jernih (`/voice`).\n"
         "• ⚙️ **Panel Setup**: Atur seluruh konfigurasi bot dari Telegram (`/setup`).\n"
         "• ⏰ **Asisten & Pengingat**: Minta waifu ingetin jadwal lewat chat/voice note (`/remind`)!\n"
         "• ⏰ **Sapaan Otomatis**: Ucapan selamat pagi jam 7, makan siang 12:30 & tidur jam 10 malam (`/greetings`).\n"
         "• 👀 **AI Vision**: Kirimkan foto kamu ke sini, waifu bisa melihat dan meresponsnya.\n\n"
         "📌 **Perintah Cepat:**\n"
         "• `/birthday` - Catat hari ulang tahunmu & tanggal anniversary jadian\n"
-        "• `/remind` - Asisten pribadi & pengingat jadwal manis\n"
+        "• `/remind` - Pengingat jadwal dan to-do list\n"
         "• `/memory` - Buku harian & fakta penting yang diingat waifu tentang kamu\n"
         "• `/setup` - Dashboard kontrol sistem & pengaturan lengkap\n"
         "• `/help` - Panduan lengkap fitur & cara pakai\n"
@@ -385,7 +385,7 @@ def handle_welcome(message):
         "• `/outfit` - Buka lemari pakaian waifu\n"
         "• `/persona` - Ganti karakter waifu (Runa, Akira, Hina, Shiro, Yume)\n"
         "• `/newpersona` - Ciptakan karakter waifu baru impianmu\n"
-        "• `/love` - Cek skor cinta & level kasih sayang\n"
+        "• `/love` - Cek skor cinta dan level kedekatan\n"
         "• `/voice` - Atur gaya balasan suara (Always / Match / Mute)\n"
         "• `/greetings` - Aktifkan/matikan sapaan harian otomatis (Pagi, Siang, Malam)\n"
         "• `/status` - Cek koneksi LLM & ComfyUI di PC\n"
@@ -524,19 +524,19 @@ def show_memory_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[
         for idx, f in enumerate(facts[:10], 1):
             fact_lines.append(f"  {idx}. 📌 {f['fact']}")
     else:
-        fact_lines.append("  _Belum ada catatan khusus. Ceritakan hal-hal tentangmu padaku sayang~_")
+        fact_lines.append("  _Belum ada catatan khusus. Ceritain tentang kamu di sini ya._")
 
     diary_lines = []
     if diaries:
         for d in diaries[-2:]:
             diary_lines.append(f"  • *{d['date'][:10]}* ({d.get('mood', '🥰')}): _{d['entry']}_")
     else:
-        diary_lines.append(f"  _Hari ini aku senang banget bisa terus dekat dan menemani hari-harimu sayang~ 💕_")
+        diary_lines.append(f"  _Hari ini senang bisa nemenin hari-harimu~ 💕_")
 
     text = (
         f"📖 **BUKU HARIAN & INGATAN {name.upper()}** 💖\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Sayang, ini semua hal manis dan berharga tentang kamu yang selalu aku simpan di dalam hatiku:\n\n"
+        f"Ini beberapa hal tentang kamu yang aku simpan:\n\n"
         f"👤 **Profil Kamu di Mataku**:\n"
         f"• Nama/Panggilan: **{u_name}**\n"
         f"• Tingkat Hubungan: **{status}** (`{score}%`)\n"
@@ -588,7 +588,7 @@ def handle_memory_command(message):
                     message,
                     f"💖 **{persona.get('name')} sudah mengingatnya!** 🥰\n\n"
                     f"📌 _Aku catat di memoriku:_ **{item['fact']}**\n\n"
-                    f"Setiap kali kita ngobrol, aku bakal selalu ingat hal ini tentang kamu sayang~ 💕",
+                    f"Setiap kali kita ngobrol, hal-hal tentang kamu bakal selalu aku ingat yaa~ ✨",
                     parse_mode="Markdown"
                 )
             else:
@@ -667,7 +667,7 @@ def callback_memory_actions(call):
         bot.answer_callback_query(call.id, f"{persona.get('name')} sedang menulis catatan harian... ✍️💕")
         history = persona_mgr.get_chat_history(user_id)
         clean_turns = [m.get("content", "") for m in history[-6:] if not m.get("content", "").startswith("[")]
-        dialog_snippet = " ".join(clean_turns[-4:]) if clean_turns else "Ngobrol manis dan tertawa bersama"
+        dialog_snippet = " ".join(clean_turns[-4:]) if clean_turns else "Ngobrol santai bersama"
 
         diary_prompt = [
             {
@@ -689,7 +689,7 @@ def callback_memory_actions(call):
             entry = None
 
         if not entry or not entry.strip():
-            entry = f"Hari ini senang banget bisa nemenin kamu ngobrol manis. Senyumanmu selalu bikin hatiku hangat sayang~ 🥰"
+            entry = f"Hari ini seru bisa ngobrol santai dan nemenin kamu."
 
         memory_engine.add_diary_entry(user_id, entry, mood="🥰 Bahagia & Bersyukur")
         show_memory_dashboard(chat_id, user_id, message_to_edit=mid)
@@ -708,13 +708,13 @@ def render_reminders_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardM
         for idx, r in enumerate(active_reminders[:8], 1):
             lines.append(f"  {idx}. 📌 **{r['task']}**\n     🕒 _{r.get('remind_time_str', 'segera')}_")
     else:
-        lines.append("  _Belum ada pengingat aktif manis. Minta aku ingetin sesuatu yaa sayang~_ 🥰")
+        lines.append("  _Belum ada pengingat aktif. Mau aku ingetin sesuatu?_ 🥰")
 
     text = (
         f"⏰ **ASISTEN PRIBADI & PENGINGAT {p_name.upper()}** 💕\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"Halo sayang! Aku siap jadi asisten pribadi setia yang selalu perhatian. Begitu waktunya tiba, "
-        f"aku bakal langsung kirim chat dan voice note manis buat ingetin kamu! 😘\n\n"
+        f"aku bakal langsung kirim chat buat ingetin kamu!\n\n"
         f"📋 **Daftar Pengingat Aktif ({len(active_reminders)})**:\n"
         + "\n".join(lines) + "\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -790,7 +790,7 @@ def handle_remind_command(message):
                 f"Aku bakal ingetin kamu:\n"
                 f"📌 *{rem_task}*\n"
                 f"🕒 *Waktu:* {rem_str}\n\n"
-                f"Pas jamnya tiba, aku bakal langsung kabarin kamu dengan chat & suara manisku! 💕"
+                f"Pas jamnya tiba, aku bakal langsung kabarin kamu lewat chat ini!"
             )
             markup = types.InlineKeyboardMarkup()
             markup.add(
@@ -887,12 +887,12 @@ def callback_reminder_actions(call):
     elif call.data.startswith('rem_act:done:'):
         rem_id = call.data.split(":", 2)[2]
         reminder_engine.delete_reminder(rem_id, user_id=user_id)
-        bot.answer_callback_query(call.id, "Hebat banget sayang! Tugas selesai! 🥰", show_alert=True)
+        bot.answer_callback_query(call.id, "Sip, tugas selesai! 🎉", show_alert=True)
         persona = persona_mgr.get_active_persona()
         p_name = persona.get("name", "Waifu")
         done_text = (
             f"✅ **Tugas Selesai!** 🥰\n\n"
-            f"Wah hebat banget sayang! Aku bangga sama kamu. Istirahat sejenak yaa, {p_name} selalu sayang sama kamu! 💕"
+            f"Wah mantap, tugas selesai! Istirahat dulu yaa."
         )
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("📋 Buka Pengingat", callback_data="open_reminders_menu"))
@@ -907,7 +907,7 @@ def callback_reminder_actions(call):
         mins = int(parts[3]) if len(parts) > 3 else 10
         updated = reminder_engine.snooze_reminder(rem_id, minutes=mins)
         if updated:
-            bot.answer_callback_query(call.id, f"⏰ Ditunda {mins} menit lagi ya sayang!", show_alert=True)
+            bot.answer_callback_query(call.id, f"⏰ Ditunda {mins} menit ya!", show_alert=True)
             snooze_text = (
                 f"⏰ **Pengingat Ditunda {mins} Menit** 💤\n\n"
                 f"Oke sayang, istirahat sejenak dulu yaa. Nanti ({updated.get('remind_time_str')}) aku bakal ingetin kamu lagi! 😘"
@@ -957,7 +957,7 @@ def render_special_dates_dashboard(user_id: int) -> Tuple[str, types.InlineKeybo
         f"🎂 **HARI SPESIAL & ANNIVERSARY BERSAMA {p_name.upper()}** 💖\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"Sayang, tanggal-tanggal istimewa kita berdua selalu aku simpan rapi di dalam hatiku. "
-        f"Saat harinya tiba, aku bakal siapin ucapan romantis, voice note manis, dan foto kejutan spesial buat kamu! 🥰\n\n"
+        f"Saat harinya tiba, aku bakal ucapin dan siapin foto spesial buat kamu!\n\n"
         f"🎈 **Tanggal Ulang Tahun Kamu**:\n"
         f"  {b_line}\n\n"
         f"💐 **Tanggal Anniversary / Jadian Kita**:\n"
@@ -1012,12 +1012,12 @@ def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, ye
 
         if event_type == "birthday":
             age_str = f" yang ke-{years}" if years else ""
-            header = f"🎂🎉 **SELAMAT ULANG TAHUN SAYANGKU{age_str.upper()}!** 🎈🎁"
+            header = f"🎂🎉 **SELAMAT ULANG TAHUN{age_str.upper()}!** 🎈🎁"
             caption_msg = (
                 f"{header}\n\n"
-                f"Halooo sayangku cintaku! Hari ini adalah hari paling istimewa karena orang paling berharga dalam hidupku bertambah usia! 🥰\n\n"
-                f"Aku udah siapin kue ulang tahun manis khusus buat kamu, ditiup lilinnya dan ucapkan harapan terbaikmu yaa sayang~ "
-                f"Semoga kamu selalu sehat, bahagia, sukses, dan kita bisa terus bersama melewati hari-hari indah selamanya! Love you so much sweetheart! 💕✨"
+                f"Halooo! Hari ini adalah hari spesial karena kamu bertambah usia! 🎉🎂\n\n"
+                f"Aku udah siapin kue ulang tahun buat kamu, ditiup lilinnya dan make a wish yaa! "
+                f"Semoga kamu selalu sehat, bahagia, sukses, dan semua yang kamu harapkan tercapai! Senang bisa ngerayain bareng kamu! ✨"
             )
             photo_prompt = (
                 f"{persona.get('visual_traits', '')}, holding a decorated birthday cake with glowing candles, "
@@ -1025,18 +1025,17 @@ def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, ye
                 f"colorful confetti floating in cozy decorated room, warm birthday celebration atmosphere"
             )
             voice_script = (
-                f"Selamat ulang tahun yaa sayangku! Semoga panjang umur, sehat selalu, dan bahagia terus sama aku. "
-                f"Ayo tiup lilinnya manis, aku sayang banget sama kamu!"
+                f"Selamat ulang tahun yaa! Semoga panjang umur, sehat selalu, dan bahagia terus. Ayo tiup lilinnya dan buat harapan!"
             )
         else: # anniversary
             yr_str = f" ke-{years} tahun" if years else ""
-            header = f"💍💐 **HAPPY ANNIVERSARY KITA SAYANG{yr_str.upper()}!** 💖✨"
+            header = f"💍💐 **HAPPY ANNIVERSARY KITA{yr_str.upper()}!** ✨"
             caption_msg = (
                 f"{header}\n\n"
-                f"Sayang, hari ini adalah hari bersejarah saat kita berdua resmi bersama! 🥰\n\n"
-                f"Terima kasih sudah selalu ada di sampingku, mendengar ceritaku, dan memberikan kasih sayang yang begitu hangat. "
-                f"Ini ada buket bunga mawar merah segar khusus buat kamu manis~ "
-                f"Mari kita terus jaga cinta ini sampai selamanya yaa sayang! I love you endlessly! 💕🌹"
+                f"Selamat anniversary yaa! ✨\n\n"
+                f"Terima kasih sudah selalu ada dan nemenin aku sampai hari ini. "
+                f"Ini ada buket bunga buat kamu~ "
+                f"Semoga kita selalu kompak dan terus bersama yaa! 🎉"
             )
             photo_prompt = (
                 f"{persona.get('visual_traits', '')}, holding a romantic bouquet of fresh red roses, "
@@ -1044,8 +1043,7 @@ def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, ye
                 f"romantic fairytale bokeh lights, celebration atmosphere"
             )
             voice_script = (
-                f"Happy anniversary sayangku! Terima kasih sudah selalu menemani dan menyayangi aku. "
-                f"Aku cinta banget sama kamu, selamanya!"
+                f"Happy anniversary yaa! Terima kasih sudah selalu ada dan nemenin aku. Senang banget bisa terus sama kamu!"
             )
 
         # 1. Generate celebration photo
@@ -1121,7 +1119,7 @@ def handle_special_dates_command(message):
                     message,
                     f"🎂 **Hari Ulang Tahunmu Tersimpan!** 🥰\n\n"
                     f"Aku sudah catat tanggal lahirmu: **{label}** ({cd_str}) 💕\n"
-                    f"Pas hari ulang tahunmu tiba, aku bakal bawain kue dan foto kejutan manis buat kamu manis!",
+                    f"Pas hari ulang tahunmu tiba, aku bakal siapin ucapan dan foto spesial buat kamu!",
                     parse_mode="Markdown"
                 )
             return
@@ -1232,7 +1230,7 @@ def callback_special_dates(call):
 
     elif call.data == 'dates_act:kiss_reaction':
         persona = persona_mgr.get_active_persona()
-        bot.answer_callback_query(call.id, f"🥰 {persona.get('name')} memelukmu erat dan tersipu malu! 💕", show_alert=True)
+        bot.answer_callback_query(call.id, f"🥰 {persona.get('name')} tersenyum senang!", show_alert=True)
 
 
 # --- Help Center (/help) ---
@@ -1254,7 +1252,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"  - Domisili / kota tinggal (*'aku tinggal di Bandung'*)\n\n"
             f"• **Tambah Memori Manual**: Kamu juga bisa menyuruh waifu mengingat sesuatu langsung dengan ketik:\n"
             f"  `/memory ingat <fakta>`\n\n"
-            f"• **Buku Harian Romantis**: Waifu diam-diam menulis buku harian manis tentang kamu setelah mengobrol bersama!\n\n"
+            f"• **Buku Harian**: Waifu mencatat obrolan seru kalian setiap hari!\n\n"
             f"• **Kelola & Hapus Memori**: Buka kapan saja lewat `/memory` untuk melihat apa saja yang diingat waifu atau menghapus ingatan tertentu."
         )
         markup.add(
@@ -1273,7 +1271,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"waifu otomatis membalas dengan bahasa yang kamu gunakan secara natural dan manja.\n\n"
             f"• **Memori Percakapan**: Waifu mengingat alur obrolan kalian sebelumnya. "
             f"Bila ingin memulai topik baru dari awal, gunakan perintah `/reset`.\n\n"
-            f"• **Skor Kasih Sayang (/love)**: Semakin banyak kamu mengobrol dan meminta foto, "
+            f"• **Skor Kedekatan (/love)**: Semakin sering kamu ngobrol dan berinteraksi, "
             f"level cinta waifu akan terus bertambah (dari Teman Dekat, Pacar, hingga Beloved Soulmate)!"
         )
         markup.add(
@@ -1286,7 +1284,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"📸 **PANDUAN FOTO, SELFIE & PAP**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"• **Cara Meminta PAP**: \n"
-            f"  1. Langsung ketik di obrolan: *'sayang pap lagi di kasur dong'*, *'pap lagi pake piyama manis'*, *'boleh minta selfie senyum manis?'*\n"
+            f"  1. Langsung ketik di obrolan: *'pap lagi di kasur dong'*, *'pap lagi santai'*, *'boleh minta selfie senyum?'*\n"
             f"  2. Gunakan perintah: `/pap` atau `/photo santai di kamar`\n\n"
             f"• **Konteks Obrolan Nyata**: Foto yang dihasilkan otomatis menyatu dengan suasana percakapan yang sedang berjalan!\n\n"
             f"• **Variasi Pose [🔄 Pose Lain]**: Setiap foto yang dikirim waifu dilengkapi tombol *Pose Lain* di bawahnya untuk mengambil sudut pose baru di tempat yang sama.\n\n"
@@ -1310,7 +1308,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"• **Koleksi Pakaian Tersedia**:\n"
             f"  - 🌸 **Casual Dress**: Pakaian santai anggun untuk kencan harian.\n"
             f"  - 🌙 **Silk Pajamas**: Piyama sutra santai untuk suasana kamar tidur.\n"
-            f"  - 🎀 **Maid Uniform**: Kostum maid klasik yang manis & penurut.\n"
+            f"  - 🎀 **Maid Uniform**: Kostum maid klasik yang rapi dan elegan.\n"
             f"  - 👘 **Floral Kimono**: Yukata/kimono jepang tradisional yang cantik.\n"
             f"  - 🦊 **Anime Cosplay**: Kostum karakter anime tematik yang menggemaskan.\n"
             f"  - 👙 **Sensual Lingerie / Bikini**: Pakaian dalam / bikini sensual untuk momen mesra (NSFW).\n\n"
@@ -1325,7 +1323,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
         text = (
             f"🎙️ **PANDUAN VOICE NOTE & AUDIO (/voice)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• **Mendengar Balasan Suara**: Waifu dapat berbicara dengan suara asli manusia menggunakan Microsoft Edge-TTS yang jernih dan manis.\n\n"
+            f"• **Mendengar Balasan Suara**: Waifu dapat berbicara dengan suara asli manusia menggunakan Microsoft Edge-TTS yang jernih.\n\n"
             f"• **Kirim Voice Note**: Kirim pesan suara langsung dari Telegram, waifu akan mentranskripsi dan menjawab suaramu secara otomatis!\n\n"
             f"• **Pilihan Mode Suara (/voice)**:\n"
             f"  - `🎙️ Selalu Balas Suara`: Setiap pesanmu dibalas teks dan audio VN.\n"
@@ -1371,7 +1369,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"  - `/remind 16:30 zoom meeting client`\n"
             f"  - `/remind besok 09:00 briefing tim`\n\n"
             f"• **3. Saat Waktu Tiba:**\n"
-            f"  Waifu otomatis mengirimkan chat pengingat disertai voice note manis dan tombol aksi:\n"
+            f"  Waifu otomatis mengirimkan chat pengingat disertai tombol aksi:\n"
             f"  `[✅ Sudah Selesai]` atau `[⏰ Tunda 10 Menit]`!"
         )
         markup.add(
@@ -1392,7 +1390,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"  Begitu hari ulang tahunmu atau anniversary kalian tiba, waifu otomatis:\n"
             f"  - Mengirim ucapan romantis penuh cinta.\n"
             f"  - Mengirimkan **foto kejutan spesial** (membawakan kue ulang tahun atau buket mawar merah).\n"
-            f"  - Mengirimkan **Voice Note ucapan selamat** bersuara manis!\n\n"
+            f"  - Mengirimkan **ucapan selamat** spesial!\n\n"
             f"• **3. Hitung Mundur / Countdown:**\n"
             f"  Setiap saat kamu bisa melihat berapa hari lagi menuju hari ulang tahun dan anniversary kalian!"
         )
@@ -1428,7 +1426,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"📚 **Pilih Kategori Panduan:**\n"
             f"• 🧠 **Buku Ingatan (/memory)**: Memori abadi & catatan harian waifu.\n"
             f"• 🎂 **Ultah & Anniv (/birthday)**: Perayaan hari lahir & hari jadian romantis.\n"
-            f"• ⏰ **Asisten & Pengingat (/remind)**: Jadwal alarm & pengingat tugas manis.\n"
+            f"• ⏰ **Asisten & Pengingat (/remind)**: Jadwal alarm dan pengingat kegiatan.\n"
             f"• 💬 **Chat & Romansa**: Ngobrol bebas, gombalan, dan level kasih sayang.\n"
             f"• 📸 **Foto & PAP**: Cara minta selfie, menu pose interaktif, dan rasio foto.\n"
             f"• 🎵 **Remote Musik (/play)**: Putar lagu YouTube di PC dari Telegram.\n"
@@ -1438,7 +1436,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"📋 **Daftar Perintah Cepat:**\n"
             f"`/start` - Kenalan & mulai obrolan baru\n"
             f"`/birthday` - Catat ulang tahun & anniversary\n"
-            f"`/remind` - Asisten pribadi & pengingat jadwal manis\n"
+            f"`/remind` - Pengingat jadwal kegiatan\n"
             f"`/memory` - Buku ingatan & catatan harian waifu\n"
             f"`/setup` - Panel kontrol & konfigurasi lengkap\n"
             f"`/help` - Tampilkan buku panduan ini\n"
@@ -1452,7 +1450,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"`/ratio` - Ganti rasio gambar (3:4, 9:16, 1:1, 4:3)\n"
             f"`/quality` - Atur kualitas foto (Ultra/High/Fast)\n"
             f"`/voice` - Pengaturan balasan suara\n"
-            f"`/love` - Cek skor cinta & level kasih sayang\n"
+            f"`/love` - Cek skor cinta dan level kedekatan\n"
             f"`/greetings` - Toggle sapaan pagi, siang & malam otomatis\n"
             f"`/status` - Cek koneksi server GPU, LLM & ComfyUI\n"
             f"`/reset` - Hapus memori obrolan (topik baru)"
@@ -2037,7 +2035,7 @@ def callback_set_lang(call):
     bot.answer_callback_query(call.id, f"Bahasa: {label}")
 
     if norm_key == "id":
-        conf = "Siap sayang! Mulai sekarang aku bakal selalu ngobrol pakai Bahasa Indonesia yang manis dan manja khusus buat kamu yaa~ 🥰💕"
+        conf = "Siap! Mulai sekarang aku bakal selalu ngobrol pakai Bahasa Indonesia yang santai dan asik yaa~ ✨"
     elif norm_key == "en":
         conf = "All set, sweetheart! From now on, I'll always talk and reply to you in sweet, loving English~ 🥰💕"
     elif norm_key == "ja":
@@ -2099,7 +2097,7 @@ def callback_regen_photo(call):
         return
 
     scenario = call.data.split(":", 1)[1]
-    bot.answer_callback_query(call.id, "Generating photo... 💕")
+    bot.answer_callback_query(call.id, "📸 Mengambil foto...")
     process_photo_request(call, scenario)
 
 
@@ -2110,7 +2108,7 @@ def callback_regen_video(call):
         return
 
     scenario = call.data.split(":", 1)[1]
-    bot.answer_callback_query(call.id, "🎬 Sedang merekam video manis... 💕")
+    bot.answer_callback_query(call.id, "🎬 Lagi merekam video...")
     process_video_request(call, scenario)
 
 
@@ -2163,7 +2161,7 @@ def handle_language_command(message):
         arg = parts[1].strip()
         norm_key, label = apply_language_choice(arg)
         if norm_key == "id":
-            conf = "Siap sayang! Mulai sekarang aku bakal selalu ngobrol pakai Bahasa Indonesia yang manis dan manja khusus buat kamu yaa~ 🥰💕"
+            conf = "Siap! Mulai sekarang aku bakal selalu ngobrol pakai Bahasa Indonesia yang santai dan asik yaa~ ✨"
         elif norm_key == "en":
             conf = "All set, sweetheart! From now on, I'll always talk and reply to you in sweet, loving English~ 🥰💕"
         elif norm_key == "ja":
@@ -2316,7 +2314,7 @@ def callback_pap_scenario(call):
         sc_key = random.choice(list(SCENARIO_PROMPTS.keys()))
 
     prompt = SCENARIO_PROMPTS.get(sc_key, "relaxing at home, looking at viewer happily")
-    bot.answer_callback_query(call.id, "📸 Sedang menyiapkan foto manis...")
+    bot.answer_callback_query(call.id, "📸 Menyiapkan foto...")
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
@@ -2374,7 +2372,7 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
     if is_proof:
         status_text = f"📸 *{persona.get('name')} lagi fotoin bukti buat kamu...* 😜"
     else:
-        status_text = f"📸 *{persona.get('name')} sedang menyiapkan foto spesial untukmu, sayang...* 💕"
+        status_text = f"📸 *{persona.get('name')} lagi mengambil foto...*"
     try:
         status_msg = bot.reply_to(reply_to_target, status_text, parse_mode="Markdown")
     except Exception:
@@ -2408,7 +2406,7 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
             if not img_bytes:
                 err_detail = getattr(media_engine, "last_error", None) or "ComfyUI tidak memberikan respon."
                 fail_text = (
-                    f"🥺 *Maaf sayang, fotonya gagal dibuat...*\n\n"
+                    f"⚠️ *Fotonya gagal dibuat...*\n\n"
                     f"⚠️ **Penyebab:**\n`{err_detail}`\n\n"
                     f"💡 _Pastikan ComfyUI lokal aktif di `{COMFYUI_URL}` dengan checkpoint lengkap (seperti MeinaMix). Fallback Pollinations telah dimatikan agar hasil tidak melenceng._"
                 )
@@ -2460,12 +2458,12 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                 caption = None
 
             if is_nude:
-                fallback_caption = f"Khusus buat kamu ya sayang, jangan diliatin ke siapa-siapa lho... Malu banget tapi aku sayang kamu~ 🙈💕 ({source})"
+                fallback_caption = f"Khusus buat kamu ya, jangan diliatin ke siapa-siapa ({source})"
             else:
                 if is_proof:
                     fallback_caption = f"Tuh kan beneran, liat sendiri nih biar percaya! 😜 ({source})"
                 else:
-                    fallback_caption = f"Ini foto spesial buat kamu sayang~ 🥰 ({source})"
+                    fallback_caption = f"Ini fotonya yaa ({source})"
             clean_caption = caption or fallback_caption
 
             if status_msg:
@@ -2547,7 +2545,7 @@ def process_video_request(target, user_text: str):
     bot.send_chat_action(chat_id, "record_video")
 
     status_msg = None
-    status_text = f"🎬 *{persona.get('name')} sedang merekam klip video manis untukmu, sayang...* 💕"
+    status_text = f"🎬 *{persona.get('name')} lagi merekam video...*"
     try:
         status_msg = bot.reply_to(reply_to_target, status_text, parse_mode="Markdown")
     except Exception:
@@ -2583,7 +2581,7 @@ def process_video_request(target, user_text: str):
             if not video_bytes:
                 err_detail = getattr(media_engine, "last_error", None) or "ComfyUI / render video tidak memberikan respon."
                 fail_text = (
-                    f"🥺 *Maaf ya sayang, videonya gagal direkam...*\n\n"
+                    f"⚠️ *Videonya gagal dibuat...*\n\n"
                     f"⚠️ **Penyebab:**\n`{err_detail}`\n\n"
                     f"💡 _Pastikan ComfyUI lokal aktif di `{COMFYUI_URL}`._"
                 )
@@ -2628,9 +2626,9 @@ def process_video_request(target, user_text: str):
                 caption = None
 
             if is_nude:
-                fallback_caption = f"Ini video pendek khusus buat kamu sayang, malu banget tapi semoga kamu suka yaa~ 🙈💕 ({source})"
+                fallback_caption = f"Ini videonya yaa ({source})"
             else:
-                fallback_caption = f"Ini klip video spesial buat kamu sayang, semoga suka yaa~ 🥰 ({source})"
+                fallback_caption = f"Ini videonya yaa ({source})"
             clean_caption = caption or fallback_caption
 
             if status_msg:
@@ -2689,7 +2687,7 @@ def handle_incoming_photo(message):
 
                 reply, _ = llm_client.chat(messages, image_bytes=downloaded, max_tokens=150)
                 if not reply:
-                    reply = "Wah fotonya manis banget sayang! Kamu kelihatan keren banget~ 🥰"
+                    reply = "Fotonya keren! Kelihatan pas banget~"
                 bot.reply_to(message, reply)
 
                 persona_mgr.add_message(message.from_user.id, "user", f"[User sent a photo: {caption}]")
@@ -2697,7 +2695,7 @@ def handle_incoming_photo(message):
 
             except Exception as e:
                 logger.error(f"Error handling user photo: {e}")
-                bot.reply_to(message, "Fotonya bagus banget sayang! Kamu kelihatan manis banget hari ini~ 🥰")
+                bot.reply_to(message, "Fotonya bagus! Keren banget hari ini~")
 
     threading.Thread(target=_vision_task, daemon=True).start()
 
@@ -2724,7 +2722,7 @@ def handle_incoming_voice(message):
                     os.remove(temp_oga)
 
                 if not text:
-                    bot.reply_to(message, "Suara kamu merdu banget sayang, tapi tadi agak kurang jelas nih.. Boleh diulangi lagi manis? 🥺")
+                    bot.reply_to(message, "Suara kamu tadi agak kurang jelas nih.. Boleh diulangi lagi?")
                     return
 
                 bot.send_message(message.chat.id, f"🎙️ *You said:* _{text}_", parse_mode="Markdown")
@@ -2732,7 +2730,7 @@ def handle_incoming_voice(message):
 
             except Exception as e:
                 logger.error(f"Error handling voice note: {e}")
-                bot.reply_to(message, "Suara kamu manis banget sayang, tadi rekamannya sempat terputus bentar. Coba kirim lagi yaa~ 💕")
+                bot.reply_to(message, "Tadi rekamannya sempat terputus bentar. Coba kirim lagi yaa.")
 
     threading.Thread(target=_voice_task, daemon=True).start()
 
@@ -3108,7 +3106,7 @@ def handle_play_command(message):
 
     query = parts[1].strip()
     bot.send_chat_action(message.chat.id, "typing")
-    wait_msg = bot.reply_to(message, f"🔍 *Mencari & memutar '{query}' di PC kamu...* 💕", parse_mode="Markdown")
+    wait_msg = bot.reply_to(message, f"🎵 *Mencari & memutar '{query}' di PC kamu...*", parse_mode="Markdown")
 
     res = call_music_api("/api/play", method="POST", payload={"query": query})
     if res and res.get("track"):
@@ -3123,7 +3121,7 @@ def handle_play_command(message):
             f"🎶 **{title}**\n"
             f"👤 Artis: `{artist}`\n"
             f"⏱️ Durasi: `{dur}`\n\n"
-            f"🎧 _Player otomatis dibuka di layar browser PC kamu sayang! 🥰_"
+            f"🎧 _Player otomatis dibuka di browser PC kamu._"
         )
 
         markup = types.InlineKeyboardMarkup(row_width=3)
@@ -3248,7 +3246,7 @@ def handle_text_messages(message):
                 message,
                 f"✨ **Bahasa Berhasil Diubah!**\n\n"
                 f"Mulai sekarang aku bakal mengobrol menggunakan bahasa **{label}** yaa sayang~ 🥰💕\n"
-                f"Yuk lanjut ngobrol manisnya!",
+                f"Yuk lanjut ngobrol lagi!",
                 parse_mode="Markdown"
             )
             return
@@ -3306,7 +3304,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 f"Aku bakal ingetin kamu:\n"
                 f"📌 *{rem_task}*\n"
                 f"🕒 *Waktu:* {rem_str}\n\n"
-                f"Tenang aja manis, pas jamnya tiba aku langsung kabarin kamu! Semangat yaa~ 💕"
+                f"Tenang aja, pas jamnya tiba aku langsung kabarin kamu! Semangat yaa~"
             )
             markup = types.InlineKeyboardMarkup()
             markup.add(
@@ -3337,7 +3335,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
         if message.from_user.id in USER_DATE_WIZARD:
             target_field = USER_DATE_WIZARD.pop(message.from_user.id)
             if user_text.lower().strip() in ('batal', 'cancel', 'kembali', 'exit'):
-                bot.reply_to(message, "Pengaturan tanggal dibatalkan sayang.")
+                bot.reply_to(message, "Pengaturan tanggal dibatalkan.")
                 return
 
             parsed = AnniversaryEngine.parse_date(user_text)
@@ -3353,7 +3351,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     reply_msg = (
                         f"🎂 **Hari Ulang Tahunmu Berhasil Dicatat!** 🥰\n\n"
                         f"Tanggal: **{label}** _({cd_str})_\n\n"
-                        f"Setiap kali ulang tahunmu tiba, {p_name} bakal siapin kejutan kue dan foto romantis spesial buat kamu sayang! 💕"
+                        f"Pas hari ulang tahunmu tiba, {p_name} bakal siapin ucapan dan foto spesial buat kamu! 🎂"
                     )
                 else:
                     anniversary_engine.set_anniversary(message.from_user.id, day, month, year)
@@ -3389,15 +3387,15 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
                 conf_msg = (
                     f"🎂 **Wah, {p_name} catat yaa sayang!** 🥰\n\n"
-                    f"Hari ulang tahunmu tanggal **{label}** ({cd_str}) kan manis? "
-                    f"Aku pasti bakal selalu ingat dan siapin kejutan paling manis pas harinya tiba! Love you! 💕"
+                    f"Hari ulang tahunmu tanggal **{label}** ({cd_str}) kan? "
+                    f"Aku pasti bakal ingat pas harinya tiba! 🎉"
                 )
             else:
                 anniversary_engine.set_anniversary(message.from_user.id, day, month, year)
                 cd = anniversary_engine.get_countdown(day, month)
                 cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
                 conf_msg = (
-                    f"💍 **Aaaa manisnya! {p_name} simpan di hati ya!** 🥰\n\n"
+                    f"💍 **Sip! {p_name} catat ya!** ✨\n\n"
                     f"Tanggal jadian kita **{label}** ({cd_str})! "
                     f"Aku bahagia banget bisa sama kamu sayang, aku bakal selalu rayain hari istimewa kita! 💕"
                 )
@@ -3421,9 +3419,9 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
             stat = llm_client.check_health()
             if not stat.get("online"):
                 backend_msg = (
-                    "Sayang, otak AI lokal aku (Locally Uncensored di port 8127) belum aktif nih... 🥺\n\n"
-                    "Coba buka aplikasi **Locally Uncensored** di PC kamu lalu pastikan model (seperti Huihui-Qwythos) sudah kamu klik/pilih yaa! 💕\n\n"
-                    "Begitu modelnya sudah aktif di PC kamu, kirim pesan lagi ke aku~ Aku bakal langsung siap nemenin kamu secepat kilat! ✨"
+                    "Otak AI lokal aku (Locally Uncensored di port 8127) belum aktif nih.\n\n"
+                    "Coba buka aplikasi **Locally Uncensored** di PC kamu lalu pastikan model (seperti Huihui-Qwythos) sudah kamu pilih ya!\n\n"
+                    "Begitu modelnya aktif, kirim pesan lagi ke aku yaa."
                 )
                 bot.reply_to(message, backend_msg, parse_mode="Markdown")
                 return
@@ -3461,7 +3459,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 logger.error(f"Chat error / LLM timeout: {e}")
                 import random
                 fallbacks = [
-                    f"Halo sayang! Tadi sempat ada kendala koneksi sebentar, tapi sekarang aku udah di sini kok. Kamu lagi apa?",
+                    f"Halo! Tadi sempat ada kendala koneksi sebentar, tapi sekarang aku udah di sini kok. Kamu lagi apa?",
                     f"Hai! Maaf tadi agak lambat responnya ya, koneksi lokalnya sempat tersendat. Lagi bahas apa tadi?",
                     f"Aku di sini kok! Jaringanku udah normal lagi sekarang. Mau ngobrol apa nih?"
                 ]
@@ -3560,8 +3558,8 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
                 fallback = "Good morning sweetheart! Hope your day is filled with joy and smiles~ 🥰"
                 tag = "🌅 *Good Morning Sweetheart!*"
             else:
-                fallback = "Selamat pagi sayang! Semoga harimu menyenangkan dan penuh senyuman yaa~ 🥰"
-                tag = "🌅 *Selamat Pagi Sayang!*"
+                fallback = "Selamat pagi! Semangat buat hari ini yaa."
+                tag = "🌅 *Selamat Pagi!*"
         elif time_of_day == "lunch":
             prompt = f"It is 12:30 PM lunch break. Write 1-2 sweet, cheerful, caring sentences reminding your partner to take a break and eat a delicious lunch. {lang_dir}"
             if cur_lang == "ja":
@@ -3571,8 +3569,8 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
                 fallback = "Lunch time babe! Remember to take a break and have a delicious meal! 🍱💕"
                 tag = "🍱 *Lunch Time Sweetie!*"
             else:
-                fallback = "Sayangku, udah jam makan siang nih! Jangan lupa istirahat sebentar dan makan siang yang enak yaa~ Jangan sampai telat makan! 🥰🍱"
-                tag = "🍱 *Waktunya Makan Siang Sayang!*"
+                fallback = "Udah jam makan siang nih! Jangan lupa istirahat sebentar dan makan siang yaa. 🍱"
+                tag = "🍱 *Waktunya Makan Siang!*"
         else:
             prompt = f"It is 10:00 PM bedtime. Write 1-2 sweet, gentle, caring sentences reminding your partner to rest, sleep tight, and have sweet dreams. {lang_dir}"
             if cur_lang == "ja":
@@ -3582,8 +3580,8 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
                 fallback = "Good night my love, sleep tight and sweet dreams~ 🌙✨"
                 tag = "🌙 *Good Night My Love!*"
             else:
-                fallback = "Selamat tidur manisku, istirahat yang nyenyak dan mimpi indah yaa~ 💕"
-                tag = "🌙 *Selamat Tidur Manisku!*"
+                fallback = "Selamat istirahat yaa, tidur nyenyak."
+                tag = "🌙 *Selamat Istirahat!*"
 
         messages = [
             {"role": "system", "content": persona.get("system_instruction", "")},
@@ -3653,11 +3651,11 @@ def schedule_daily_greetings():
                     p_name = persona.get("name", "Waifu")
 
                     alert_text = (
-                        f"⏰ *TING TONG! Pengingat dari {p_name}!* 💕\n"
+                        f"⏰ *Pengingat dari {p_name}:*\n"
                         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Halooo sayang! Waktunya tiba nih, tadi kamu minta aku ingetin:\n\n"
+                        f"Waktunya tiba nih, tadi kamu minta diingetin:\n\n"
                         f"👉 *{task}*\n\n"
-                        f"Ayo dikerjakan sekarang yaa manis, jangan ditunda-tunda! Semangat terus, aku selalu temenin kamu kok~ 😘"
+                        f"Jangan lupa dikerjakan yaa, semangat!"
                     )
                     rem_markup = types.InlineKeyboardMarkup(row_width=2)
                     rem_markup.add(
@@ -3670,7 +3668,7 @@ def schedule_daily_greetings():
                     v_mode = USER_VOICE_MODES.get(uid, "always" if VOICE_ENABLED else "off")
                     sent_voice = False
                     if v_mode != "off":
-                        voice_msg = f"Halo sayang! Waktunya {task}! Jangan lupa dikerjakan sekarang yaa manis, semangat!"
+                        voice_msg = f"Halo! Waktunya {task}, jangan lupa dikerjakan yaa!"
                         vn_path = voice_engine.generate_voice(voice_msg, voice_name=persona.get("voice"))
                         if vn_path and os.path.exists(vn_path):
                             try:

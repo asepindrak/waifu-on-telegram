@@ -290,7 +290,7 @@ class LocallyUncensoredClient:
                 clean_reply = quotes[-1].strip()
             else:
                 # Look for Indonesian or affectionate sentence inside reasoning
-                clean_reply = "Hai sayang! Aku lagi di sini kok nemenin kamu~ 🥰 Ada yang mau diceritain manis?"
+                clean_reply = "Hai! Aku lagi di sini kok nemenin kamu. Ada yang mau diobrolin?"
 
         return clean_reply, reasoning
 
