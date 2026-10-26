@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-💖 WAIFU ON TELEGRAM - AUTONOMOUS AI ROMANCE COMPANION CLI 🤖
+💖 WAIFU ON TELEGRAM - AUTONOMOUS AI ROMANCE COMPANION CLI 🌸
 Repository: https://github.com/asepindrak/waifu-on-telegram
 Usage:
   waifu start [--daemon]
@@ -68,7 +68,7 @@ def print_banner():
 {c(BOLD + MAGENTA, "  ██║███╗██║██╔══██║██║██╔══╝  ██║   ██║    ██╔══██╗██║   ██║   ██║   ")}
 {c(BOLD + MAGENTA, "  ╚███╔███╔╝██║  ██║██║██║     ╚██████╔╝    ██████╔╝╚██████╔╝   ██║   ")}
 {c(BOLD + MAGENTA, "   ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝╚═╝      ╚═════╝     ╚═════╝  ╚═════╝    ╚═╝   ")}
-  {c(CYAN, f"💖 WAIFU ON TELEGRAM v{v} - Autonomous AI Romance Companion 🤖")}
+  {c(CYAN, f"💖 WAIFU ON TELEGRAM v{v} - Autonomous AI Romance Companion 🌸")}
   {c(DIM, "Project Root: " + PROJECT_ROOT + " | Repo: asepindrak/waifu-on-telegram")}
 """
     print(banner)

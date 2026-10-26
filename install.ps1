@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 function Write-GradientHeader {
     Write-Host "====================================================================" -ForegroundColor Magenta
     $ver = if (Test-Path "VERSION") { (Get-Content "VERSION").Trim() } else { "1.6.8" }
-    Write-Host "   💖 WAIFU ON TELEGRAM v$ver - Windows One-Click All-in-One Installer 🤖   " -ForegroundColor Magenta
+    Write-Host "   💖 WAIFU ON TELEGRAM v$ver - Windows One-Click All-in-One Installer 🌸   " -ForegroundColor Magenta
     Write-Host "====================================================================" -ForegroundColor Magenta
     Write-Host ""
 }

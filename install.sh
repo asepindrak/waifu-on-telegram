@@ -7,7 +7,7 @@ set -e
 
 echo "===================================================================="
 VER=$(cat VERSION 2>/dev/null || echo "1.6.8")
-echo "       💖 WAIFU ON TELEGRAM v$VER - Linux/macOS 1-Line Installer 🤖       "
+echo "       💖 WAIFU ON TELEGRAM v$VER - Linux/macOS 1-Line Installer 🌸       "
 echo "===================================================================="
 echo ""
 
