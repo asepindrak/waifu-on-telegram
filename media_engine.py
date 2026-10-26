@@ -32,7 +32,8 @@ class MediaEngine:
                     "online": True,
                     "backend": "ComfyUI Local",
                     "device": vram_info,
-                    "checkpoints": ckpts
+                    "checkpoints": ckpts,
+                    "active_checkpoint": self.get_active_checkpoint()
                 }
         except Exception:
             pass
@@ -40,8 +41,37 @@ class MediaEngine:
         return {
             "online": False,
             "backend": "Cloud Fallback (Pollinations)" if self.allow_cloud_fallback else "ComfyUI Offline",
-            "device": "Remote CPU/GPU"
+            "device": "Remote CPU/GPU",
+            "active_checkpoint": self.get_active_checkpoint()
         }
+
+    def get_active_checkpoint(self) -> str:
+        """Determines the active image checkpoint model currently selected/available."""
+        ckpts = self.get_available_checkpoints()
+        env_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "").strip()
+        if env_ckpt and ckpts:
+            matched = [c for c in ckpts if env_ckpt.lower() in c.lower()]
+            if matched:
+                return matched[0]
+        if ckpts:
+            valid_ckpts = [c for c in ckpts if not ("basnsfw" in c.lower() and "base" in c.lower())] or ckpts
+            for c in valid_ckpts:
+                if "meina" in c.lower():
+                    return c
+            for c in valid_ckpts:
+                if any(k in c.lower() for k in ["aom", "orange"]):
+                    return c
+            return valid_ckpts[0]
+        if env_ckpt:
+            return env_ckpt
+        try:
+            import asset_manager
+            info = asset_manager.get_asset_info("meinamix")
+            if info and info.get("installed") and info.get("target_path"):
+                return os.path.basename(info["target_path"])
+        except Exception:
+            pass
+        return "meinamix_v12Final.safetensors"
 
     def get_available_checkpoints(self) -> list:
         """Queries ComfyUI for available checkpoint models."""

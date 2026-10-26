@@ -1472,6 +1472,8 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"`/pap` - Menu interaktif skenario selfie & foto waifu\n"
             f"`/video` - Minta klip video / animasi bergerak waifu\n"
             f"`/play <judul>` - Putar musik YouTube langsung di PC\n"
+            f"`/queue <judul>` - Tambah lagu ke antrean / lihat antrean\n"
+            f"`/playlist <nama>` - Putar full album / playlist di PC\n"
             f"`/music` - Remote kontrol pemutar musik PC\n"
             f"`/outfit` - Buka lemari pakaian waifu\n"
             f"`/persona` - Ganti karakter waifu\n"
@@ -1748,13 +1750,18 @@ def callback_set_quality(call):
     show_quality_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
 
 
-@bot.message_handler(commands=['status'])
-def handle_status(message):
-    if not is_authorized(message.from_user.id):
-        return
+def is_music_server_online() -> bool:
+    """Quick socket check if music player server is responding on port 8002."""
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", 8002), timeout=0.5):
+            return True
+    except Exception:
+        return False
 
-    bot.send_chat_action(message.chat.id, "typing")
-    user_id = message.from_user.id
+
+def build_system_diagnostics_report(user_id: int) -> str:
+    """Builds a comprehensive system diagnostics report matching and exceeding CLI 'waifu status'."""
     llm_stat = llm_client.check_health()
     media_stat = media_engine.check_status()
     persona = persona_mgr.get_active_persona()
@@ -1769,43 +1776,96 @@ def handle_status(message):
     else:
         llm_model_name = raw_model
 
-    # Resolve active outfit
-    _, cur_outfit = persona_mgr.get_user_outfit(user_id)
+    # Resolve Vision Model (mmproj)
+    vision_info = asset_manager.get_asset_info("qwythos_vision") if asset_manager else None
+    if vision_info and vision_info.get("installed"):
+        v_name = os.path.basename(vision_info.get("target_path", vision_info.get("filename", "mmproj")))
+        vision_str = f"`{v_name}` _(Aktif ✓)_"
+    else:
+        vision_str = "`Belum Terpasang` _(Chat biasa tetap normal)_"
 
-    # Resolve photo checkpoint & video engine
-    ckpts = media_engine.get_available_checkpoints()
-    cur_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "").strip() or (ckpts[0] if ckpts else "Auto (MeinaMix preferred)")
-    v_engine_label = VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)
+    # Resolve Persona & Outfit
+    p_name = persona.get("name", "Waifu")
+    p_arch = persona.get("archetype", "Companion")
+    _, cur_outfit = persona_mgr.get_user_outfit(user_id)
     lang_label = persona_mgr.get_language_display_name(BOT_LANGUAGE)
-    ar = USER_RATIOS.get(user_id, "3:4")
-    qual = USER_QUALITIES.get(user_id, "high").title()
-    facts_count = len(memory_engine.get_facts(user_id))
+    score, rel_status = persona_mgr.get_relationship_status(user_id)
     affinity_score = memory_engine.get_affinity(user_id)
 
+    # Resolve Photo model checkpoint
+    cur_ckpt = media_stat.get("active_checkpoint") or media_engine.get_active_checkpoint()
+
+    # Resolve Video Engine & Video model
+    v_engine_label = VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)
+    is_v_ready, missing_v = asset_manager.ensure_video_engine_assets(VIDEO_ENGINE) if asset_manager else (True, [])
+    v_ready_badge = "_(Siap ✓)_" if is_v_ready else f"_(Perlu Download: {', '.join(missing_v)})_"
+    if VIDEO_ENGINE == "wan21":
+        v_model_str = "`wan2.1_t2v_1.3B_bf16.safetensors` + `wan_2.1_vae.safetensors`"
+    else:
+        v_model_str = "`mm_sd_v15_v2.ckpt` + `ComfyUI-AnimateDiff-Evolved`"
+
+    # Photo ratio & quality preset
+    ar = USER_RATIOS.get(user_id, "3:4")
+    qual = USER_QUALITIES.get(user_id, "high").title()
+
+    # Voice TTS & Music Player
+    voice_str = f"Aktif ({voice_engine.default_voice})" if VOICE_ENABLED else "Nonaktif"
+    music_str = "🟢 Online (Port 8002)" if is_music_server_online() else "⚪ Inactive"
+
+    # Bot Process & Windows Autorun
+    bot_pid = os.getpid()
+    autorun_str = "🟢 Aktif (Auto-boot PC)" if is_autorun_enabled() else "⚪ Nonaktif"
+
+    # Memory facts
+    facts_count = len(memory_engine.get_facts(user_id))
+
     report = (
-        f"📊 **WAIFU ON TELEGRAM - SYSTEM STATUS** `(v{get_version()})`\n"
+        f"📊 **Waifu on Telegram v{get_version()} - System Diagnostics**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👑 **Persona Waifu** : **{persona.get('name')}** _({persona.get('archetype', 'Companion')})_\n"
+        f"👑 **Persona Waifu** : **{p_name}** _({p_arch})_\n"
         f"👗 **Pakaian Aktif** : `{cur_outfit}`\n"
-        f"🌐 **Bahasa**        : `{lang_label}`\n"
-        f"💖 **Skor Cinta**    : `{affinity_score} pts`\n\n"
-        f"🧠 **Model LLM Chat**: {status_icon}\n"
-        f"• Nama Model : `{llm_model_name}`\n"
-        f"• Backend    : `{llm_stat.get('backend', 'Locally Uncensored')}`\n"
-        f"• Endpoint   : `{LLM_BASE_URL}`\n\n"
-        f"🎨 **Generator Visual**: {media_icon}\n"
-        f"• Model Foto : `{cur_ckpt}`\n"
-        f"• Video AI   : `{v_engine_label}`\n"
-        f"• Rasio/Preset: `{ar}` | `{qual}`\n"
-        f"• Device/GPU : `{media_stat.get('device', 'CUDA')}`\n\n"
-        f"🎙️ **Suara & Audio**:\n"
-        f"• Voice TTS  : `{'Aktif (' + voice_engine.default_voice + ')' if VOICE_ENABLED else 'Nonaktif'}`\n"
-        f"• Musik PC   : `Online (Port 8002)`\n\n"
-        f"🧠 **Buku Ingatan**  : `{facts_count} fakta tersimpan`\n"
+        f"🌐 **Bahasa Chat**   : `{lang_label}`\n"
+        f"💖 **Status Hubungan**: **{rel_status}** (`{score}%` • `{affinity_score} pts`)\n\n"
+        f"🧠 **Local LLM (Port 8127)**: {status_icon}\n"
+        f"• Model Chat   : `{llm_model_name}`\n"
+        f"• Vision Model : {vision_str}\n"
+        f"• Backend      : `{llm_stat.get('backend', 'Locally Uncensored')}`\n"
+        f"• Endpoint     : `{LLM_BASE_URL}`\n\n"
+        f"🎨 **Generator Visual (Port 8188)**: {media_icon}\n"
+        f"• Backend      : `{media_stat.get('backend', 'ComfyUI Local')}`\n"
+        f"• Device / GPU : `{media_stat.get('device', 'CUDA')}`\n"
+        f"• **Model Foto** : `{cur_ckpt}`\n"
+        f"• **Engine Video**: `{v_engine_label}` {v_ready_badge}\n"
+        f"• **Model Video**: {v_model_str}\n"
+        f"• Rasio/Preset : `{ar}` | `{qual}`\n\n"
+        f"🎙️ **Audio & Suara**:\n"
+        f"• Suara Waifu  : `{voice_str}`\n"
+        f"• Server Musik : `{music_str}`\n\n"
+        f"⚙️ **Sistem & Proses**:\n"
+        f"• Bot Process  : `🟢 Berjalan (PID: {bot_pid})`\n"
+        f"• PC Autorun   : `{autorun_str}`\n"
+        f"• Buku Ingatan : `{facts_count} fakta tersimpan`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 _Ketik `/setup` untuk membuka panel kontrol dan pengaturan lengkap._"
     )
-    bot.reply_to(message, report, parse_mode="Markdown")
+    return report
+
+
+@bot.message_handler(commands=['status'])
+def handle_status(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    bot.send_chat_action(message.chat.id, "typing")
+    user_id = message.from_user.id
+    report = build_system_diagnostics_report(user_id)
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🔄 Segarkan Status", callback_data="cfg_action:status"),
+        types.InlineKeyboardButton("⚙️ Panel Setup (/setup)", callback_data="cfg_submenu:dashboard")
+    )
+    bot.reply_to(message, report, reply_markup=markup, parse_mode="Markdown")
 
 
 def show_persona_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
@@ -2288,28 +2348,13 @@ def callback_set_lang(call):
 def callback_cfg_status(call):
     if not is_authorized(call.from_user.id):
         return
-    bot.answer_callback_query(call.id)
-    llm_stat = llm_client.check_health()
-    media_stat = media_engine.check_status()
-    persona = persona_mgr.get_active_persona()
-    status_icon = "🟢 Online" if llm_stat.get("online") else "🔴 Offline"
-    media_icon = "🟢 Active" if media_stat.get("online") else "🟡 Cloud Fallback"
-
-    report = (
-        f"📊 **Waifu on Telegram v{get_version()} - System Diagnostics**\n\n"
-        f"🧠 **Local LLM**: {status_icon}\n"
-        f"• Backend: `{llm_stat.get('backend', 'Unknown')}`\n"
-        f"• Endpoint: `{LLM_BASE_URL}`\n"
-        f"• Model: `{llm_stat.get('model', 'Active')}`\n\n"
-        f"🎨 **Media Generator**: {media_icon}\n"
-        f"• Backend: `{media_stat.get('backend')}`\n"
-        f"• Device: `{media_stat.get('device')}`\n\n"
-        f"🎭 **Active Persona**: **{persona.get('name')}**\n"
-        f"🎙️ **Voice Reply**: `{'Active (' + voice_engine.default_voice + ')' if VOICE_ENABLED else 'Disabled'}`\n"
-        f"🧠 **Ingatan Tersimpan**: `{len(memory_engine.get_facts(call.from_user.id))} fakta`\n"
+    bot.answer_callback_query(call.id, "🔄 Status diagnostik diperbarui!")
+    report = build_system_diagnostics_report(call.from_user.id)
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🔄 Segarkan Status", callback_data="cfg_action:status"),
+        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
     )
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
     try:
         bot.edit_message_text(report, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
     except Exception:
@@ -2589,10 +2634,11 @@ def callback_pap_scenario(call):
 
     prompt = SCENARIO_PROMPTS.get(sc_key, "relaxing at home, looking at viewer happily")
     bot.answer_callback_query(call.id, "📸 Menyiapkan foto...")
-    try:
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-    except Exception:
-        pass
+    if call.message.text and "Pilih suasana" in call.message.text:
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
     process_photo_request(call, prompt)
 
 
@@ -3417,15 +3463,116 @@ def render_music_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
     )
     markup.add(
-        types.InlineKeyboardButton("☕ Lofi Santai", callback_data="music_cmd:lofi"),
-        types.InlineKeyboardButton("🌸 J-Pop Hits", callback_data="music_cmd:jpop"),
-        types.InlineKeyboardButton("🔄 Refresh", callback_data="music_cmd:refresh")
+        types.InlineKeyboardButton("📜 Daftar Antrean", callback_data="music_cmd:view_queue"),
+        types.InlineKeyboardButton("☕ Lofi", callback_data="music_cmd:lofi"),
+        types.InlineKeyboardButton("🌸 J-Pop", callback_data="music_cmd:jpop")
     )
     markup.add(
-        types.InlineKeyboardButton("🌐 Buka Player di PC", callback_data="music_cmd:open_pc"),
-        types.InlineKeyboardButton("🔙 Menu Setup", callback_data="open_setup_menu")
+        types.InlineKeyboardButton("🌐 Buka di PC", callback_data="music_cmd:open_pc"),
+        types.InlineKeyboardButton("🔄 Refresh", callback_data="music_cmd:refresh"),
+        types.InlineKeyboardButton("🔙 Setup", callback_data="open_setup_menu")
     )
     return text, markup
+
+
+def render_queue_dashboard() -> Tuple[str, types.InlineKeyboardMarkup]:
+    """Renders the current queue/playlist list and interactive control buttons."""
+    stat = call_music_api("/api/status")
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    if not stat or not stat.get("enabled"):
+        text = "⚠️ Layanan pemutar musik PC (Port 8002) sedang tidak aktif."
+        markup.add(types.InlineKeyboardButton("🔙 Remote Musik", callback_data="open_music_menu"))
+        return text, markup
+
+    queue = stat.get("queue", [])
+    cur_idx = stat.get("currentIndex", 0)
+    playback = stat.get("playbackState", "STOPPED")
+
+    if not queue:
+        text = (
+            "📜 **DAFTAR ANTREAN MUSIK PC (PLAYLIST QUEUE)**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "Belum ada antrean lagu di PC kamu saat ini.\n\n"
+            "💡 _Ketik `/queue <judul>` untuk menambah lagu ke antrean!_\n"
+            "💡 _Ketik `/playlist <nama album/artis>` untuk memuat banyak lagu sekaligus._"
+        )
+        markup.add(
+            types.InlineKeyboardButton("☕ Lofi Santai", callback_data="music_cmd:lofi"),
+            types.InlineKeyboardButton("🌸 J-Pop Hits", callback_data="music_cmd:jpop")
+        )
+        markup.add(types.InlineKeyboardButton("🔙 Remote Musik", callback_data="open_music_menu"))
+        return text, markup
+
+    lines = [
+        "📜 **DAFTAR ANTREAN MUSIK PC (PLAYLIST QUEUE)**",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    ]
+    # Display up to 12 upcoming tracks
+    display_tracks = queue[:12]
+    for i, t in enumerate(display_tracks):
+        title = t.get("title", "Unknown")
+        artist = t.get("artist", "")
+        dur = t.get("durationFormatted", "")
+        if i == cur_idx:
+            badge = "▶️ *(Sedang Memutar)*" if playback == "PLAYING" else "⏸️ *(Jeda)*"
+            lines.append(f"• **{i+1}. {title}**\n   _{artist}_ ({dur}) {badge}")
+        elif i == cur_idx + 1:
+            lines.append(f"• {i+1}. **{title}**\n   _{artist}_ ({dur}) ⏳ _(Berikutnya)_")
+        else:
+            lines.append(f"• {i+1}. {title} - _{artist}_ ({dur})")
+
+    if len(queue) > 12:
+        lines.append(f"\n_...dan {len(queue) - 12} lagu lainnya dalam antrean._")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append(f"📊 Total Antrean: `{len(queue)} lagu` | Lagu ke-`{cur_idx + 1}`")
+    lines.append("💡 _Ketik `/queue <judul lagu>` untuk menambahkan lagu baru!_")
+
+    text = "\n".join(lines)
+    markup.add(
+        types.InlineKeyboardButton("⏭️ Next Track", callback_data="music_cmd:next"),
+        types.InlineKeyboardButton("🔄 Refresh", callback_data="music_cmd:view_queue"),
+        types.InlineKeyboardButton("🔙 Remote", callback_data="open_music_menu")
+    )
+    return text, markup
+
+
+def show_queue_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    text, markup = render_queue_dashboard()
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            try:
+                bot.edit_message_caption(caption=text[:1024], chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+                return
+            except Exception:
+                pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+def get_music_player_markup(is_playing: bool = True) -> types.InlineKeyboardMarkup:
+    """Builds inline control keyboard for the currently playing music card."""
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    play_pause_btn = (
+        types.InlineKeyboardButton("⏸️ Pause", callback_data="music_cmd:pause")
+        if is_playing else
+        types.InlineKeyboardButton("▶️ Resume", callback_data="music_cmd:resume")
+    )
+    markup.add(
+        play_pause_btn,
+        types.InlineKeyboardButton("⏭️ Next", callback_data="music_cmd:next"),
+        types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
+    )
+    markup.add(
+        types.InlineKeyboardButton("📜 Antrean Lagu", callback_data="music_cmd:view_queue"),
+        types.InlineKeyboardButton("🎵 Remote Musik", callback_data="open_music_menu")
+    )
+    markup.add(
+        types.InlineKeyboardButton("📸 Minta PAP Sambil Dengerin", callback_data="pap_sc:cafe")
+    )
+    return markup
 
 
 def show_music_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
@@ -3435,7 +3582,11 @@ def show_music_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[i
             bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            try:
+                bot.edit_message_caption(caption=text[:1024], chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+                return
+            except Exception:
+                pass
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
 
 
@@ -3470,16 +3621,7 @@ def handle_play_command(message):
             f"🎧 _Player otomatis dibuka di browser PC kamu._"
         )
 
-        markup = types.InlineKeyboardMarkup(row_width=3)
-        markup.add(
-            types.InlineKeyboardButton("⏸️ Pause", callback_data="music_cmd:pause"),
-            types.InlineKeyboardButton("⏭️ Next", callback_data="music_cmd:next"),
-            types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
-        )
-        markup.add(
-            types.InlineKeyboardButton("🎵 Remote Musik", callback_data="open_music_menu"),
-            types.InlineKeyboardButton("📸 Minta PAP Sambil Dengerin", callback_data="pap_sc:cafe")
-        )
+        markup = get_music_player_markup(is_playing=True)
 
         try:
             bot.delete_message(message.chat.id, wait_msg.message_id)
@@ -3537,6 +3679,89 @@ def handle_stop_command(message):
     bot.reply_to(message, "⏹️ Pemutaran musik di PC telah dihentikan.")
 
 
+@bot.message_handler(commands=['queue', 'antrean', 'antre', 'addsong', 'q'])
+def handle_queue_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    raw = message.text.strip()
+    parts = raw.split(maxsplit=1)
+    if len(parts) < 2:
+        show_queue_dashboard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+        return
+
+    query = parts[1].strip()
+    bot.send_chat_action(message.chat.id, "typing")
+    wait_msg = bot.reply_to(message, f"➕ *Mencari & menambahkan '{query}' ke antrean...*", parse_mode="Markdown")
+
+    res = call_music_api("/api/play", method="POST", payload={"query": query, "enqueue": True})
+    try:
+        bot.delete_message(message.chat.id, wait_msg.message_id)
+    except Exception:
+        pass
+
+    if res and res.get("track"):
+        t = res["track"]
+        q_len = len(res.get("queue", []))
+        caption = (
+            f"➕ **Lagu Berhasil Ditambahkan ke Antrean!**\n\n"
+            f"🎶 **{t.get('title')}**\n"
+            f"👤 Artis: `{t.get('artist', 'YouTube Music')}`\n"
+            f"⏱️ Durasi: `{t.get('durationFormatted', '')}`\n"
+            f"📊 Posisi Antrean: `#{q_len}`\n\n"
+            f"🎧 _Lagu ini akan diputar otomatis setelah lagu sebelumnya selesai._"
+        )
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            types.InlineKeyboardButton("📜 Lihat Antrean", callback_data="music_cmd:view_queue"),
+            types.InlineKeyboardButton("⏭️ Putar Sekarang", callback_data="music_cmd:next")
+        )
+        markup.add(types.InlineKeyboardButton("🎵 Remote Musik", callback_data="open_music_menu"))
+        bot.send_message(message.chat.id, caption, reply_markup=markup, parse_mode="Markdown")
+    else:
+        err = res.get("error") if res else "Koneksi ke pemutar musik (Port 8002) gagal."
+        bot.send_message(message.chat.id, f"⚠️ Tidak dapat menambahkan '{query}' ke antrean: {err}")
+
+
+@bot.message_handler(commands=['playlist', 'album', 'putarplaylist'])
+def handle_playlist_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    raw = message.text.strip()
+    parts = raw.split(maxsplit=1)
+    if len(parts) < 2:
+        bot.reply_to(message, "📻 **Format Penggunaan Playlist:**\nKetik `/playlist <nama album/artis/genre>`\n\nContoh:\n• `/playlist anime hits`\n• `/playlist lofi study`\n• `/playlist yoasobi full album`")
+        return
+
+    query = parts[1].strip()
+    bot.send_chat_action(message.chat.id, "typing")
+    wait_msg = bot.reply_to(message, f"📻 *Mencari & memuat playlist '{query}' di PC kamu...*", parse_mode="Markdown")
+
+    res = call_music_api("/api/playlist", method="POST", payload={"query": query})
+    try:
+        bot.delete_message(message.chat.id, wait_msg.message_id)
+    except Exception:
+        pass
+
+    if res and res.get("status") == "playlist_playing":
+        pl_title = res.get("title", query)
+        count = res.get("count", len(res.get("tracks", [])))
+        first_t = res.get("current_track", {})
+        caption = (
+            f"📻 **Memutar Playlist di PC Kamu:**\n\n"
+            f"🎶 Playlist: **{pl_title}**\n"
+            f"📊 Total: `{count} lagu` dimuat ke antrean\n"
+            f"▶️ Lagu Pertama: **{first_t.get('title', 'Unknown')}** - `{first_t.get('artist', '')}`\n\n"
+            f"🎧 _Lagu-lagu dalam playlist akan otomatis berganti sendiri hingga selesai!_"
+        )
+        markup = get_music_player_markup(is_playing=True)
+        bot.send_message(message.chat.id, caption, reply_markup=markup, parse_mode="Markdown")
+    else:
+        err = res.get("error") if res else "Tidak dapat memuat playlist."
+        bot.send_message(message.chat.id, f"⚠️ Gagal memutar playlist '{query}': {err}")
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('music_cmd:'))
 def callback_music_command(call):
     if not is_authorized(call.from_user.id):
@@ -3546,34 +3771,100 @@ def callback_music_command(call):
     user_id = call.from_user.id
     mid = call.message.message_id
 
+    # Check whether the button was clicked on a track card or in the full dashboard
+    is_track_card = bool(
+        (call.message.caption and "Memutar Musik" in call.message.caption) or
+        (call.message.text and "Memutar Musik" in call.message.text)
+    )
+
     if action == "pause":
         call_music_api("/api/pause", method="POST")
         bot.answer_callback_query(call.id, "⏸️ Musik di-pause")
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+        if is_track_card:
+            try:
+                bot.edit_message_reply_markup(chat_id=chat_id, message_id=mid, reply_markup=get_music_player_markup(is_playing=False))
+            except Exception:
+                pass
+        else:
+            show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+
     elif action == "resume":
         call_music_api("/api/resume", method="POST")
         bot.answer_callback_query(call.id, "▶️ Musik dilanjutkan")
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+        if is_track_card:
+            try:
+                bot.edit_message_reply_markup(chat_id=chat_id, message_id=mid, reply_markup=get_music_player_markup(is_playing=True))
+            except Exception:
+                pass
+        else:
+            show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+
     elif action == "next":
         res = call_music_api("/api/next", method="POST")
-        title = res.get("track", {}).get("title") if res and res.get("track") else "Lagu berikutnya"
-        bot.answer_callback_query(call.id, f"⏭️ {title}")
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+        t = res.get("track") if res else None
+        if t:
+            title = t.get("title", "Lagu berikutnya")
+            bot.answer_callback_query(call.id, f"⏭️ {title}")
+            if is_track_card:
+                new_caption = (
+                    f"🎵 **Memutar Musik di PC Kamu:**\n\n"
+                    f"🎶 **{t.get('title')}**\n"
+                    f"👤 Artis: `{t.get('artist', 'YouTube Music')}`\n"
+                    f"⏱️ Durasi: `{t.get('durationFormatted', '')}`\n\n"
+                    f"🎧 _Player otomatis dibuka di browser PC kamu._"
+                )
+                new_markup = get_music_player_markup(is_playing=True)
+                try:
+                    bot.edit_message_caption(caption=new_caption, chat_id=chat_id, message_id=mid, reply_markup=new_markup, parse_mode="Markdown")
+                except Exception:
+                    try:
+                        bot.edit_message_text(new_caption, chat_id=chat_id, message_id=mid, reply_markup=new_markup, parse_mode="Markdown")
+                    except Exception:
+                        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+            else:
+                show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+        else:
+            bot.answer_callback_query(call.id, "⏭️ Antrean lagu sudah selesai atau kosong.", show_alert=True)
+            if not is_track_card:
+                show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+
     elif action == "stop":
         call_music_api("/api/stop", method="POST")
         bot.answer_callback_query(call.id, "⏹️ Musik dihentikan")
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+        if is_track_card:
+            stopped_markup = types.InlineKeyboardMarkup(row_width=2)
+            stopped_markup.add(
+                types.InlineKeyboardButton("☕ Putar Lofi", callback_data="music_cmd:lofi"),
+                types.InlineKeyboardButton("🌸 J-Pop Hits", callback_data="music_cmd:jpop")
+            )
+            stopped_markup.add(
+                types.InlineKeyboardButton("🎵 Buka Remote Musik", callback_data="open_music_menu")
+            )
+            try:
+                bot.edit_message_reply_markup(chat_id=chat_id, message_id=mid, reply_markup=stopped_markup)
+            except Exception:
+                pass
+        else:
+            show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+
     elif action == "lofi":
         bot.answer_callback_query(call.id, "☕ Memutar Lofi Santai...")
         call_music_api("/api/play", method="POST", payload={"query": "lofi hip hop radio beats to relax"})
         show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+
     elif action == "jpop":
         bot.answer_callback_query(call.id, "🌸 Memutar J-Pop Hits...")
         call_music_api("/api/play", method="POST", payload={"query": "popular j-pop anime hits"})
         show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+
     elif action == "open_pc":
         call_music_api("/api/open", method="POST")
         bot.answer_callback_query(call.id, "🌐 Membuka player di browser PC...")
+
+    elif action == "view_queue":
+        bot.answer_callback_query(call.id, "📜 Memuat antrean musik...")
+        show_queue_dashboard(chat_id, user_id, message_to_edit=mid)
+
     elif action == "refresh":
         bot.answer_callback_query(call.id, "🔄 Status diperbarui")
         show_music_dashboard(chat_id, user_id, message_to_edit=mid)
@@ -3604,6 +3895,12 @@ def handle_text_messages(message):
     first_token = message.text.strip().split()[0].lower() if message.text else ''
     if first_token in ('/play', '/lagu', '/musik', '/music'):
         handle_play_command(message)
+        return
+    elif first_token in ('/queue', '/antrean', '/antre', '/addsong', '/q'):
+        handle_queue_command(message)
+        return
+    elif first_token in ('/playlist', '/album', '/putarplaylist'):
+        handle_playlist_command(message)
         return
     elif first_token in ('/pause',):
         handle_pause_command(message)
@@ -4094,6 +4391,8 @@ def setup_bot_commands():
         types.BotCommand("pap", "📸 Minta foto / menu skenario selfie"),
         types.BotCommand("video", "🎬 Dashboard AI Video & generate video waifu"),
         types.BotCommand("play", "🎵 Putar lagu YouTube di PC"),
+        types.BotCommand("queue", "➕ Tambah lagu ke antrean / lihat playlist"),
+        types.BotCommand("playlist", "📻 Putar album / playlist lengkap di PC"),
         types.BotCommand("music", "🎶 Remote kontrol pemutar musik PC"),
         types.BotCommand("language", "🌐 Pengaturan bahasa waifu (ID, EN, JA, Kustom)"),
         types.BotCommand("outfit", "👗 Lemari pakaian & ganti baju"),

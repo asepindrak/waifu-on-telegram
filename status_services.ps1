@@ -69,6 +69,15 @@ try {
     }
     Write-Host "  [ONLINE]  Locally Uncensored LLM: ONLINE (Port 8127)" -ForegroundColor Green
     Write-Host "            Model: $llmModelName" -ForegroundColor DarkCyan
+
+    # Check Vision Adapter
+    $luDir = Join-Path $env:APPDATA "Locally Uncensored\models"
+    if (Test-Path $luDir) {
+        $mmFiles = Get-ChildItem -Path $luDir -Filter "*mmproj*.gguf" -ErrorAction SilentlyContinue
+        if ($mmFiles -and $mmFiles.Count -gt 0) {
+            Write-Host "            Vision Model: $($mmFiles[0].Name)" -ForegroundColor DarkCyan
+        }
+    }
 } catch {
     Write-Host "  [OFFLINE] Locally Uncensored LLM (Port 8127): OFFLINE / Unreachable" -ForegroundColor Red
 }
@@ -96,7 +105,9 @@ try {
 $vEngine = $env:VIDEO_ENGINE
 if (-not $vEngine) { $vEngine = "wan21" }
 $vLabel = if ($vEngine -eq "animatediff") { "AnimateDiff (SD 1.5 Anime)" } else { "Wan 2.1 (1.3B AI Video)" }
+$vModel = if ($vEngine -eq "animatediff") { "mm_sd_v15_v2.ckpt (AnimateDiff v2)" } else { "wan2.1_t2v_1.3B_bf16.safetensors + wan_2.1_vae.safetensors" }
 Write-Host "  [VIDEO]   Active Video Engine: $vLabel" -ForegroundColor Cyan
+Write-Host "            Video Model: $vModel" -ForegroundColor DarkCyan
 
 # 5. Check Music Server (Port 8002)
 try {
