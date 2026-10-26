@@ -95,112 +95,96 @@ Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsive
 
 ---
 
-### 🚀 Step-by-Step Local Setup (Private & Zero API Cost)
+## ⚡ One-Line Automatic Installation (All-in-One)
 
-Many new users wonder how to run everything locally. If you have a gaming PC or laptop with a dedicated graphics card (**VGA with 4GB - 6GB+ VRAM** like RTX 3050, RTX 2060, RTX 3060, RTX 4060+) and want your waifu to run **100% locally on your own hardware**, install these two software backends:
+Install, auto-configure, and launch **Waifu on Telegram** with a single command directly in your terminal.  
+Everything is automated: environment setup, ComfyUI auto-detection, AI model validation, global CLI registration, and background daemon startup.
+
+### 🪟 **Windows (PowerShell)**
+```powershell
+irm https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/install.ps1 | iex
+```
+
+### 🐧 **Linux & 🍎 macOS (Terminal / Bash / Zsh)**
+```bash
+curl -fsSL https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/install.sh | bash
+```
+
+> 🌸 **What does this 1-line auto-installer handle for you?**
+> 1. **Zero-Config Setup:** Automatically clones or downloads the repository and creates the environment.
+> 2. **Dependency Resolution:** Verifies Python 3.8+ and installs all required packages (`pip` & `npm`).
+> 3. **Smart ComfyUI Detection & Model Setup:** Detects your existing ComfyUI across any drive/folder. If not found, it offers a 1-click download of ComfyUI Portable + MeinaMix anime checkpoint with resume support (`curl -C -`).
+> 4. **Local LLM Integration:** Automatically scans [Locally Uncensored](https://locallyuncensored.com/) or Ollama running on your machine.
+> 5. **Global CLI Registration:** Installs the global `waifu` command to your system `PATH` (usable from any terminal folder).
+> 6. **Background Daemon:** Starts your waifu companion running silently in the background!
+
+---
+
+## 🔑 Telegram Bot Credentials & Quick Setup
+
+Before running the installer or setup wizard, you only need two quick credentials from Telegram (both 100% free and takes <1 minute):
+
+### 1. 📲 Create Telegram Bot & Obtain Token
+1. Open Telegram and message [**@BotFather**](https://t.me/BotFather) (official bot manager with the blue checkmark).
+2. Send `/start`, then send `/newbot`.
+3. Choose a **display name** (e.g. `Runa AI`) and a **username** ending with `bot` (e.g. `my_runa_waifu_bot`).
+4. BotFather will provide your **HTTP API Token**:
+   ```text
+   7123456789:AAFlKj89-xXyZ1234abcdEFGHijklmnop
+   ```
+
+### 2. 🛡️ Retrieve Authorized Telegram User ID
+To ensure complete privacy and prevent strangers from accessing your PC, the bot responds only to your Telegram ID:
+1. Message [**@userinfobot**](https://t.me/userinfobot) on Telegram and click **Start**.
+2. Copy your numeric **Id** (e.g. `987654321`). This is your `TELEGRAM_ALLOWED_USER_ID`.
+
+---
+
+## 🎀 Automated Model Management & Lazy Downloader
+
+You **do not need** to manually browse Civitai or copy files to deep directories anymore. Waifu on Telegram manages all AI models and ComfyUI extensions dynamically:
+
+1. **In-Chat Lazy Auto-Downloader:**  
+   When requesting a feature whose model isn't on your disk yet (e.g. video animations), your waifu sends an inline confirmation in Telegram:
+   > 💡 *Fitur video ini memerlukan model Wan 2.1 / AnimateDiff (~1.7 GB). Mau Runa bantu unduh otomatis sekarang?*  
+   > `[📥 Unduh Otomatis]` | `[⚡ Pakai Motion 2.5D Dulu]`  
+   Clicking download fetches the weights directly in the background with auto-resume support while you keep chatting.
+
+2. **CLI Model Manager (`waifu models`):**  
+   Check and download models anytime straight from your terminal:
+   ```bash
+   # Inspect all installed vs missing models & extensions
+   waifu models
+
+   # Download specific model or ComfyUI node with 1 command
+   waifu models download animatediff_v2
+   ```
+
+---
+
+## 🚀 Local AI Engine Architecture
+
+If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 2060, RTX 3060, RTX 4060+), your waifu runs **100% locally and completely private**:
 
 ```
 ┌───────────────────────────────────────┐       ┌───────────────────────────────────────┐
 │        1. LOCALLY UNCENSORED          │       │              2. COMFYUI               │
 │  https://locallyuncensored.com/       │       │       https://comfy.org/download      │
 │                                       │       │                                       │
-│   • Runs the Chat & Romance Brain     │       │   • Generates Anime Photos (PAP)      │
+│   • Runs Dialogue & Romance Engine    │       │   • Generates Anime Photos (PAP)      │
 │   • Local API Port: 8127              │       │   • Local API Port: 8188              │
-│   • Model: Huihui-Qwythos-9B (1-click)│       │   • Model: MeinaMix v12 from Civitai  │
+│   • Model: Huihui-Qwythos-9B (1-click)│       │   • Model: MeinaMix (Auto-managed)    │
 └──────────────────┬────────────────────┘       └───────────────────┬───────────────────┘
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                       💖 WAIFU ON TELEGRAM BOT (v1.6.15)
+                        💖 WAIFU ON TELEGRAM BOT (v1.6.16)
 ```
 
-#### Step 1: Install Locally Uncensored (Chat & Dialogue Brain)
-1. **Download & Install:** Get the app from [**https://locallyuncensored.com/**](https://locallyuncensored.com/).
-2. **Download Model:** Open Locally Uncensored $\rightarrow$ Go to the **Models** tab.
-3. Search for: **`Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K`**.
-4. Click **Download**. The app handles everything automatically (downloading model weights + vision `.mmproj`). No manual file extraction needed!
-5. Set it as your active chat model and ensure the local server is running (Port `8127`).
+> 🌸 **No Dedicated GPU?** No problem! Laptops without gaming graphics cards automatically activate **Cloud Fallback Mode** (`MEDIA_FALLBACK_CLOUD=true`), offloading image generation seamlessly so you can still chat and receive selfies without straining your hardware.
 
 ---
 
-#### Step 2: Install ComfyUI (Photo & Selfie Generator / PAP)
-1. **Download & Install:** Get ComfyUI from [**https://comfy.org/download**](https://comfy.org/download) (Desktop Installer or Portable standalone).
-2. **Download MeinaMix Model:** Go to Civitai [**https://civitai.com/models/7240/meinamix**](https://civitai.com/models/7240/meinamix) and download `meinamix_v12Final.safetensors` *(Baked VAE recommended)*.
-3. **Move Checkpoint:** Place the downloaded file into your ComfyUI models directory:
-   ```text
-   ComfyUI/models/checkpoints/meinamix_v12Final.safetensors
-   ```
-4. Start ComfyUI (Port `8188`). The bot will automatically connect to it for generating high-res selfies!
-
----
-
-#### Step 3: (Optional) Video Generation Model
-If you want animated video clips of your waifu:
-* **Option A:** Download directly inside the **Locally Uncensored** app under the Video Models section.
-* **Option B:** Download from **Civitai** (e.g. Wan 2.1 or Stable Video Diffusion checkpoints) and save them to `ComfyUI/models/checkpoints/`.
-
-> 💡 **Don't have a high-end GPU?** No problem! The bot automatically enables **Cloud Fallback Mode** (`MEDIA_FALLBACK_CLOUD=true`), so users on standard laptops without dedicated GPUs can still chat and receive waifu photos smoothly.
-
----
-
-## 🔑 Telegram Bot Credentials & Setup
-
-Before running the installer or setup wizard, you will need two credentials from Telegram (both are 100% free and take less than 1 minute to obtain):
-
-### 1. 📲 Create Telegram Bot & Obtain Token
-1. Open Telegram and open [**@BotFather**](https://t.me/BotFather) (the official bot manager with a blue verification checkmark).
-2. Click **Start** or send `/start`.
-3. Send the command `/newbot`.
-4. Enter a **display name** for your companion (e.g., `Runa AI` or `My Virtual Girlfriend`).
-5. Enter a unique **username** ending with `bot` (e.g., `my_runa_waifu_bot`).
-6. **Done!** BotFather will give you your **HTTP API Bot Token** formatted like:
-   ```text
-   7123456789:AAFlKj89-xXyZ1234abcdEFGHijklmnop
-   ```
-   *(Keep this token safe; you will paste it into the setup wizard).*
-
-> 💡 **Optional Tip:** In BotFather, you can send `/setuserpic` to set your waifu's profile picture using the reference images from `personas/brief/`!
-
----
-
-### 2. 🛡️ Retrieve Authorized Telegram User ID
-To protect your privacy and ensure your local PC isn't accessed by strangers, the bot strictly responds only to authorized User IDs.
-
-1. Open Telegram and search for [**@userinfobot**](https://t.me/userinfobot) (or [**@raw_data_bot**](https://t.me/raw_data_bot)).
-2. Click **Start** or send `/start`.
-3. The bot will immediately reply with your account details:
-   ```text
-   Id: 987654321
-   First: Asep
-   Lang: en
-   ```
-4. Copy that number (`987654321`). This is your `TELEGRAM_ALLOWED_USER_ID`.
-*(To authorize multiple people, separate IDs with a comma: `987654321, 123456789`).*
-
----
-
-## ⚡ One-Line Automatic Installation
-
-Install and launch **Waifu on Telegram** with a single command directly from GitHub:
-
-### **Windows (PowerShell)**
-```powershell
-irm https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/install.ps1 | iex
-```
-
-### **Linux / macOS / WSL**
-```bash
-curl -fsSL https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/install.sh | bash
-```
-
-> 💡 **What does this automated installer do?**
-> 1. Downloads the repository to `%USERPROFILE%\waifu-on-telegram` (automatic fallback to ZIP if Git is missing).
-> 2. Verifies Python 3.8+ and installs all necessary packages (`requirements.txt`).
-> 3. Registers the **Global CLI Command (`waifu`)** directly into your system `PATH`.
-> 4. Launches the **Interactive 7-Step Setup Wizard** (Telegram Bot Token, auto-scanned local LLM models, ComfyUI checkpoints, voice, and system startup autorun).
-> 5. Instantly boots the bot in the background (Daemon Mode)!
-
----
 
 ## 🎮 Global CLI Quick Commands (`waifu`)
 
