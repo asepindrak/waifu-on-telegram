@@ -124,10 +124,19 @@ class TestMultiplatformInstallerLifecycle(unittest.TestCase):
         mock_comfy = os.path.join(self.test_dir, "ComfyUI")
         os.makedirs(os.path.join(mock_comfy, "models"), exist_ok=True)
 
+        diff_dir = os.path.join(mock_comfy, "models", "diffusion_models")
+        vae_dir = os.path.join(mock_comfy, "models", "vae")
+        os.makedirs(diff_dir, exist_ok=True)
+        os.makedirs(vae_dir, exist_ok=True)
+        with open(os.path.join(diff_dir, "wan2.1_t2v_1.3B_bf16.safetensors"), "wb") as f:
+            f.write(b"W" * (12 * 1024 * 1024))
+        with open(os.path.join(vae_dir, "wan_2.1_vae.safetensors"), "wb") as f:
+            f.write(b"V" * (12 * 1024 * 1024))
+
         with patch.dict(os.environ, {"COMFYUI_DIR": mock_comfy}):
             self.assertEqual(asset_manager.detect_comfyui_dir(), os.path.abspath(mock_comfy))
-            # Test Motion 2.5D is immediately operational since it requires 0 external models
-            ready, missing = asset_manager.ensure_video_engine_assets("motion")
+            # Test Wan 2.1 AI video engine is immediately operational
+            ready, missing = asset_manager.ensure_video_engine_assets("wan21")
             self.assertTrue(ready)
             self.assertEqual(len(missing), 0)
 

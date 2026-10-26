@@ -469,7 +469,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("🧠 Model LLM / Chat", callback_data="cfg_submenu:llm"),
         types.InlineKeyboardButton("🌐 Bahasa / Language", callback_data="cfg_submenu:language"),
         types.InlineKeyboardButton("🎨 Model Foto & ComfyUI", callback_data="cfg_submenu:photo"),
-        types.InlineKeyboardButton("🎬 Video Engine (/video_engine)", callback_data="cfg_submenu:video_engine"),
+        types.InlineKeyboardButton("🎬 Video Engine (/video)", callback_data="cfg_submenu:video_engine"),
         types.InlineKeyboardButton("🎭 Ganti Persona", callback_data="open_persona_menu"),
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
         types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
@@ -701,23 +701,23 @@ def callback_memory_actions(call):
 # Context cache for regenerating exact photo/video scenes with pose variations
 USER_LAST_PHOTO_CONTEXT: Dict[int, Dict[str, Any]] = {}
 
-# Video Generator Engine Configuration
+# Video Generator Engine Configuration (100% Neural AI Video)
 VIDEO_ENGINE = os.environ.get("VIDEO_ENGINE", "wan21").lower().strip()
+if VIDEO_ENGINE not in ("wan21", "animatediff"):
+    VIDEO_ENGINE = "wan21"
+
 VIDEO_ENGINE_LABELS = {
     "wan21": "🌟 Wan 2.1 (1.3B AI Video)",
-    "animatediff": "🌸 AnimateDiff (SD 1.5 Anime)",
-    "motion": "⚡ Motion 2.5D (Fast Parallax)"
+    "animatediff": "🌸 AnimateDiff (SD 1.5 Anime)"
 }
 
 def apply_video_engine_choice(key: str) -> str:
     global VIDEO_ENGINE
     clean_k = key.lower().strip()
-    if clean_k in ("wan", "wan21", "wan2.1"):
-        VIDEO_ENGINE = "wan21"
-    elif clean_k in ("animatediff", "anim"):
+    if clean_k in ("animatediff", "anim"):
         VIDEO_ENGINE = "animatediff"
     else:
-        VIDEO_ENGINE = "motion"
+        VIDEO_ENGINE = "wan21"
 
     os.environ["VIDEO_ENGINE"] = VIDEO_ENGINE
     update_env_var("VIDEO_ENGINE", VIDEO_ENGINE)
@@ -1966,32 +1966,33 @@ def callback_quick_actions(call):
 # --- Setup Submenu Handlers ---
 
 
-def show_video_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
-    """Renders interactive Video Engine selection menu."""
-    cur_label = VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)
+def show_video_hub_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders unified interactive AI Video Hub dashboard."""
+    cur_label = VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, "🌟 Wan 2.1 (1.3B AI Video)")
+    is_ready, missing = asset_manager.ensure_video_engine_assets(VIDEO_ENGINE)
+    ready_badge = "✅ Siap Digunakan" if is_ready else "⏳ Perlu Unduh Model"
+
     text = (
-        f"🎬 **PILIH ENGINE GENERATOR VIDEO WAIFU**\n"
+        f"🎬 **AI VIDEO GENERATOR HUB**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Pilih teknologi yang digunakan waifu saat kamu meminta video gerak (`/video` atau tombol *Bikin Video Gerak*):\n\n"
-        f"📌 **Status Aktif Saat Ini**: **{cur_label}**\n\n"
-        f"1. 🌟 **Wan 2.1 1.3B** *(Model Terdeteksi di PC kamu!)*\n"
-        f"   • Model AI Video canggih dari Alibaba Wanx.\n"
-        f"   • File `wan2.1_t2v_1.3B_bf16.safetensors` & text encoder sudah siap di ComfyUI.\n\n"
-        f"2. 🌸 **AnimateDiff (SD 1.5 Anime)**\n"
-        f"   • Khusus anime SD 1.5 (MeinaMix).\n"
-        f"   • Hemat VRAM (~4GB). Butuh motion module `mm_sd_v15_v2.ckpt` di folder AnimateDiff.\n\n"
-        f"3. ⚡ **Motion 2.5D Parallax (Fast & 0 VRAM)**\n"
-        f"   • Animasi langsung dari foto dalam 1 detik.\n"
-        f"   • 100% konsisten, ringan, dan tidak membebani kartu grafis.\n\n"
+        f"Semua permintaan video waifu ditenagai 100% oleh **AI Neural Diffusion Video Engine** (tanpa animasi 2.5D statis).\n\n"
+        f"📌 **Engine Aktif**: **{cur_label}**\n"
+        f"📊 **Status Model**: {ready_badge}\n\n"
+        f"Pilihan Engine AI Video:\n"
+        f"1. 🌟 **Wan 2.1 (1.3B)**: Model AI video generasi terbaru Alibaba Wanx. Sangat mulus dan sinematik!\n"
+        f"2. 🌸 **AnimateDiff (SD 1.5)**: Spesialis animasi gaya anime khas MeinaMix.\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 _Pilih salah satu opsi di bawah ini:_"
+        f"💡 _Cara Penggunaan:_\n"
+        f"• Tekan **🎬 Buat Video Sekarang!** di bawah untuk langsung generate.\n"
+        f"• Ketik `/video <skenario>` (contoh: `/video tersenyum manis sambil melambaikan tangan`).\n"
+        f"• Tekan tombol *🎬 Bikin Video Gerak* pada setiap foto waifu!"
     )
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
+        types.InlineKeyboardButton("🎬 Buat Video Sekarang!", callback_data="vid_generate_now"),
         types.InlineKeyboardButton(f"{'✅ ' if VIDEO_ENGINE == 'wan21' else ''}🌟 Wan 2.1 (1.3B AI Video)", callback_data="cfg_set_vengine:wan21"),
         types.InlineKeyboardButton(f"{'✅ ' if VIDEO_ENGINE == 'animatediff' else ''}🌸 AnimateDiff (SD 1.5 Anime)", callback_data="cfg_set_vengine:animatediff"),
-        types.InlineKeyboardButton(f"{'✅ ' if VIDEO_ENGINE == 'motion' else ''}⚡ Motion 2.5D (Fast Parallax)", callback_data="cfg_set_vengine:motion"),
-        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+        types.InlineKeyboardButton("🔙 Menu Setup", callback_data="cfg_submenu:dashboard")
     )
     if message_to_edit:
         try:
@@ -2002,11 +2003,16 @@ def show_video_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
 
 
+def show_video_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Backwards-compatible alias redirecting to unified Video Hub."""
+    show_video_hub_menu(chat_id, user_id, message_to_edit=message_to_edit, reply_to_id=reply_to_id)
+
+
 @bot.message_handler(commands=['video_engine', 'vengine', 'videoengine'])
 def handle_video_engine_command(message):
     if not is_authorized(message.from_user.id):
         return
-    show_video_engine_menu(message.chat.id, message.from_user.id, reply_to_message_id=message.message_id)
+    show_video_hub_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_submenu:'))
@@ -2099,7 +2105,7 @@ def prompt_missing_asset_download(chat_id: int, user_id: int, missing_keys: List
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
         types.InlineKeyboardButton(f"📥 Unduh Otomatis (~{size_mb} MB)", callback_data=f"dl_asset:{first_key}"),
-        types.InlineKeyboardButton("⚡ Pakai Motion 2.5D Dulu (Tanpa Download)", callback_data="cfg_fallback_motion"),
+        types.InlineKeyboardButton("🌟 Alihkan ke Wan 2.1 (Engine Siap)", callback_data="cfg_set_vengine:wan21"),
         types.InlineKeyboardButton("❌ Batal", callback_data="cancel_dl_prompt")
     )
     target_mid = message_to_edit or (status_msg.message_id if status_msg else None)
@@ -2159,34 +2165,24 @@ def callback_dl_asset(call):
     threading.Thread(target=download_worker, daemon=True).start()
 
 
-@bot.callback_query_handler(func=lambda call: call.data == 'cfg_fallback_motion')
-def callback_cfg_fallback_motion(call):
+@bot.callback_query_handler(func=lambda call: call.data == 'vid_generate_now')
+def callback_vid_generate_now(call):
     if not is_authorized(call.from_user.id):
         return
-    apply_video_engine_choice("motion")
-    bot.answer_callback_query(call.id, "Engine dialihkan ke Motion 2.5D (Instant)")
+    bot.answer_callback_query(call.id, "🎬 Merekam video waifu...")
     user_id = call.from_user.id
-    chat_id = call.message.chat.id
     last_ctx = USER_LAST_PHOTO_CONTEXT.get(user_id)
     if last_ctx and last_ctx.get("img_bytes"):
-        try:
-            bot.edit_message_text("⚡ Membuat animasi instan dengan Motion 2.5D...", chat_id=chat_id, message_id=call.message.message_id)
-        except Exception:
-            pass
-        generate_video_action(
-            chat_id=chat_id,
-            user_id=user_id,
-            user_text=last_ctx.get("user_text", ""),
+        process_video_request(
+            call,
+            last_ctx.get("user_text", "smiling affectionately at you"),
             base_image_bytes=last_ctx.get("img_bytes"),
-            detected_scene=last_ctx.get("detected_scene", "kamar santai"),
-            outfit_label=last_ctx.get("outfit_label", "pakaian santai"),
-            is_nude_override=last_ctx.get("is_nude", False)
+            scene_override=last_ctx.get("detected_scene"),
+            outfit_override=last_ctx.get("outfit_label"),
+            is_nude_override=last_ctx.get("is_nude")
         )
     else:
-        try:
-            bot.edit_message_text("✅ Engine video diubah ke *Motion 2.5D*. Silakan coba tombol video pada foto waifu ya!", chat_id=chat_id, message_id=call.message.message_id, parse_mode="Markdown")
-        except Exception:
-            pass
+        process_video_request(call, "smiling warmly, looking into camera, gentle natural motion")
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'cancel_dl_prompt')
@@ -2803,8 +2799,12 @@ def handle_video_command(message):
         return
 
     scenario = message.text.replace("/video", "").replace("/anim", "").replace("/animate", "").replace("/klip", "").strip()
-    user_prompt = scenario if scenario else "smiling affectionately, looking into camera"
-    process_video_request(message, user_prompt)
+    if not scenario:
+        # Bare /video command opens interactive AI Video Hub dashboard
+        show_video_hub_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+        return
+
+    process_video_request(message, scenario)
 
 
 def process_video_request(
@@ -4061,7 +4061,7 @@ def setup_bot_commands():
         types.BotCommand("setup", "⚙️ Panel kontrol & pengaturan lengkap"),
         types.BotCommand("help", "❓ Panduan fitur & cara penggunaan"),
         types.BotCommand("pap", "📸 Minta foto / menu skenario selfie"),
-        types.BotCommand("video", "🎬 Minta klip video / animasi waifu"),
+        types.BotCommand("video", "🎬 Dashboard AI Video & generate video waifu"),
         types.BotCommand("play", "🎵 Putar lagu YouTube di PC"),
         types.BotCommand("music", "🎶 Remote kontrol pemutar musik PC"),
         types.BotCommand("language", "🌐 Pengaturan bahasa waifu (ID, EN, JA, Kustom)"),
@@ -4071,7 +4071,7 @@ def setup_bot_commands():
         types.BotCommand("ratio", "📐 Ganti rasio foto (3:4, 9:16, 1:1, 4:3)"),
         types.BotCommand("quality", "✨ Atur kualitas foto (Ultra/High/Fast)"),
         types.BotCommand("voice", "🎙️ Pengaturan balasan suara / VN"),
-        types.BotCommand("video_engine", "🎬 Pilih generator video (Wan 2.1 / AnimateDiff / Motion)"),
+        types.BotCommand("video_engine", "🎬 Dashboard AI Video Engine (Wan 2.1 / AnimateDiff)"),
         types.BotCommand("love", "💖 Cek skor cinta & status hubungan"),
         types.BotCommand("greetings", "⏰ Toggle sapaan harian (Pagi, Siang, Malam)"),
         types.BotCommand("chatting", "💬 Toggle inisiatif chat duluan dari waifu"),

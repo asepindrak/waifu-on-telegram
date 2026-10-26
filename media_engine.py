@@ -3,6 +3,7 @@ import time
 import json
 import uuid
 import random
+import io
 import urllib.parse
 import logging
 import requests
@@ -371,137 +372,299 @@ class MediaEngine:
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None,
         duration: float = 3.0,
-        fps: int = 24,
+        fps: int = 16,
         base_image_bytes: Optional[bytes] = None
     ) -> Tuple[Optional[bytes], str]:
         """
-        Generates smooth dynamic video animation clip (H.264 MP4) featuring the waifu.
-        Renders character visual first, then constructs cinematic parallax camera motion,
-        breathing oscillation, and ambient sparkling particle overlay.
+        Renders AI video animation using neural ComfyUI Video Engines (Wan 2.1 or AnimateDiff).
+        No simple 2.5D motion: pure AI neural video generation.
         Returns: (video_bytes, source_label)
         """
-        import io
-        import math
-        import tempfile
-        from PIL import Image, ImageDraw
-        try:
-            import imageio
-            import numpy as np
-        except ImportError:
-            logger.error("imageio not installed. Cannot render video.")
-            return None, "Failed (Missing imageio)"
-
-        # 1. Obtain base character frame according to selected VIDEO_ENGINE
         engine = os.environ.get("VIDEO_ENGINE", "wan21").lower().strip()
-        if base_image_bytes:
-            img_bytes = base_image_bytes
-            engine_label = "Wan 2.1" if engine == "wan21" else ("AnimateDiff" if engine == "animatediff" else "Motion 2.5D")
-            source = f"Animasi Foto ({engine_label})"
-        else:
-            img_bytes, photo_src = self.generate_photo(
+        if engine not in ("wan21", "animatediff"):
+            engine = "wan21"
+
+        logger.info(f"Generating AI video with engine: {engine}")
+
+        # Dispatch to neural engine
+        if engine == "wan21":
+            vid_bytes = self.generate_video_wan21(
                 visual_prompt=visual_prompt,
                 negative_prompt=negative_prompt,
-                aspect_ratio=aspect_ratio or "3:4",
-                quality=quality
+                base_image_bytes=base_image_bytes
             )
-            if img_bytes:
-                engine_label = "Wan 2.1 1.3B" if engine == "wan21" else ("AnimateDiff SD1.5" if engine == "animatediff" else "Motion 2.5D")
-                source = f"{engine_label} ({photo_src})"
-            else:
-                source = "Failed"
-        if not img_bytes:
-            return None, "Failed (Photo Generation)"
+            if vid_bytes:
+                return vid_bytes, "🌟 Wan 2.1 AI Video Engine"
+        else: # animatediff
+            vid_bytes = self.generate_video_animatediff(
+                visual_prompt=visual_prompt,
+                negative_prompt=negative_prompt,
+                base_image_bytes=base_image_bytes
+            )
+            if vid_bytes:
+                return vid_bytes, "🌸 AnimateDiff Anime Video Engine"
 
+        return None, "Failed (Video Generation)"
+
+    def _upload_image_to_comfy(self, img_bytes: bytes, filename: str = "waifu_source.png") -> Optional[str]:
+        """Uploads raw image bytes to ComfyUI's input directory."""
         try:
-            base_image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-            w, h = base_image.size
+            files = {"image": (filename, io.BytesIO(img_bytes), "image/png")}
+            data = {"overwrite": "true"}
+            r = requests.post(f"{self.comfyui_url}/upload/image", files=files, data=data, timeout=10)
+            if r.status_code == 200:
+                return r.json().get("name", filename)
+        except Exception as e:
+            logger.warning(f"Error uploading image to ComfyUI: {e}")
+        return None
 
-            # Ensure even dimensions for H.264 libx264 compatibility
-            if w % 2 != 0:
-                w -= 1
-            if h % 2 != 0:
-                h -= 1
-            if (w, h) != base_image.size:
-                base_image = base_image.crop((0, 0, w, h))
+    def generate_video_wan21(
+        self,
+        visual_prompt: str,
+        negative_prompt: Optional[str] = None,
+        base_image_bytes: Optional[bytes] = None
+    ) -> Optional[bytes]:
+        """Executes Wan 2.1 1.3B AI Video pipeline on ComfyUI."""
+        neg = negative_prompt or "bad anatomy, deformed, distorted, blurry, worst quality"
+        seed = random.randint(1000000, 99999999)
 
-            total_frames = int(duration * fps)
-
-            # Generate ambient floating particle seeds
-            particles = [
-                {
-                    "x": random.uniform(20, w - 20),
-                    "y": random.uniform(20, h - 20),
-                    "r": random.uniform(2.0, 5.0),
-                    "speed_y": random.uniform(-0.8, -1.8),
-                    "drift_x": random.uniform(-0.5, 0.5),
-                    "color": random.choice([
-                        (255, 230, 240, 160),  # Pink cherry sparkle
-                        (255, 255, 220, 150),  # Golden sunshine dust
-                        (220, 240, 255, 140)   # Celestial blue sparkle
-                    ])
+        # Base workflow for Wan 2.1
+        workflow = {
+            "1": {
+                "class_type": "UNETLoader",
+                "inputs": {
+                    "unet_name": "wan2.1_t2v_1.3B_bf16.safetensors",
+                    "weight_dtype": "default"
                 }
-                for _ in range(16)
-            ]
+            },
+            "2": {
+                "class_type": "CLIPLoader",
+                "inputs": {
+                    "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+                    "type": "wan"
+                }
+            },
+            "3": {
+                "class_type": "VAELoader",
+                "inputs": {
+                    "vae_name": "wan_2.1_vae.safetensors"
+                }
+            },
+            "4": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {
+                    "text": visual_prompt,
+                    "clip": ["2", 0]
+                }
+            },
+            "5": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {
+                    "text": neg,
+                    "clip": ["2", 0]
+                }
+            },
+            "6": {
+                "class_type": "WanImageToVideo",
+                "inputs": {
+                    "positive": ["4", 0],
+                    "negative": ["5", 0],
+                    "vae": ["3", 0],
+                    "width": 640,
+                    "height": 480,
+                    "length": 25,
+                    "batch_size": 1
+                }
+            },
+            "7": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "seed": seed,
+                    "steps": 20,
+                    "cfg": 6.0,
+                    "sampler_name": "euler",
+                    "scheduler": "normal",
+                    "denoise": 1.0,
+                    "model": ["1", 0],
+                    "positive": ["6", 0],
+                    "negative": ["6", 1],
+                    "latent_image": ["6", 2]
+                }
+            },
+            "8": {
+                "class_type": "VAEDecode",
+                "inputs": {
+                    "samples": ["7", 0],
+                    "vae": ["3", 0]
+                }
+            },
+            "9": {
+                "class_type": "CreateVideo",
+                "inputs": {
+                    "images": ["8", 0],
+                    "fps": 16.0
+                }
+            },
+            "10": {
+                "class_type": "SaveVideo",
+                "inputs": {
+                    "video": ["9", 0],
+                    "filename_prefix": "WaifuWan21Video",
+                    "format": "auto"
+                }
+            }
+        }
 
-            # Temporary MP4 file
-            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_file:
-                tmp_path = tmp_file.name
+        # If base image is provided (e.g. from photo message), upload and feed as start_image
+        if base_image_bytes:
+            uploaded_name = self._upload_image_to_comfy(base_image_bytes, f"wan_in_{seed}.png")
+            if uploaded_name:
+                workflow["11"] = {
+                    "class_type": "LoadImage",
+                    "inputs": {"image": uploaded_name}
+                }
+                workflow["6"]["inputs"]["start_image"] = ["11", 0]
 
-            writer = imageio.get_writer(
-                tmp_path,
-                fps=fps,
-                codec="libx264",
-                pixelformat="yuv420p",
-                quality=8
+        return self._execute_video_workflow(workflow, output_node_id="10")
+
+    def generate_video_animatediff(
+        self,
+        visual_prompt: str,
+        negative_prompt: Optional[str] = None,
+        base_image_bytes: Optional[bytes] = None
+    ) -> Optional[bytes]:
+        """Executes AnimateDiff SD 1.5 Anime video pipeline on ComfyUI."""
+        ckpts = self.get_available_checkpoints()
+        chosen_ckpt = None
+        for c in ckpts:
+            if any(k in c.lower() for k in ["meina", "anime", "aom"]):
+                chosen_ckpt = c
+                break
+        if not chosen_ckpt and ckpts:
+            chosen_ckpt = ckpts[0]
+
+        if not chosen_ckpt:
+            self.last_error = "Checkpoint anime MeinaMix tidak ditemukan di ComfyUI."
+            return None
+
+        seed = random.randint(1000000, 99999999)
+        neg = negative_prompt or "worst quality, low quality, bad anatomy, deformed eyes"
+
+        workflow = {
+            "1": {
+                "class_type": "CheckpointLoaderSimple",
+                "inputs": {"ckpt_name": chosen_ckpt}
+            },
+            "2": {
+                "class_type": "EmptyLatentImage",
+                "inputs": {"width": 512, "height": 768, "batch_size": 16}
+            },
+            "3": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {"text": visual_prompt, "clip": ["1", 1]}
+            },
+            "4": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {"text": neg, "clip": ["1", 1]}
+            },
+            "5": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "seed": seed,
+                    "steps": 20,
+                    "cfg": 7.0,
+                    "sampler_name": "dpmpp_2m",
+                    "scheduler": "karras",
+                    "denoise": 1.0,
+                    "model": ["1", 0],
+                    "positive": ["3", 0],
+                    "negative": ["4", 0],
+                    "latent_image": ["2", 0]
+                }
+            },
+            "6": {
+                "class_type": "VAEDecode",
+                "inputs": {"samples": ["5", 0], "vae": ["1", 2]}
+            },
+            "7": {
+                "class_type": "CreateVideo",
+                "inputs": {"images": ["6", 0], "fps": 12.0}
+            },
+            "8": {
+                "class_type": "SaveVideo",
+                "inputs": {
+                    "video": ["7", 0],
+                    "filename_prefix": "WaifuAnimateDiff",
+                    "format": "auto"
+                }
+            }
+        }
+
+        return self._execute_video_workflow(workflow, output_node_id="8")
+
+    def _execute_video_workflow(self, workflow: dict, output_node_id: str = "9") -> Optional[bytes]:
+        """Submits video workflow to ComfyUI and polls for the resulting MP4 video binary."""
+        try:
+            res = requests.post(
+                f"{self.comfyui_url}/prompt",
+                json={"prompt": workflow, "client_id": self.client_id},
+                timeout=12
             )
+            if res.status_code != 200:
+                logger.warning(f"ComfyUI video prompt rejected: {res.text}")
+                self.last_error = f"ComfyUI menolak prompt video: {res.text[:120]}"
+                return None
 
-            for i in range(total_frames):
-                # Smooth cosine normalized time (0 to 2*pi for seamless loop)
-                t = (i / total_frames) * 2 * math.pi
+            prompt_id = res.json().get("prompt_id")
+            if not prompt_id:
+                self.last_error = "ComfyUI tidak mengembalikan prompt_id untuk video."
+                return None
 
-                # Subtle smooth zoom: 1.0 to 1.045
-                zoom = 1.0 + 0.045 * ((1 - math.cos(t)) / 2)
+            # Poll for video completion (up to 300 seconds for video diffusion)
+            for _ in range(150):
+                time.sleep(2.0)
+                try:
+                    h_res = requests.get(f"{self.comfyui_url}/history/{prompt_id}", timeout=6)
+                except Exception:
+                    continue
 
-                # Gentle vertical breathing motion: -3 to +3 pixels
-                y_shift = int(3.5 * math.sin(t))
+                if h_res.status_code == 200:
+                    h_data = h_res.json()
+                    if prompt_id in h_data:
+                        task = h_data[prompt_id]
+                        status = task.get("status", {})
+                        if status.get("status_str") == "error":
+                            messages = status.get("messages", [])
+                            err_detail = "Node error"
+                            for m in messages:
+                                if isinstance(m, list) and len(m) > 1 and m[0] == "execution_error":
+                                    info = m[1]
+                                    err_detail = f"{info.get('node_type')}: {info.get('exception_message', '').strip()}"
+                                    break
+                            logger.error(f"ComfyUI video error: {status.get('messages')}")
+                            self.last_error = f"ComfyUI video render error ({err_detail})"
+                            return None
 
-                # Crop zoom
-                crop_w = int(w / zoom)
-                crop_h = int(h / zoom)
-                crop_left = (w - crop_w) // 2
-                crop_top = max(0, min(h - crop_h, (h - crop_h) // 2 + y_shift))
+                        outputs = task.get("outputs", {})
+                        # Search for video outputs in any returned node
+                        for nid, node_out in outputs.items():
+                            for media_key in ("videos", "gifs", "images"):
+                                if media_key in node_out and len(node_out[media_key]) > 0:
+                                    vinfo = node_out[media_key][0]
+                                    fname = vinfo.get("filename")
+                                    subfolder = vinfo.get("subfolder", "")
+                                    mtype = vinfo.get("type", "output")
 
-                frame_img = base_image.crop((crop_left, crop_top, crop_left + crop_w, crop_top + crop_h))
-                frame_img = frame_img.resize((w, h), Image.Resampling.BILINEAR)
+                                    view_url = f"{self.comfyui_url}/view?filename={fname}&subfolder={subfolder}&type={mtype}"
+                                    vresp = requests.get(view_url, timeout=60)
+                                    if vresp.status_code == 200:
+                                        return vresp.content
 
-                # Overlay soft glowing particles
-                overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-                draw = ImageDraw.Draw(overlay)
-
-                for p in particles:
-                    px = (p["x"] + p["drift_x"] * i) % w
-                    py = (p["y"] + p["speed_y"] * i) % h
-                    pr = p["r"] * (0.8 + 0.3 * math.sin(t + px))
-                    rgba = p["color"]
-                    draw.ellipse([px - pr, py - pr, px + pr, py + pr], fill=rgba)
-
-                frame_rgba = frame_img.convert("RGBA")
-                frame_combined = Image.alpha_composite(frame_rgba, overlay).convert("RGB")
-
-                writer.append_data(np.array(frame_combined))
-
-            writer.close()
-
-            with open(tmp_path, "rb") as f:
-                video_bytes = f.read()
-
-            try:
-                os.remove(tmp_path)
-            except Exception:
-                pass
-
-            return video_bytes, f"{source} (Motion Rendered)"
+            if not self.last_error:
+                self.last_error = "Waktu render video melebihi batas (ComfyUI sibuk atau VRAM terbatas)."
 
         except Exception as e:
-            logger.error(f"Error rendering video animation: {e}")
-            return None, "Failed (Video Render)"
+            logger.error(f"ComfyUI video workflow exception: {e}")
+            self.last_error = f"Error rendering video ComfyUI: {e}"
+
+        return None
