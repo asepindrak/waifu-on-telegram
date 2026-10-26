@@ -93,11 +93,7 @@ def detect_comfyui_dir() -> Optional[str]:
     candidate_paths = [
         # Comfy-Desktop official install (Windows)
         os.path.join(local_app_data, "Comfy-Desktop", "ComfyUI-Installs", "ComfyUI", "ComfyUI"),
-        # Portable Windows ComfyUI
-        os.path.join(user_home, "ComfyUI_windows_portable", "ComfyUI"),
-        "C:\\ComfyUI_windows_portable\\ComfyUI",
-        "D:\\ComfyUI_windows_portable\\ComfyUI",
-        "E:\\ComfyUI_windows_portable\\ComfyUI",
+        os.path.join(local_app_data, "Comfy-Desktop", "ComfyUI-Shared"),
         # macOS paths
         os.path.join(user_home, "Library", "Application Support", "ComfyUI"),
         "/Applications/ComfyUI.app/Contents/Resources/ComfyUI",
@@ -108,9 +104,24 @@ def detect_comfyui_dir() -> Optional[str]:
         # Standard user folder (macOS / Linux / Windows)
         os.path.join(user_home, "ComfyUI"),
         os.path.join(user_home, "comfyui"),
+        os.path.join(user_home, "Desktop", "ComfyUI"),
+        os.path.join(user_home, "Downloads", "ComfyUI"),
+        os.path.join(user_home, "Documents", "ComfyUI"),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "ComfyUI")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "ComfyUI"))
     ]
+
+    # Additional Windows drive scanning (C:, D:, E:, F:, G:)
+    if platform.system() == "Windows":
+        for drive in ["C:", "D:", "E:", "F:", "G:"]:
+            candidate_paths.extend([
+                f"{drive}\\ComfyUI",
+                f"{drive}\\comfyui",
+                f"{drive}\\ComfyUI_windows_portable\\ComfyUI",
+                f"{drive}\\AI\\ComfyUI",
+                f"{drive}\\StableDiffusion\\ComfyUI",
+                f"{drive}\\sd\\ComfyUI"
+            ])
 
     # 2. Check running process across Windows, Linux, and macOS
     if platform.system() != "Windows":
