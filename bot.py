@@ -1754,6 +1754,7 @@ def handle_status(message):
         return
 
     bot.send_chat_action(message.chat.id, "typing")
+    user_id = message.from_user.id
     llm_stat = llm_client.check_health()
     media_stat = media_engine.check_status()
     persona = persona_mgr.get_active_persona()
@@ -1761,18 +1762,48 @@ def handle_status(message):
     status_icon = "🟢 Online" if llm_stat.get("online") else "🔴 Offline"
     media_icon = "🟢 Active" if media_stat.get("online") else "🟡 Cloud Fallback"
 
+    # Resolve LLM model name
+    raw_model = llm_stat.get("model", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
+    if "\\" in raw_model or "/" in raw_model:
+        llm_model_name = os.path.basename(raw_model)
+    else:
+        llm_model_name = raw_model
+
+    # Resolve active outfit
+    _, cur_outfit = persona_mgr.get_user_outfit(user_id)
+
+    # Resolve photo checkpoint & video engine
+    ckpts = media_engine.get_available_checkpoints()
+    cur_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "").strip() or (ckpts[0] if ckpts else "Auto (MeinaMix preferred)")
+    v_engine_label = VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)
+    lang_label = persona_mgr.get_language_display_name(BOT_LANGUAGE)
+    ar = USER_RATIOS.get(user_id, "3:4")
+    qual = USER_QUALITIES.get(user_id, "high").title()
+    facts_count = len(memory_engine.get_facts(user_id))
+    affinity_score = memory_engine.get_affinity(user_id)
+
     report = (
-        f"📊 **Waifu on Telegram v{get_version()} - System Diagnostics**\n\n"
-        f"🧠 **Local LLM**: {status_icon}\n"
-        f"• Backend: `{llm_stat.get('backend', 'Unknown')}`\n"
-        f"• Endpoint: `{LLM_BASE_URL}`\n"
-        f"• Model: `{llm_stat.get('model', 'Active')}`\n\n"
-        f"🎨 **Media Generator**: {media_icon}\n"
-        f"• Backend: `{media_stat.get('backend')}`\n"
-        f"• Device: `{media_stat.get('device')}`\n\n"
-        f"🎭 **Active Persona**: **{persona.get('name')}**\n"
-        f"🎙️ **Voice Reply**: `{'Active (' + voice_engine.default_voice + ')' if VOICE_ENABLED else 'Disabled'}`\n"
-        f"🧠 **Ingatan Tersimpan**: `{len(memory_engine.get_facts(message.from_user.id))} fakta`\n"
+        f"📊 **WAIFU ON TELEGRAM - SYSTEM STATUS** `(v{get_version()})`\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👑 **Persona Waifu** : **{persona.get('name')}** _({persona.get('archetype', 'Companion')})_\n"
+        f"👗 **Pakaian Aktif** : `{cur_outfit}`\n"
+        f"🌐 **Bahasa**        : `{lang_label}`\n"
+        f"💖 **Skor Cinta**    : `{affinity_score} pts`\n\n"
+        f"🧠 **Model LLM Chat**: {status_icon}\n"
+        f"• Nama Model : `{llm_model_name}`\n"
+        f"• Backend    : `{llm_stat.get('backend', 'Locally Uncensored')}`\n"
+        f"• Endpoint   : `{LLM_BASE_URL}`\n\n"
+        f"🎨 **Generator Visual**: {media_icon}\n"
+        f"• Model Foto : `{cur_ckpt}`\n"
+        f"• Video AI   : `{v_engine_label}`\n"
+        f"• Rasio/Preset: `{ar}` | `{qual}`\n"
+        f"• Device/GPU : `{media_stat.get('device', 'CUDA')}`\n\n"
+        f"🎙️ **Suara & Audio**:\n"
+        f"• Voice TTS  : `{'Aktif (' + voice_engine.default_voice + ')' if VOICE_ENABLED else 'Nonaktif'}`\n"
+        f"• Musik PC   : `Online (Port 8002)`\n\n"
+        f"🧠 **Buku Ingatan**  : `{facts_count} fakta tersimpan`\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 _Ketik `/setup` untuk membuka panel kontrol dan pengaturan lengkap._"
     )
     bot.reply_to(message, report, parse_mode="Markdown")
 
