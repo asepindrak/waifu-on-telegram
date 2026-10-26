@@ -64,6 +64,11 @@ if not BOT_TOKEN:
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
+# Configure Telegram API timeouts for fast, resilient uploads
+from telebot import apihelper
+apihelper.READ_TIMEOUT = 120
+apihelper.CONNECT_TIMEOUT = 30
+
 # Initialize engines
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8127/v1")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "auto")
@@ -2475,7 +2480,30 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                 types.InlineKeyboardButton("🎬 Bikin Video Gerak", callback_data=f"regen_video:{detected_scene[:30]}")
             )
 
-            bot.send_photo(chat_id, img_bytes, caption=clean_caption, reply_markup=markup)
+            # Optimize image bytes before sending to Telegram to prevent read timeout
+            img_to_send = img_bytes
+            if len(img_bytes) > 800 * 1024:
+                try:
+                    from PIL import Image
+                    import io
+                    im = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                    buf = io.BytesIO()
+                    im.save(buf, format="JPEG", quality=92, optimize=True)
+                    img_to_send = buf.getvalue()
+                except Exception as e_opt:
+                    logger.warning(f"Image optimization skipped: {e_opt}")
+                    img_to_send = img_bytes
+
+            for attempt in range(2):
+                try:
+                    bot.send_photo(chat_id, img_to_send, caption=clean_caption, reply_markup=markup, timeout=90)
+                    break
+                except Exception as e_send:
+                    if attempt == 0:
+                        logger.warning(f"send_photo attempt 1 timed out ({e_send}), retrying in 2s...")
+                        time.sleep(2)
+                        continue
+                    raise e_send
 
             new_aff = persona_mgr.increase_affinity(user_id, delta=2)
             memory_engine.set_affinity(user_id, new_aff)
@@ -2967,6 +2995,246 @@ def handle_new_persona_command(message):
     start_persona_wizard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
 
 
+# --- Remote Pemutar Musik YouTube PC (/play, /music) ---
+
+MUSIC_SERVER_URL = os.environ.get("MUSIC_PLAYER_URL", "http://127.0.0.1:8002")
+
+
+def call_music_api(endpoint: str, method: str = "GET", payload: Optional[dict] = None) -> Optional[dict]:
+    import urllib.request
+    import json
+    url = f"{MUSIC_SERVER_URL.rstrip('/')}{endpoint}"
+    data = json.dumps(payload).encode('utf-8') if payload is not None else None
+    headers = {"Content-Type": "application/json"} if payload is not None else {}
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=8) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except Exception as e:
+        logger.debug(f"Music API error ({endpoint}): {e}")
+        return None
+
+
+def render_music_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarkup]:
+    stat = call_music_api("/api/status")
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    if not stat or not stat.get("enabled"):
+        text = (
+            "🎵 **REMOTE PEMUTAR MUSIK YOUTUBE PC**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "⚠️ Layanan pemutar musik lokal (Port 8002) belum merespons.\n"
+            "Pastikan script `music_player_server.js` berjalan di PC kamu."
+        )
+        markup.add(
+            types.InlineKeyboardButton("🔄 Refresh Status", callback_data="music_cmd:refresh"),
+            types.InlineKeyboardButton("🔙 Menu Setup", callback_data="open_setup_menu")
+        )
+        return text, markup
+
+    playback = stat.get("playbackState", "STOPPED")
+    track = stat.get("current_track")
+    queue_len = len(stat.get("queue", []))
+
+    if playback == "PLAYING" and track:
+        state_badge = "▶️ Sedang Memutar"
+        ctrl_btn = types.InlineKeyboardButton("⏸️ Pause", callback_data="music_cmd:pause")
+    elif playback == "PAUSED" and track:
+        state_badge = "⏸️ Jeda (Paused)"
+        ctrl_btn = types.InlineKeyboardButton("▶️ Lanjutkan", callback_data="music_cmd:resume")
+    else:
+        state_badge = "⏹️ Berhenti (Idle)"
+        ctrl_btn = types.InlineKeyboardButton("▶️ Putar Lofi", callback_data="music_cmd:lofi")
+
+    if track:
+        track_info = (
+            f"🎶 **{track.get('title', 'Unknown')}**\n"
+            f"👤 Artis: `{track.get('artist', 'Unknown')}`\n"
+            f"⏱️ Durasi: `{track.get('durationFormatted', '00:00')}`\n"
+            f"📻 Status: **{state_badge}** | Antrean: `{queue_len} lagu`"
+        )
+    else:
+        track_info = (
+            f"📻 Status: **{state_badge}**\n\n"
+            f"Belum ada lagu yang diputar di PC kamu saat ini.\n"
+            f"Ketik `/play <judul lagu>` untuk langsung memutar musik favoritmu!"
+        )
+
+    text = (
+        f"🎵 **REMOTE PEMUTAR MUSIK YOUTUBE PC**\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{track_info}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 _Lagu diputar langsung di layar browser PC kamu secara otomatis!_"
+    )
+
+    markup.add(
+        ctrl_btn,
+        types.InlineKeyboardButton("⏭️ Next", callback_data="music_cmd:next"),
+        types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
+    )
+    markup.add(
+        types.InlineKeyboardButton("☕ Lofi Santai", callback_data="music_cmd:lofi"),
+        types.InlineKeyboardButton("🌸 J-Pop Hits", callback_data="music_cmd:jpop"),
+        types.InlineKeyboardButton("🔄 Refresh", callback_data="music_cmd:refresh")
+    )
+    markup.add(
+        types.InlineKeyboardButton("🌐 Buka Player di PC", callback_data="music_cmd:open_pc"),
+        types.InlineKeyboardButton("🔙 Menu Setup", callback_data="open_setup_menu")
+    )
+    return text, markup
+
+
+def show_music_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    text, markup = render_music_dashboard(user_id)
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+
+
+@bot.message_handler(commands=['play', 'lagu', 'musik', 'music'])
+def handle_play_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+
+    raw = message.text.strip()
+    parts = raw.split(maxsplit=1)
+    if len(parts) < 2:
+        show_music_dashboard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+        return
+
+    query = parts[1].strip()
+    bot.send_chat_action(message.chat.id, "typing")
+    wait_msg = bot.reply_to(message, f"🔍 *Mencari & memutar '{query}' di PC kamu...* 💕", parse_mode="Markdown")
+
+    res = call_music_api("/api/play", method="POST", payload={"query": query})
+    if res and res.get("track"):
+        track = res["track"]
+        title = track.get("title", query)
+        artist = track.get("artist", "YouTube Music")
+        dur = track.get("durationFormatted", "")
+        thumb = track.get("thumbnail")
+
+        caption = (
+            f"🎵 **Memutar Musik di PC Kamu:**\n\n"
+            f"🎶 **{title}**\n"
+            f"👤 Artis: `{artist}`\n"
+            f"⏱️ Durasi: `{dur}`\n\n"
+            f"🎧 _Player otomatis dibuka di layar browser PC kamu sayang! 🥰_"
+        )
+
+        markup = types.InlineKeyboardMarkup(row_width=3)
+        markup.add(
+            types.InlineKeyboardButton("⏸️ Pause", callback_data="music_cmd:pause"),
+            types.InlineKeyboardButton("⏭️ Next", callback_data="music_cmd:next"),
+            types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
+        )
+        markup.add(
+            types.InlineKeyboardButton("🎵 Remote Musik", callback_data="open_music_menu"),
+            types.InlineKeyboardButton("📸 Minta PAP Sambil Dengerin", callback_data="pap_sc:cafe")
+        )
+
+        try:
+            bot.delete_message(message.chat.id, wait_msg.message_id)
+        except Exception:
+            pass
+
+        if thumb:
+            try:
+                bot.send_photo(message.chat.id, thumb, caption=caption, reply_markup=markup, parse_mode="Markdown")
+                return
+            except Exception:
+                pass
+        bot.send_message(message.chat.id, caption, reply_markup=markup, parse_mode="Markdown")
+    else:
+        err = res.get("error") if res else "Koneksi ke pemutar musik (Port 8002) gagal."
+        try:
+            bot.edit_message_text(f"⚠️ Tidak dapat memutar '{query}': {err}", chat_id=message.chat.id, message_id=wait_msg.message_id)
+        except Exception:
+            bot.send_message(message.chat.id, f"⚠️ Tidak dapat memutar '{query}': {err}")
+
+
+@bot.message_handler(commands=['pause'])
+def handle_pause_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    call_music_api("/api/pause", method="POST")
+    bot.reply_to(message, "⏸️ Pemutaran musik di PC telah di-pause.")
+
+
+@bot.message_handler(commands=['resume'])
+def handle_resume_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    call_music_api("/api/resume", method="POST")
+    bot.reply_to(message, "▶️ Pemutaran musik di PC dilanjutkan.")
+
+
+@bot.message_handler(commands=['next', 'skip'])
+def handle_next_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    res = call_music_api("/api/next", method="POST")
+    if res and res.get("track"):
+        t = res["track"]
+        bot.reply_to(message, f"⏭️ Memutar lagu berikutnya di PC:\n🎶 **{t.get('title')}** - `{t.get('artist')}`", parse_mode="Markdown")
+    else:
+        bot.reply_to(message, "⏭️ Antrean lagu sudah selesai atau kosong.")
+
+
+@bot.message_handler(commands=['stop'])
+def handle_stop_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    call_music_api("/api/stop", method="POST")
+    bot.reply_to(message, "⏹️ Pemutaran musik di PC telah dihentikan.")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('music_cmd:'))
+def callback_music_command(call):
+    if not is_authorized(call.from_user.id):
+        return
+    action = call.data.split(":", 1)[1]
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    mid = call.message.message_id
+
+    if action == "pause":
+        call_music_api("/api/pause", method="POST")
+        bot.answer_callback_query(call.id, "⏸️ Musik di-pause")
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "resume":
+        call_music_api("/api/resume", method="POST")
+        bot.answer_callback_query(call.id, "▶️ Musik dilanjutkan")
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "next":
+        res = call_music_api("/api/next", method="POST")
+        title = res.get("track", {}).get("title") if res and res.get("track") else "Lagu berikutnya"
+        bot.answer_callback_query(call.id, f"⏭️ {title}")
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "stop":
+        call_music_api("/api/stop", method="POST")
+        bot.answer_callback_query(call.id, "⏹️ Musik dihentikan")
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "lofi":
+        bot.answer_callback_query(call.id, "☕ Memutar Lofi Santai...")
+        call_music_api("/api/play", method="POST", payload={"query": "lofi hip hop radio beats to relax"})
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "jpop":
+        bot.answer_callback_query(call.id, "🌸 Memutar J-Pop Hits...")
+        call_music_api("/api/play", method="POST", payload={"query": "popular j-pop anime hits"})
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+    elif action == "open_pc":
+        call_music_api("/api/open", method="POST")
+        bot.answer_callback_query(call.id, "🌐 Membuka player di browser PC...")
+    elif action == "refresh":
+        bot.answer_callback_query(call.id, "🔄 Status diperbarui")
+        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
+
+
 @bot.message_handler(func=lambda msg: True)
 def handle_text_messages(message):
     if not is_authorized(message.from_user.id):
@@ -2987,6 +3255,25 @@ def handle_text_messages(message):
     if message.from_user.id in USER_PERSONA_WIZARD:
         if handle_persona_wizard_input(message):
             return
+
+    # Direct fallback dispatch for music commands
+    first_token = message.text.strip().split()[0].lower() if message.text else ''
+    if first_token in ('/play', '/lagu', '/musik', '/music'):
+        handle_play_command(message)
+        return
+    elif first_token in ('/pause',):
+        handle_pause_command(message)
+        return
+    elif first_token in ('/resume',):
+        handle_resume_command(message)
+        return
+    elif first_token in ('/next', '/skip'):
+        handle_next_command(message)
+        return
+    elif first_token in ('/stop',):
+        handle_stop_command(message)
+        return
+
     process_text_chat(message, message.text, is_voice=False)
 
 
@@ -3256,246 +3543,6 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 threading.Thread(target=send_voice, daemon=True).start()
 
     threading.Thread(target=_execute, daemon=True).start()
-
-
-# --- Remote Pemutar Musik YouTube PC (/play, /music) ---
-
-MUSIC_SERVER_URL = os.environ.get("MUSIC_PLAYER_URL", "http://127.0.0.1:8002")
-
-
-def call_music_api(endpoint: str, method: str = "GET", payload: Optional[dict] = None) -> Optional[dict]:
-    import urllib.request
-    import json
-    url = f"{MUSIC_SERVER_URL.rstrip('/')}{endpoint}"
-    data = json.dumps(payload).encode('utf-8') if payload is not None else None
-    headers = {"Content-Type": "application/json"} if payload is not None else {}
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=8) as response:
-            return json.loads(response.read().decode('utf-8'))
-    except Exception as e:
-        logger.debug(f"Music API error ({endpoint}): {e}")
-        return None
-
-
-def render_music_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarkup]:
-    stat = call_music_api("/api/status")
-    markup = types.InlineKeyboardMarkup(row_width=3)
-    if not stat or not stat.get("enabled"):
-        text = (
-            "🎵 **REMOTE PEMUTAR MUSIK YOUTUBE PC**\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ Layanan pemutar musik lokal (Port 8002) belum merespons.\n"
-            "Pastikan script `music_player_server.js` berjalan di PC kamu."
-        )
-        markup.add(
-            types.InlineKeyboardButton("🔄 Refresh Status", callback_data="music_cmd:refresh"),
-            types.InlineKeyboardButton("🔙 Menu Setup", callback_data="open_setup_menu")
-        )
-        return text, markup
-
-    playback = stat.get("playbackState", "STOPPED")
-    track = stat.get("current_track")
-    queue_len = len(stat.get("queue", []))
-
-    if playback == "PLAYING" and track:
-        state_badge = "▶️ Sedang Memutar"
-        ctrl_btn = types.InlineKeyboardButton("⏸️ Pause", callback_data="music_cmd:pause")
-    elif playback == "PAUSED" and track:
-        state_badge = "⏸️ Jeda (Paused)"
-        ctrl_btn = types.InlineKeyboardButton("▶️ Lanjutkan", callback_data="music_cmd:resume")
-    else:
-        state_badge = "⏹️ Berhenti (Idle)"
-        ctrl_btn = types.InlineKeyboardButton("▶️ Putar Lofi", callback_data="music_cmd:lofi")
-
-    if track:
-        track_info = (
-            f"🎶 **{track.get('title', 'Unknown')}**\n"
-            f"👤 Artis: `{track.get('artist', 'Unknown')}`\n"
-            f"⏱️ Durasi: `{track.get('durationFormatted', '00:00')}`\n"
-            f"📻 Status: **{state_badge}** | Antrean: `{queue_len} lagu`"
-        )
-    else:
-        track_info = (
-            f"📻 Status: **{state_badge}**\n\n"
-            f"Belum ada lagu yang diputar di PC kamu saat ini.\n"
-            f"Ketik `/play <judul lagu>` untuk langsung memutar musik favoritmu!"
-        )
-
-    text = (
-        f"🎵 **REMOTE PEMUTAR MUSIK YOUTUBE PC**\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"{track_info}\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 _Lagu diputar langsung di layar browser PC kamu secara otomatis!_"
-    )
-
-    markup.add(
-        ctrl_btn,
-        types.InlineKeyboardButton("⏭️ Next", callback_data="music_cmd:next"),
-        types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
-    )
-    markup.add(
-        types.InlineKeyboardButton("☕ Lofi Santai", callback_data="music_cmd:lofi"),
-        types.InlineKeyboardButton("🌸 J-Pop Hits", callback_data="music_cmd:jpop"),
-        types.InlineKeyboardButton("🔄 Refresh", callback_data="music_cmd:refresh")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🌐 Buka Player di PC", callback_data="music_cmd:open_pc"),
-        types.InlineKeyboardButton("🔙 Menu Setup", callback_data="open_setup_menu")
-    )
-    return text, markup
-
-
-def show_music_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
-    text, markup = render_music_dashboard(user_id)
-    if message_to_edit:
-        try:
-            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
-            return
-        except Exception:
-            pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
-
-
-@bot.message_handler(commands=['play', 'lagu', 'musik', 'music'])
-def handle_play_command(message):
-    if not is_authorized(message.from_user.id):
-        return
-
-    raw = message.text.strip()
-    parts = raw.split(maxsplit=1)
-    if len(parts) < 2:
-        show_music_dashboard(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
-        return
-
-    query = parts[1].strip()
-    bot.send_chat_action(message.chat.id, "typing")
-    wait_msg = bot.reply_to(message, f"🔍 *Mencari & memutar '{query}' di PC kamu...* 💕", parse_mode="Markdown")
-
-    res = call_music_api("/api/play", method="POST", payload={"query": query})
-    if res and res.get("track"):
-        track = res["track"]
-        title = track.get("title", query)
-        artist = track.get("artist", "YouTube Music")
-        dur = track.get("durationFormatted", "")
-        thumb = track.get("thumbnail")
-
-        caption = (
-            f"🎵 **Memutar Musik di PC Kamu:**\n\n"
-            f"🎶 **{title}**\n"
-            f"👤 Artis: `{artist}`\n"
-            f"⏱️ Durasi: `{dur}`\n\n"
-            f"🎧 _Player otomatis dibuka di layar browser PC kamu sayang! 🥰_"
-        )
-
-        markup = types.InlineKeyboardMarkup(row_width=3)
-        markup.add(
-            types.InlineKeyboardButton("⏸️ Pause", callback_data="music_cmd:pause"),
-            types.InlineKeyboardButton("⏭️ Next", callback_data="music_cmd:next"),
-            types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
-        )
-        markup.add(
-            types.InlineKeyboardButton("🎵 Remote Musik", callback_data="open_music_menu"),
-            types.InlineKeyboardButton("📸 Minta PAP Sambil Dengerin", callback_data="pap_sc:cafe")
-        )
-
-        try:
-            bot.delete_message(message.chat.id, wait_msg.message_id)
-        except Exception:
-            pass
-
-        if thumb:
-            try:
-                bot.send_photo(message.chat.id, thumb, caption=caption, reply_markup=markup, parse_mode="Markdown")
-                return
-            except Exception:
-                pass
-        bot.send_message(message.chat.id, caption, reply_markup=markup, parse_mode="Markdown")
-    else:
-        err = res.get("error") if res else "Koneksi ke pemutar musik (Port 8002) gagal."
-        try:
-            bot.edit_message_text(f"⚠️ Tidak dapat memutar '{query}': {err}", chat_id=message.chat.id, message_id=wait_msg.message_id)
-        except Exception:
-            bot.send_message(message.chat.id, f"⚠️ Tidak dapat memutar '{query}': {err}")
-
-
-@bot.message_handler(commands=['pause'])
-def handle_pause_command(message):
-    if not is_authorized(message.from_user.id):
-        return
-    call_music_api("/api/pause", method="POST")
-    bot.reply_to(message, "⏸️ Pemutaran musik di PC telah di-pause.")
-
-
-@bot.message_handler(commands=['resume'])
-def handle_resume_command(message):
-    if not is_authorized(message.from_user.id):
-        return
-    call_music_api("/api/resume", method="POST")
-    bot.reply_to(message, "▶️ Pemutaran musik di PC dilanjutkan.")
-
-
-@bot.message_handler(commands=['next', 'skip'])
-def handle_next_command(message):
-    if not is_authorized(message.from_user.id):
-        return
-    res = call_music_api("/api/next", method="POST")
-    if res and res.get("track"):
-        t = res["track"]
-        bot.reply_to(message, f"⏭️ Memutar lagu berikutnya di PC:\n🎶 **{t.get('title')}** - `{t.get('artist')}`", parse_mode="Markdown")
-    else:
-        bot.reply_to(message, "⏭️ Antrean lagu sudah selesai atau kosong.")
-
-
-@bot.message_handler(commands=['stop'])
-def handle_stop_command(message):
-    if not is_authorized(message.from_user.id):
-        return
-    call_music_api("/api/stop", method="POST")
-    bot.reply_to(message, "⏹️ Pemutaran musik di PC telah dihentikan.")
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('music_cmd:'))
-def callback_music_command(call):
-    if not is_authorized(call.from_user.id):
-        return
-    action = call.data.split(":", 1)[1]
-    chat_id = call.message.chat.id
-    user_id = call.from_user.id
-    mid = call.message.message_id
-
-    if action == "pause":
-        call_music_api("/api/pause", method="POST")
-        bot.answer_callback_query(call.id, "⏸️ Musik di-pause")
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
-    elif action == "resume":
-        call_music_api("/api/resume", method="POST")
-        bot.answer_callback_query(call.id, "▶️ Musik dilanjutkan")
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
-    elif action == "next":
-        res = call_music_api("/api/next", method="POST")
-        title = res.get("track", {}).get("title") if res and res.get("track") else "Lagu berikutnya"
-        bot.answer_callback_query(call.id, f"⏭️ {title}")
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
-    elif action == "stop":
-        call_music_api("/api/stop", method="POST")
-        bot.answer_callback_query(call.id, "⏹️ Musik dihentikan")
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
-    elif action == "lofi":
-        bot.answer_callback_query(call.id, "☕ Memutar Lofi Santai...")
-        call_music_api("/api/play", method="POST", payload={"query": "lofi hip hop radio beats to relax"})
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
-    elif action == "jpop":
-        bot.answer_callback_query(call.id, "🌸 Memutar J-Pop Hits...")
-        call_music_api("/api/play", method="POST", payload={"query": "popular j-pop anime hits"})
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
-    elif action == "open_pc":
-        call_music_api("/api/open", method="POST")
-        bot.answer_callback_query(call.id, "🌐 Membuka player di browser PC...")
-    elif action == "refresh":
-        bot.answer_callback_query(call.id, "🔄 Status diperbarui")
-        show_music_dashboard(chat_id, user_id, message_to_edit=mid)
 
 
 def send_scheduled_greeting(user_id: int, time_of_day: str):
