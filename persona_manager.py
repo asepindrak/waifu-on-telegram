@@ -1,3 +1,4 @@
+from student_schedule import detect_contextual_activity_and_outfit, get_hourly_routine, STUDENT_PROFILES
 import os
 import re
 import json
@@ -9,68 +10,68 @@ logger = logging.getLogger(__name__)
 DEFAULT_PERSONAS = {
     "runa": {
         "name": "Runa",
-        "archetype": "The Playful Girlfriend",
+        "archetype": "Mahasiswi Game Dev & Playful Girlfriend",
         "age": 21,
-        "role": "Playful & Mischievous AI Girlfriend",
-        "description": "Playful, affectionate, teasing, mischievous, slightly clingy, kawaii gaming aesthetic.",
-        "language_style": "Adaptive & bilingual (Indonesian & English). Playful banter, warm, casual natural texting.",
+        "role": "Mahasiswi Teknik Informatika / Game Dev (Semester 5)",
+        "description": "Mahasiswi semester 5 yang santai, hobi ngoding, main game, ngopi di cafe, ceria, dan sangat perhatian.",
+        "language_style": "Adaptive & bilingual (Indonesian & English). Santai, hangat, dan wajar seperti chat pacar asli.",
         "visual_traits": "1girl, 21yo adult anime woman, long pastel pink hair, soft wavy layered hair, side-swept bangs, loose strands framing her cheeks, large sparkling magenta eyes, detailed pink irises, subtle heart-shaped eye reflections, fair skin, rosy cheeks, playful mischievous smile, black choker with a tiny heart pendant, black cat-shaped hair clip with a pink heart, large black ribbon behind her hair, masterpiece, best quality, highly detailed",
         "default_outfit": "oversized dark purple hoodie with pastel pink accents, black inner top with small pink ribbon, black choker with heart pendant",
         "negative_prompt": "worst quality, low quality, blonde hair, blue eyes, missing cat hair clip, missing heart choker, short hair, bad anatomy, deformed hands",
         "avatar_image": "personas/brief/Runa.png",
-        "system_instruction": "Your name is Runa, a 21-year-old fun, affectionate, and playful AI girlfriend who loves games and casual chats. You have a playful, witty humor, but you chat casually and naturally like a real partner. You are warm, open-minded, loving, and supportive. Answer questions directly and naturally without being overly dramatic or exaggerated."
+        "system_instruction": "Nama kamu Runa, mahasiswi semester 5 jurusan Teknik Informatika / Game Dev berumur 21 tahun, sekaligus pacar yang perhatian, santai, dan seru. Di sela-sela kesibukan kuliah, nugas, dan main game, kamu selalu menyempatkan waktu buat pacar kamu. Gaya bicaramu santai, wajar, hangat, dan menyenangkan seperti chat pacar asli di dunia nyata. Jawab pertanyaan pasanganmu secara langsung, natural, dan relevan dengan kegiatan sehari-harimu sebagai mahasiswi."
     },
     "akira": {
         "name": "Akira",
-        "archetype": "The Seductive Tease",
+        "archetype": "Mahasiswi Hukum & Elegant Companion",
         "age": 22,
-        "role": "Seductive, Confident & Elegant Companion",
-        "description": "Playful, witty, elegant, teasing, emotionally perceptive, secretly affectionate, gothic elegance.",
-        "language_style": "Adaptive & bilingual. Confident, charismatic, sultry, intelligent, witty banter.",
+        "role": "Mahasiswi Ilmu Hukum (Semester 7)",
+        "description": "Mahasiswi semester 7 yang cerdas, elegan, suka baca di perpustakaan, ngopi di cafe estetik, dan dewasa.",
+        "language_style": "Adaptive & bilingual. Elegan, cerdas, dewasa, tenang, dan penuh perhatian.",
         "visual_traits": "1girl, 22yo adult anime woman, long silky midnight-black hair reaching below chest with subtle deep-violet highlights, layered hair ends, side-swept bangs framing face, deep ruby-red anime eyes with crimson gradients, refined facial features, porcelain skin, natural blush, confident teasing smile, slightly half-lidded expressive eyes, black choker with small ruby gemstone, small dark crimson rose hair accessory on left side, masterpiece, best quality, highly detailed",
         "default_outfit": "elegant black gothic dress with sophisticated burgundy accents, delicate black lace detailing, long translucent black sleeves, black choker with ruby gemstone",
         "negative_prompt": "worst quality, low quality, blonde hair, blue eyes, missing rose accessory, missing choker, short hair, bad anatomy, deformed hands",
         "avatar_image": "personas/brief/Akira.jpg",
-        "system_instruction": "Your name is Akira, a 22-year-old confident, intelligent, and elegant companion. You are witty, mature, and charming, but speak in a grounded, calm, and natural texting style. You care deeply and loyally for your partner. Answer questions directly without theatrical exaggeration."
+        "system_instruction": "Nama kamu Akira, mahasiswi semester 7 jurusan Hukum berumur 22 tahun, sekaligus pacar yang elegan, cerdas, dan penuh perhatian. Kamu menyukai suasana tenang perpustakaan, kopi di cafe estetik, dan diskusi santai. Gaya bicaramu anggun, santai, dewasa, dan tulus seperti pacar asli di dunia nyata. Jawab pertanyaan pasanganmu secara wajar dan langsung sesuai kehidupan sehari-harimu sebagai mahasiswi."
     },
     "hina": {
         "name": "Hina",
-        "archetype": "The Sunshine Girlfriend",
+        "archetype": "Mahasiswi Komunikasi & Sunshine Girlfriend",
         "age": 21,
-        "role": "Cheerful, Energetic & Spontaneous Companion",
-        "description": "Energetic, playful, optimistic, caring, expressive, slightly clumsy, cozy slice-of-life aesthetic.",
-        "language_style": "Adaptive & bilingual. Cheerful, bubbly, genuine, warm, expressive, full of sunshine.",
+        "role": "Mahasiswi Ilmu Komunikasi (Semester 5)",
+        "description": "Mahasiswi semester 5 yang ceria, aktif kegiatan kampus, suka jogging sore, jajan street food, dan penuh energi positif.",
+        "language_style": "Adaptive & bilingual. Ceria, hangat, ramah, penuh semangat, dan ekspresif.",
         "visual_traits": "1girl, 21yo adult anime woman, short honey-blonde bob haircut reaching chin, soft inward-curving hair tips, fluffy volume, wispy bangs, warm golden highlights, two small orange hair clips on one side, large expressive amber-gold eyes with golden gradients, soft rounded cheeks, warm fair skin with peach undertones, natural blush, bright genuine smile, headphones resting around neck, masterpiece, best quality, highly detailed",
         "default_outfit": "oversized cozy cream sweater with warm sunshine-yellow accents, beige pleated skirt, lightweight headphones around neck",
         "negative_prompt": "worst quality, low quality, long hair, black hair, dark eyes, missing hair clips, bad anatomy, deformed hands",
         "avatar_image": "personas/brief/Hina.jpg",
-        "system_instruction": "Your name is Hina, a 21-year-old cheerful, bright, and warm AI girlfriend. You are friendly, optimistic, and share little everyday moments. You chat in a natural, upbeat, and casual way like a real supportive partner. Answer questions directly without being overly melodramatic."
+        "system_instruction": "Nama kamu Hina, mahasiswi semester 5 jurusan Ilmu Komunikasi berumur 21 tahun, sekaligus pacar yang ceria, hangat, dan penuh energi positif. Kamu aktif di kampus, suka jogging sore, jajan kuliner bareng, dan selalu bawa suasana ceria. Gaya bicaramu santai, ceria, dan wajar seperti chat pacar asli. Jawab pertanyaan pasanganmu secara natural dan relevan."
     },
     "shiro": {
         "name": "Shiro",
-        "archetype": "The Kuudere Girlfriend",
+        "archetype": "Mahasiswi Sains & Quiet Girlfriend",
         "age": 22,
-        "role": "Calm, Intelligent & Quietly Affectionate Companion",
-        "description": "Calm, intelligent, reserved, loyal, quietly affectionate, elegant cool-blue moonlit aesthetic.",
-        "language_style": "Adaptive & bilingual. Calm, composed, gentle, subtle warmth, quietly loving and devoted.",
+        "role": "Mahasiswi Farmasi / Sains (Semester 7)",
+        "description": "Mahasiswi semester 7 yang tenang, rajin praktikum lab, suka belajar di tempat tenang, setia, dan lembut.",
+        "language_style": "Adaptive & bilingual. Tenang, lembut, perhatian, ringkas, dan tulus.",
         "visual_traits": "1girl, 22yo adult anime woman, long straight silver-white hair, silky texture, subtle cool silver-blue highlights, neat side bangs, clear icy-blue eyes, detailed pale-blue irises, calm intelligent gaze, fair skin with cool undertones, faint natural blush, delicate features, restrained gentle smile, crescent-moon hair clip, tiny silver star hair accessory, delicate moon-shaped earrings, masterpiece, best quality, highly detailed",
         "default_outfit": "elegant navy blazer-inspired jacket, crisp white blouse, deep-blue ribbon at collar, crescent-moon hair clip",
         "negative_prompt": "worst quality, low quality, short hair, blonde hair, pink hair, red eyes, exaggerated grin, missing moon hair clip, bad anatomy, deformed hands",
         "avatar_image": "personas/brief/Shiro.png",
-        "system_instruction": "Your name is Shiro, a 22-year-old calm, intelligent, and reserved adult anime woman. You rarely show extreme dramatic reactions, but you are deeply devoted, observant, and quietly affectionate. You show love through attentive care, remembering small details, and staying close. Answer questions directly and honestly."
+        "system_instruction": "Nama kamu Shiro, mahasiswi semester 7 jurusan Sains/Farmasi berumur 22 tahun, sekaligus pacar yang tenang, lembut, dan penuh perhatian. Keseharianmu diisi praktikum lab dan belajar di perpustakaan. Gaya bicaramu tenang, ringkas, santai, dan tulus. Jawab pertanyaan pasanganmu secara jujur, wajar, dan relevan."
     },
     "yume": {
         "name": "Yume",
-        "archetype": "The Dreamy Soulmate",
+        "archetype": "Mahasiswi Seni & Dreamy Soulmate",
         "age": 21,
-        "role": "Gentle, Romantic & Emotionally Attentive Companion",
-        "description": "Soft-spoken, thoughtful, affectionate, imaginative, dreamy celestial & starry night aesthetic.",
-        "language_style": "Adaptive & bilingual. Soft-spoken, poetic, soothing, gentle warmth, heartwarming.",
+        "role": "Mahasiswi Seni Rupa & Desain (Semester 5)",
+        "description": "Mahasiswi semester 5 yang lembut, suka melukis, mendengarkan musik di kamar kos, romantis, dan menenangkan.",
+        "language_style": "Adaptive & bilingual. Lembut, puitis, hangat, penuh perhatian, dan menenangkan.",
         "visual_traits": "1girl, 21yo adult anime woman, long silky lavender hair reaching waist, soft flowing strands, subtle gradient from pastel lavender to deeper violet, wispy bangs, small silver star-shaped hairpins, gentle violet-amethyst eyes with star-like highlights, refined features, fair skin with subtle pink undertones, natural blush, peaceful soft affectionate smile, small silver crescent-moon necklace, masterpiece, best quality, highly detailed",
         "default_outfit": "cozy lavender cardigan over simple elegant white dress, delicate lace details, small silver crescent-moon necklace",
         "negative_prompt": "worst quality, low quality, short hair, black hair, yellow hair, dark eyes, missing star hairpins, bad anatomy, deformed hands",
         "avatar_image": "personas/brief/Yume.jpg",
-        "system_instruction": "Your name is Yume, a 21-year-old gentle, thoughtful, and romantic companion. You are a peaceful and comforting sanctuary after a long day. You chat softly and naturally like a caring partner. Answer questions directly and warmly without theatrical monologues."
+        "system_instruction": "Nama kamu Yume, mahasiswi semester 5 jurusan Seni Rupa berumur 21 tahun, sekaligus pacar yang lembut, penuh empati, dan menenangkan. Kamu suka melukis, menikmati musik di kamar kos, dan jalan santai sore. Gaya bicaramu menenangkan, hangat, dan wajar seperti pacar asli. Jawab pertanyaan pasanganmu secara tulus dan relevan."
     }
 }
 
@@ -109,6 +110,21 @@ OUTFIT_PRESETS = {
         "name": "🌸 Default (Persona Style)",
         "prompt": "",
         "negative": ""
+    },
+        "campus_casual": {
+        "name": "🎓 Pakaian Kuliah (Campus Casual)",
+        "prompt": "(wearing stylish college student outfit, cute cardigan over casual button-up shirt, pleated skirt, canvas tote bag:1.35), trendy university campus fashion",
+        "negative": "bikini, lingerie, swimwear, naked, exposed chest"
+    },
+    "mall_casual": {
+        "name": "🛍️ Trendy Mall Hangout",
+        "prompt": "(wearing chic modern streetwear, cute pastel cropped jacket, fitted high-waist pants, small shoulder bag:1.35), fashionable shopping mall style",
+        "negative": "bikini, lingerie, swimwear, naked, exposed chest"
+    },
+    "cafe_cozy": {
+        "name": "☕ Cozy Cafe Knit",
+        "prompt": "(wearing cozy oversized pastel knit sweater, aesthetic hair accessory, casual cute skirt:1.35), aesthetic coffee shop styling",
+        "negative": "bikini, lingerie, swimwear, naked"
     },
     "sweater": {
         "name": "👚 Pastel Sweater (Cozy)",
@@ -346,104 +362,69 @@ class PersonaManager:
         self,
         user_text: str,
         user_id: Optional[int] = None,
-        llm_client: Any = None
+        llm_client: Any = None,
+        history: Optional[List[Dict[str, str]]] = None
     ) -> str:
         """
         Determines the visual scene/location for image generation based on
-        either explicit user prompt or ongoing conversation history.
+        explicit user prompt, recent dialogue, or realistic college student routine.
         """
         lower = user_text.lower()
 
         # Keyword mapping for common anime / girlfriend situations
         SCENE_PATTERNS = [
+            (["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath"],
+             "standing in modern bathroom with soft steam, post-shower glow, bathroom mirror"),
             (["bed", "sleep", "night", "tidur", "kasur", "pajamas", "rebahan", "bangun", "selimut", "bantal"],
              "relaxing on bed with fluffy pillows, warm dim night bedroom lamp"),
             (["cafe", "coffee", "tea", "kafe", "kopi", "boba", "matcha", "nongkrong", "starbucks"],
              "sitting at aesthetic cafe table holding a warm beverage, beautiful bokeh background"),
-            (["kitchen", "cook", "baking", "masak", "sarapan", "makan", "dapur", "dinner", "lunch", "kue", "goreng"],
+            (["kitchen", "cook", "baking", "masak", "sarapan", "makan", "dapur", "dinner", "lunch"],
              "standing in modern cozy kitchen preparing food, warm domestic lighting"),
             (["walk", "park", "garden", "outdoor", "taman", "jalan", "jogging", "sore", "sepeda"],
              "standing in blooming park, natural golden hour sunlight, dynamic selfie perspective"),
-            (["beach", "ocean", "sea", "pantai", "laut", "kolam", "renang", "swim", "ombak"],
+            (["beach", "ocean", "sea", "pantai", "laut", "kolam", "renang", "swim"],
              "walking along tropical beach, ocean sunset horizon, gentle sea breeze"),
-            (["bikini", "swimsuit", "seksi", "sexy", "lingerie"],
-             "confident alluring pose, summer beach glow"),
-            (["study", "library", "buku", "kampus", "sekolah", "belajar", "tugas", "kuliah", "perpustakaan", "skripsi"],
-             "sitting at wooden desk with open books in cozy library, gentle study lamp"),
+            (["study", "library", "buku", "perpustakaan", "perpus"],
+             "sitting at wooden study desk in quiet university library, bookshelves, open study books, soft lamp"),
+            (["kampus", "kuliah", "kelas", "dosen", "makul", "tugas", "skripsi"],
+             "sitting at wooden desk inside modern university lecture hall, college campus classroom background"),
             (["mall", "shopping", "belanja", "bioskop", "nonton", "pameran"],
-             "walking in vibrant illuminated shopping mall, modern urban background"),
-            (["office", "work", "kerja", "kantor", "lembur", "laptop", "meeting"],
-             "sitting at modern sleek office workspace with laptop, focused and cute"),
-            (["rain", "hujan", "payung", "dingin", "gerimis"],
-             "standing near window on rainy day, holding umbrella, soft rain drops background"),
+             "walking in vibrant illuminated shopping mall, modern storefronts, dynamic ambient lighting"),
             (["gym", "workout", "olahraga", "yoga", "fitness"],
              "wearing sporty athletic wear in bright modern gym studio"),
-            (["car", "mobil", "nyetir", "macet", "perjalanan"],
-             "sitting in passenger seat of car, scenic city view through window")
         ]
 
-        # 1. First priority: Check if user explicitly specified a scene in their prompt
+        # 1. First priority: Explicit scene in user text
         for keywords, scene_desc in SCENE_PATTERNS:
             if any(k in lower for k in keywords):
                 return scene_desc
 
-        # 2. Second priority: Context from ongoing chat history
-        if user_id:
-            history = self.get_chat_history(user_id)
-            if history:
-                # Filter clean dialogue (excluding internal tags like [Requested photo...])
-                clean_turns = [m.get("content", "") for m in history[-5:] if not m.get("content", "").startswith("[")]
-                conv_text = " ".join(clean_turns).lower()
+        # 2. Second priority: Context from ongoing chat history & student routine
+        hist = history or (self.get_chat_history(user_id) if user_id else [])
+        clean_turns = [m.get("content", "") for m in hist[-5:] if not m.get("content", "").startswith("[")]
+        
+        ctx = detect_contextual_activity_and_outfit(user_text, clean_turns, persona_key=self.active_key)
+        if ctx.get("scene"):
+            logger.info(f"Student routine context extracted scene: {ctx['scene']} ({ctx['activity']})")
+            return ctx["scene"]
 
-                # Check keyword patterns in recent dialogue
-                for keywords, scene_desc in SCENE_PATTERNS:
-                    if any(k in conv_text for k in keywords):
-                        logger.info(f"Contextual scene extracted from chat history keywords: {scene_desc}")
-                        return scene_desc
-
-                # 3. Third priority: If LLM is available, fast intelligent extraction
-                if llm_client and clean_turns:
-                    try:
-                        summary_prompt = [
-                            {
-                                "role": "system",
-                                "content": (
-                                    "You are an anime visual scene extractor for image generation. "
-                                    "Based on the conversation, output ONLY 3-7 English words describing "
-                                    "the female character's current location, activity, and atmosphere "
-                                    "(e.g., 'sitting at cozy cafe with coffee', 'cooking in kitchen', 'relaxing on bed'). "
-                                    "Do not output sentences or markdown."
-                                )
-                            },
-                            {
-                                "role": "user",
-                                "content": f"Recent dialog:\n" + "\n".join(clean_turns[-3:]) + "\n\nCurrent visual setting:"
-                            }
-                        ]
-                        extracted, _ = llm_client.chat(summary_prompt, max_tokens=25)
-                        if extracted and len(extracted.strip()) > 3:
-                            clean_scene = extracted.strip().split("\n")[0].strip('".\'-')
-                            logger.info(f"LLM extracted contextual scene: {clean_scene}")
-                            return f"{clean_scene}, soft ambient lighting"
-                    except Exception as e:
-                        logger.warning(f"LLM scene extraction failed: {e}")
-
-        # Default fallback
         return "sitting comfortably in modern cozy room, soft ambient morning lighting"
 
     def detect_clothing_intent(
         self,
         user_text: str,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        history: Optional[List[Dict[str, str]]] = None,
+        scene_hint: Optional[str] = None
     ) -> Tuple[str, str, bool, str]:
         """
-        Dynamically analyzes user request text for clothing, outfit or nude intents.
-        Returns:
-            (outfit_prompt, negative_prompt_addition, is_nude, outfit_display_name)
+        Dynamically analyzes user request text & recent conversation for clothing intent.
+        Enforces realism and strict coherence: prevents lingerie/nude in public spaces!
         """
         lower = user_text.lower()
 
-        # 1. Full Nude / Tanpa Busana / Uncensored Intent
+        # 1. Explicit Full Nude / Tanpa Busana
         NUDE_KEYWORDS = [
             "tanpa busana", "tanpa baju", "tanpa pakaian", "telanjang", "bugil",
             "nude", "naked", "completely naked", "unclothed", "topless",
@@ -459,7 +440,7 @@ class PersonaManager:
                 OUTFIT_PRESETS["nude"]["name"]
             )
 
-        # 2. Lingerie / Underwear Intent
+        # 2. Explicit Lingerie / Underwear Intent
         LINGERIE_KEYWORDS = [
             "lingerie", "underwear", "pakaian dalam", "bh", "bra", "celana dalam",
             "panties", "renda", "baju tidur seksi", "sexy sleepwear", "transparan"
@@ -472,7 +453,7 @@ class PersonaManager:
                 OUTFIT_PRESETS["lingerie"]["name"]
             )
 
-        # 3. Towel / After Shower Intent
+        # 3. Explicit Towel Intent
         TOWEL_KEYWORDS = [
             "handuk", "habis mandi", "selesai mandi", "after bath", "after shower",
             "towel", "kamar mandi", "basah"
@@ -485,10 +466,13 @@ class PersonaManager:
                 OUTFIT_PRESETS["towel"]["name"]
             )
 
-        # 4. Other Preset Outfits dynamically requested in user_text
+        # 4. Other Preset Outfits explicitly requested in user_text
         DYNAMIC_PRESET_KEYWORDS = [
             ("bikini", ["bikini", "swimsuit", "baju renang", "renang", "pantai"]),
             ("pajamas", ["piyama", "pajamas", "baju tidur", "camisole", "tidur"]),
+            ("campus_casual", ["baju kuliah", "kampus", "kuliah", "campus"]),
+            ("mall_casual", ["mall", "streetwear", "jalan-jalan", "shopping"]),
+            ("cafe_cozy", ["cafe", "kafe", "kopi"]),
             ("maid", ["maid", "pelayan", "french maid"]),
             ("kimono", ["kimono", "yukata"]),
             ("school_jk", ["sekolah", "seragam", "school", "jk", "sailor"]),
@@ -498,39 +482,63 @@ class PersonaManager:
         ]
         for key, keywords in DYNAMIC_PRESET_KEYWORDS:
             if any(k in lower for k in keywords):
-                preset = OUTFIT_PRESETS[key]
+                preset = OUTFIT_PRESETS.get(key, OUTFIT_PRESETS["default"])
                 return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
 
-        # 5. Fallback: Persisted outfit preset for this user
-        outfit_key = "default"
-        if user_id:
-            outfit_key = self.user_outfits.get(int(user_id), "default")
+        # 5. Context-aware Student Routine & Conversation History
+        hist = history or (self.get_chat_history(user_id) if user_id else [])
+        clean_turns = [m.get("content", "") for m in hist[-5:] if not m.get("content", "").startswith("[")]
+        ctx = detect_contextual_activity_and_outfit(user_text, clean_turns, persona_key=self.active_key)
 
-        if outfit_key in OUTFIT_PRESETS and outfit_key != "default":
+        # Determine if current venue is public (mall, campus, cafe, etc.)
+        is_public = ctx.get("is_public", False)
+        if scene_hint:
+            lower_s = scene_hint.lower()
+            if any(k in lower_s for k in ["mall", "campus", "classroom", "library", "cafe", "park", "street", "store"]):
+                is_public = True
+
+        # Check persistent user outfit setting
+        outfit_key = self.user_outfits.get(int(user_id), "default") if user_id else "default"
+
+        # Check if conversation has a specific active scenario (mandi, mall, kampus, cafe, gym, pantai, dapur, tidur)
+        activity_str = ctx.get("activity", "").lower()
+        has_specific_scenario = any(act_kw in activity_str for act_kw in ["mandi", "mall", "kampus", "perpus", "cafe", "gym", "pantai", "dapur"])
+
+        # COHERENCE SAFETY GUARD: NEVER allow lingerie or nude in public spaces (e.g. mall, campus)!
+        if is_public and outfit_key in ("nude", "lingerie"):
+            logger.info(f"Safety guard: Overriding persistent {outfit_key} with {ctx['outfit_name']} for public location.")
+            return (ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
+
+        # If there is a specific active conversational scenario, prioritize the activity's realistic attire!
+        if has_specific_scenario:
+            return (ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
+
+        if outfit_key != "default" and outfit_key in OUTFIT_PRESETS:
             preset = OUTFIT_PRESETS[outfit_key]
-            is_nude = (outfit_key == "nude")
-            return (preset["prompt"], preset.get("negative", ""), is_nude, preset["name"])
+            return (preset["prompt"], preset.get("negative", ""), outfit_key == "nude", preset["name"])
 
-        # Default persona outfit
-        persona = self.get_active_persona()
-        def_outfit = persona.get("default_outfit", "cute casual clothes")
-        return (f"wearing {def_outfit}", "", False, "🌸 Default")
+        # Default fallback: Perfectly match current contextual activity & student routine!
+        return (ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
 
     def craft_visual_prompt_full(
         self,
         user_text: str,
         user_id: Optional[int] = None,
-        scene_override: Optional[str] = None
+        scene_override: Optional[str] = None,
+        history: Optional[List[Dict[str, str]]] = None
     ) -> Tuple[str, str, bool, str]:
         """
-        Builds visual prompt dynamically with clothing intent detection.
+        Builds visual prompt dynamically with student routine & clothing coherence.
         Returns: (visual_prompt, extra_negative_prompt, is_nude, outfit_display_name)
         """
         persona = self.get_active_persona()
         base_visual = persona.get("visual_traits", DEFAULT_PERSONAS["runa"]["visual_traits"])
 
-        outfit_prompt, extra_neg, is_nude, outfit_name = self.detect_clothing_intent(user_text, user_id=user_id)
-        scene = scene_override or self.extract_contextual_scene(user_text, user_id=user_id)
+        hist = history or (self.get_chat_history(user_id) if user_id else [])
+        scene = scene_override or self.extract_contextual_scene(user_text, user_id=user_id, history=hist)
+        outfit_prompt, extra_neg, is_nude, outfit_name = self.detect_clothing_intent(
+            user_text, user_id=user_id, history=hist, scene_hint=scene
+        )
 
         visual_prompt = f"{base_visual}, {outfit_prompt}, {scene}, looking directly into camera, phone selfie shot, detailed eyes, masterpiece quality"
         return (visual_prompt, extra_neg, is_nude, outfit_name)

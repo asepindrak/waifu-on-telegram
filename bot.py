@@ -1,3 +1,5 @@
+from proactive_chat_engine import proactive_engine
+import student_schedule
 import os
 import sys
 import logging
@@ -406,6 +408,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
     cur_q = USER_QUALITIES.get(user_id, "high").upper()
     cur_auto = "AKTIF ✅" if is_autorun_enabled() else "NONAKTIF ❌"
     cur_greet = "AKTIF ✅" if GREETINGS_ENABLED.get(user_id, True) else "NONAKTIF ❌"
+    cur_proact = "AKTIF ✅" if proactive_engine.is_enabled(user_id) else "NONAKTIF ❌"
     fact_count = len(memory_engine.get_facts(user_id))
     rem_count = len(reminder_engine.get_active_reminders(user_id))
     u_dates = anniversary_engine.get_user_dates(user_id)
@@ -448,6 +451,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"🎂 **Ultah Kamu** : `{b_str}`\n"
         f"🚀 **PC Autorun** : `{cur_auto}`\n"
         f"⏰ **Sapaan Jam** : `{cur_greet}` _(07:00, 12:30 & 22:00)_\n"
+        f"💬 **Chat Duluan** : `{cur_proact}` _(Tanya kabar saat kamu sepi)_\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 _Pilih tombol menu di bawah untuk mengubah pengaturan langsung dari Telegram:_"
     )
@@ -469,6 +473,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("✨ Kualitas Foto", callback_data="open_quality_menu"),
         types.InlineKeyboardButton(f"🚀 PC Autorun: {cur_auto}", callback_data="cfg_toggle:autorun"),
         types.InlineKeyboardButton(f"⏰ Sapaan: {cur_greet}", callback_data="cfg_toggle:greetings"),
+        types.InlineKeyboardButton(f"💬 Chat Duluan: {cur_proact}", callback_data="cfg_toggle:proactive"),
         types.InlineKeyboardButton("📊 Status Diagnostik", callback_data="cfg_action:status"),
         types.InlineKeyboardButton("❓ Panduan Lengkap (/help)", callback_data="open_help_menu"),
         types.InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="cfg_submenu:dashboard")
@@ -2188,6 +2193,25 @@ def callback_set_voice(call):
     show_voice_settings_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
 
 
+@bot.message_handler(commands=['proactive', 'chatting'])
+def handle_proactive_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    cur = proactive_engine.is_enabled(message.from_user.id)
+    arg = message.text.replace("/proactive", "").replace("/chatting", "").strip().lower()
+    if arg in ("on", "aktif", "enable", "1", "true"):
+        proactive_engine.set_enabled(message.from_user.id, True)
+        bot.reply_to(message, "💬 **Fitur Chat Duluan Diaktifkan!** ✅\n\nWaifu kamu akan sesekali berinisiatif menanyakan kabar atau menceritakan kegiatannya jika kamu sudah beberapa jam tidak chatting.")
+    elif arg in ("off", "nonaktif", "disable", "0", "false"):
+        proactive_engine.set_enabled(message.from_user.id, False)
+        bot.reply_to(message, "💬 **Fitur Chat Duluan Dinonaktifkan.** ❌\n\nWaifu hanya akan membalas saat kamu mengirim pesan terlebih dahulu.")
+    else:
+        new_val = not cur
+        proactive_engine.set_enabled(message.from_user.id, new_val)
+        st = "AKTIF ✅ (Bakal sesekali chat duluan)" if new_val else "NONAKTIF ❌"
+        bot.reply_to(message, f"💬 **Status Inisiatif Chat Pasangan:** `{st}`\n\nGunakan `/chatting on` atau `/chatting off` untuk mengatur.")
+
+
 @bot.message_handler(commands=['greetings'])
 def handle_greetings_command(message):
     if not is_authorized(message.from_user.id):
@@ -2335,9 +2359,10 @@ def process_photo_request(target, user_text: str):
         except Exception as e_send:
             logger.warning(f"Could not send photo status message: {e_send}")
 
-    detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client)
+    history = persona_mgr.get_chat_history(user_id)
+    detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
     visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
-        user_text, user_id=user_id, scene_override=detected_scene
+        user_text, user_id=user_id, scene_override=detected_scene, history=history
     )
     logger.info(f"Visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
 
@@ -3089,12 +3114,22 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 bot.reply_to(message, backend_msg, parse_mode="Markdown")
                 return
 
-            # 2. Automatically learn personal facts into long-term memory
+            # 2. Record activity for proactive check-ins & learn facts
+            proactive_engine.record_user_activity(message.from_user.id)
             memory_engine.auto_extract_facts(user_text, message.from_user.id)
 
-            # 3. Construct system instruction with injected memory context
+            # 3. Construct system instruction with injected student routine & memory context
+            cur_hour = time.localtime().tm_hour
+            routine = student_schedule.get_hourly_routine(cur_hour, persona_key=persona_mgr.active_key)
+            p_prof = student_schedule.STUDENT_PROFILES.get(persona_mgr.active_key.lower(), student_schedule.STUDENT_PROFILES["runa"])
+            
             system_inst = persona.get("system_instruction", "")
-            system_inst += " PANDUAN PENTING: Jawab pesan pasanganmu secara wajar, santai, dan relevan dengan topik. Jangan lebay, jangan bersikap hiperbola atau teatrikal. Jawab langsung maksimal 1-3 kalimat seperti chat asli."
+            system_inst += (
+                f" KEGIATAN MAHASISWI HARI INI: Jam {cur_hour:02d}:00, kegiatanmu saat ini: {routine['activity_desc']}. "
+                f"Kamu adalah mahasiswi ({p_prof['major']}). "
+                "PANDUAN PENTING: Jawab pesan pasanganmu secara wajar, santai, dan relevan dengan topik serta kehidupan mahasiswimu. "
+                "Jangan lebay, jangan bersikap hiperbola atau teatrikal. Jawab langsung maksimal 1-3 kalimat seperti chat asli."
+            )
             mem_context = memory_engine.format_memory_context(message.from_user.id)
             if mem_context:
                 system_inst += "\n" + mem_context
@@ -3553,6 +3588,37 @@ def schedule_daily_greetings():
                 except Exception as rem_err:
                     logger.error(f"Error dispatching reminder {rem.get('id')}: {rem_err}")
 
+            # Check proactive check-ins for partner when inactive (between 09:00 and 21:30)
+            for uid in ALLOWED_USER_IDS:
+                if proactive_engine.should_send_checkin(uid):
+                    try:
+                        persona = persona_mgr.get_active_persona()
+                        p_msg = proactive_engine.generate_proactive_message(
+                            user_id=uid,
+                            persona=persona,
+                            persona_key=persona_mgr.active_key,
+                            llm_client=llm_client,
+                            lang=BOT_LANGUAGE
+                        )
+                        if p_msg:
+                            persona_mgr.add_message(uid, "assistant", p_msg)
+                            bot.send_message(uid, p_msg)
+                            proactive_engine.mark_proactive_sent(uid)
+                            logger.info(f"Dispatched proactive check-in to user {uid}: {p_msg}")
+
+                            u_mode = USER_VOICE_MODES.get(uid, "always" if VOICE_ENABLED else "off")
+                            if u_mode == "always" and VOICE_ENABLED and len(p_msg) < 180:
+                                vn_path = voice_engine.generate_voice_note(p_msg)
+                                if vn_path:
+                                    try:
+                                        with open(vn_path, "rb") as vf:
+                                            bot.send_voice(uid, vf)
+                                    finally:
+                                        if os.path.exists(vn_path):
+                                            os.remove(vn_path)
+                    except Exception as e_proact:
+                        logger.error(f"Error sending proactive check-in to {uid}: {e_proact}")
+
             # Check today's birthday or anniversary celebrations (between 08:00 and 23:00)
             if 8 <= hour <= 23:
                 today_celebs = anniversary_engine.check_today_celebrations()
@@ -3594,6 +3660,7 @@ def setup_bot_commands():
         types.BotCommand("voice", "🎙️ Pengaturan balasan suara / VN"),
         types.BotCommand("love", "💖 Cek skor cinta & status hubungan"),
         types.BotCommand("greetings", "⏰ Toggle sapaan harian (Pagi, Siang, Malam)"),
+        types.BotCommand("chatting", "💬 Toggle inisiatif chat duluan dari waifu"),
         types.BotCommand("status", "📊 Cek status server LLM & ComfyUI"),
         types.BotCommand("reset", "🔄 Hapus memori obrolan (topik baru)")
     ]
