@@ -1,6 +1,6 @@
 {
   "name": "waifu-on-telegram",
-  "version": "1.6.21",
+  "version": "1.6.22",
   "description": "Waifu on Telegram - Autonomous AI Girlfriend & Romance Companion Powered by Local LLM & ComfyUI (SFW & NSFW)",
   "main": "music_player_server.js",
   "bin": {
