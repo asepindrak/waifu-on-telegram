@@ -720,7 +720,7 @@ def apply_video_engine_choice(key: str) -> str:
         VIDEO_ENGINE = "wan21"
 
     os.environ["VIDEO_ENGINE"] = VIDEO_ENGINE
-    update_env_var("VIDEO_ENGINE", VIDEO_ENGINE)
+    update_env_variable("VIDEO_ENGINE", VIDEO_ENGINE)
     return VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)
 
 

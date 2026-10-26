@@ -506,6 +506,7 @@ def main():
     parser = argparse.ArgumentParser(description="💖 Waifu on Telegram CLI", add_help=False)
     parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "language", "lang", "logs", "models", "model", "assets", "update", "uninstall", "release", "version", "--version", "-v", "help"])
     parser.add_argument("arg", nargs="?", default=None)
+    parser.add_argument("extra_args", nargs="*", default=[])
     parser.add_argument("--daemon", "-d", action="store_true", help="Run bot silently in background")
     args = parser.parse_args()
 
@@ -532,8 +533,7 @@ def main():
         cmd_logs()
     elif cmd in ("models", "model", "assets"):
         sub = args.arg
-        # If there are additional arguments, e.g. waifu models download animatediff_v2
-        remaining = sys.argv[3] if len(sys.argv) > 3 else None
+        remaining = args.extra_args[0] if args.extra_args else (sys.argv[3] if len(sys.argv) > 3 else None)
         cmd_models(sub, remaining)
     elif cmd == "update":
         cmd_update()

@@ -244,12 +244,20 @@ def check_all_assets() -> Dict[str, Dict[str, Any]]:
 
 def download_asset(asset_key: str, progress_callback=None) -> bool:
     """
-    Downloads model asset with HTTP byte resume support (curl or requests).
+    Downloads model asset with HTTP byte resume support (curl or requests),
+    or clones custom node if type is 'custom_node'.
     Returns True on success, False otherwise.
     """
     info = get_asset_info(asset_key)
-    if not info or info.get("type") != "model":
-        logger.error(f"Asset '{asset_key}' is not a downloadable model.")
+    if not info:
+        logger.error(f"Asset '{asset_key}' not found.")
+        return False
+
+    if info.get("type") == "custom_node":
+        return install_custom_node(asset_key)
+
+    if info.get("type") != "model":
+        logger.error(f"Asset '{asset_key}' is not a downloadable model or custom node.")
         return False
 
     target_path = info.get("target_path")
@@ -308,7 +316,7 @@ def download_asset(asset_key: str, progress_callback=None) -> bool:
     return False
 
 def install_custom_node(asset_key: str) -> bool:
-    """Clones a ComfyUI custom node git repository into ComfyUI/custom_nodes/."""
+    """Clones or updates a ComfyUI custom node git repository into ComfyUI/custom_nodes/."""
     info = get_asset_info(asset_key)
     if not info or info.get("type") != "custom_node":
         return False
@@ -318,8 +326,13 @@ def install_custom_node(asset_key: str) -> bool:
     if not target_path or not git_url:
         return False
 
+    # If directory already exists with a valid __init__.py, it is already installed successfully
+    if os.path.exists(target_path) and os.path.exists(os.path.join(target_path, "__init__.py")):
+        logger.info(f"Custom node '{asset_key}' is already installed at {target_path}")
+        return True
+
     # If incomplete or missing __init__.py, remove corrupted folder
-    if os.path.exists(target_path) and not os.path.exists(os.path.join(target_path, "__init__.py")):
+    if os.path.exists(target_path):
         try:
             shutil.rmtree(target_path, ignore_errors=True)
         except Exception:
