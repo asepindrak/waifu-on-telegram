@@ -1,5 +1,6 @@
 from proactive_chat_engine import proactive_engine
 import student_schedule
+import re
 import os
 import sys
 import logging
