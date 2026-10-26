@@ -65,7 +65,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8127/v1")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "auto")
 COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://127.0.0.1:8188")
-MEDIA_FALLBACK = os.environ.get("MEDIA_FALLBACK_CLOUD", "true").lower() in ("true", "1", "yes")
+MEDIA_FALLBACK = os.environ.get("MEDIA_FALLBACK_CLOUD", "false").lower() in ("true", "1", "yes")
 VOICE_ENABLED = os.environ.get("VOICE_REPLY_ENABLED", "true").lower() in ("true", "1", "yes")
 VOICE_NAME = os.environ.get("VOICE_NAME", "en-US-AnaNeural")
 DEFAULT_PERSONA = os.environ.get("DEFAULT_PERSONA", "runa")
@@ -158,12 +158,12 @@ def apply_ckpt_choice(choice: str) -> str:
     if choice == "auto":
         os.environ["COMFYUI_CHECKPOINT"] = ""
         os.environ["COMFYUI_URL"] = "http://127.0.0.1:8188"
-        os.environ["MEDIA_FALLBACK_CLOUD"] = "true"
+        os.environ["MEDIA_FALLBACK_CLOUD"] = "false"
         media_engine.comfyui_url = "http://127.0.0.1:8188"
-        media_engine.allow_cloud_fallback = True
+        media_engine.allow_cloud_fallback = False
         update_env_variable("COMFYUI_CHECKPOINT", "")
         update_env_variable("COMFYUI_URL", "http://127.0.0.1:8188")
-        update_env_variable("MEDIA_FALLBACK_CLOUD", "true")
+        update_env_variable("MEDIA_FALLBACK_CLOUD", "false")
         return "Auto (MeinaMix preferred)"
     elif choice == "cloud":
         os.environ["COMFYUI_URL"] = ""
@@ -185,9 +185,12 @@ def apply_ckpt_choice(choice: str) -> str:
         _, ckpt_name = detected_ckpts[int(choice)]
         os.environ["COMFYUI_CHECKPOINT"] = ckpt_name
         os.environ["COMFYUI_URL"] = "http://127.0.0.1:8188"
+        os.environ["MEDIA_FALLBACK_CLOUD"] = "false"
         media_engine.comfyui_url = "http://127.0.0.1:8188"
+        media_engine.allow_cloud_fallback = False
         update_env_variable("COMFYUI_CHECKPOINT", ckpt_name)
         update_env_variable("COMFYUI_URL", "http://127.0.0.1:8188")
+        update_env_variable("MEDIA_FALLBACK_CLOUD", "false")
         return ckpt_name
     return "Unknown"
 
@@ -1480,7 +1483,7 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
 def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
     cur_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "")
     cur_url = os.environ.get("COMFYUI_URL", "")
-    cur_cloud = os.environ.get("MEDIA_FALLBACK_CLOUD", "true").lower() in ("true", "1")
+    cur_cloud = os.environ.get("MEDIA_FALLBACK_CLOUD", "false").lower() in ("true", "1")
     detected = scan_image_models()
 
     markup = types.InlineKeyboardMarkup(row_width=1)
@@ -2223,14 +2226,19 @@ def process_photo_request(target, user_text: str):
                     quality=u_qual
                 )
             if not img_bytes:
-                fail_text = "Maaf sayang, kameraku agak ngadat... Nanti aku coba foto lagi yaa! 🥺"
+                err_detail = getattr(media_engine, "last_error", None) or "ComfyUI tidak memberikan respon."
+                fail_text = (
+                    f"🥺 *Maaf sayang, fotonya gagal dibuat...*\n\n"
+                    f"⚠️ **Penyebab:**\n`{err_detail}`\n\n"
+                    f"💡 _Pastikan ComfyUI lokal aktif di `{COMFYUI_URL}` dengan checkpoint lengkap (seperti MeinaMix). Fallback Pollinations telah dimatikan agar hasil tidak melenceng._"
+                )
                 if status_msg:
                     try:
-                        bot.edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id)
+                        bot.edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id, parse_mode="Markdown")
                     except Exception:
-                        bot.send_message(chat_id, fail_text)
+                        bot.send_message(chat_id, fail_text, parse_mode="Markdown")
                 else:
-                    bot.send_message(chat_id, fail_text)
+                    bot.send_message(chat_id, fail_text, parse_mode="Markdown")
                 return
 
             history = persona_mgr.get_chat_history(user_id)
@@ -2364,14 +2372,19 @@ def process_video_request(target, user_text: str):
                 )
 
             if not video_bytes:
-                fail_text = "Maaf ya sayang, kameraku tadi agak ngadat pas ngerekam video... Nanti aku coba rekam lagi buat kamu yaa! 🥺"
+                err_detail = getattr(media_engine, "last_error", None) or "ComfyUI / render video tidak memberikan respon."
+                fail_text = (
+                    f"🥺 *Maaf ya sayang, videonya gagal direkam...*\n\n"
+                    f"⚠️ **Penyebab:**\n`{err_detail}`\n\n"
+                    f"💡 _Pastikan ComfyUI lokal aktif di `{COMFYUI_URL}`._"
+                )
                 if status_msg:
                     try:
-                        bot.edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id)
+                        bot.edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id, parse_mode="Markdown")
                     except Exception:
-                        bot.send_message(chat_id, fail_text)
+                        bot.send_message(chat_id, fail_text, parse_mode="Markdown")
                 else:
-                    bot.send_message(chat_id, fail_text)
+                    bot.send_message(chat_id, fail_text, parse_mode="Markdown")
                 return
 
             history = persona_mgr.get_chat_history(user_id)

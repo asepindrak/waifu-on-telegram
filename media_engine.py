@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 class MediaEngine:
     """Generates images and videos via local ComfyUI with cloud fallback."""
 
-    def __init__(self, comfyui_url: str = "http://127.0.0.1:8188", allow_cloud_fallback: bool = True):
+    def __init__(self, comfyui_url: str = "http://127.0.0.1:8188", allow_cloud_fallback: bool = False):
+        self.last_error = None
         self.comfyui_url = comfyui_url.rstrip("/")
         self.allow_cloud_fallback = allow_cloud_fallback
         self.client_id = str(uuid.uuid4())
@@ -37,7 +38,7 @@ class MediaEngine:
 
         return {
             "online": False,
-            "backend": "Cloud Fallback (Pollinations)" if self.allow_cloud_fallback else "Disabled",
+            "backend": "Cloud Fallback (Pollinations)" if self.allow_cloud_fallback else "ComfyUI Offline",
             "device": "Remote CPU/GPU"
         }
 
@@ -123,32 +124,37 @@ class MediaEngine:
             if matched:
                 chosen_ckpt = matched[0]
 
-        # 2. Check if dedicated uncensored hentai/NSFW model requested & available
-        is_explicit_nsfw = any(k in prompt.lower() for k in ["completely nude", "bare body", "full body nude", "nipples", "bare skin", "sensual lace lingerie", "lingerie"])
-        if is_explicit_nsfw and not chosen_ckpt:
-            for c in ckpts:
-                if any(k in c.lower() for k in ["basnsfw", "hentai", "nsfw"]):
-                    chosen_ckpt = c
-                    logger.info(f"Auto-selected dedicated uncensored anime model: {chosen_ckpt}")
-                    break
+        # Filter out incomplete / UNet-only checkpoints that lack CLIP or VAE (e.g. BASNSFW...baseV10)
+        valid_ckpts = [c for c in ckpts if not ("basnsfw" in c.lower() and "base" in c.lower())]
+        if not valid_ckpts:
+            valid_ckpts = ckpts
 
-        # 3. Prefer MeinaMix if present in folder
+        # 2. Prefer MeinaMix if present in folder (SD 1.5 anime model with CLIP & VAE, handles SFW & NSFW)
         if not chosen_ckpt:
-            for c in ckpts:
+            for c in valid_ckpts:
                 if "meina" in c.lower():
                     chosen_ckpt = c
                     break
 
-        # 4. Prefer AOM3 / OrangeMix if present
+        # 3. Prefer AOM3 / OrangeMix if present
         if not chosen_ckpt:
-            for c in ckpts:
+            for c in valid_ckpts:
                 if any(k in c.lower() for k in ["aom", "orange"]):
                     chosen_ckpt = c
                     break
 
-        # 5. Fallback to first available checkpoint
+        # 4. Check if dedicated uncensored hentai/NSFW model requested & available
+        is_explicit_nsfw = any(k in prompt.lower() for k in ["completely nude", "bare body", "full body nude", "nipples", "bare skin", "sensual lace lingerie", "lingerie"])
+        if is_explicit_nsfw and not chosen_ckpt:
+            for c in valid_ckpts:
+                if any(k in c.lower() for k in ["hentai", "nsfw"]):
+                    chosen_ckpt = c
+                    logger.info(f"Auto-selected dedicated uncensored anime model: {chosen_ckpt}")
+                    break
+
+        # 5. Fallback to first available valid checkpoint
         if not chosen_ckpt:
-            chosen_ckpt = ckpts[0]
+            chosen_ckpt = valid_ckpts[0]
 
         is_sdxl = any(k in chosen_ckpt.lower() for k in ["xl", "sdxl", "pony", "illustrious"])
 
@@ -242,23 +248,36 @@ class MediaEngine:
             )
             if res.status_code != 200:
                 logger.warning(f"ComfyUI rejected prompt: {res.text}")
+                self.last_error = f"ComfyUI menolak prompt (HTTP {res.status_code}): {res.text[:120]}"
                 return None
 
             prompt_id = res.json().get("prompt_id")
             if not prompt_id:
+                self.last_error = "ComfyUI tidak mengembalikan prompt_id."
                 return None
 
             # Poll history for completion
             for _ in range(120):  # Wait up to 120 seconds
                 time.sleep(1.5)
-                h_res = requests.get(f"{self.comfyui_url}/history/{prompt_id}", timeout=5)
+                try:
+                    h_res = requests.get(f"{self.comfyui_url}/history/{prompt_id}", timeout=5)
+                except Exception:
+                    continue
                 if h_res.status_code == 200:
                     h_data = h_res.json()
                     if prompt_id in h_data:
                         task = h_data[prompt_id]
                         status = task.get("status", {})
                         if status.get("status_str") == "error":
+                            messages = status.get("messages", [])
+                            err_detail = "Node error"
+                            for m in messages:
+                                if isinstance(m, list) and len(m) > 1 and m[0] == "execution_error":
+                                    info = m[1]
+                                    err_detail = f"{info.get('node_type')}: {info.get('exception_message', '').strip()}"
+                                    break
                             logger.error(f"ComfyUI node execution error: {status.get('messages')}")
+                            self.last_error = f"ComfyUI execution error ({err_detail})"
                             return None
 
                         outputs = task.get("outputs", {})
@@ -274,8 +293,15 @@ class MediaEngine:
                             if img_resp.status_code == 200:
                                 return img_resp.content
 
+            if not self.last_error:
+                self.last_error = "ComfyUI timeout: waktu rendering melebihi 120 detik (antrean sibuk atau VRAM terbatas)."
+
+        except requests.exceptions.ConnectionError:
+            self.last_error = f"Tidak dapat terhubung ke ComfyUI di {self.comfyui_url}. Pastikan ComfyUI sudah aktif."
+            logger.error(self.last_error)
         except Exception as e:
             logger.error(f"ComfyUI generation error: {e}")
+            self.last_error = f"Error komunikasi ComfyUI: {e}"
 
         return None
 
@@ -301,31 +327,38 @@ class MediaEngine:
 
     def generate_photo(
         self,
-        visual_prompt: str,
+        visual_prompt: str = "",
+        prompt: Optional[str] = None,
         negative_prompt: Optional[str] = None,
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None
     ) -> Tuple[Optional[bytes], str]:
         """
         Main entry for photo generation.
-        Tries local ComfyUI first; if offline or fails, falls back to cloud.
+        Tries local ComfyUI first; if offline or fails, returns (None, 'Failed').
+        Cloud fallback is disabled unless explicitly enabled.
         Returns: (image_bytes, source_label)
         """
+        self.last_error = None
+        effective_prompt = prompt or visual_prompt
+
         # 1. Try local ComfyUI
         if self.comfyui_url:
             local_img = self.generate_image_comfyui(
-                visual_prompt,
+                effective_prompt,
                 negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
                 aspect_ratio=aspect_ratio,
                 quality=quality
             )
             if local_img:
                 return local_img, "ComfyUI Local"
+        else:
+            self.last_error = "ComfyUI URL belum dikonfigurasi (pastikan ComfyUI lokal aktif)."
 
-        # 2. Cloud Fallback
+        # 2. Cloud Fallback (Disabled by default)
         if self.allow_cloud_fallback:
             w, h = self.get_dimensions(aspect_ratio or "3:4", is_sdxl=False)
-            cloud_img = self.generate_image_cloud_fallback(visual_prompt, width=w, height=h)
+            cloud_img = self.generate_image_cloud_fallback(effective_prompt, width=w, height=h)
             if cloud_img:
                 return cloud_img, "Cloud Engine (Free GPU)"
 
