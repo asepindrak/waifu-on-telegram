@@ -2694,6 +2694,9 @@ def sanitize_chat_caption(text: Optional[str], fallback: str) -> str:
     clean = re.sub(r'^(?:sori\s+gaes|halo\s+gaes|hai\s+gaes|gaes|guys|temen-temen|teman-teman)[,\s!.]*', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'\b(?:intip\s+aja\s+yuk|intip\s+yuk|stay\s+tuned|pantau\s+terus)\b[,\s!.]*', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'\b(?:makasih\s+udah\s+sabar\s+tungguin\s+aku|makasih\s+udah\s+nungguin\s+aku|tungguin\s+aku)\s+di\s+semester\s+\w+\s+ini[,\s!.]*', '', clean, flags=re.IGNORECASE)
+    # Strip defensive proof / existential doubt artifacts (anti-paranoid)
+    clean = re.sub(r'\b(?:biar\s+(?:kamu\s+)?(?:percaya|yakin)|liat\s+sendiri\s+(?:nih|biar|foto)|nih\s+buktinya|tuh\s+kan\s+beneran|aku\s+beneran\s+ada|diliatin\s+aja\s+yuk|jangan\s+bohong\s+lagi)[,\s!.]*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\b(?:biar\s+kamu\s+ga\s+main\s+game\s+doang|biar\s+kamu\s+tau\s+aku\s+beneran)[,\s!.]*', '', clean, flags=re.IGNORECASE)
     clean = clean.strip()
     if not clean or len(clean) < 3:
         return fallback
@@ -2719,10 +2722,7 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
     bot.send_chat_action(chat_id, "upload_photo")
 
     status_msg = None
-    if is_proof:
-        status_text = f"📸 *{persona.get('name')} lagi fotoin bukti buat kamu...* 😜"
-    else:
-        status_text = f"📸 *{persona.get('name')} lagi mengambil foto...*"
+    status_text = f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕"
     try:
         status_msg = bot.reply_to(reply_to_target, status_text, parse_mode="Markdown")
     except Exception:
@@ -2797,17 +2797,12 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                     "and deeply in love. Remind them gently that this special view is just between the two of you."
                 )
 
-            if is_proof:
-                cap_guide = (
-                    f" You just took a quick selfie photo to prove your whereabouts to your boyfriend who was doubting you. "
-                    f"Write 1 natural, casual sentence teasing him for doubting you (e.g. 'Tuh kan beneran, liat sendiri nih biar percaya! 😜'). "
-                    f"STRICT: Chat 1-on-1 with boyfriend. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip yuk'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
-                )
-            else:
-                cap_guide = (
-                    f" You just took a photo to send to your boyfriend. Write 1 natural, casual Indonesian girlfriend chat sentence accompanying the photo. "
-                    f"STRICT: Chat 1-on-1 with boyfriend. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip yuk'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
-                )
+            cap_guide = (
+                f" You just took a sweet, cute photo to send to your beloved boyfriend on Telegram. "
+                f"Write 1 natural, affectionate, and playful girlfriend chat caption accompanying the photo (e.g. 'Lagi santai rebahan nih sayang, kepikiran kamu terus 💕' or 'Spesial buat kamu nih, suka ga? 🅰'). "
+                f"DILARANG KERAS bersikap defensif atau meyakinkan keberadaan ('biar percaya', 'biar yakin', 'beneran ada di sini', 'nih buktinya', 'diliatin aja'). "
+                f"STRICT: Chat 1-on-1 with boyfriend. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip yuk'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
+            )
 
             caption_prompt = [
                 {
@@ -2836,14 +2831,12 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                 caption = None
 
             if is_nude:
-                fallback_caption = f"Khusus buat kamu ya, jangan diliatin ke siapa-siapa ({source})"
+                fallback_caption = f"Khusus buat kamu ya sayang, jangan diliatin ke siapa-siapa 💕 ({source})"
             else:
                 if "Vault" in source:
-                    fallback_caption = f"Ini foto dari album galeri aku ya sayang~ ({source})"
-                elif is_proof:
-                    fallback_caption = f"Tuh kan beneran, liat sendiri nih biar percaya! 😜 ({source})"
+                    fallback_caption = f"Ini foto manis dari galeri aku ya sayang~ ({source})"
                 else:
-                    fallback_caption = f"Ini fotonya yaa ({source})"
+                    fallback_caption = f"Spesial buat kamu nih sayang 💕 ({source})"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
 
             if status_msg:
@@ -4110,7 +4103,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 f"Kamu adalah mahasiswi ({p_prof['major']}). "
                 "PANDUAN PENTING: Jawab pesan pasanganmu secara wajar, santai, dan relevan dengan topik serta kehidupan mahasiswimu. "
                 "Jangan lebay, jangan bersikap hiperbola atau teatrikal. Jawab langsung maksimal 1-3 kalimat seperti chat asli.\n"
-                "INISIATIF KIRIM PAP (FOTO BUKTI): Jika pacarmu meragukan keberadaanmu, tidak percaya, menuduhmu bohong ('ah bohong', 'mana buktinya', 'ga percaya', dll), atau jika kamu ingin menunjukkan kegiatan/outfitmu secara spontan, kamu HARUS berinisiatif membuktikannya! Tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dan katakan bahwa kamu sedang memfoto/mengirimkan foto bukti agar dia percaya (misal: 'Beneran tauu! Nih aku fotoin biar kamu percaya haha 😜 [ACTION: SEND_PAP]')."
+                "INISIATIF KIRIM PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan, outfit, atau sekadar memanjakan pacarmu karena kangen! Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat pacar yang manis dan wajar (misal: 'Lagi rebahan santai nih sayang, kangen kamu deh 💕 [ACTION: SEND_PAP]' atau 'Liat deh penampilanku hari ini, cocok ga buat kamu? 🥰 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu ('biar kamu percaya aku beneran ada di sini', 'nih buktinya', 'biar kamu yakin', 'jangan bohong lagi'). Kamu adalah pacar nyata yang percaya diri, hangat, dan penuh cinta."
             )
             mem_context = memory_engine.format_memory_context(message.from_user.id)
             if mem_context:
@@ -4137,20 +4130,18 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
             if not reply_text or not reply_text.strip():
                 reply_text = "Aku dengerin kok, lagi mikirin apa nih?"
 
-            # Check if waifu takes initiative to send spontaneous PAP / proof photo
+            # Check if waifu takes initiative to send spontaneous PAP photo
             has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
-            has_doubt = is_user_expressing_doubt(user_text)
-            has_proof_phrase = any(phrase in reply_text.lower() for phrase in [
-                "nih aku fotoin", "nih buktinya", "liat sendiri", "aku pap", "nih fotonya",
-                "nih aku pap", "aku kirim foto", "nih liat langsung", "aku fotoin ya", "tuh kan"
+            has_pap_phrase = any(phrase in reply_text.lower() for phrase in [
+                "aku fotoin ya", "aku kirim foto ya", "nih foto spesial buat kamu", "aku pap buat kamu"
             ])
 
-            should_send_proof_photo = has_action_tag or (has_doubt and any(kw in reply_text.lower() for kw in ["nih", "bukti", "foto", "liat", "percaya", "beneran"])) or has_proof_phrase
+            should_send_photo = has_action_tag or has_pap_phrase
 
             # Clean action tag from text so user only sees natural dialogue
             clean_reply = re.sub(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", "", reply_text, flags=re.IGNORECASE).strip()
             if not clean_reply:
-                clean_reply = "Beneran tauu! Nih aku fotoin biar kamu percaya haha 😜"
+                clean_reply = "Lagi kangen banget sama kamu nih sayang 💕"
 
             new_aff = persona_mgr.increase_affinity(message.from_user.id, delta=1)
             memory_engine.set_affinity(message.from_user.id, new_aff)
@@ -4159,15 +4150,16 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
             bot.reply_to(message, clean_reply)
 
-            if should_send_proof_photo:
-                def _send_spontaneous_proof():
+            if should_send_photo:
+                def _send_spontaneous_photo():
                     try:
                         time.sleep(1.5)  # Natural human pause as if snapping a quick selfie
-                        process_photo_request(message, user_text="foto bukti kegiatan dan lokasi saat ini", is_proof=True)
-                    except Exception as e_proof:
-                        logger.error(f"Error sending spontaneous proof photo: {e_proof}")
+                        photo_prompt = clean_reply if clean_reply else f"{routine['activity_desc']}"
+                        process_photo_request(message, user_text=photo_prompt, is_proof=False)
+                    except Exception as e_photo:
+                        logger.error(f"Error sending spontaneous photo: {e_photo}")
 
-                threading.Thread(target=_send_spontaneous_proof, daemon=True).start()
+                threading.Thread(target=_send_spontaneous_photo, daemon=True).start()
 
             # Auto-diary entry every 6 turns
             if len(history) > 0 and len(history) % 6 == 0:
