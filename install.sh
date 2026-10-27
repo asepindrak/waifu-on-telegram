@@ -89,6 +89,22 @@ else
     echo "  ✓ Local GGUF chat model found."
 fi
 
+# Check for Vision Adapter (mmproj)
+EXISTING_MMPROJ=$(ls "$INSTALL_DIR/models/"*mmproj*.gguf 2>/dev/null | head -n 1)
+if [ -z "$EXISTING_MMPROJ" ]; then
+    echo "  ℹ Vision adapter (mmproj) not found in '$INSTALL_DIR/models'."
+    read -p "  Auto-download Huihui-Qwythos Vision Adapter mmproj (~879 MB) so waifu can see photos? [Y/n, default: Y]: " DL_VISION
+    DL_VISION=${DL_VISION:-Y}
+    if [[ "$DL_VISION" =~ ^[Yy]$ ]]; then
+        echo "  Downloading Huihui-Qwythos Vision Adapter..."
+        curl -fL -C - -o "$INSTALL_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf" \
+          "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf" || true
+        echo "  ✓ Vision adapter downloaded successfully."
+    fi
+else
+    echo "  ✓ Vision Adapter detected: $(basename "$EXISTING_MMPROJ")"
+fi
+
 # 5. Check & Auto-Install Node.js for PC Music Remote
 echo "[5/7] Checking Node.js for Music Remote..."
 if ! command -v node &>/dev/null; then

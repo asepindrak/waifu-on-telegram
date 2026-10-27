@@ -9,6 +9,8 @@ from typing import Optional, Dict, Any, List, Tuple
 
 logger = logging.getLogger(__name__)
 
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
 # Registry of AI Models, Custom Nodes, and Third-Party Dependencies
 ASSET_REGISTRY = {
     "qwythos_9b": {
@@ -260,19 +262,27 @@ def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:
 
     spec = dict(ASSET_REGISTRY[asset_key])
     if spec.get("type") == "llm_model":
-        target_dir = detect_locally_uncensored_dir()
+        project_models_dir = os.path.join(PROJECT_ROOT, "models")
+        lu_models_dir = detect_locally_uncensored_dir()
+        candidate_dirs = [project_models_dir, lu_models_dir]
+
+        target_dir = project_models_dir
         spec["target_dir"] = target_dir
         spec["target_path"] = os.path.join(target_dir, spec["filename"])
         found_file = None
         found_size = 0
-        if os.path.isdir(target_dir):
-            p = os.path.join(target_dir, spec["filename"])
+
+        for cdir in candidate_dirs:
+            if not os.path.isdir(cdir):
+                continue
+            p = os.path.join(cdir, spec["filename"])
             if os.path.isfile(p) and os.path.getsize(p) > (10 * 1024 * 1024):
                 found_file = p
                 found_size = os.path.getsize(p)
-            elif "patterns" in spec:
+                break
+            if "patterns" in spec:
                 for pat in spec["patterns"]:
-                    matches = glob.glob(os.path.join(target_dir, pat))
+                    matches = glob.glob(os.path.join(cdir, pat))
                     for m in matches:
                         if os.path.isfile(m) and os.path.getsize(m) > (10 * 1024 * 1024):
                             found_file = m
@@ -280,6 +290,9 @@ def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:
                             break
                     if found_file:
                         break
+            if found_file:
+                break
+
         if found_file:
             spec["installed"] = True
             spec["target_path"] = found_file
@@ -362,45 +375,20 @@ def check_all_assets() -> Dict[str, Dict[str, Any]]:
             results[key] = info
     return results
 
-def download_asset(asset_key: str, progress_callback=None) -> bool:
-    """
-    Downloads model asset with HTTP byte resume support (curl or requests),
-    or clones custom node if type is 'custom_node'.
-    Returns True on success, False otherwise.
-    """
-    info = get_asset_info(asset_key)
-    if not info:
-        logger.error(f"Asset '{asset_key}' not found.")
-        return False
-
-    if info.get("type") == "custom_node":
-        return install_custom_node(asset_key)
-
-    if info.get("type") != "model":
-        logger.error(f"Asset '{asset_key}' is not a downloadable model or custom node.")
-        return False
-
-    target_path = info.get("target_path")
-    if not target_path:
-        logger.error(f"Could not determine target path for '{asset_key}'.")
-        return False
-
+def _download_file(url: str, target_path: str, fallback_url: Optional[str] = None, progress_callback=None) -> bool:
+    """Helper to download file with resume support via curl or requests."""
     target_dir = os.path.dirname(target_path)
-    os.makedirs(target_dir, exist_ok=True)
-
-    url = info.get("url")
-    fallback_url = info.get("fallback_url")
-    name = info["name"]
-    logger.info(f"Downloading {name} -> {target_path}")
+    if target_dir:
+        os.makedirs(target_dir, exist_ok=True)
 
     for dl_url in [url, fallback_url]:
         if not dl_url:
             continue
-        # Use curl if available for high-speed resumable downloads
+        # Use curl if available for high-speed resumable downloads (-fL avoids saving HTML error pages)
         curl_path = shutil.which("curl")
         if curl_path:
             try:
-                cmd = [curl_path, "-L", "-C", "-", "--retry", "3", "--progress-bar", "-o", target_path, dl_url]
+                cmd = [curl_path, "-fL", "-C", "-", "--retry", "3", "--progress-bar", "-o", target_path, dl_url]
                 ret = subprocess.run(cmd)
                 if ret.returncode == 0 and os.path.exists(target_path) and os.path.getsize(target_path) > 10 * 1024 * 1024:
                     return True
@@ -432,6 +420,120 @@ def download_asset(asset_key: str, progress_callback=None) -> bool:
                         return True
         except Exception as e:
             logger.warning(f"Failed to download from {dl_url}: {e}")
+
+    return False
+
+def download_asset(asset_key: str, progress_callback=None) -> bool:
+    """
+    Downloads model asset with HTTP byte resume support (curl or requests),
+    or clones custom node if type is 'custom_node'.
+    Supports models, llm_models, and custom nodes.
+    Returns True on success, False otherwise.
+    """
+    info = get_asset_info(asset_key)
+    if not info:
+        logger.error(f"Asset '{asset_key}' not found.")
+        return False
+
+    if info.get("type") == "custom_node":
+        return install_custom_node(asset_key)
+
+    if info.get("type") not in ("model", "llm_model"):
+        logger.error(f"Asset '{asset_key}' is not a downloadable model or custom node.")
+        return False
+
+    target_path = info.get("target_path")
+    if not target_path:
+        logger.error(f"Could not determine target path for '{asset_key}'.")
+        return False
+
+    target_dir = os.path.dirname(target_path)
+    os.makedirs(target_dir, exist_ok=True)
+
+    name = info["name"]
+    logger.info(f"Downloading {name} -> {target_path}")
+
+    return _download_file(
+        url=info.get("url"),
+        target_path=target_path,
+        fallback_url=info.get("fallback_url"),
+        progress_callback=progress_callback
+    )
+
+def ensure_koboldcpp() -> bool:
+    """Ensures standalone KoboldCPP binary is downloaded and ready in tools/."""
+    tools_dir = os.path.join(PROJECT_ROOT, "tools")
+    os.makedirs(tools_dir, exist_ok=True)
+    if platform.system() == "Windows":
+        exe_path = os.path.join(tools_dir, "koboldcpp.exe")
+        if os.path.isfile(exe_path) and os.path.getsize(exe_path) > 10 * 1024 * 1024:
+            return True
+        url = "https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp.exe"
+        return _download_file(url, exe_path)
+    elif platform.system() == "Darwin":
+        bin_path = os.path.join(tools_dir, "koboldcpp")
+        if os.path.isfile(bin_path) and os.path.getsize(bin_path) > 10 * 1024 * 1024:
+            return True
+        url = "https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-mac-arm64"
+        ok = _download_file(url, bin_path)
+        if ok and os.path.exists(bin_path):
+            try:
+                os.chmod(bin_path, 0o755)
+            except Exception:
+                pass
+        return ok
+    else: # Linux
+        bin_path = os.path.join(tools_dir, "koboldcpp")
+        if os.path.isfile(bin_path) and os.path.getsize(bin_path) > 10 * 1024 * 1024:
+            return True
+        url = "https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-linux-x64-nocuda"
+        ok = _download_file(url, bin_path)
+        if ok and os.path.exists(bin_path):
+            try:
+                os.chmod(bin_path, 0o755)
+            except Exception:
+                pass
+        return ok
+
+def ensure_nodejs() -> bool:
+    """Ensures Node.js is present (system-wide or standalone portable in tools/nodejs)."""
+    # 1. Check if node is already working
+    if shutil.which("node"):
+        return True
+
+    local_node_dir = os.path.join(PROJECT_ROOT, "tools", "nodejs")
+    local_node_exe = os.path.join(local_node_dir, "node.exe" if platform.system() == "Windows" else "bin/node")
+    if os.path.isfile(local_node_exe):
+        if local_node_dir not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = local_node_dir + os.pathsep + os.environ.get("PATH", "")
+        return True
+
+    # 2. On Windows, auto-download portable Node.js LTS
+    if platform.system() == "Windows":
+        try:
+            os.makedirs(local_node_dir, exist_ok=True)
+            zip_dest = os.path.join(PROJECT_ROOT, "tools", "nodejs_temp.zip")
+            url = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-win-x64.zip"
+            if _download_file(url, zip_dest):
+                import zipfile
+                with zipfile.ZipFile(zip_dest, 'r') as zip_ref:
+                    for member in zip_ref.namelist():
+                        parts = member.split('/', 1)
+                        if len(parts) > 1 and parts[1]:
+                            target_file = os.path.join(local_node_dir, parts[1].replace('/', os.sep))
+                            if member.endswith('/'):
+                                os.makedirs(target_file, exist_ok=True)
+                            else:
+                                os.makedirs(os.path.dirname(target_file), exist_ok=True)
+                                with zip_ref.open(member) as src, open(target_file, "wb") as dst:
+                                    dst.write(src.read())
+                if os.path.exists(zip_dest):
+                    os.remove(zip_dest)
+                if os.path.isfile(local_node_exe):
+                    os.environ["PATH"] = local_node_dir + os.pathsep + os.environ.get("PATH", "")
+                    return True
+        except Exception as e:
+            logger.warning(f"Failed to auto-install portable Node.js: {e}")
 
     return False
 

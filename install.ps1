@@ -188,6 +188,38 @@ if ($existingGgufs.Count -eq 0) {
     Write-Host "  [OK] Local Chat & Romance GGUF Model detected: $activeGguf" -ForegroundColor Green
 }
 
+# Check for Vision Adapter (mmproj)
+$existingMmproj = @(Get-ChildItem -Path $modelsDir -Filter "*mmproj*.gguf" -ErrorAction SilentlyContinue)
+if ($existingMmproj.Count -eq 0) {
+    # Check if user has mmproj in Locally Uncensored
+    $luDir = "$env:APPDATA\Locally Uncensored\models"
+    $foundMmprojCandidate = $null
+    if (Test-Path $luDir) {
+        $luMmprojs = @(Get-ChildItem -Path $luDir -Filter "*mmproj*.gguf" -ErrorAction SilentlyContinue)
+        if ($luMmprojs.Count -gt 0) {
+            $foundMmprojCandidate = $luMmprojs[0].FullName
+        }
+    }
+
+    if ($foundMmprojCandidate) {
+        $candMmprojName = Split-Path -Leaf $foundMmprojCandidate
+        Write-Host "  [DETECTED] Found existing Vision Adapter in Locally Uncensored: $candMmprojName" -ForegroundColor Cyan
+        Copy-Item -Path $foundMmprojCandidate -Destination "$modelsDir\$candMmprojName" -Force
+        Write-Host "  [OK] Vision adapter copied successfully." -ForegroundColor Green
+    } else {
+        Write-Host "  [INFO] Vision adapter (mmproj) not found in '$modelsDir'." -ForegroundColor Yellow
+        $dlVision = Read-Host "  Auto-download Huihui-Qwythos Vision Adapter (~879 MB) so waifu can see photos? [Y/n, default: Y]"
+        if ($dlVision.Trim().ToLower() -ne "n") {
+            $visionUrl = "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf"
+            $destMmproj = "$modelsDir\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
+            Download-FileWithProgress -Url $visionUrl -DestinationPath $destMmproj -Description "Huihui-Qwythos Vision Adapter (~879 MB)"
+        }
+    }
+} else {
+    $activeMmproj = $existingMmproj[0].Name
+    Write-Host "  [OK] Vision Adapter detected: $activeMmproj" -ForegroundColor Green
+}
+
 # 5. Check & Setup ComfyUI & Models (MeinaMix & AnimateDiff)
 Write-Host "`n[5/8] Checking ComfyUI & Generative Models (Photos & Videos)..." -ForegroundColor Cyan
 $foundComfy = $null

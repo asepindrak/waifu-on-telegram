@@ -22,10 +22,22 @@ if [ -f "$SCRIPT_DIR/tools/koboldcpp" ]; then
         MODEL_PATH=$(ls "$SCRIPT_DIR/models/"*.gguf 2>/dev/null | grep -v "mmproj" | head -n 1)
     fi
 
+    MMPROJ_PATH=""
+    if [ -f "$SCRIPT_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf" ]; then
+        MMPROJ_PATH="$SCRIPT_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
+    elif [ -d "$SCRIPT_DIR/models" ]; then
+        MMPROJ_PATH=$(ls "$SCRIPT_DIR/models/"*mmproj*.gguf 2>/dev/null | head -n 1)
+    fi
+
+    MMPROJ_ARG=""
+    if [ -n "$MMPROJ_PATH" ]; then
+        MMPROJ_ARG="--mmproj $MMPROJ_PATH"
+    fi
+
     if [ -n "$MODEL_PATH" ]; then
         if ! nc -z 127.0.0.1 5001 2>/dev/null && ! (echo >/dev/tcp/127.0.0.1/5001) 2>/dev/null; then
-            echo "Starting KoboldCPP LLM Engine with model: $MODEL_PATH..."
-            nohup "$SCRIPT_DIR/tools/koboldcpp" --model "$MODEL_PATH" --gpulayers 99 --port 5001 --quiet >/dev/null 2>&1 &
+            echo "Starting KoboldCPP LLM Engine with model: $MODEL_PATH ${MMPROJ_ARG:+(Vision enabled)}..."
+            nohup "$SCRIPT_DIR/tools/koboldcpp" --model "$MODEL_PATH" $MMPROJ_ARG --gpulayers 99 --port 5001 --quiet >/dev/null 2>&1 &
             sleep 3
         fi
     fi

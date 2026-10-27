@@ -426,13 +426,13 @@ def cmd_models(subcmd=None, target=None):
 def cmd_update():
     print_banner()
     cur_v = get_version()
-    print(c(CYAN, f"🔄 Checking updates (Current Version: v{cur_v})..."))
+    print(c(CYAN, f"🔄 Checking updates and verifying AI models (Current Version: v{cur_v})..."))
     is_running = get_running_pid() is not None
 
     # Step 1: Git pull latest changes
     git_dir = os.path.join(PROJECT_ROOT, ".git")
     if os.path.exists(git_dir):
-        print(c(CYAN, "📥 [1/4] Pulling latest repository updates from GitHub..."))
+        print(c(CYAN, "\n📥 [1/5] Pulling latest repository updates from GitHub..."))
         try:
             res = subprocess.run(["git", "pull", "--tags"], cwd=PROJECT_ROOT, capture_output=True, text=True)
             if res.returncode == 0:
@@ -445,12 +445,12 @@ def cmd_update():
         except Exception as e:
             print(c(YELLOW, f"  ⚠️ Git pull error: {e}"))
     else:
-        print(c(YELLOW, "  Project directory is not a Git clone. Please run the 1-click installer to update."))
+        print(c(YELLOW, "  Project directory is not a Git clone. Skipping git pull."))
 
     # Step 2: Auto check and install Python dependencies
     req_txt = os.path.join(PROJECT_ROOT, "requirements.txt")
     if os.path.exists(req_txt):
-        print(c(CYAN, "📦 [2/4] Checking and updating Python libraries (pip install -r requirements.txt)..."))
+        print(c(CYAN, "\n📦 [2/5] Checking and updating Python libraries (pip install -r requirements.txt)..."))
         try:
             res = subprocess.run(
                 [sys.executable, "-m", "pip", "install", "-r", req_txt, "--disable-pip-version-check"],
@@ -466,10 +466,13 @@ def cmd_update():
         except Exception as e:
             print(c(RED, f"  ❌ Error updating Python libraries: {e}"))
 
-    # Step 3: Auto check Node.js dependencies for music remote
+    # Step 3: Auto check Node.js environment & dependencies for music remote
+    print(c(CYAN, "\n🎵 [3/5] Checking Node.js environment & YouTube music remote..."))
+    if asset_manager:
+        asset_manager.ensure_nodejs()
+
     pkg_json = os.path.join(PROJECT_ROOT, "package.json")
     if os.path.exists(pkg_json):
-        print(c(CYAN, "🎵 [3/4] Checking Node.js dependencies for YouTube music remote..."))
         npm_cmd = shutil.which("npm")
         if npm_cmd:
             try:
@@ -487,29 +490,66 @@ def cmd_update():
             except Exception as e:
                 print(c(YELLOW, f"  ⚠️ npm error: {e}"))
         else:
-            print(c(DIM, "  ℹ Node.js/npm not installed. (Optional: only needed for YouTube music playback)"))
+            print(c(DIM, "  ℹ Node.js not detected. (Music remote feature will be inactive)."))
 
-    # Step 4: Auto check ComfyUI extensions & AI models
+    # Step 4: Check Standalone KoboldCPP Engine
+    print(c(CYAN, "\n🧠 [4/5] Checking Standalone KoboldCPP LLM Engine..."))
     if asset_manager:
-        print(c(CYAN, "🧩 [4/4] Checking ComfyUI extensions & AI models..."))
+        if asset_manager.ensure_koboldcpp():
+            print(c(GREEN, "  ✓ KoboldCPP standalone binary is ready in tools/."))
+        else:
+            print(c(YELLOW, "  ⚠️ KoboldCPP binary could not be verified. Check internet connection."))
+
+    # Step 5: Check & Auto-Download Core AI Models (Chat Brain, Vision, and Image Generation)
+    print(c(CYAN, "\n📦 [5/5] Checking and auto-downloading AI Models & Vision mmproj..."))
+    if asset_manager:
+        # 1. Main Chat Brain: Huihui-Qwythos-9B
+        info_9b = asset_manager.get_asset_info("qwythos_9b")
+        if info_9b and not info_9b.get("installed"):
+            print(c(YELLOW, f"  ⏳ Core Brain '{info_9b['name']}' missing. Auto-downloading (~{info_9b['size_mb']} MB)..."))
+            ok = asset_manager.download_asset("qwythos_9b")
+            if ok:
+                print(c(GREEN, f"  ✓ '{info_9b['name']}' downloaded successfully!"))
+            else:
+                print(c(RED, f"  ❌ Download failed for '{info_9b['name']}'. Run 'waifu models download qwythos_9b'."))
+        else:
+            sz = info_9b.get("current_size_mb", 0) if info_9b else 0
+            print(c(GREEN, f"  ✓ Core Chat Brain '{info_9b['name']}' is ready ({sz} MB)."))
+
+        # 2. Vision Adapter: Huihui-Qwythos Vision mmproj
+        info_vis = asset_manager.get_asset_info("qwythos_vision")
+        if info_vis and not info_vis.get("installed"):
+            print(c(YELLOW, f"  ⏳ Vision Adapter '{info_vis['name']}' missing. Auto-downloading (~{info_vis['size_mb']} MB)..."))
+            ok = asset_manager.download_asset("qwythos_vision")
+            if ok:
+                print(c(GREEN, f"  ✓ '{info_vis['name']}' downloaded successfully!"))
+            else:
+                print(c(RED, f"  ❌ Download failed for '{info_vis['name']}'. Run 'waifu models download qwythos_vision'."))
+        else:
+            sz = info_vis.get("current_size_mb", 0) if info_vis else 0
+            print(c(GREEN, f"  ✓ Vision Adapter '{info_vis['name']}' is ready ({sz} MB)."))
+
+        # 3. ComfyUI Models (if ComfyUI is detected)
         comfy_dir = asset_manager.detect_comfyui_dir()
         if comfy_dir:
-            assets = asset_manager.check_all_assets()
-            missing = [k for k, v in assets.items() if not v.get("installed")]
-            if missing:
-                print(c(YELLOW, f"  ℹ ComfyUI detected at: {comfy_dir}"))
-                print(c(YELLOW, f"  ℹ Optional models available for download: {', '.join(missing)}"))
-                print(c(DIM, "    (Run 'waifu models' to view details or 'waifu models download <key>' to install)"))
+            print(c(CYAN, f"  🧩 ComfyUI detected at: {comfy_dir}"))
+            info_meina = asset_manager.get_asset_info("meinamix")
+            if info_meina and not info_meina.get("installed"):
+                print(c(YELLOW, f"  ⏳ Anime Checkpoint '{info_meina['name']}' missing. Auto-downloading (~{info_meina['size_mb']} MB)..."))
+                ok = asset_manager.download_asset("meinamix")
+                if ok:
+                    print(c(GREEN, f"  ✓ '{info_meina['name']}' downloaded successfully!"))
             else:
-                print(c(GREEN, "  ✓ All core AI models & ComfyUI extensions are verified."))
+                sz = info_meina.get("current_size_mb", 0) if info_meina else 0
+                print(c(GREEN, f"  ✓ Anime Checkpoint '{info_meina['name']}' is ready ({sz} MB)."))
         else:
-            print(c(DIM, "  ℹ ComfyUI directory not detected yet (will auto-check when ComfyUI is launched)."))
+            print(c(DIM, "  ℹ ComfyUI not detected locally. Photo Vault album will be used for photos."))
 
     new_v = get_version()
     if new_v != cur_v:
         print(c(BOLD + GREEN, f"\n🎉 Successfully updated Waifu on Telegram from v{cur_v} to v{new_v}!"))
     else:
-        print(c(BOLD + GREEN, f"\n🎉 Waifu on Telegram is already at latest version (v{new_v})!"))
+        print(c(BOLD + GREEN, f"\n🎉 Waifu on Telegram is fully up to date (v{new_v})!"))
 
     if is_running:
         print(c(CYAN, "\n🔄 Restarting bot daemon to apply all changes cleanly..."))
