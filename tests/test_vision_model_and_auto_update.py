@@ -77,9 +77,11 @@ class TestVisionModelAndAutoUpdate(unittest.TestCase):
     @patch("subprocess.run")
     @patch.object(asset_manager, "ensure_nodejs", return_value=True)
     @patch.object(asset_manager, "ensure_koboldcpp", return_value=True)
+    @patch.object(asset_manager, "ensure_comfyui", return_value=True)
+    @patch.object(asset_manager, "detect_comfyui_dir", return_value="/tmp/ComfyUI")
     @patch.object(asset_manager, "get_asset_info")
     @patch.object(asset_manager, "download_asset", return_value=True)
-    def test_cmd_update_auto_repairs_missing_models(self, mock_dl, mock_info, mock_kcpp, mock_node, mock_sub):
+    def test_cmd_update_auto_repairs_missing_models(self, mock_dl, mock_info, mock_detect, mock_comfy, mock_kcpp, mock_node, mock_sub):
         mock_sub.return_value = MagicMock(returncode=0, stdout="", stderr="")
 
         # Simulate missing models
@@ -101,6 +103,50 @@ class TestVisionModelAndAutoUpdate(unittest.TestCase):
         downloaded_keys = [call_args[0][0] for call_args in mock_dl.call_args_list]
         self.assertIn("qwythos_9b", downloaded_keys)
         self.assertIn("qwythos_vision", downloaded_keys)
+
+    def test_detect_comfyui_in_tools_directory(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fake_tools_comfy = os.path.join(tmp_dir, "tools", "ComfyUI", "ComfyUI_windows_portable", "ComfyUI")
+            os.makedirs(os.path.join(fake_tools_comfy, "models"), exist_ok=True)
+            with open(os.path.join(fake_tools_comfy, "main.py"), "w") as f:
+                f.write("# dummy main")
+
+            with patch.object(asset_manager, "PROJECT_ROOT", tmp_dir):
+                asset_manager._COMFYUI_DIR_CACHE = None
+                found = asset_manager.detect_comfyui_dir()
+                self.assertIsNotNone(found)
+                self.assertEqual(os.path.abspath(found), os.path.abspath(fake_tools_comfy))
+            asset_manager._COMFYUI_DIR_CACHE = None
+
+    def test_get_comfyui_launch_spec_uses_embedded_python(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fake_portable = os.path.join(tmp_dir, "tools", "ComfyUI", "ComfyUI_windows_portable")
+            fake_comfy = os.path.join(fake_portable, "ComfyUI")
+            os.makedirs(os.path.join(fake_comfy, "models"), exist_ok=True)
+            with open(os.path.join(fake_comfy, "main.py"), "w") as f:
+                f.write("# dummy")
+
+            fake_py_embed_dir = os.path.join(fake_portable, "python_embeded")
+            os.makedirs(fake_py_embed_dir, exist_ok=True)
+            fake_py_exe = os.path.join(fake_py_embed_dir, "python.exe")
+            with open(fake_py_exe, "w") as f:
+                f.write("# dummy py")
+
+            # Also create run_nvidia_gpu.bat
+            fake_bat = os.path.join(fake_portable, "run_nvidia_gpu.bat")
+            with open(fake_bat, "w") as f:
+                f.write("pause")
+
+            with patch.object(asset_manager, "PROJECT_ROOT", tmp_dir):
+                asset_manager._COMFYUI_DIR_CACHE = None
+                spec = asset_manager.get_comfyui_launch_spec()
+                self.assertIsNotNone(spec)
+                # Ensure it runs python_embeded directly, NOT run_nvidia_gpu.bat
+                self.assertIn("python_embeded", spec["cmd"][0])
+                self.assertNotIn("run_nvidia_gpu.bat", spec["cmd"][0])
+                self.assertIn("--port", spec["cmd"])
+                self.assertIn("8188", spec["cmd"])
+            asset_manager._COMFYUI_DIR_CACHE = None
 
 
 if __name__ == "__main__":

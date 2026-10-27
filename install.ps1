@@ -248,18 +248,26 @@ try {
 # 5.2 Check candidate folders across drives
 if (-not $foundComfy) {
     $comfyDirs = @(
+        "$installDir\tools\ComfyUI\ComfyUI_windows_portable\ComfyUI",
+        "$installDir\tools\ComfyUI\ComfyUI",
+        "$installDir\tools\ComfyUI",
         "$env:LOCALAPPDATA\Comfy-Desktop\ComfyUI-Installs\ComfyUI\ComfyUI",
         "$env:LOCALAPPDATA\Comfy-Desktop\ComfyUI-Shared",
         "C:\ComfyUI",
         "D:\ComfyUI",
         "E:\ComfyUI",
         "$env:USERPROFILE\ComfyUI",
-        "$env:USERPROFILE\ComfyUI_windows_portable\ComfyUI",
-        "$installDir\tools\ComfyUI"
+        "$env:USERPROFILE\ComfyUI_windows_portable\ComfyUI"
     )
     foreach ($cd in $comfyDirs) {
-        if ($cd -and (Test-Path "$cd\models")) {
+        if ($cd -and (Test-Path "$cd\main.py") -and (Test-Path "$cd\models")) {
             $foundComfy = $cd
+            break
+        } elseif ($cd -and (Test-Path "$cd\ComfyUI\main.py") -and (Test-Path "$cd\ComfyUI\models")) {
+            $foundComfy = "$cd\ComfyUI"
+            break
+        } elseif ($cd -and (Test-Path "$cd\ComfyUI_windows_portable\ComfyUI\main.py")) {
+            $foundComfy = "$cd\ComfyUI_windows_portable\ComfyUI"
             break
         }
     }
@@ -283,6 +291,7 @@ if ($foundComfy) {
     if (-not $hasCkpt) {
         $dlCkpt = Read-Host "  Anime Checkpoint model not found. Auto-download MeinaMix SD 1.5 (~2 GB)? [Y/n, default: Y]"
         if ($dlCkpt.Trim().ToLower() -ne "n") {
+            if (-not (Test-Path $ckptDir)) { New-Item -ItemType Directory -Force -Path $ckptDir | Out-Null }
             $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
             $meinaDest = "$ckptDir\MeinaMix_v11.safetensors"
             Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11 Anime SD 1.5 (~2 GB)"
@@ -323,11 +332,36 @@ if ($foundComfy) {
             }
             Remove-Item -Path $comfyZipDest -Force -ErrorAction SilentlyContinue
 
-            # Download MeinaMix anime checkpoint
-            $ckptDir = "$comfyToolDir\ComfyUI\models\checkpoints"
-            $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
-            $meinaDest = "$ckptDir\MeinaMix_v11.safetensors"
-            Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11 Anime SD 1.5 (~2 GB)"
+            # Dynamically locate extracted ComfyUI directory
+            $detectedComfy = $null
+            $candidatesAfterExtract = @(
+                "$comfyToolDir\ComfyUI_windows_portable\ComfyUI",
+                "$comfyToolDir\ComfyUI",
+                "$comfyToolDir"
+            )
+            foreach ($c in $candidatesAfterExtract) {
+                if ((Test-Path "$c\main.py") -and (Test-Path "$c\models")) {
+                    $detectedComfy = $c
+                    break
+                }
+            }
+            if (-not $detectedComfy) {
+                $foundMain = Get-ChildItem -Path $comfyToolDir -Filter "main.py" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($foundMain) {
+                    $detectedComfy = Split-Path -Parent $foundMain.FullName
+                }
+            }
+
+            if ($detectedComfy) {
+                $foundComfy = $detectedComfy
+                Write-Host "  [OK] ComfyUI Portable ready at: $foundComfy" -ForegroundColor Green
+                # Download MeinaMix anime checkpoint
+                $ckptDir = "$foundComfy\models\checkpoints"
+                if (-not (Test-Path $ckptDir)) { New-Item -ItemType Directory -Force -Path $ckptDir | Out-Null }
+                $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
+                $meinaDest = "$ckptDir\MeinaMix_v11.safetensors"
+                Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11 Anime SD 1.5 (~2 GB)"
+            }
         }
     }
 }
@@ -419,13 +453,20 @@ if ($userPath -notlike "*$userBin*") {
 }
 Write-Host "  [OK] Global CLI 'waifu' registered successfully." -ForegroundColor Green
 
-# 8. Interactive Configuration Wizard
-Write-Host "`n[8/8] Starting Interactive Configuration Manager..." -ForegroundColor Cyan
+# 8. Configure Windows Startup Autorun (Auto-start on PC boot)
+Write-Host "`n[8/9] Enabling Windows Startup Autorun (Runs automatically on PC boot)..." -ForegroundColor Cyan
+$enableAutostartPs1 = "$installDir\enable_autostart.ps1"
+if (Test-Path $enableAutostartPs1) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $enableAutostartPs1
+}
+
+# 9. Interactive Configuration Wizard
+Write-Host "`n[9/9] Starting Interactive Configuration Manager..." -ForegroundColor Cyan
 & $py setup.py
 
 Write-Host "`n====================================================================" -ForegroundColor Green
 Write-Host "  Installation completed successfully!" -ForegroundColor Green
-Write-Host "  You can start your bot anytime using the command:" -ForegroundColor Cyan
+Write-Host "  You can manage your bot anytime using the command:" -ForegroundColor Cyan
 Write-Host "    waifu start --daemon" -ForegroundColor Yellow
 Write-Host "  To inspect system status: waifu status" -ForegroundColor Cyan
 Write-Host "====================================================================" -ForegroundColor Green
@@ -433,4 +474,6 @@ Write-Host "====================================================================
 $startNow = Read-Host "`nWould you like to start the bot right now? [Y/n, default: Y]"
 if ($startNow.Trim().ToLower() -ne "n") {
     & "$userBin\waifu.cmd" start --daemon
+    Start-Sleep -Seconds 3
+    & "$userBin\waifu.cmd" status
 }

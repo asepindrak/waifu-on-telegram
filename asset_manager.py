@@ -139,7 +139,14 @@ def detect_comfyui_dir() -> Optional[str]:
     user_home = os.path.expanduser("~")
     local_app_data = os.environ.get("LOCALAPPDATA", os.path.join(user_home, "AppData", "Local"))
 
+    # Project tools/ComfyUI candidates
+    project_tools = os.path.join(PROJECT_ROOT, "tools")
     candidate_paths = [
+        os.path.join(project_tools, "ComfyUI", "ComfyUI_windows_portable", "ComfyUI"),
+        os.path.join(project_tools, "ComfyUI", "ComfyUI"),
+        os.path.join(project_tools, "ComfyUI_windows_portable", "ComfyUI"),
+        os.path.join(project_tools, "ComfyUI"),
+        os.path.join(PROJECT_ROOT, "ComfyUI"),
         # Comfy-Desktop official install (Windows)
         os.path.join(local_app_data, "Comfy-Desktop", "ComfyUI-Installs", "ComfyUI", "ComfyUI"),
         os.path.join(local_app_data, "Comfy-Desktop", "ComfyUI-Shared"),
@@ -171,6 +178,17 @@ def detect_comfyui_dir() -> Optional[str]:
                 f"{drive}\\StableDiffusion\\ComfyUI",
                 f"{drive}\\sd\\ComfyUI"
             ])
+
+    # Dynamic search inside project tools/ComfyUI directory
+    tools_comfy = os.path.join(PROJECT_ROOT, "tools", "ComfyUI")
+    if os.path.isdir(tools_comfy):
+        for root, dirs, files in os.walk(tools_comfy):
+            if "main.py" in files and "models" in dirs:
+                _COMFYUI_DIR_CACHE = os.path.abspath(root)
+                return _COMFYUI_DIR_CACHE
+            rel_depth = len(os.path.relpath(root, tools_comfy).split(os.sep))
+            if rel_depth >= 4:
+                dirs.clear()
 
     # 2. Check running process across Windows, Linux, and macOS
     if platform.system() != "Windows":
@@ -207,7 +225,20 @@ def detect_comfyui_dir() -> Optional[str]:
             pass
 
     for p in candidate_paths:
-        if os.path.exists(p) and os.path.exists(os.path.join(p, "models")):
+        if not os.path.exists(p):
+            continue
+        if os.path.isfile(os.path.join(p, "main.py")) and os.path.isdir(os.path.join(p, "models")):
+            _COMFYUI_DIR_CACHE = os.path.abspath(p)
+            return _COMFYUI_DIR_CACHE
+        sub_c = os.path.join(p, "ComfyUI")
+        if os.path.isfile(os.path.join(sub_c, "main.py")) and os.path.isdir(os.path.join(sub_c, "models")):
+            _COMFYUI_DIR_CACHE = os.path.abspath(sub_c)
+            return _COMFYUI_DIR_CACHE
+        sub_port = os.path.join(p, "ComfyUI_windows_portable", "ComfyUI")
+        if os.path.isfile(os.path.join(sub_port, "main.py")) and os.path.isdir(os.path.join(sub_port, "models")):
+            _COMFYUI_DIR_CACHE = os.path.abspath(sub_port)
+            return _COMFYUI_DIR_CACHE
+        if os.path.exists(os.path.join(p, "models")):
             _COMFYUI_DIR_CACHE = os.path.abspath(p)
             return _COMFYUI_DIR_CACHE
 
@@ -217,43 +248,40 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
     """
     Returns executable command, working directory, and arguments to launch ComfyUI
     with safe VRAM options (--normalvram --listen 127.0.0.1 --port 8188).
+    Directly invokes embedded python to prevent batch file 'pause' freezing.
     """
     cdir = detect_comfyui_dir()
     if not cdir:
         return None
 
-    # Check for ComfyUI Windows Portable batch scripts or embedded python
-    for base in [cdir, os.path.dirname(cdir)]:
-        bat_nvidia = os.path.join(base, "run_nvidia_gpu.bat")
-        if os.path.isfile(bat_nvidia):
-            return {"cwd": base, "cmd": [bat_nvidia]}
-        py_embed = os.path.join(base, "python_embeded", "python.exe")
-        main_py = os.path.join(cdir, "main.py")
-        if os.path.isfile(py_embed) and os.path.isfile(main_py):
-            return {
-                "cwd": cdir,
-                "cmd": [py_embed, main_py, "--windows-standalone-build", "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
-            }
-
-    # Check virtual environments in cdir
-    for venv_dir in [".venv", "venv"]:
-        v_py = os.path.join(cdir, venv_dir, "Scripts", "python.exe") if platform.system() == "Windows" else os.path.join(cdir, venv_dir, "bin", "python")
-        main_py = os.path.join(cdir, "main.py")
-        if os.path.isfile(v_py) and os.path.isfile(main_py):
-            return {
-                "cwd": cdir,
-                "cmd": [v_py, main_py, "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
-            }
-
-    # Fallback to system python
     main_py = os.path.join(cdir, "main.py")
-    if os.path.isfile(main_py):
-        return {
-            "cwd": cdir,
-            "cmd": [sys.executable, main_py, "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
-        }
+    if not os.path.isfile(main_py):
+        return None
 
-    return None
+    # 1. Check for ComfyUI Windows Portable embedded python
+    for base in [cdir, os.path.dirname(cdir), os.path.dirname(os.path.dirname(cdir))]:
+        py_embed = os.path.join(base, "python_embeded", "python.exe")
+        if os.path.isfile(py_embed):
+            return {
+                "cwd": cdir,
+                "cmd": [py_embed, "-s", main_py, "--windows-standalone-build", "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
+            }
+
+    # 2. Check virtual environments in cdir or parent
+    for base in [cdir, os.path.dirname(cdir)]:
+        for venv_dir in [".venv", "venv"]:
+            v_py = os.path.join(base, venv_dir, "Scripts", "python.exe") if platform.system() == "Windows" else os.path.join(base, venv_dir, "bin", "python")
+            if os.path.isfile(v_py):
+                return {
+                    "cwd": cdir,
+                    "cmd": [v_py, main_py, "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
+                }
+
+    # 3. Fallback to system python
+    return {
+        "cwd": cdir,
+        "cmd": [sys.executable, main_py, "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
+    }
 
 def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:
     """Retrieves metadata and current installation status of a registered asset."""
@@ -534,6 +562,51 @@ def ensure_nodejs() -> bool:
                     return True
         except Exception as e:
             logger.warning(f"Failed to auto-install portable Node.js: {e}")
+
+    return False
+
+def ensure_comfyui() -> bool:
+    """Ensures ComfyUI portable is downloaded, extracted, and ready in tools/ComfyUI."""
+    if detect_comfyui_dir():
+        return True
+
+    if platform.system() == "Windows":
+        comfy_tool_dir = os.path.join(PROJECT_ROOT, "tools", "ComfyUI")
+        os.makedirs(comfy_tool_dir, exist_ok=True)
+        zip_dest = os.path.join(PROJECT_ROOT, "tools", "ComfyUI_portable.7z")
+        url = "https://github.com/comfyanonymous/ComfyUI/releases/latest/download/ComfyUI_windows_portable_nvidia.7z"
+        logger.info(f"Downloading official ComfyUI Windows Portable (~1.4 GB) to {zip_dest}...")
+        ok = _download_file(url, zip_dest)
+        if ok and os.path.exists(zip_dest):
+            extracted = False
+            seven_zip = shutil.which("7z")
+            if seven_zip:
+                res = subprocess.run([seven_zip, "x", zip_dest, f"-o{comfy_tool_dir}", "-y"])
+                extracted = (res.returncode == 0)
+            if not extracted:
+                tar_bin = shutil.which("tar")
+                if tar_bin:
+                    res = subprocess.run([tar_bin, "-xf", zip_dest, "-C", comfy_tool_dir])
+                    extracted = (res.returncode == 0)
+            if not extracted:
+                seven_zr = os.path.join(PROJECT_ROOT, "tools", "7zr.exe")
+                if _download_file("https://www.7-zip.org/a/7zr.exe", seven_zr):
+                    res = subprocess.run([seven_zr, "x", zip_dest, f"-o{comfy_tool_dir}", "-y"])
+                    extracted = (res.returncode == 0)
+                    if os.path.exists(seven_zr):
+                        try:
+                            os.remove(seven_zr)
+                        except Exception:
+                            pass
+            if os.path.exists(zip_dest):
+                try:
+                    os.remove(zip_dest)
+                except Exception:
+                    pass
+
+            global _COMFYUI_DIR_CACHE
+            _COMFYUI_DIR_CACHE = None
+            return detect_comfyui_dir() is not None
 
     return False
 

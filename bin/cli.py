@@ -110,19 +110,8 @@ def cmd_start(daemon: bool = False):
 
     print(c(CYAN, "🚀 Launching Waifu on Telegram..."))
 
-    # Start optional music server in background
-    music_js = os.path.join(PROJECT_ROOT, "music_player_server.js")
-    if os.path.exists(music_js):
-        node_bin = "node"
-        local_node = os.path.join(PROJECT_ROOT, "tools", "nodejs", "node.exe" if platform.system() == "Windows" else "bin/node")
-        if not shutil.which("node") and os.path.isfile(local_node):
-            node_bin = local_node
-        if shutil.which(node_bin) or os.path.isfile(node_bin):
-            try:
-                subprocess.Popen([node_bin, music_js], cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                print(c(GREEN, "  ✓ YouTube Music Server active on port 8002"))
-            except Exception:
-                pass
+    # Auto start background auxiliary servers (KoboldCPP, ComfyUI, Music)
+    start_auxiliary_services()
 
     bot_script = os.path.join(PROJECT_ROOT, "bot.py")
 
@@ -160,6 +149,70 @@ def cmd_start(daemon: bool = False):
             subprocess.run([sys.executable, bot_script], cwd=PROJECT_ROOT)
         except KeyboardInterrupt:
             print(c(YELLOW, "\nBot stopped by user."))
+
+def is_port_listening(port: int) -> bool:
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.25):
+            return True
+    except Exception:
+        return False
+
+def start_auxiliary_services():
+    """Starts KoboldCPP, ComfyUI, and Music Remote if installed and not yet running."""
+    # 1. KoboldCPP (Port 5001)
+    if not is_port_listening(5001):
+        kcpp_exe = os.path.join(PROJECT_ROOT, "tools", "koboldcpp.exe" if platform.system() == "Windows" else "koboldcpp")
+        if os.path.isfile(kcpp_exe):
+            models_dir = os.path.join(PROJECT_ROOT, "models")
+            model_path = None
+            mmproj_path = None
+            if os.path.isdir(models_dir):
+                for f in os.listdir(models_dir):
+                    if f.endswith(".gguf") and "mmproj" not in f.lower():
+                        model_path = os.path.join(models_dir, f)
+                        break
+                for f in os.listdir(models_dir):
+                    if f.endswith(".gguf") and "mmproj" in f.lower():
+                        mmproj_path = os.path.join(models_dir, f)
+                        break
+            if model_path:
+                mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
+                cmd = [kcpp_exe, "--model", model_path] + mm_args + ["--gpulayers", "99", "--port", "5001"]
+                if platform.system() == "Windows":
+                    cmd += ["--usecublas", "normal", "--quiet"]
+                else:
+                    cmd += ["--quiet"]
+                try:
+                    subprocess.Popen(cmd, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    print(c(GREEN, "  ✓ KoboldCPP LLM Server active on port 5001"))
+                except Exception:
+                    pass
+
+    # 2. ComfyUI (Port 8188)
+    if not is_port_listening(8188) and asset_manager:
+        spec = asset_manager.get_comfyui_launch_spec()
+        if spec:
+            try:
+                subprocess.Popen(spec["cmd"], cwd=spec["cwd"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print(c(GREEN, "  ✓ ComfyUI Photo Generator active on port 8188"))
+            except Exception:
+                pass
+
+    # 3. YouTube Music Server (Port 8002)
+    if not is_port_listening(8002):
+        music_js = os.path.join(PROJECT_ROOT, "music_player_server.js")
+        if os.path.exists(music_js):
+            node_bin = "node"
+            local_node = os.path.join(PROJECT_ROOT, "tools", "nodejs", "node.exe" if platform.system() == "Windows" else "bin/node")
+            if not shutil.which("node") and os.path.isfile(local_node):
+                node_bin = local_node
+            if shutil.which(node_bin) or os.path.isfile(node_bin):
+                try:
+                    subprocess.Popen([node_bin, music_js], cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    print(c(GREEN, "  ✓ YouTube Music Server active on port 8002"))
+                except Exception:
+                    pass
 
 def cmd_stop():
     print_banner()
@@ -529,8 +582,14 @@ def cmd_update():
             sz = info_vis.get("current_size_mb", 0) if info_vis else 0
             print(c(GREEN, f"  ✓ Vision Adapter '{info_vis['name']}' is ready ({sz} MB)."))
 
-        # 3. ComfyUI Models (if ComfyUI is detected)
+        # 3. ComfyUI Models (if ComfyUI is detected or auto-installed)
         comfy_dir = asset_manager.detect_comfyui_dir()
+        if not comfy_dir and platform.system() == "Windows":
+            print(c(YELLOW, "  ⏳ ComfyUI not detected locally. Auto-installing official ComfyUI Portable (~1.4 GB)..."))
+            if asset_manager.ensure_comfyui():
+                comfy_dir = asset_manager.detect_comfyui_dir()
+                print(c(GREEN, f"  ✓ ComfyUI Portable ready at: {comfy_dir}"))
+
         if comfy_dir:
             print(c(CYAN, f"  🧩 ComfyUI detected at: {comfy_dir}"))
             info_meina = asset_manager.get_asset_info("meinamix")
@@ -544,6 +603,14 @@ def cmd_update():
                 print(c(GREEN, f"  ✓ Anime Checkpoint '{info_meina['name']}' is ready ({sz} MB)."))
         else:
             print(c(DIM, "  ℹ ComfyUI not detected locally. Photo Vault album will be used for photos."))
+
+    # Auto-ensure Windows Startup Autorun is enabled
+    if platform.system() == "Windows":
+        startup_folder = os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs\Startup")
+        shortcut = os.path.join(startup_folder, "Start_Waifu_on_Telegram.lnk")
+        if not os.path.exists(shortcut):
+            print(c(CYAN, "\n⚙️ Auto-enabling Windows Startup Autorun (Runs on PC boot)..."))
+            cmd_autorun("on")
 
     new_v = get_version()
     if new_v != cur_v:
