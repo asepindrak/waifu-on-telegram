@@ -48,14 +48,14 @@ If FSO.FileExists(ScriptDir & "\tools\koboldcpp.exe") Then
     End If
 End If
 
-' 2. Start ComfyUI Generator if present and port 8188 not active
-Dim portCheck8188
-portCheck8188 = WshShell.Run("powershell -NoProfile -Command ""$t = New-Object System.Net.Sockets.TcpClient; try { $t.Connect('127.0.0.1', 8188); $t.Close(); exit 0 } catch { exit 1 }""", 0, True)
-If portCheck8188 <> 0 Then
+' 2. Start ComfyUI Generator if present and not already running
+Dim comfyRunning
+comfyRunning = WshShell.Run("powershell -NoProfile -Command ""if ((Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*main.py*' -and $_.CommandLine -like '*8188*' }) -or (Test-NetConnection -ComputerName 127.0.0.1 -Port 8188 -InformationLevel Quiet -WarningAction SilentlyContinue)) { exit 0 } else { exit 1 }""", 0, True)
+If comfyRunning <> 0 Then
     Dim comfyCheck
     comfyCheck = WshShell.Run("python -c ""import asset_manager; spec = asset_manager.get_comfyui_launch_spec(); exit(0 if spec else 1)""", 0, True)
     If comfyCheck = 0 Then
-        WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && python -c ""import asset_manager, subprocess; spec = asset_manager.get_comfyui_launch_spec(); subprocess.run(spec['cmd'], cwd=spec['cwd'])""", 0, False
+        WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && python -c ""import asset_manager, subprocess; spec = asset_manager.get_comfyui_launch_spec(); subprocess.run(spec['cmd'], cwd=spec['cwd'])"" >> comfyui.log 2>&1", 0, False
         WScript.Sleep 4000
     End If
 End If

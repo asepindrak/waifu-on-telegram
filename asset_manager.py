@@ -190,6 +190,33 @@ def detect_comfyui_dir() -> Optional[str]:
             if rel_depth >= 4:
                 dirs.clear()
 
+    # Dynamic search inside UserProfile, OneDrive, Documents, and Downloads
+    search_dirs = [
+        user_home,
+        os.path.join(user_home, "Downloads"),
+        os.path.join(user_home, "Desktop"),
+        os.path.join(user_home, "Documents"),
+        os.path.join(user_home, "OneDrive"),
+    ]
+    for env_k in ["OneDrive", "OneDriveConsumer"]:
+        val = os.environ.get(env_k)
+        if val and os.path.isdir(val):
+            search_dirs.append(val)
+            search_dirs.append(os.path.join(val, "Documents"))
+            search_dirs.append(os.path.join(val, "Desktop"))
+
+    for s_dir in set(filter(os.path.isdir, search_dirs)):
+        for pat in ["*ComfyUI*", "*comfyui*"]:
+            for match in glob.glob(os.path.join(s_dir, pat)):
+                if os.path.isdir(match):
+                    for subroot, dirs, files in os.walk(match):
+                        if "main.py" in files and "models" in dirs:
+                            _COMFYUI_DIR_CACHE = os.path.abspath(subroot)
+                            return _COMFYUI_DIR_CACHE
+                        rel = len(os.path.relpath(subroot, match).split(os.sep))
+                        if rel >= 3:
+                            dirs.clear()
+
     # 2. Check running process across Windows, Linux, and macOS
     if platform.system() != "Windows":
         try:
@@ -244,12 +271,16 @@ def detect_comfyui_dir() -> Optional[str]:
 
     return None
 
+_COMFYUI_FORCE_CPU: Optional[bool] = None
+
 def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
     """
     Returns executable command, working directory, and arguments to launch ComfyUI
-    with safe VRAM options (--normalvram --listen 127.0.0.1 --port 8188).
+    with standard options (--listen 127.0.0.1 --port 8188).
     Directly invokes embedded python to prevent batch file 'pause' freezing.
+    Automatically detects if CUDA is unsupported to append --cpu and avoid crash.
     """
+    global _COMFYUI_FORCE_CPU
     cdir = detect_comfyui_dir()
     if not cdir:
         return None
@@ -258,29 +289,50 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
     if not os.path.isfile(main_py):
         return None
 
+    def _should_use_cpu(py_exe: str) -> bool:
+        global _COMFYUI_FORCE_CPU
+        if os.environ.get("COMFYUI_CPU", "").strip().lower() in ("1", "true", "yes"):
+            return True
+        if _COMFYUI_FORCE_CPU is not None:
+            return _COMFYUI_FORCE_CPU
+        try:
+            probe = subprocess.run(
+                [py_exe, "-s", "-c", "import torch; exit(0 if torch.cuda.is_available() else 1)"],
+                capture_output=True,
+                timeout=12
+            )
+            _COMFYUI_FORCE_CPU = (probe.returncode != 0)
+        except Exception:
+            _COMFYUI_FORCE_CPU = True
+        return _COMFYUI_FORCE_CPU
+
     # 1. Check for ComfyUI Windows Portable embedded python
     for base in [cdir, os.path.dirname(cdir), os.path.dirname(os.path.dirname(cdir))]:
-        py_embed = os.path.join(base, "python_embeded", "python.exe")
-        if os.path.isfile(py_embed):
-            return {
-                "cwd": cdir,
-                "cmd": [py_embed, "-s", main_py, "--windows-standalone-build", "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
-            }
+        for py_dir in ["python_embeded", "python_embedded", "python"]:
+            py_embed = os.path.join(base, py_dir, "python.exe")
+            if os.path.isfile(py_embed):
+                extra_args = ["--cpu"] if _should_use_cpu(py_embed) else []
+                return {
+                    "cwd": cdir,
+                    "cmd": [py_embed, "-s", main_py, "--windows-standalone-build", "--port", "8188", "--listen", "127.0.0.1"] + extra_args
+                }
 
     # 2. Check virtual environments in cdir or parent
     for base in [cdir, os.path.dirname(cdir)]:
         for venv_dir in [".venv", "venv"]:
             v_py = os.path.join(base, venv_dir, "Scripts", "python.exe") if platform.system() == "Windows" else os.path.join(base, venv_dir, "bin", "python")
             if os.path.isfile(v_py):
+                extra_args = ["--cpu"] if _should_use_cpu(v_py) else []
                 return {
                     "cwd": cdir,
-                    "cmd": [v_py, main_py, "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
+                    "cmd": [v_py, main_py, "--port", "8188", "--listen", "127.0.0.1"] + extra_args
                 }
 
     # 3. Fallback to system python
+    extra_args = ["--cpu"] if _should_use_cpu(sys.executable) else []
     return {
         "cwd": cdir,
-        "cmd": [sys.executable, main_py, "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
+        "cmd": [sys.executable, main_py, "--port", "8188", "--listen", "127.0.0.1"] + extra_args
     }
 
 def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:

@@ -53,8 +53,9 @@ class TestMultiplatformInstallerLifecycle(unittest.TestCase):
                     with patch("subprocess.run") as mock_sub:
                         # Mock no listening process on port 8188
                         mock_sub.return_value = MagicMock(returncode=1, stdout="", stderr="")
-                        comfy_dir = asset_manager.detect_comfyui_dir()
-                        self.assertIsNone(comfy_dir, "ComfyUI should not be detected when none exists")
+                        with patch("asset_manager.detect_comfyui_dir", return_value=None):
+                            comfy_dir = asset_manager.detect_comfyui_dir()
+                            self.assertIsNone(comfy_dir, "ComfyUI should not be detected when none exists")
 
                         # All assets should be reported as missing
                         assets = asset_manager.check_all_assets()

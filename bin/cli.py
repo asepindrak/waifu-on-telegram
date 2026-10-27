@@ -160,6 +160,12 @@ def is_port_listening(port: int) -> bool:
 
 def start_auxiliary_services():
     """Starts KoboldCPP, ComfyUI, and Music Remote if installed and not yet running."""
+    popen_kwargs = {}
+    if platform.system() == "Windows":
+        popen_kwargs = {"creationflags": 0x08000000 | 0x00000200}
+    else:
+        popen_kwargs = {"start_new_session": True}
+
     # 1. KoboldCPP (Port 5001)
     if not is_port_listening(5001):
         kcpp_exe = os.path.join(PROJECT_ROOT, "tools", "koboldcpp.exe" if platform.system() == "Windows" else "koboldcpp")
@@ -184,7 +190,7 @@ def start_auxiliary_services():
                 else:
                     cmd += ["--quiet"]
                 try:
-                    subprocess.Popen(cmd, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.Popen(cmd, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
                     print(c(GREEN, "  ✓ KoboldCPP LLM Server active on port 5001"))
                 except Exception:
                     pass
@@ -194,7 +200,9 @@ def start_auxiliary_services():
         spec = asset_manager.get_comfyui_launch_spec()
         if spec:
             try:
-                subprocess.Popen(spec["cmd"], cwd=spec["cwd"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                comfy_log = os.path.join(PROJECT_ROOT, "comfyui.log")
+                f_comfy = open(comfy_log, "a", encoding="utf-8")
+                subprocess.Popen(spec["cmd"], cwd=spec["cwd"], stdout=f_comfy, stderr=f_comfy, **popen_kwargs)
                 print(c(GREEN, "  ✓ ComfyUI Photo Generator active on port 8188"))
             except Exception:
                 pass
@@ -209,7 +217,7 @@ def start_auxiliary_services():
                 node_bin = local_node
             if shutil.which(node_bin) or os.path.isfile(node_bin):
                 try:
-                    subprocess.Popen([node_bin, music_js], cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.Popen([node_bin, music_js], cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
                     print(c(GREEN, "  ✓ YouTube Music Server active on port 8002"))
                 except Exception:
                     pass

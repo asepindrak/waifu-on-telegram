@@ -19,6 +19,13 @@ import platform
 import subprocess
 import argparse
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # Colors
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
