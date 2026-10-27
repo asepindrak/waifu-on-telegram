@@ -57,29 +57,50 @@ try {
     Write-Host "  [OUTFIT]  Current Outfit: $outfitName" -ForegroundColor Magenta
 } catch {}
 
-# 2. Check Local LLM (Port 8127) & Model Name
-$llmModelName = "Offline"
-try {
-    $modelsRes = Invoke-RestMethod -Uri "http://127.0.0.1:8127/v1/models" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
-    if ($modelsRes.data -and $modelsRes.data.Count -gt 0) {
-        $rawId = $modelsRes.data[0].id
-        $llmModelName = Split-Path -Leaf $rawId
-    } elseif ($modelsRes.models -and $modelsRes.models.Count -gt 0) {
-        $llmModelName = Split-Path -Leaf $modelsRes.models[0].name
-    }
-    Write-Host "  [ONLINE]  Locally Uncensored LLM: ONLINE (Port 8127)" -ForegroundColor Green
-    Write-Host "            Model: $llmModelName" -ForegroundColor DarkCyan
+# 2. Check Local LLM (KoboldCPP 5001 / Locally Uncensored 8127 / Ollama 11434 / LM Studio 1234)
+$llmOnline = $false
+$llmPorts = @(
+    @{ Port = 5001; Name = "KoboldCPP" },
+    @{ Port = 8127; Name = "Locally Uncensored" },
+    @{ Port = 11434; Name = "Ollama" },
+    @{ Port = 1234; Name = "LM Studio" }
+)
 
-    # Check Vision Adapter
-    $luDir = Join-Path $env:APPDATA "Locally Uncensored\models"
-    if (Test-Path $luDir) {
-        $mmFiles = Get-ChildItem -Path $luDir -Filter "*mmproj*.gguf" -ErrorAction SilentlyContinue
-        if ($mmFiles -and $mmFiles.Count -gt 0) {
-            Write-Host "            Vision Model: $($mmFiles[0].Name)" -ForegroundColor DarkCyan
+foreach ($target in $llmPorts) {
+    $p = $target.Port
+    $bName = $target.Name
+    $isTcpOpen = $false
+    try {
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        $connect = $tcp.BeginConnect("127.0.0.1", $p, $null, $null)
+        $wait = $connect.AsyncWaitHandle.WaitOne(150, $false)
+        if ($wait -and $tcp.Connected) {
+            $tcp.EndConnect($connect)
+            $isTcpOpen = $true
         }
+        $tcp.Close()
+    } catch {}
+
+    if ($isTcpOpen) {
+        try {
+            $modelsRes = Invoke-RestMethod -Uri "http://127.0.0.1:$p/v1/models" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+            $detectedModel = "Active Model"
+            if ($modelsRes.data -and $modelsRes.data.Count -gt 0) {
+                $rawId = $modelsRes.data[0].id
+                $detectedModel = Split-Path -Leaf $rawId
+            } elseif ($modelsRes.models -and $modelsRes.models.Count -gt 0) {
+                $detectedModel = Split-Path -Leaf $modelsRes.models[0].name
+            }
+            Write-Host "  [ONLINE]  $bName LLM: ONLINE (Port $p)" -ForegroundColor Green
+            Write-Host "            Model: $detectedModel" -ForegroundColor DarkCyan
+            $llmOnline = $true
+            break
+        } catch {}
     }
-} catch {
-    Write-Host "  [OFFLINE] Locally Uncensored LLM (Port 8127): OFFLINE / Unreachable" -ForegroundColor Red
+}
+
+if (-not $llmOnline) {
+    Write-Host "  [OFFLINE] Local LLM Engine: OFFLINE / Unreachable (Checked ports 5001, 8127, 11434, 1234)" -ForegroundColor Red
 }
 
 # 3. Check ComfyUI (Port 8188) & Checkpoint

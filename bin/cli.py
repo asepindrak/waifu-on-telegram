@@ -157,6 +157,8 @@ def cmd_stop():
         ps_cmd = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*bot.py*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
         subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True)
         subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq Waifu Music Server*"], capture_output=True)
+        subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq KoboldCPP*"], capture_output=True)
+        subprocess.run(["taskkill", "/F", "/IM", "koboldcpp.exe"], capture_output=True)
     else:
         stop_sh = os.path.join(PROJECT_ROOT, "stop_services.sh")
         if os.path.exists(stop_sh):
@@ -170,6 +172,7 @@ def cmd_stop():
                     pass
             subprocess.run(["pkill", "-f", "python.*bot.py"], capture_output=True)
             subprocess.run(["pkill", "-f", "node.*music_player_server.js"], capture_output=True)
+            subprocess.run(["pkill", "-f", "koboldcpp"], capture_output=True)
 
     if os.path.exists(PID_FILE):
         try:

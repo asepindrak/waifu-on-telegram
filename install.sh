@@ -48,11 +48,49 @@ fi
 echo "  ✓ Python: $($PY --version)"
 
 # 3. Install dependencies
-echo "[3/6] Installing Python dependencies..."
+echo "[3/7] Installing Python dependencies..."
 $PY -m pip install -r requirements.txt --quiet --disable-pip-version-check
 
-# 4. Check Node.js for PC Music Remote
-echo "[4/6] Checking Node.js for Music Remote..."
+# 4. Check & Setup Local LLM Engine (KoboldCPP)
+echo "[4/7] Checking Local LLM Engine (Chat & Romance Brain)..."
+mkdir -p "$INSTALL_DIR/tools" "$INSTALL_DIR/models"
+
+if [ ! -f "$INSTALL_DIR/tools/koboldcpp" ]; then
+    echo "  ℹ Standalone LLM engine (KoboldCPP) not installed."
+    read -p "  Download KoboldCPP standalone engine (~150 MB)? [Y/n, default: Y]: " DL_KCPP
+    DL_KCPP=${DL_KCPP:-Y}
+    if [[ "$DL_KCPP" =~ ^[Yy]$ ]]; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            echo "  >> Downloading KoboldCPP for macOS (Apple Silicon Metal)..."
+            curl -fL -o "$INSTALL_DIR/tools/koboldcpp" "https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-mac-arm64"
+        else
+            echo "  >> Downloading KoboldCPP for Linux (CUDA/Vulkan)..."
+            curl -fL -o "$INSTALL_DIR/tools/koboldcpp" "https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-linux-x64"
+        fi
+        chmod +x "$INSTALL_DIR/tools/koboldcpp"
+        echo "  ✓ KoboldCPP downloaded and made executable."
+    fi
+else
+    echo "  ✓ KoboldCPP detected at: $INSTALL_DIR/tools/koboldcpp"
+fi
+
+# Check for GGUF model in models/
+GGUF_COUNT=$(ls "$INSTALL_DIR/models/"*.gguf 2>/dev/null | grep -v "mmproj" | wc -l)
+if [ "$GGUF_COUNT" -eq 0 ]; then
+    echo "  ℹ No GGUF chat model found in '$INSTALL_DIR/models'."
+    read -p "  Auto-download uncensored 'Huihui-Qwythos-9B-Claude-Mythos-5-1M' Q4_K model (~5.5 GB)? [Y/n, default: Y]: " DL_MODEL
+    DL_MODEL=${DL_MODEL:-Y}
+    if [[ "$DL_MODEL" =~ ^[Yy]$ ]]; then
+        curl -fL -C - -o "$INSTALL_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" \
+          "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+        echo "  ✓ Model downloaded successfully."
+    fi
+else
+    echo "  ✓ Local GGUF chat model found."
+fi
+
+# 5. Check Node.js for PC Music Remote
+echo "[5/7] Checking Node.js for Music Remote..."
 if command -v node &>/dev/null; then
     echo "  ✓ Node.js found: $(node -v). Installing npm packages..."
     npm install --silent
@@ -60,8 +98,8 @@ else
     echo "  ℹ Node.js not detected. Music remote feature will be disabled (chat & photos remain functional)."
 fi
 
-# 5. Register global CLI script
-echo "[5/6] Registering global CLI 'waifu' in ~/.local/bin..."
+# 6. Register global CLI script
+echo "[6/7] Registering global CLI 'waifu' in ~/.local/bin..."
 mkdir -p "$HOME/.local/bin"
 cat <<EOF > "$HOME/.local/bin/waifu"
 #!/usr/bin/env bash
@@ -80,8 +118,8 @@ if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     done
 fi
 
-# 6. Launch interactive setup wizard (Models, Language, Video Engine & Autorun)
-echo "[6/6] Launching Interactive Setup Wizard..."
+# 7. Launch interactive setup wizard (Models, Language, Video Engine & Autorun)
+echo "[7/7] Launching Interactive Setup Wizard..."
 $PY setup.py --wizard
 
 echo ""

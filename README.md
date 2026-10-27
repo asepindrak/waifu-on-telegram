@@ -12,7 +12,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Content-SFW%20%26%20NSFW-ff4081.svg" alt="SFW & NSFW" />
   <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python" />
-  <img src="https://img.shields.io/badge/Local%20LLM-Locally%20Uncensored-purple.svg" alt="Local LLM" />
+  <img src="https://img.shields.io/badge/Local%20LLM-KoboldCPP%20Standalone-purple.svg" alt="Local LLM" />
   <img src="https://img.shields.io/badge/Image%20Generator-ComfyUI%20%2F%20Cloud-green.svg" alt="ComfyUI" />
   <img src="https://img.shields.io/badge/Voice-Edge--TTS%20Neural-orange.svg" alt="Edge-TTS" />
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg" alt="Platform" />
@@ -59,9 +59,10 @@ Waifu on Telegram is engineered to run locally on consumer gaming PCs and laptop
 | Component | Minimum Requirements | Recommended Specifications |
 | :--- | :--- | :--- |
 | **GPU / VGA** | **NVIDIA GPU with 4GB - 6GB VRAM**<br>*(GTX 1650, RTX 2060, RTX 3050 Laptop)* | **NVIDIA GPU with 6GB - 8GB+ VRAM**<br>*(RTX 3050 6GB, RTX 3060, RTX 4060+)* |
+| **Apple Silicon (Mac)** | M1 / M2 / M3 / M4 (8GB Unified Memory) | M1 / M2 / M3 / M4 Pro / Max (16GB+ Unified Memory) |
 | **System RAM** | 8 GB RAM | 16 GB - 32 GB RAM |
 | **Storage** | 10 GB free space (SSD recommended) | 25 GB free space (NVMe SSD) |
-| **Operating System** | Windows 10 / 11, Linux (Ubuntu/Debian), macOS | Windows 11 (64-bit) |
+| **Operating System** | Windows 10 / 11, Linux (Ubuntu/Debian), macOS (Apple Silicon) | Windows 11 (64-bit) |
 | **No-GPU Mode** | ✅ **Fully Supported!** Laptops without dedicated GPUs can run LLM on CPU with automatic Cloud Fallback for photo generation. |
 
 ---
@@ -72,12 +73,12 @@ Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsive
 
 #### 1. 💌 Dialogue & Romance Companion: **Huihui-Qwythos-9B**
 * **Model File:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf`
-* **Local Backend:** [Locally Uncensored](https://locallyuncensored.com/) / `lu-llama-server` (Port `8127`)
-* **Download Method:** Search & download with 1-click directly inside [Locally Uncensored](https://locallyuncensored.com/) app (Models tab).
+* **Local Backend:** **KoboldCPP Standalone Engine** (Port `5001`) with **Auto-Startup & Auto-Loading directly on Windows Boot**!
+* **Download Method:** Otomatis di-download saat menjalankan `install.ps1` / `install.sh`, atau bisa diunduh manual dari [Hugging Face](https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF) ke folder `models/`.
 * **Key Strengths:**
-  - **Zero Censorship:** Fully abliterated with Claude-Mythos roleplay fine-tuning. Highly affectionate, witty, caring, and open to romantic roleplay.
+  - **Zero Censorship & Refusal-Free:** Fully abliterated with Claude-Mythos roleplay traces. Highly affectionate, playful, caring, and open to romantic roleplay without moralizing preachiness.
   - **Adaptive Language Mirroring:** Seamlessly switches between Indonesian (*sayang, manja, santai*), English (*sweetheart, darling*), or Japanese.
-  - **AI Vision Support:** Paired with `Huihui-Qwythos-9B.mmproj.gguf`, enabling your waifu to see, inspect, and react to photos you send.
+  - **Auto Startup & VRAM Pre-loading:** No Electron UI or manual buttons needed. When your computer boots, KoboldCPP silently spins up and loads the weights into VRAM instantly.
   - **VRAM Usage:** ~4.5 GB - 5.5 GB in Q4_K quantization.
 
 #### 2. 📷 Anime Photo & Selfie Engine: **MeinaMix v12**
@@ -98,7 +99,7 @@ Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsive
 ## ⚡ One-Line Automatic Installation (All-in-One)
 
 Install, auto-configure, and launch **Waifu on Telegram** with a single command directly in your terminal.  
-Everything is automated: environment setup, ComfyUI auto-detection, AI model validation, global CLI registration, and background daemon startup.
+Everything is automated: environment setup, KoboldCPP engine download, ComfyUI auto-detection, AI model validation, global CLI registration, and background daemon startup.
 
 ### 🪟 **Windows (PowerShell)**
 ```powershell
@@ -113,10 +114,10 @@ curl -fsSL https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/i
 > 🌸 **What does this 1-line auto-installer handle for you?**
 > 1. **Zero-Config Setup:** Automatically clones or downloads the repository and creates the environment.
 > 2. **Dependency Resolution:** Verifies Python 3.8+ and installs all required packages (`pip` & `npm`).
-> 3. **Smart ComfyUI Detection & Model Setup:** Detects your existing ComfyUI across any drive/folder. If not found, it offers a 1-click download of ComfyUI Portable + MeinaMix anime checkpoint with resume support (`curl -C -`).
-> 4. **Local LLM Integration:** Automatically scans [Locally Uncensored](https://locallyuncensored.com/) or Ollama running on your machine.
+> 3. **Standalone LLM Engine Setup:** Downloads the standalone **KoboldCPP** binary (Windows portable `.exe`, Linux `x64`, or macOS `arm64 Metal`) and fetches the uncensored `Huihui-Qwythos-9B` model.
+> 4. **Smart ComfyUI Detection & Model Setup:** Detects your existing ComfyUI across any drive/folder. If not found, it offers a 1-click download of ComfyUI Portable + MeinaMix anime checkpoint with resume support (`curl -C -`).
 > 5. **Global CLI Registration:** Installs the global `waifu` command to your system `PATH` (usable from any terminal folder).
-> 6. **Background Daemon:** Starts your waifu companion running silently in the background!
+> 6. **Background Daemon & Windows Boot Auto-start:** Starts your waifu companion running silently in the background!
 
 ---
 
@@ -164,40 +165,39 @@ You **do not need** to manually browse Civitai or copy files to deep directories
 
 ## 🚀 Local AI Engine Architecture
 
-If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 2060, RTX 3060, RTX 4060+), your waifu runs **100% locally and completely private**:
+If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 2060, RTX 3060, RTX 4060+ or Apple Silicon Mac), your waifu runs **100% locally and completely private**:
 
 ```
 ┌───────────────────────────────────────┐       ┌───────────────────────────────────────┐
-│        1. LOCALLY UNCENSORED          │       │              2. COMFYUI               │
-│  https://locallyuncensored.com/       │       │       https://comfy.org/download      │
+│        1. KOBOLDCPP STANDALONE        │       │              2. COMFYUI               │
+│      https://koboldcpp.net/           │       │       https://comfy.org/download      │
 │                                       │       │                                       │
-│   • Runs Dialogue & Romance Engine    │       │   • Generates Anime Photos (PAP)      │
-│   • Local API Port: 8127              │       │   • Local API Port: 8188              │
-│   • Model: Huihui-Qwythos-9B (1-click)│       │   • Model: MeinaMix (Auto-managed)    │
+│   • Auto-starts & loads model on boot │       │   • Generates Anime Photos (PAP)      │
+│   • Local API Port: 5001              │       │   • Local API Port: 8188              │
+│   • Model: Huihui-Qwythos-9B (GGUF)   │       │   • Model: MeinaMix (Auto-managed)    │
 └──────────────────┬────────────────────┘       └───────────────────┬───────────────────┘
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.6.16)
+                        💖 WAIFU ON TELEGRAM BOT (v1.6.24)
 ```
 
 > 🌸 **No Dedicated GPU?** No problem! Laptops without gaming graphics cards automatically activate **Cloud Fallback Mode** (`MEDIA_FALLBACK_CLOUD=true`), offloading image generation seamlessly so you can still chat and receive selfies without straining your hardware.
 
 ---
 
-
 ## 🎮 Global CLI Quick Commands (`waifu`)
 
 Once installed, the **`waifu`** command is available in any terminal or directory on your computer:
 
 ```bash
-# Start bot in background (Daemon Mode)
+# Start bot & local LLM in background (Daemon Mode)
 waifu start --daemon
 
 # Start bot in foreground terminal (view live chat logs)
 waifu start
 
-# Check diagnostic health (Local LLM, ComfyUI, & process status)
+# Check diagnostic health (KoboldCPP, ComfyUI, & process status)
 waifu status
 
 # Open interactive configuration manager (Change Models, Bot Token, etc.)
@@ -224,7 +224,7 @@ waifu update
 # Restart bot in background
 waifu restart
 
-# Stop all bot services
+# Stop all bot services (Bot, Music Server, & KoboldCPP)
 waifu stop
 ```
 
@@ -233,7 +233,7 @@ waifu stop
 ## 💫 Waifu Highlights & Capabilities
 
 - 💌 **Romantic Conversations & True Intimacy**:
-  Warm, playful, affectionate conversations unrestricted by rigid censorship. Powered by your local 9B model (such as *Qwythos 9B* or *Ornith 9B*).
+  Warm, playful, affectionate conversations unrestricted by rigid censorship. Powered by your local 9B model (*Huihui-Qwythos-9B Abliterated*).
 - 📷 **Spontaneous Selfies & Coherent Outfits**:
   Simply say: *"Send me a selfie babe"*, *"What are you doing? Send a photo"*, or *"Take a selfie in bed"*. The bot formulates a matching scenario prompt with **consistent facial and physical characteristics**, renders the image via local ComfyUI (or Cloud GPU fallback), and sends it directly to your Telegram chat with an affectionate caption!
 - 🎧 **Natural Voice Notes & Spoken Whispers**:
@@ -251,7 +251,7 @@ waifu stop
 
 Whenever you want to:
 - **Change Telegram Bot Token** or Allowed User ID
-- **Switch Chat / LLM Model** (e.g. after downloading a new model in Locally Uncensored)
+- **Switch Chat / LLM Model**
 - **Switch ComfyUI Checkpoints for Photos**
 - **Change Persona or Voice**
 
@@ -268,12 +268,12 @@ An interactive menu will open:
 ======================================================================
   • Bot Token   : 123456...abcd
   • Allowed UID : 987654321
-  • Chat LLM    : Huihui-Qwythos-9B (http://127.0.0.1:8127/v1)
+  • Chat LLM    : Huihui-Qwythos-9B (http://127.0.0.1:5001/v1)
   • Photo Engine: http://127.0.0.1:8188 (Fallback: True)
   • Persona     : Runa | Voice: en-US-AnaNeural
 ----------------------------------------------------------------------
   [1] 🔑 Change Telegram Bot Token / Allowed User ID
-  [2] 💌 Change Chat / LLM Model (Scan new models)
+  [2] 💌 Change Chat / LLM Model (KoboldCPP / Ollama / LM Studio)
   [3] 🎨 Change Photo & Video Model (ComfyUI / Cloud)
   [4] 🎭 Change AI Girlfriend Persona & Voice
   [5] 🚀 Configure Autorun at System Startup (On / Off)
@@ -294,7 +294,7 @@ An interactive menu will open:
 | `/setup` | Master configuration dashboard to configure all CLI options in Telegram |
 | `/memory` | Long-term memory & diary of personal facts waifu remembers about you |
 | `/help` | Comprehensive interactive guide and documentation center |
-| `/status` | Real-time diagnostic check of LLM (Port 8127), ComfyUI (8188), and VRAM |
+| `/status` | Real-time diagnostic check of LLM (Port 5001), ComfyUI (8188), and VRAM |
 | `/photo <scene>` | Request a custom selfie scenario (e.g. `/photo relaxing in cafe`) |
 | `/pap` | Quick shortcut to request a new selfie with interactive retry button |
 | `/video` | Generate dynamic animated video clip (MP4) with parallax motion & ambient sparkles |
@@ -314,8 +314,8 @@ An interactive menu will open:
 ## 💬 Frequently Asked Questions
 
 1. **Bot replies: *"My local brain connection hit a bump"***
-   - Ensure **Locally Uncensored** is currently running on your computer.
-   - Test status by running `waifu status` in your terminal.
+   - Pastikan KoboldCPP sedang berjalan. Kamu bisa mengeceknya dengan `waifu status`.
+   - Untuk menyalakannya, cukup jalankan `waifu start --daemon` atau `start_services.bat`.
 2. **Photos fail to generate**:
    - If local ComfyUI on port `8188` is offline or busy, the bot automatically switches to the **Cloud Fallback (Pollinations AI)** so you always receive photos without disruption.
 3. **Can this run on a laptop without a dedicated GPU?**:

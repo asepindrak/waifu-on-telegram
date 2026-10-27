@@ -104,7 +104,7 @@ class LocallyUncensoredClient:
 
     def __init__(
         self,
-        base_url: str = "http://127.0.0.1:8127/v1",
+        base_url: str = "http://127.0.0.1:5001/v1",
         api_key: str = "auto",
         model: str = "default",
         timeout: int = 50
@@ -117,16 +117,25 @@ class LocallyUncensoredClient:
 
     def get_api_key(self) -> str:
         """Resolves active API Key (dynamic memory extraction or static)."""
-        if self.config_api_key and self.config_api_key.lower() != "auto":
+        if self.config_api_key and self.config_api_key.lower() not in ("auto", ""):
             return self.config_api_key
 
         if self.cached_api_key:
             return self.cached_api_key
 
-        auto_key = extract_llama_key_from_process()
-        if auto_key:
-            self.cached_api_key = auto_key
-            return auto_key
+        # Only check memory extraction when connecting to Locally Uncensored (port 8127)
+        if ":8127" in self.base_url:
+            auto_key = extract_llama_key_from_process()
+            if auto_key:
+                self.cached_api_key = auto_key
+                return auto_key
+
+        if ":5001" in self.base_url:
+            return "kobold"
+        if ":11434" in self.base_url:
+            return "ollama"
+        if ":1234" in self.base_url:
+            return "lm-studio"
 
         return "locally-uncensored"
 
@@ -141,8 +150,9 @@ class LocallyUncensoredClient:
             if r.status_code == 200:
                 data = r.json()
                 models = data.get("data", []) or data.get("models", [])
-                model_name = models[0].get("id", "Unknown") if models else "Active Model"
-                return {"online": True, "backend": "Locally Uncensored", "model": model_name}
+                model_name = models[0].get("id", "Unknown") if models else (self.model or "Active Model")
+                backend = "KoboldCPP" if ":5001" in self.base_url else ("Locally Uncensored" if ":8127" in self.base_url else "Local LLM")
+                return {"online": True, "backend": backend, "model": model_name}
         except Exception:
             pass
 
@@ -155,8 +165,8 @@ class LocallyUncensoredClient:
         except Exception:
             pass
 
-        # Check common alternatives (Ollama on 11434, LM Studio on 1234)
-        for alt_port, alt_name in [(11434, "Ollama"), (1234, "LM Studio")]:
+        # Check common alternatives (KoboldCPP on 5001, Ollama on 11434, LM Studio on 1234, Locally Uncensored on 8127)
+        for alt_port, alt_name in [(5001, "KoboldCPP"), (11434, "Ollama"), (1234, "LM Studio"), (8127, "Locally Uncensored")]:
             try:
                 r = requests.get(f"http://127.0.0.1:{alt_port}/v1/models", timeout=2)
                 if r.status_code == 200:

@@ -122,10 +122,10 @@ Write-Host "`n[3/8] Installing Python requirements..." -ForegroundColor Cyan
 & $py -m pip install -r requirements.txt --quiet --disable-pip-version-check
 Write-Host "  [OK] Dependencies installed successfully." -ForegroundColor Green
 
-# 4. Check Local LLM Backend (Locally Uncensored / Ollama / llama-server)
-Write-Host "`n[4/8] Checking Local LLM Backend (Chat Engine)..." -ForegroundColor Cyan
+# 4. Check & Setup Local LLM Engine (KoboldCPP / Auto-loading Engine)
+Write-Host "`n[4/8] Checking Local LLM Engine (Chat & Romance Brain)..." -ForegroundColor Cyan
 $llmOnline = $false
-foreach ($port in @(8127, 11434, 1234)) {
+foreach ($port in @(5001, 8127, 11434, 1234)) {
     try {
         $tcp = New-Object System.Net.Sockets.TcpClient
         $tcp.Connect("127.0.0.1", $port)
@@ -136,18 +136,56 @@ foreach ($port in @(8127, 11434, 1234)) {
     } catch {}
 }
 
-if (-not $llmOnline) {
+$toolsDir = "$installDir\tools"
+$modelsDir = "$installDir\models"
+if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null }
+if (-not (Test-Path $modelsDir)) { New-Item -ItemType Directory -Force -Path $modelsDir | Out-Null }
+
+$kcppExe = "$toolsDir\koboldcpp.exe"
+if (-not (Test-Path $kcppExe)) {
+    Write-Host "  [INFO] Standalone auto-starting LLM engine (KoboldCPP) not installed." -ForegroundColor Yellow
+    $dlKcpp = Read-Host "  Would you like to auto-download KoboldCPP Windows Portable (~150 MB)? [Y/n, default: Y]"
+    if ($dlKcpp.Trim().ToLower() -ne "n") {
+        $kcppUrl = "https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp.exe"
+        Download-FileWithProgress -Url $kcppUrl -DestinationPath $kcppExe -Description "KoboldCPP Standalone LLM Server (~150 MB)"
+    }
+} else {
+    Write-Host "  [OK] KoboldCPP LLM Engine detected: $kcppExe" -ForegroundColor Green
+}
+
+# Check for GGUF Brain Model
+$existingGgufs = @(Get-ChildItem -Path $modelsDir -Filter "*.gguf" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*mmproj*" })
+if ($existingGgufs.Count -eq 0) {
+    # Check if user has GGUF files in Locally Uncensored or Downloads
     $luDir = "$env:APPDATA\Locally Uncensored\models"
-    $localGguf = @()
+    $foundCandidate = $null
     if (Test-Path $luDir) {
-        $localGguf = Get-ChildItem -Path $luDir -Filter "*.gguf" -ErrorAction SilentlyContinue
+        $luGgufs = @(Get-ChildItem -Path $luDir -Filter "*.gguf" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*mmproj*" -and $_.Length -gt 500*1024*1024 })
+        if ($luGgufs.Count -gt 0) {
+            $foundCandidate = $luGgufs[0].FullName
+        }
     }
-    if ($localGguf.Count -gt 0) {
-        $sampleGguf = $localGguf[0].Name
-        Write-Host "  [OK] Locally Uncensored model found: $sampleGguf" -ForegroundColor Green
+    
+    if ($foundCandidate) {
+        $candName = Split-Path -Leaf $foundCandidate
+        Write-Host "  [DETECTED] Found existing GGUF model in Locally Uncensored: $candName" -ForegroundColor Cyan
+        $copyCand = Read-Host "  Copy this model to project for auto-start with KoboldCPP? [Y/n, default: Y]"
+        if ($copyCand.Trim().ToLower() -ne "n") {
+            Copy-Item -Path $foundCandidate -Destination "$modelsDir\$candName" -Force
+            Write-Host "  [OK] Model copied successfully." -ForegroundColor Green
+        }
     } else {
-        Write-Host "  [INFO] No local LLM currently active on port 8127. (Will connect when Locally Uncensored is launched)." -ForegroundColor DarkGray
+        Write-Host "  [INFO] No GGUF chat model found in '$modelsDir'." -ForegroundColor Yellow
+        $dlModel = Read-Host "  Auto-download uncensored 'Huihui-Qwythos-9B-Claude-Mythos-5-1M' Q4_K model (~5.5 GB)? [Y/n, default: Y]"
+        if ($dlModel.Trim().ToLower() -ne "n") {
+            $qwythosUrl = "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+            $destGguf = "$modelsDir\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+            Download-FileWithProgress -Url $qwythosUrl -DestinationPath $destGguf -Description "Huihui-Qwythos 9B Abliterated Q4_K (~5.5 GB)"
+        }
     }
+} else {
+    $activeGguf = $existingGgufs[0].Name
+    Write-Host "  [OK] Local Chat & Romance GGUF Model detected: $activeGguf" -ForegroundColor Green
 }
 
 # 5. Check & Setup ComfyUI & Models (MeinaMix & AnimateDiff)

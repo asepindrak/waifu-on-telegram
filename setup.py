@@ -65,8 +65,29 @@ def write_env(env_vars):
     print(c(GREEN, f"\n✓ Configuration successfully saved to: {ENV_FILE}"))
 
 def scan_local_llm_models():
-    """Scans Locally Uncensored and local model directories across Windows, Linux, and macOS."""
+    """Scans KoboldCPP, Locally Uncensored, and local model directories across Windows, Linux, and macOS."""
     models = []
+    
+    # 1. Project models/ directory for KoboldCPP
+    proj_models = os.path.join(SCRIPT_DIR, "models")
+    if os.path.exists(proj_models):
+        for f in os.listdir(proj_models):
+            if f.endswith(".gguf") and not f.startswith("mmproj") and not f.endswith(".mmproj.gguf"):
+                models.append(("KoboldCPP", f, os.path.join(proj_models, f)))
+
+    # 2. Check running KoboldCPP on port 5001
+    try:
+        import urllib.request
+        with urllib.request.urlopen("http://127.0.0.1:5001/v1/models", timeout=1.5) as r:
+            data = json.loads(r.read())
+            m_list = data.get("data", []) or data.get("models", [])
+            for m in m_list:
+                m_id = m.get("id", "default")
+                if not any(m_id == x[1] for x in models):
+                    models.append(("KoboldCPP", m_id, "http://127.0.0.1:5001/v1"))
+    except Exception:
+        pass
+
     user_home = os.path.expanduser("~")
     # Cross-platform Locally Uncensored paths
     candidate_lu_dirs = [
@@ -81,7 +102,7 @@ def scan_local_llm_models():
                 if f.endswith(".gguf") and not f.endswith(".mmproj.gguf"):
                     models.append(("Locally Uncensored", f, os.path.join(lu_dir, f)))
 
-    # 2. Query running Ollama tags if active
+    # 4. Query running Ollama tags if active
     try:
         import urllib.request
         with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=1.5) as r:
@@ -208,20 +229,23 @@ def config_telegram_credentials(env_vars):
 def config_llm_model(env_vars):
     print(c(BOLD + CYAN, "\n[Step 2/7: Chat & Romance LLM Model Selection]"))
     print("-" * 60)
-    cur_base = env_vars.get("LLM_BASE_URL", "http://127.0.0.1:8127/v1")
+    cur_base = env_vars.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
     cur_model = env_vars.get("LLM_MODEL", "default")
     print(f"Active Settings: `{cur_model}` at `{cur_base}`\n")
 
     detected_llms = scan_local_llm_models()
     options = []
-    options.append(("Locally Uncensored (Auto-detect Active Model & Dynamic Key)", "http://127.0.0.1:8127/v1", "auto", "default"))
+    options.append(("KoboldCPP (Auto-starts & Auto-loads GGUF model on boot)", "http://127.0.0.1:5001/v1", "kobold", "default"))
 
     for source, mname, mpath in detected_llms:
-        if source == "Locally Uncensored":
+        if source == "KoboldCPP":
+            options.append((f"{mname} ({source} - Project Model)", "http://127.0.0.1:5001/v1", "kobold", mname))
+        elif source == "Locally Uncensored":
             options.append((f"{mname} ({source})", "http://127.0.0.1:8127/v1", "auto", mname))
         elif source == "Ollama":
             options.append((f"{mname} (Ollama)", "http://127.0.0.1:11434/v1", "ollama", mname))
 
+    options.append(("Locally Uncensored (Auto-detect Active Model & Dynamic Key)", "http://127.0.0.1:8127/v1", "auto", "default"))
     options.append(("Custom OpenAI-compatible URL", "custom", "", ""))
 
     for idx, opt in enumerate(options, 1):
