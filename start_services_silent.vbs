@@ -71,4 +71,9 @@ If FSO.FileExists(ScriptDir & "\music_player_server.js") Then
 End If
 
 ' 4. Start Python Bot
-WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && python bot.py", 0, False
+Dim pyCmd
+pyCmd = "python"
+If FSO.FileExists("C:\Python315\python.exe") Then
+    pyCmd = "C:\Python315\python.exe"
+End If
+WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && """ & pyCmd & """ bot.py", 0, False
