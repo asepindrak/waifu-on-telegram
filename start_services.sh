@@ -31,12 +31,18 @@ if [ -f "$SCRIPT_DIR/tools/koboldcpp" ]; then
     fi
 fi
 
-# 2. Start Music Server if node is available
+# 2. Start ComfyUI Generator if present & port 8188 not active
+if ! nc -z 127.0.0.1 8188 2>/dev/null && ! (echo >/dev/tcp/127.0.0.1/8188) 2>/dev/null; then
+    $PY -c "import asset_manager, subprocess; spec = asset_manager.get_comfyui_launch_spec(); subprocess.run(spec['cmd'], cwd=spec['cwd']) if spec else exit(1)" >/dev/null 2>&1 &
+    sleep 3
+fi
+
+# 3. Start Music Server if node is available
 if command -v node &>/dev/null && [ -f "$SCRIPT_DIR/music_player_server.js" ]; then
     nohup node "$SCRIPT_DIR/music_player_server.js" >/dev/null 2>&1 &
 fi
 
-# 2. Start Python Telegram Bot
+# 4. Start Python Telegram Bot
 nohup $PY "$SCRIPT_DIR/bot.py" >> "$LOG_FILE" 2>&1 &
 BOT_PID=$!
 echo "$BOT_PID" > "$PID_FILE"

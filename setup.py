@@ -275,8 +275,9 @@ def config_image_model(env_vars):
 
     img_options = []
     for source, ckpt_name in detected_img:
-        img_options.append((f"{ckpt_name} (Local GPU via ComfyUI)", ckpt_name, True))
+        img_options.append((f"{ckpt_name} (Local GPU via ComfyUI + Photo Vault Archive)", ckpt_name, False))
 
+    img_options.append(("Local ComfyUI Standard (Auto-detect active checkpoint + Photo Vault)", "auto", False))
     img_options.append(("Cloud Fallback Engine (Pollinations AI - Fast, Free GPU, 0 VRAM)", "cloud", True))
     img_options.append(("Disable photo generation", "disabled", False))
 

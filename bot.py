@@ -71,8 +71,8 @@ apihelper.READ_TIMEOUT = 120
 apihelper.CONNECT_TIMEOUT = 30
 
 # Initialize engines
-LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8127/v1")
-LLM_API_KEY = os.environ.get("LLM_API_KEY", "auto")
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "kobold")
 COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://127.0.0.1:8188")
 MEDIA_FALLBACK = os.environ.get("MEDIA_FALLBACK_CLOUD", "false").lower() in ("true", "1", "yes")
 VOICE_ENABLED = os.environ.get("VOICE_REPLY_ENABLED", "true").lower() in ("true", "1", "yes")
@@ -139,19 +139,30 @@ def update_env_variable(key: str, value: str):
 def apply_llm_choice(choice: str) -> str:
     global LLM_BASE_URL
     detected_llms = scan_local_llm_models()
-    if choice == "auto":
+    if choice == "kobold" or choice == "auto":
+        new_base = "http://127.0.0.1:5001/v1"
+        new_model = "default"
+        label = "KoboldCPP (Auto-start & Loaded)"
+    elif choice == "locally_uncensored":
         new_base = "http://127.0.0.1:8127/v1"
         new_model = "default"
-        label = "Locally Uncensored (Auto-detect)"
+        label = "Locally Uncensored (Port 8127)"
     elif choice == "ollama":
         new_base = "http://127.0.0.1:11434/v1"
         new_model = "default"
         label = "Ollama (Port 11434)"
     elif choice.isdigit() and int(choice) < len(detected_llms):
         source, mname, mpath = detected_llms[int(choice)]
-        new_base = "http://127.0.0.1:8127/v1" if source == "Locally Uncensored" else "http://127.0.0.1:11434/v1"
+        if source == "KoboldCPP":
+            new_base = "http://127.0.0.1:5001/v1"
+        elif source == "Locally Uncensored":
+            new_base = "http://127.0.0.1:8127/v1"
+        elif source == "Ollama":
+            new_base = "http://127.0.0.1:11434/v1"
+        else:
+            new_base = "http://127.0.0.1:5001/v1"
         new_model = mname
-        label = mname
+        label = f"{mname} ({source})"
     else:
         return "Unknown"
 
@@ -1525,22 +1536,24 @@ def handle_help(message):
 
 def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
     cur_llm = os.environ.get("LLM_MODEL", "default")
-    cur_base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8127/v1")
+    cur_base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
     detected = scan_local_llm_models()
 
     markup = types.InlineKeyboardMarkup(row_width=1)
-    is_auto = (cur_llm in ("default", "auto") or ("8127" in cur_base and cur_llm == "default"))
-    markup.add(types.InlineKeyboardButton(f"🤖 Locally Uncensored (Auto-detect) {'✓' if is_auto else ''}", callback_data="cfg_set_llm:auto"))
+    is_kobold = ("5001" in cur_base)
+    markup.add(types.InlineKeyboardButton(f"🤖 KoboldCPP (Port 5001 - Auto-start) {'✓' if is_kobold else ''}", callback_data="cfg_set_llm:kobold"))
 
     for idx, (source, mname, mpath) in enumerate(detected):
         is_cur = (cur_llm.lower() in mname.lower())
         short_name = mname.replace(".gguf", "")
         if len(short_name) > 34:
             short_name = short_name[:31] + "..."
-        markup.add(types.InlineKeyboardButton(f"🧠 {short_name} {'✓' if is_cur else ''}", callback_data=f"cfg_set_llm:{idx}"))
+        markup.add(types.InlineKeyboardButton(f"🧠 {short_name} ({source}) {'✓' if is_cur else ''}", callback_data=f"cfg_set_llm:{idx}"))
 
     is_ollama = ("11434" in cur_base)
     markup.add(types.InlineKeyboardButton(f"🦙 Ollama Server (Port 11434) {'✓' if is_ollama else ''}", callback_data="cfg_set_llm:ollama"))
+    is_lu = ("8127" in cur_base)
+    markup.add(types.InlineKeyboardButton(f"⚙️ Locally Uncensored (Port 8127) {'✓' if is_lu else ''}", callback_data="cfg_set_llm:locally_uncensored"))
     markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
 
     text = (
@@ -1826,10 +1839,10 @@ def build_system_diagnostics_report(user_id: int) -> str:
         f"👗 **Pakaian Aktif** : `{cur_outfit}`\n"
         f"🌐 **Bahasa Chat**   : `{lang_label}`\n"
         f"💖 **Status Hubungan**: **{rel_status}** (`{score}%` • `{affinity_score} pts`)\n\n"
-        f"🧠 **Local LLM (Port 8127)**: {status_icon}\n"
+        f"🧠 **Local LLM Engine**: {status_icon}\n"
         f"• Model Chat   : `{llm_model_name}`\n"
         f"• Vision Model : {vision_str}\n"
-        f"• Backend      : `{llm_stat.get('backend', 'Locally Uncensored')}`\n"
+        f"• Backend      : `{llm_stat.get('backend', 'KoboldCPP')}`\n"
         f"• Endpoint     : `{LLM_BASE_URL}`\n\n"
         f"🎨 **Generator Visual (Port 8188)**: {media_icon}\n"
         f"• Backend      : `{media_stat.get('backend', 'ComfyUI Local')}`\n"
@@ -2742,11 +2755,17 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
 
                 u_ar = USER_RATIOS.get(user_id, "3:4")
                 u_qual = USER_QUALITIES.get(user_id, "high")
+                active_p_key = persona_mgr.get_active_persona_key(user_id) if hasattr(persona_mgr, "get_active_persona_key") else DEFAULT_PERSONA
                 img_bytes, source = media_engine.generate_photo(
                     visual_prompt,
                     negative_prompt=neg_p,
                     aspect_ratio=u_ar,
-                    quality=u_qual
+                    quality=u_qual,
+                    persona=active_p_key,
+                    scene=detected_scene,
+                    outfit_label=outfit_label,
+                    is_nude=is_nude,
+                    user_query=user_text
                 )
             if img_bytes:
                 USER_LAST_PHOTO_CONTEXT[user_id]["img_bytes"] = img_bytes
@@ -2800,10 +2819,14 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                     )
                 }
             ]
+            vault_guidance = ""
+            if "Vault" in source:
+                vault_guidance = " [ComfyUI is offline; you are happily sending a matching saved photo from your private album]."
+
             caption_prompt.extend(clean_recent_turns)
             caption_prompt.append({
                 "role": "user",
-                "content": f"[Sending photo to boyfriend. Setting: '{detected_scene}', wearing: '{outfit_label}']. Write 1 natural girlfriend chat sentence:"
+                "content": f"[Sending photo to boyfriend. Setting: '{detected_scene}', wearing: '{outfit_label}'{vault_guidance}]. Write 1 natural girlfriend chat sentence:"
             })
 
             try:
@@ -2815,7 +2838,9 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
             if is_nude:
                 fallback_caption = f"Khusus buat kamu ya, jangan diliatin ke siapa-siapa ({source})"
             else:
-                if is_proof:
+                if "Vault" in source:
+                    fallback_caption = f"Ini foto dari album galeri aku ya sayang~ ({source})"
+                elif is_proof:
                     fallback_caption = f"Tuh kan beneran, liat sendiri nih biar percaya! 😜 ({source})"
                 else:
                     fallback_caption = f"Ini fotonya yaa ({source})"
@@ -4062,9 +4087,10 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
             stat = llm_client.check_health()
             if not stat.get("online"):
                 backend_msg = (
-                    "Otak AI lokal aku (Locally Uncensored di port 8127) belum aktif nih.\n\n"
-                    "Coba buka aplikasi **Locally Uncensored** di PC kamu lalu pastikan model (seperti Huihui-Qwythos) sudah kamu pilih ya!\n\n"
-                    "Begitu modelnya aktif, kirim pesan lagi ke aku yaa."
+                    "Otak AI lokal aku (KoboldCPP) belum aktif nih.\n\n"
+                    "Coba jalankan layanan dari terminal dengan perintah:\n`waifu start --daemon`\n\n"
+                    "Atau klik ganda file `start_services.bat` di folder PC kamu yaa sayang!\n"
+                    "Begitu aktif, kirim pesan lagi ke aku yaa."
                 )
                 bot.reply_to(message, backend_msg, parse_mode="Markdown")
                 return

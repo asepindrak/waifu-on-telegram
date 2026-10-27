@@ -9,6 +9,11 @@ import logging
 import requests
 from typing import Optional, Dict, Any, Tuple
 
+try:
+    import photo_vault
+except ImportError:
+    photo_vault = None
+
 logger = logging.getLogger(__name__)
 
 class MediaEngine:
@@ -362,12 +367,18 @@ class MediaEngine:
         prompt: Optional[str] = None,
         negative_prompt: Optional[str] = None,
         aspect_ratio: Optional[str] = None,
-        quality: Optional[str] = None
+        quality: Optional[str] = None,
+        persona: str = "runa",
+        scene: str = "",
+        outfit_label: str = "",
+        is_nude: bool = False,
+        user_query: str = ""
     ) -> Tuple[Optional[bytes], str]:
         """
         Main entry for photo generation.
-        Tries local ComfyUI first; if offline or fails, returns (None, 'Failed').
-        Cloud fallback is disabled unless explicitly enabled.
+        1. Tries local ComfyUI.
+        2. On success: archives photo into Photo Vault with semantic metadata.
+        3. On failure / offline: searches Photo Vault for matching persona & scene (No low-quality cloud!).
         Returns: (image_bytes, source_label)
         """
         self.last_error = None
@@ -382,17 +393,43 @@ class MediaEngine:
                 quality=quality
             )
             if local_img:
+                # Automatically save high-quality local render to Photo Vault
+                if photo_vault:
+                    try:
+                        photo_vault.save_photo_to_vault(
+                            local_img,
+                            persona=persona,
+                            scene=scene or user_query,
+                            outfit_label=outfit_label,
+                            is_nude=is_nude,
+                            visual_prompt=effective_prompt,
+                            user_query=user_query,
+                            aspect_ratio=aspect_ratio or "3:4"
+                        )
+                    except Exception as e_save:
+                        logger.warning(f"Failed to auto-archive photo to vault: {e_save}")
                 return local_img, "ComfyUI Local"
         else:
-            self.last_error = "ComfyUI URL belum dikonfigurasi (pastikan ComfyUI lokal aktif)."
+            self.last_error = "ComfyUI URL belum dikonfigurasi (pastikan ComfyUI lokal aktif di port 8188)."
 
-        # 2. Cloud Fallback (Disabled by default)
-        if self.allow_cloud_fallback:
-            w, h = self.get_dimensions(aspect_ratio or "3:4", is_sdxl=False)
-            cloud_img = self.generate_image_cloud_fallback(effective_prompt, width=w, height=h)
-            if cloud_img:
-                return cloud_img, "Cloud Engine (Free GPU)"
+        # 2. Smart Photo Vault Retrieval (Offline Semantic Fallback)
+        if photo_vault:
+            try:
+                matched = photo_vault.find_matching_photo(
+                    persona=persona,
+                    scene=scene or user_query,
+                    outfit_label=outfit_label,
+                    is_nude=is_nude,
+                    user_query=user_query
+                )
+                if matched:
+                    vault_img, meta = matched
+                    logger.info(f"Retrieved matching photo from vault: {meta.get('filename')} (Scene: {meta.get('scene')})")
+                    return vault_img, "Vault Archive (Saved Photo)"
+            except Exception as e_find:
+                logger.warning(f"Error querying photo vault: {e_find}")
 
+        # Cloud fallback is intentionally disabled per user request (bad quality)
         return None, "Failed"
 
     def generate_video(

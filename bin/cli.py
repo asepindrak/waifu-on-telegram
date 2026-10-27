@@ -106,11 +106,16 @@ def cmd_start(daemon: bool = False):
     # Start optional music server in background
     music_js = os.path.join(PROJECT_ROOT, "music_player_server.js")
     if os.path.exists(music_js):
-        try:
-            subprocess.Popen(["node", music_js], cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print(c(GREEN, "  ✓ YouTube Music Server active on port 8002"))
-        except Exception:
-            pass
+        node_bin = "node"
+        local_node = os.path.join(PROJECT_ROOT, "tools", "nodejs", "node.exe" if platform.system() == "Windows" else "bin/node")
+        if not shutil.which("node") and os.path.isfile(local_node):
+            node_bin = local_node
+        if shutil.which(node_bin) or os.path.isfile(node_bin):
+            try:
+                subprocess.Popen([node_bin, music_js], cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print(c(GREEN, "  ✓ YouTube Music Server active on port 8002"))
+            except Exception:
+                pass
 
     bot_script = os.path.join(PROJECT_ROOT, "bot.py")
 
@@ -159,6 +164,9 @@ def cmd_stop():
         subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq Waifu Music Server*"], capture_output=True)
         subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq KoboldCPP*"], capture_output=True)
         subprocess.run(["taskkill", "/F", "/IM", "koboldcpp.exe"], capture_output=True)
+        subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq ComfyUI*"], capture_output=True)
+        ps_comfy = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*main.py*" -and $_.CommandLine -like "*8188*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
+        subprocess.run(["powershell", "-NoProfile", "-Command", ps_comfy], capture_output=True)
     else:
         stop_sh = os.path.join(PROJECT_ROOT, "stop_services.sh")
         if os.path.exists(stop_sh):
@@ -173,6 +181,7 @@ def cmd_stop():
             subprocess.run(["pkill", "-f", "python.*bot.py"], capture_output=True)
             subprocess.run(["pkill", "-f", "node.*music_player_server.js"], capture_output=True)
             subprocess.run(["pkill", "-f", "koboldcpp"], capture_output=True)
+            subprocess.run(["pkill", "-f", "main.py.*8188"], capture_output=True)
 
     if os.path.exists(PID_FILE):
         try:
@@ -195,7 +204,7 @@ def cmd_status():
     else:
         import urllib.request
         print(c(BOLD + CYAN, f"System Status Diagnostics (v{get_version()}):"))
-        for name, url in [("Local LLM (8127)", "http://127.0.0.1:8127/health"), ("ComfyUI (8188)", "http://127.0.0.1:8188/system_stats")]:
+        for name, url in [("Local LLM (KoboldCPP 5001)", "http://127.0.0.1:5001/v1/models"), ("ComfyUI (8188)", "http://127.0.0.1:8188/system_stats")]:
             try:
                 with urllib.request.urlopen(url, timeout=2) as r:
                     print(f"  ✓ {name}: " + c(GREEN, "ONLINE"))

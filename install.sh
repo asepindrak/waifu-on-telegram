@@ -6,7 +6,7 @@
 set -e
 
 echo "===================================================================="
-VER=$(cat VERSION 2>/dev/null || echo "1.6.8")
+VER=$(cat VERSION 2>/dev/null || echo "1.6.26")
 echo "       💖 WAIFU ON TELEGRAM v$VER - Linux/macOS 1-Line Installer 🌸       "
 echo "===================================================================="
 echo ""
@@ -17,10 +17,10 @@ DEFAULT_INSTALL_DIR="$HOME/waifu-on-telegram"
 # 1. Target Directory & Clone
 if [ -f "bot.py" ] && [ -f "setup.py" ]; then
     INSTALL_DIR="$(pwd)"
-    echo "[1/6] Running inside project folder: $INSTALL_DIR"
+    echo "[1/7] Running inside project folder: $INSTALL_DIR"
 else
     INSTALL_DIR="$DEFAULT_INSTALL_DIR"
-    echo "[1/6] Target directory: $INSTALL_DIR"
+    echo "[1/7] Target directory: $INSTALL_DIR"
     if [ -d "$INSTALL_DIR/.git" ]; then
         echo "  Updating repository..."
         cd "$INSTALL_DIR"
@@ -36,7 +36,7 @@ else
 fi
 
 # 2. Check Python
-echo "[2/6] Checking Python environment..."
+echo "[2/7] Checking Python environment..."
 if command -v python3 &>/dev/null; then
     PY="python3"
 elif command -v python &>/dev/null; then
@@ -89,13 +89,31 @@ else
     echo "  ✓ Local GGUF chat model found."
 fi
 
-# 5. Check Node.js for PC Music Remote
+# 5. Check & Auto-Install Node.js for PC Music Remote
 echo "[5/7] Checking Node.js for Music Remote..."
+if ! command -v node &>/dev/null; then
+    echo "  >> Node.js not detected. Auto-installing Node.js..."
+    if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &>/dev/null; then
+        echo "     Installing Node.js via Homebrew..."
+        brew install node || true
+    else
+        echo "     Installing Node.js LTS via NVM..."
+        export NVM_DIR="$HOME/.nvm"
+        if [ ! -d "$NVM_DIR" ]; then
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash || true
+        fi
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm install --lts || true
+        nvm use --lts || true
+    fi
+fi
+
 if command -v node &>/dev/null; then
-    echo "  ✓ Node.js found: $(node -v). Installing npm packages..."
+    echo "  ✓ Node.js active: $(node -v). Installing npm packages..."
     npm install --silent
+    echo "  ✓ YouTube Music Remote dependencies installed successfully."
 else
-    echo "  ℹ Node.js not detected. Music remote feature will be disabled (chat & photos remain functional)."
+    echo "  ℹ Node.js could not be installed automatically. Music remote feature will be disabled."
 fi
 
 # 6. Register global CLI script

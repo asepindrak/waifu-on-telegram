@@ -169,20 +169,20 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
 
 ```
 ┌───────────────────────────────────────┐       ┌───────────────────────────────────────┐
-│        1. KOBOLDCPP STANDALONE        │       │              2. COMFYUI               │
+│        1. KOBOLDCPP STANDALONE        │       │        2. COMFYUI + PHOTO VAULT       │
 │      https://koboldcpp.net/           │       │       https://comfy.org/download      │
 │                                       │       │                                       │
-│   • Auto-starts & loads model on boot │       │   • Generates Anime Photos (PAP)      │
+│   • Auto-starts & loads model on boot │       │   • Auto-starts with --normalvram     │
 │   • Local API Port: 5001              │       │   • Local API Port: 8188              │
-│   • Model: Huihui-Qwythos-9B (GGUF)   │       │   • Model: MeinaMix (Auto-managed)    │
+│   • Model: Huihui-Qwythos-9B (GGUF)   │       │   • Smart Vault Archive Fallback      │
 └──────────────────┬────────────────────┘       └───────────────────┬───────────────────┘
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.6.24)
+                        💖 WAIFU ON TELEGRAM BOT (v1.6.26)
 ```
 
-> 🌸 **No Dedicated GPU?** No problem! Laptops without gaming graphics cards automatically activate **Cloud Fallback Mode** (`MEDIA_FALLBACK_CLOUD=true`), offloading image generation seamlessly so you can still chat and receive selfies without straining your hardware.
+> 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.
 
 ---
 

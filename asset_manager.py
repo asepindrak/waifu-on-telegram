@@ -211,6 +211,48 @@ def detect_comfyui_dir() -> Optional[str]:
 
     return None
 
+def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
+    """
+    Returns executable command, working directory, and arguments to launch ComfyUI
+    with safe VRAM options (--normalvram --listen 127.0.0.1 --port 8188).
+    """
+    cdir = detect_comfyui_dir()
+    if not cdir:
+        return None
+
+    # Check for ComfyUI Windows Portable batch scripts or embedded python
+    for base in [cdir, os.path.dirname(cdir)]:
+        bat_nvidia = os.path.join(base, "run_nvidia_gpu.bat")
+        if os.path.isfile(bat_nvidia):
+            return {"cwd": base, "cmd": [bat_nvidia]}
+        py_embed = os.path.join(base, "python_embeded", "python.exe")
+        main_py = os.path.join(cdir, "main.py")
+        if os.path.isfile(py_embed) and os.path.isfile(main_py):
+            return {
+                "cwd": cdir,
+                "cmd": [py_embed, main_py, "--windows-standalone-build", "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
+            }
+
+    # Check virtual environments in cdir
+    for venv_dir in [".venv", "venv"]:
+        v_py = os.path.join(cdir, venv_dir, "Scripts", "python.exe") if platform.system() == "Windows" else os.path.join(cdir, venv_dir, "bin", "python")
+        main_py = os.path.join(cdir, "main.py")
+        if os.path.isfile(v_py) and os.path.isfile(main_py):
+            return {
+                "cwd": cdir,
+                "cmd": [v_py, main_py, "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
+            }
+
+    # Fallback to system python
+    main_py = os.path.join(cdir, "main.py")
+    if os.path.isfile(main_py):
+        return {
+            "cwd": cdir,
+            "cmd": [sys.executable, main_py, "--normalvram", "--port", "8188", "--listen", "127.0.0.1"]
+        }
+
+    return None
+
 def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:
     """Retrieves metadata and current installation status of a registered asset."""
     if asset_key not in ASSET_REGISTRY:

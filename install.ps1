@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 
 function Write-GradientHeader {
     Write-Host "====================================================================" -ForegroundColor Magenta
-    $ver = if (Test-Path "VERSION") { (Get-Content "VERSION").Trim() } else { "1.6.17" }
+    $ver = if (Test-Path "VERSION") { (Get-Content "VERSION").Trim() } else { "1.6.26" }
     Write-Host "   WAIFU ON TELEGRAM v$ver - Windows One-Click All-in-One Installer   " -ForegroundColor Magenta
     Write-Host "====================================================================" -ForegroundColor Magenta
     Write-Host ""
@@ -279,8 +279,15 @@ if ($foundComfy) {
             Write-Host "  Extracting ComfyUI Portable..." -ForegroundColor Yellow
             if (Get-Command 7z -ErrorAction SilentlyContinue) {
                 & 7z x "$comfyZipDest" -o"$comfyToolDir" -y
+            } elseif (Get-Command tar.exe -ErrorAction SilentlyContinue) {
+                & tar.exe -xf "$comfyZipDest" -C "$comfyToolDir"
             } else {
-                Expand-Archive -Path $comfyZipDest -DestinationPath $comfyToolDir -Force
+                Write-Host "  >> Downloading 7-Zip standalone extractor..." -ForegroundColor Yellow
+                $sevenZipUrl = "https://www.7-zip.org/a/7zr.exe"
+                $sevenZipExe = "$env:TEMP\7zr.exe"
+                Invoke-WebRequest -Uri $sevenZipUrl -OutFile $sevenZipExe
+                & $sevenZipExe x "$comfyZipDest" -o"$comfyToolDir" -y
+                Remove-Item -Path $sevenZipExe -Force -ErrorAction SilentlyContinue
             }
             Remove-Item -Path $comfyZipDest -Force -ErrorAction SilentlyContinue
 
@@ -293,14 +300,72 @@ if ($foundComfy) {
     }
 }
 
-# 6. Check Node.js for Music Remote (Optional)
+# 6. Check & Auto-Install Node.js for PC Music Remote
 Write-Host "`n[6/8] Checking Node.js for PC Music Remote..." -ForegroundColor Cyan
+
+$hasNode = $false
 if (Get-Command node -ErrorAction SilentlyContinue) {
-    $nodeVer = & node -v
-    Write-Host "  [OK] Node.js found: $nodeVer. Installing npm dependencies..." -ForegroundColor Green
-    & npm install --no-audit --no-fund --silent
+    $hasNode = $true
 } else {
-    Write-Host "  [INFO] Node.js not detected. PC Music remote feature disabled (all other features 100% active)." -ForegroundColor DarkGray
+    $localNode = "$installDir\tools\nodejs\node.exe"
+    if (Test-Path $localNode) {
+        $nodeDir = Split-Path -Parent $localNode
+        $env:Path = "$nodeDir;$env:Path"
+        $hasNode = $true
+    }
+}
+
+if (-not $hasNode) {
+    Write-Host "  >> Node.js not found. Auto-installing Node.js for Music Remote..." -ForegroundColor Yellow
+    $installedViaWinget = $false
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        try {
+            Write-Host "     Attempting install via winget..." -ForegroundColor DarkGray
+            & winget install OpenJS.NodeJS.LTS -e --silent --accept-package-agreements --accept-source-agreements
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            if (Get-Command node -ErrorAction SilentlyContinue) {
+                $installedViaWinget = $true
+                $hasNode = $true
+            }
+        } catch {}
+    }
+
+    if (-not $installedViaWinget) {
+        # Portable Node.js fallback (Zero admin required, 100% standalone)
+        $nodeToolDir = "$installDir\tools\nodejs"
+        New-Item -ItemType Directory -Force -Path $nodeToolDir | Out-Null
+        $nodeZipUrl = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-win-x64.zip"
+        $nodeZipDest = "$installDir\tools\nodejs_portable.zip"
+        $ok = Download-FileWithProgress -Url $nodeZipUrl -DestinationPath $nodeZipDest -Description "Node.js LTS Standalone (~30 MB)"
+        if ($ok) {
+            Write-Host "  Extracting Node.js Portable..." -ForegroundColor Yellow
+            $tempExtract = "$env:TEMP\node_extract"
+            if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force }
+            Expand-Archive -Path $nodeZipDest -DestinationPath $tempExtract -Force
+            $extractedFolder = Get-ChildItem -Path $tempExtract -Directory | Select-Object -First 1
+            if ($extractedFolder) {
+                Copy-Item -Path "$($extractedFolder.FullName)\*" -Destination $nodeToolDir -Recurse -Force
+            }
+            Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $nodeZipDest -Force -ErrorAction SilentlyContinue
+
+            $env:Path = "$nodeToolDir;$env:Path"
+            $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+            if ($userPath -notlike "*$nodeToolDir*") {
+                [Environment]::SetEnvironmentVariable("Path", "$nodeToolDir;$userPath", "User")
+            }
+            $hasNode = $true
+        }
+    }
+}
+
+if ($hasNode -or (Get-Command node -ErrorAction SilentlyContinue)) {
+    $nodeVer = & node -v
+    Write-Host "  [OK] Node.js active: $nodeVer. Installing npm dependencies..." -ForegroundColor Green
+    & npm install --no-audit --no-fund --silent
+    Write-Host "  [OK] YouTube Music Remote dependencies installed successfully." -ForegroundColor Green
+} else {
+    Write-Host "  [WARNING] Could not auto-install Node.js. PC Music remote feature disabled." -ForegroundColor Yellow
 }
 
 # 7. Register Global CLI Commands ('waifu')

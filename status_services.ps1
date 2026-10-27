@@ -1,6 +1,6 @@
 # Health & Status Checker for Waifu on Telegram
 $vPath = Join-Path $PSScriptRoot "VERSION"
-$version = if (Test-Path $vPath) { (Get-Content $vPath).Trim() } else { "1.6.21" }
+$version = if (Test-Path $vPath) { (Get-Content $vPath).Trim() } else { "1.6.26" }
 Write-Host "====================================================================" -ForegroundColor Magenta
 Write-Host "       WAIFU ON TELEGRAM v$version - SYSTEM STATUS DIAGNOSTICS      " -ForegroundColor Magenta
 Write-Host "====================================================================" -ForegroundColor Magenta
@@ -119,7 +119,7 @@ try {
     Write-Host "            Device: $gpu" -ForegroundColor DarkCyan
     Write-Host "            Photo Model: $comfyCkpt" -ForegroundColor DarkCyan
 } catch {
-    Write-Host "  [OFFLINE] ComfyUI Generator (Port 8188): OFFLINE (Cloud Fallback active)" -ForegroundColor Yellow
+    Write-Host "  [OFFLINE] ComfyUI Generator (Port 8188): OFFLINE (Smart Photo Vault active)" -ForegroundColor Yellow
 }
 
 # 4. Video Engine
