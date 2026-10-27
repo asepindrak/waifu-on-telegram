@@ -293,7 +293,7 @@ class MediaEngine:
                 return None
 
             # Poll history for completion
-            for _ in range(120):  # Wait up to 120 seconds
+            for _ in range(160):  # Wait up to 240 seconds
                 time.sleep(1.5)
                 try:
                     h_res = requests.get(f"{self.comfyui_url}/history/{prompt_id}", timeout=5)
@@ -330,7 +330,7 @@ class MediaEngine:
                                 return img_resp.content
 
             if not self.last_error:
-                self.last_error = "ComfyUI timeout: waktu rendering melebihi 120 detik (antrean sibuk atau VRAM terbatas)."
+                self.last_error = "ComfyUI timeout: waktu rendering melebihi 240 detik (antrean sibuk atau VRAM terbatas)."
 
         except requests.exceptions.ConnectionError:
             self.last_error = f"Tidak dapat terhubung ke ComfyUI di {self.comfyui_url}. Pastikan ComfyUI sudah aktif."

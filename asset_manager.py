@@ -299,11 +299,11 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
             probe = subprocess.run(
                 [py_exe, "-s", "-c", "import torch; exit(0 if torch.cuda.is_available() else 1)"],
                 capture_output=True,
-                timeout=12
+                timeout=45
             )
             _COMFYUI_FORCE_CPU = (probe.returncode != 0)
         except Exception:
-            _COMFYUI_FORCE_CPU = True
+            _COMFYUI_FORCE_CPU = False
         return _COMFYUI_FORCE_CPU
 
     # 1. Check for ComfyUI Windows Portable embedded python
