@@ -16,7 +16,8 @@ function Download-FileWithProgress {
     param(
         [string]$Url,
         [string]$DestinationPath,
-        [string]$Description
+        [string]$Description,
+        [string]$FallbackUrl = ""
     )
     if (Test-Path $DestinationPath) {
         $size = (Get-Item $DestinationPath).Length
@@ -26,35 +27,47 @@ function Download-FileWithProgress {
             return $true
         }
     }
-    Write-Host "  >> Downloading $Description..." -ForegroundColor Yellow
-    Write-Host "     Source: $Url" -ForegroundColor DarkGray
-    Write-Host "     Dest  : $DestinationPath" -ForegroundColor DarkGray
 
     $destDir = Split-Path -Parent $DestinationPath
     if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Force -Path $destDir | Out-Null }
 
-    try {
-        if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-            & curl.exe -L -C - --retry 3 --progress-bar -o "$DestinationPath" "$Url"
-        } else {
-            Import-Module BitsTransfer -ErrorAction SilentlyContinue
-            if (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue) {
-                Start-BitsTransfer -Source $Url -Destination $DestinationPath -DisplayName $Description
+    $urlsToTry = @($Url)
+    if ($FallbackUrl) { $urlsToTry += $FallbackUrl }
+
+    foreach ($dlUrl in $urlsToTry) {
+        Write-Host "  >> Downloading $Description..." -ForegroundColor Yellow
+        Write-Host "     Source: $dlUrl" -ForegroundColor DarkGray
+        Write-Host "     Dest  : $DestinationPath" -ForegroundColor DarkGray
+
+        try {
+            if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+                & curl.exe -fL -C - --retry 3 --progress-bar -o "$DestinationPath" "$dlUrl"
             } else {
-                $wc = New-Object System.Net.WebClient
-                $wc.DownloadFile($Url, $DestinationPath)
+                Import-Module BitsTransfer -ErrorAction SilentlyContinue
+                if (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue) {
+                    Start-BitsTransfer -Source $dlUrl -Destination $DestinationPath -DisplayName $Description
+                } else {
+                    $wc = New-Object System.Net.WebClient
+                    $wc.DownloadFile($dlUrl, $DestinationPath)
+                }
             }
+            if (Test-Path $DestinationPath) {
+                $fSize = (Get-Item $DestinationPath).Length
+                if ($fSize -gt 1024*1024) {
+                    $fSizeMb = [math]::Round($fSize / 1MB, 1)
+                    Write-Host "  [OK] $Description downloaded successfully ($fSizeMb MB)" -ForegroundColor Green
+                    return $true
+                } else {
+                    Remove-Item -Path $DestinationPath -Force -ErrorAction SilentlyContinue
+                    Write-Host "  [!] Download resulted in invalid/empty file ($fSize bytes). Retrying fallback..." -ForegroundColor Yellow
+                }
+            }
+        } catch {
+            Write-Host "  [!] Attempt failed: $_" -ForegroundColor Yellow
+            Remove-Item -Path $DestinationPath -Force -ErrorAction SilentlyContinue
         }
-        if (Test-Path $DestinationPath) {
-            $fSize = (Get-Item $DestinationPath).Length
-            $fSizeMb = [math]::Round($fSize / 1MB, 1)
-            Write-Host "  [OK] $Description downloaded successfully ($fSizeMb MB)" -ForegroundColor Green
-            return $true
-        }
-    } catch {
-        Write-Host "  [!] Download failed: $_" -ForegroundColor Red
-        return $false
     }
+    Write-Host "  [!] All download attempts failed for $Description." -ForegroundColor Red
     return $false
 }
 
@@ -247,9 +260,13 @@ try {
 
 # 5.2 Check candidate folders across drives
 if (-not $foundComfy) {
+    # Clean up obsolete phantom directory if created by older installer
+    $phantomComfy = "$installDir\tools\ComfyUI\ComfyUI"
+    if ((Test-Path $phantomComfy) -and (-not (Test-Path "$phantomComfy\main.py"))) {
+        Remove-Item -Path $phantomComfy -Recurse -Force -ErrorAction SilentlyContinue
+    }
     $comfyDirs = @(
         "$installDir\tools\ComfyUI\ComfyUI_windows_portable\ComfyUI",
-        "$installDir\tools\ComfyUI\ComfyUI",
         "$installDir\tools\ComfyUI",
         "$env:LOCALAPPDATA\Comfy-Desktop\ComfyUI-Installs\ComfyUI\ComfyUI",
         "$env:LOCALAPPDATA\Comfy-Desktop\ComfyUI-Shared",
@@ -280,7 +297,7 @@ if ($foundComfy) {
     $ckptDir = "$foundComfy\models\checkpoints"
     $hasCkpt = $false
     if (Test-Path $ckptDir) {
-        $ckpts = Get-ChildItem -Path $ckptDir -Filter "*.safetensors" -Recurse -ErrorAction SilentlyContinue
+        $ckpts = Get-ChildItem -Path $ckptDir -Filter "*.safetensors" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 10*1024*1024 }
         if ($ckpts.Count -gt 0) {
             $hasCkpt = $true
             $ckptCount = $ckpts.Count
@@ -292,9 +309,10 @@ if ($foundComfy) {
         $dlCkpt = Read-Host "  Anime Checkpoint model not found. Auto-download MeinaMix SD 1.5 (~2 GB)? [Y/n, default: Y]"
         if ($dlCkpt.Trim().ToLower() -ne "n") {
             if (-not (Test-Path $ckptDir)) { New-Item -ItemType Directory -Force -Path $ckptDir | Out-Null }
-            $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
-            $meinaDest = "$ckptDir\MeinaMix_v11.safetensors"
-            Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11 Anime SD 1.5 (~2 GB)"
+            $meinaUrl = "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16"
+            $meinaDest = "$ckptDir\meinamix_v12Final.safetensors"
+            $meinaFallback = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V10%20-%20baked%20VAE.safetensors"
+            Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback
         }
     }
 
@@ -358,9 +376,10 @@ if ($foundComfy) {
                 # Download MeinaMix anime checkpoint
                 $ckptDir = "$foundComfy\models\checkpoints"
                 if (-not (Test-Path $ckptDir)) { New-Item -ItemType Directory -Force -Path $ckptDir | Out-Null }
-                $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
-                $meinaDest = "$ckptDir\MeinaMix_v11.safetensors"
-                Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11 Anime SD 1.5 (~2 GB)"
+                $meinaUrl = "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16"
+                $meinaDest = "$ckptDir\meinamix_v12Final.safetensors"
+                $meinaFallback = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V10%20-%20baked%20VAE.safetensors"
+            Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback
             }
         }
     }

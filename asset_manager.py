@@ -41,7 +41,7 @@ ASSET_REGISTRY = {
         "patterns": ["*meinamix*.safetensors", "*meina*.safetensors", "*anything*.safetensors", "*aom3*.safetensors"],
         "size_mb": 2033,
         "url": "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16",
-        "fallback_url": "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors",
+        "fallback_url": "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V10%20-%20baked%20VAE.safetensors",
         "description": "Checkpoint utama ilustrasi anime berkualitas tinggi untuk foto waifu konsisten.",
         "required_for": "Semua generasi foto & PAP waifu"
     },
