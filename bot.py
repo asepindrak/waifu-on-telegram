@@ -63,7 +63,7 @@ if not BOT_TOKEN:
     logger.error("TELEGRAM_BOT_TOKEN is not configured in .env! Run 'waifu setup' to configure.")
     sys.exit(1)
 
-bot = telebot.TeleBot(BOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN, num_threads=8)
 
 # Configure Telegram API timeouts for fast, resilient uploads
 from telebot import apihelper
@@ -321,6 +321,38 @@ def get_persona_image_path(persona: dict):
     return None
 
 
+
+def send_menu_message(chat_id: int, text: str, reply_markup=None, reply_to_id: Optional[int] = None):
+    """
+    Safely delivers menu messages with automatic resilience:
+    1. Attempts sending with Markdown formatting and reply_to_id.
+    2. If reply_to_id fails (message deleted/not found), retries without reply_to_id.
+    3. If Markdown entity parsing fails (special characters, unescaped markdown), retries as plain text.
+    """
+    try:
+        return bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    except Exception as e_first:
+        logger.warning(f"send_menu_message attempt 1 failed ({e_first}). Retrying resiliently...")
+
+    if reply_to_id:
+        try:
+            return bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        except Exception:
+            pass
+
+    clean_text = text.replace("**", "").replace("*", "").replace("`", "").replace("_", "")
+    try:
+        if reply_to_id:
+            try:
+                return bot.send_message(chat_id, clean_text, reply_markup=reply_markup, reply_to_message_id=reply_to_id)
+            except Exception:
+                pass
+        return bot.send_message(chat_id, clean_text, reply_markup=reply_markup)
+    except Exception as e_final:
+        logger.error(f"send_menu_message failed completely: {e_final}")
+        return None
+
+
 @bot.message_handler(commands=['start'])
 def handle_welcome(message):
     if not is_authorized(message.from_user.id):
@@ -510,7 +542,7 @@ def show_setup_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[i
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 @bot.message_handler(commands=['setup', 'config', 'settings'])
@@ -581,7 +613,7 @@ def show_memory_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 @bot.message_handler(commands=['memory', 'memori', 'ingatan'])
@@ -801,7 +833,7 @@ def show_reminders_dashboard(chat_id: int, user_id: int, message_to_edit: Option
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 @bot.message_handler(commands=['remind', 'reminders', 'pengingat', 'alarm'])
@@ -1040,7 +1072,7 @@ def show_special_dates_dashboard(chat_id: int, user_id: int, message_to_edit: Op
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, years: Optional[int] = None):
@@ -1522,7 +1554,7 @@ def show_help_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = 
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 @bot.message_handler(commands=['help'])
@@ -1637,7 +1669,7 @@ def show_language_menu(chat_id: int, user_id: int, message_to_edit: Optional[int
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
@@ -1696,7 +1728,7 @@ def show_quality_menu(chat_id: int, user_id: int, message_to_edit: Optional[int]
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 @bot.message_handler(commands=['quality'])
@@ -1733,7 +1765,7 @@ def show_ratio_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] =
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 @bot.message_handler(commands=['ratio', 'aspect_ratio'])
@@ -1909,7 +1941,7 @@ def show_persona_menu(chat_id: int, user_id: int, message_to_edit: Optional[int]
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 def show_outfit_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
@@ -1938,7 +1970,7 @@ def show_outfit_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] 
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 def show_affection_status(chat_id: int, user_id: int, reply_to_id: Optional[int] = None):
@@ -1963,7 +1995,7 @@ def show_affection_status(chat_id: int, user_id: int, reply_to_id: Optional[int]
         f"• **Love Meter**: `[{bar}]` **{score}%**\n\n"
         f"_{persona.get('name')} cherishes every message and moment spent with you, darling! Keep chatting and asking for photos to grow your bond closer._ 🥰"
     )
-    bot.send_message(chat_id, reply, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, reply, reply_to_id=reply_to_id)
 
 
 @bot.message_handler(commands=['persona'])
@@ -1971,29 +2003,34 @@ def handle_persona(message):
     if not is_authorized(message.from_user.id):
         return
 
-    args = message.text.strip().split()
-    if len(args) > 1:
-        chosen = args[1].lower()
-        if persona_mgr.set_active_persona(chosen):
-            update_env_variable("DEFAULT_PERSONA", chosen)
-            p = persona_mgr.get_active_persona()
-            img_p = get_persona_image_path(p)
-            if img_p and os.path.exists(img_p):
-                with open(img_p, "rb") as f:
-                    bot.send_photo(
-                        message.chat.id,
-                        f,
-                        caption=f"✨ **Karakter aktif berganti ke {p.get('name')}!** 🥰\n*({p.get('archetype', 'AI Girlfriend')})*\n\n_{p.get('description')}_",
-                        parse_mode="Markdown"
-                    )
+    try:
+        raw = (message.text or "").strip()
+        args = raw.split()
+        if len(args) > 1:
+            chosen = args[1].lower()
+            if persona_mgr.set_active_persona(chosen):
+                update_env_variable("DEFAULT_PERSONA", chosen)
+                p = persona_mgr.get_active_persona()
+                img_p = get_persona_image_path(p)
+                if img_p and os.path.exists(img_p):
+                    with open(img_p, "rb") as f:
+                        bot.send_photo(
+                            message.chat.id,
+                            f,
+                            caption=f"✨ **Karakter aktif berganti ke {p.get('name')}!** 🥰\n*({p.get('archetype', 'AI Girlfriend')})*\n\n_{p.get('description')}_",
+                            parse_mode="Markdown"
+                        )
+                else:
+                    bot.reply_to(message, f"✨ Active character switched to **{p.get('name')}**! 🥰", parse_mode="Markdown")
+                return
             else:
-                bot.reply_to(message, f"✨ Active character switched to **{p.get('name')}**! 🥰", parse_mode="Markdown")
-            return
-        else:
-            bot.reply_to(message, f"⚠️ Persona `{chosen}` was not found.")
-            return
+                bot.reply_to(message, f"⚠️ Persona `{chosen}` was not found.")
+                return
 
-    show_persona_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+        show_persona_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+    except Exception as e:
+        logger.error(f"Error handling /persona command: {e}", exc_info=True)
+        bot.reply_to(message, f"⚠️ Terjadi kendala saat membuka menu persona: {e}")
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('set_persona:'))
@@ -2104,7 +2141,7 @@ def show_video_hub_menu(chat_id: int, user_id: int, message_to_edit: Optional[in
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 def show_video_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
@@ -2455,7 +2492,11 @@ def handle_affection_command(message):
 def handle_outfit_command(message):
     if not is_authorized(message.from_user.id):
         return
-    show_outfit_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+    try:
+        show_outfit_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+    except Exception as e:
+        logger.error(f"Error handling /outfit command: {e}", exc_info=True)
+        bot.reply_to(message, f"⚠️ Terjadi kendala saat membuka lemari pakaian: {e}")
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('set_outfit:'))
@@ -2624,7 +2665,7 @@ def show_pap_scenario_menu(chat_id: int, user_id: int, message_to_edit: Optional
             return
         except Exception:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('pap_sc:'))
@@ -3167,7 +3208,7 @@ def start_persona_wizard(chat_id: int, user_id: int, reply_to_id: Optional[int] 
         "_(Contoh: Sakura, Valerie, Chika, Aoi, Luna)_\n\n"
         "👉 *Ketik namanya langsung di chat:*"
     )
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 def show_persona_wizard_preview(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
@@ -3567,7 +3608,7 @@ def show_queue_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[i
                 return
             except Exception:
                 pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 def get_music_player_markup(is_playing: bool = True) -> types.InlineKeyboardMarkup:
@@ -3605,7 +3646,7 @@ def show_music_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[i
                 return
             except Exception:
                 pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown", reply_to_message_id=reply_to_id)
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
 @bot.message_handler(commands=['play', 'lagu', 'musik', 'music'])
@@ -3909,9 +3950,55 @@ def handle_text_messages(message):
         if handle_persona_wizard_input(message):
             return
 
-    # Direct fallback dispatch for music commands
-    first_token = message.text.strip().split()[0].lower() if message.text else ''
-    if first_token in ('/play', '/lagu', '/musik', '/music'):
+    # Direct robust fallback dispatch for all bot commands (handles leading spaces, case, bot username suffix)
+    raw_text = (message.text or "").strip()
+    first_token = raw_text.split()[0].lower() if raw_text else ""
+    if "@" in first_token:
+        first_token = first_token.split("@")[0]
+
+    if first_token in ('/outfit', '/wardrobe', '/baju', '/pakaian'):
+        handle_outfit_command(message)
+        return
+    elif first_token in ('/persona', '/karakter'):
+        handle_persona(message)
+        return
+    elif first_token in ('/setup', '/config', '/settings', '/pengaturan'):
+        handle_setup(message)
+        return
+    elif first_token in ('/help', '/bantuan'):
+        handle_help(message)
+        return
+    elif first_token in ('/pap', '/photo', '/foto'):
+        handle_photo_command(message)
+        return
+    elif first_token in ('/video', '/anim', '/animate', '/klip'):
+        handle_video_command(message)
+        return
+    elif first_token in ('/memory', '/memori', '/ingatan'):
+        handle_memory_command(message)
+        return
+    elif first_token in ('/remind', '/reminders', '/pengingat', '/alarm'):
+        handle_remind_command(message)
+        return
+    elif first_token in ('/birthday', '/anniversary', '/ultah', '/jadian'):
+        handle_special_dates_command(message)
+        return
+    elif first_token in ('/love', '/affection', '/cinta'):
+        handle_affection_command(message)
+        return
+    elif first_token in ('/voice', '/suara'):
+        handle_voice_command(message)
+        return
+    elif first_token in ('/language', '/lang', '/bahasa'):
+        handle_language_command(message)
+        return
+    elif first_token in ('/status', '/diagnostik'):
+        handle_status(message)
+        return
+    elif first_token in ('/reset',):
+        handle_reset(message)
+        return
+    elif first_token in ('/play', '/lagu', '/musik', '/music'):
         handle_play_command(message)
         return
     elif first_token in ('/queue', '/antrean', '/antre', '/addsong', '/q'):
@@ -4455,7 +4542,12 @@ def main():
     else:
         logger.warning(f"⚠️ Local LLM is OFFLINE: {stat.get('error')}")
 
-    bot.infinity_polling(timeout=20, long_polling_timeout=20)
+    while True:
+        try:
+            bot.infinity_polling(timeout=20, long_polling_timeout=20, skip_pending=False)
+        except Exception as e:
+            logger.error(f"Telegram polling loop error: {e}. Reconnecting in 3 seconds...")
+            time.sleep(3)
 
 
 if __name__ == "__main__":
