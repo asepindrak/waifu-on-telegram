@@ -611,15 +611,18 @@ def cmd_update():
 
         if comfy_dir:
             print(c(CYAN, f"  🧩 ComfyUI detected at: {comfy_dir}"))
-            info_meina = asset_manager.get_asset_info("meinamix")
-            if info_meina and not info_meina.get("installed"):
-                print(c(YELLOW, f"  ⏳ Anime Checkpoint '{info_meina['name']}' missing. Auto-downloading (~{info_meina['size_mb']} MB)..."))
-                ok = asset_manager.download_asset("meinamix")
+            configured_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "").lower()
+            target_asset = "anything_xl" if "anything" in configured_ckpt else "meinamix"
+            info_target = asset_manager.get_asset_info(target_asset)
+            if info_target and not info_target.get("installed"):
+                print(c(YELLOW, f"  ⏳ Anime Checkpoint '{info_target['name']}' missing. Auto-downloading (~{info_target['size_mb']} MB)..."))
+                ok = asset_manager.download_asset(target_asset)
                 if ok:
-                    print(c(GREEN, f"  ✓ '{info_meina['name']}' downloaded successfully!"))
+                    print(c(GREEN, f"  ✓ '{info_target['name']}' downloaded successfully!"))
             else:
-                sz = info_meina.get("current_size_mb", 0) if info_meina else 0
-                print(c(GREEN, f"  ✓ Anime Checkpoint '{info_meina['name']}' is ready ({sz} MB)."))
+                sz = info_target.get("current_size_mb", 0) if info_target else 0
+                name = info_target.get("name", target_asset) if info_target else target_asset
+                print(c(GREEN, f"  ✓ Anime Checkpoint '{name}' is ready ({sz} MB)."))
         else:
             print(c(DIM, "  ℹ ComfyUI not detected locally. Photo Vault album will be used for photos."))
 

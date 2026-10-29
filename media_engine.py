@@ -64,6 +64,9 @@ class MediaEngine:
                 if "meina" in c.lower():
                     return c
             for c in valid_ckpts:
+                if any(k in c.lower() for k in ["anything", "xl"]):
+                    return c
+            for c in valid_ckpts:
                 if any(k in c.lower() for k in ["aom", "orange"]):
                     return c
             return valid_ckpts[0]
@@ -71,6 +74,9 @@ class MediaEngine:
             return env_ckpt
         try:
             import asset_manager
+            info = asset_manager.get_asset_info("anything_xl")
+            if info and info.get("installed") and info.get("target_path"):
+                return os.path.basename(info["target_path"])
             info = asset_manager.get_asset_info("meinamix")
             if info and info.get("installed") and info.get("target_path"):
                 return os.path.basename(info["target_path"])
@@ -172,7 +178,14 @@ class MediaEngine:
                     chosen_ckpt = c
                     break
 
-        # 3. Prefer AOM3 / OrangeMix if present
+        # 3. Prefer Anything XL if present
+        if not chosen_ckpt:
+            for c in valid_ckpts:
+                if any(k in c.lower() for k in ["anything", "xl"]):
+                    chosen_ckpt = c
+                    break
+
+        # 4. Prefer AOM3 / OrangeMix if present
         if not chosen_ckpt:
             for c in valid_ckpts:
                 if any(k in c.lower() for k in ["aom", "orange"]):

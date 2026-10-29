@@ -278,29 +278,118 @@ def config_llm_model(env_vars):
 def config_image_model(env_vars):
     print(c(BOLD + CYAN, "\n[Step 3/7: Photo / Selfie Generator Model (ComfyUI)]"))
     print("-" * 60)
+    print("Pilih model ilustrasi anime yang ingin digunakan untuk generasi foto / selfie waifu:\n")
+
+    meina_info = asset_manager.get_asset_info("meinamix") if asset_manager else None
+    meina_inst = meina_info.get("installed", False) if meina_info else False
+    meina_tag = c(GREEN, "[TERPASANG]") if meina_inst else c(YELLOW, "[PERLU DOWNLOAD ~2.0 GB]")
+
+    anything_info = asset_manager.get_asset_info("anything_xl") if asset_manager else None
+    anything_inst = anything_info.get("installed", False) if anything_info else False
+    anything_tag = c(GREEN, "[TERPASANG]") if anything_inst else c(YELLOW, "[PERLU DOWNLOAD ~6.6 GB]")
+
+    options = []
+    # 1. MeinaMix v12
+    options.append((
+        f"✨ MeinaMix v12 (Anime SD 1.5) {meina_tag}\n"
+        f"     ↳ Cepat, estetik anime konsisten, hemat VRAM (Rekomendasi GPU 4GB - 8GB)",
+        "meinamix",
+        "meinamix_v12Final.safetensors"
+    ))
+    # 2. Anything XL
+    options.append((
+        f"🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Civitai #9409) {anything_tag}\n"
+        f"     ↳ Resolusi 1024px ultra jernih, detail anime kaya (Rekomendasi GPU 8GB+ VRAM)",
+        "anything_xl",
+        "AnythingXL_xl.safetensors"
+    ))
+
+    # 3. Other detected local checkpoints
     detected_img = scan_image_models()
-
-    img_options = []
     for source, ckpt_name in detected_img:
-        img_options.append((f"{ckpt_name} (Local GPU via ComfyUI + Photo Vault Archive)", ckpt_name, False))
+        lower_c = ckpt_name.lower()
+        if "meina" in lower_c or "anything" in lower_c:
+            continue
+        options.append((
+            f"🎨 {ckpt_name} (Local ComfyUI Checkpoint)",
+            "local_custom",
+            ckpt_name
+        ))
 
-    img_options.append(("Local ComfyUI Standard (Auto-detect active checkpoint + Photo Vault)", "auto", False))
-    img_options.append(("Cloud Fallback Engine (Pollinations AI - Fast, Free GPU, 0 VRAM)", "cloud", True))
-    img_options.append(("Disable photo generation", "disabled", False))
+    # 4. Auto detect
+    options.append((
+        "🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif di ComfyUI)",
+        "auto",
+        ""
+    ))
 
-    for idx, opt in enumerate(img_options, 1):
-        print(f"  {idx}) {opt[0]}")
+    # 5. Cloud Engine
+    options.append((
+        "☁️ Cloud Fallback Engine (Pollinations AI - Cepat, Free Cloud GPU, 0 VRAM)",
+        "cloud",
+        ""
+    ))
 
-    choice_img = input(f"\nSelect Photo Model [1-{len(img_options)}, default: 1]: ").strip()
-    chosen_img_idx = int(choice_img) - 1 if choice_img.isdigit() and 1 <= int(choice_img) <= len(img_options) else 0
+    # 6. Disable
+    options.append((
+        "❌ Nonaktifkan fitur foto / selfie",
+        "disabled",
+        ""
+    ))
 
-    _, img_val, allow_fallback = img_options[chosen_img_idx]
-    if img_val == "disabled":
+    for idx, (label, mode, val) in enumerate(options, 1):
+        print(f"  {idx}) {label}")
+
+    cur_ckpt = env_vars.get("COMFYUI_CHECKPOINT", "")
+    default_idx = "1"
+    if cur_ckpt:
+        for idx, (_, mode, val) in enumerate(options, 1):
+            if val and val.lower() in cur_ckpt.lower():
+                default_idx = str(idx)
+                break
+
+    choice_img = input(f"\nPilih Model Foto [1-{len(options)}, default: {default_idx}]: ").strip()
+    chosen_idx = int(choice_img) - 1 if choice_img.isdigit() and 1 <= int(choice_img) <= len(options) else (int(default_idx) - 1)
+
+    chosen_label, chosen_mode, chosen_val = options[chosen_idx]
+
+    if chosen_mode == "disabled":
         env_vars["COMFYUI_URL"] = ""
         env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
+        env_vars["COMFYUI_CHECKPOINT"] = ""
+        print(c(YELLOW, "  ✓ Fitur foto dinonaktifkan."))
+    elif chosen_mode == "cloud":
+        env_vars["COMFYUI_URL"] = ""
+        env_vars["MEDIA_FALLBACK_CLOUD"] = "true"
+        env_vars["COMFYUI_CHECKPOINT"] = ""
+        print(c(GREEN, "  ✓ Model Foto dipilih: Cloud Fallback Engine (Pollinations AI)"))
+    elif chosen_mode == "auto":
+        env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
+        env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
+        env_vars["COMFYUI_CHECKPOINT"] = ""
+        print(c(GREEN, "  ✓ Model Foto dipilih: Auto-detect ComfyUI"))
+    elif chosen_mode in ("meinamix", "anything_xl"):
+        env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
+        env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
+        env_vars["COMFYUI_CHECKPOINT"] = chosen_val
+        print(c(GREEN, f"  ✓ Model Foto dipilih: {chosen_val}"))
+
+        target_info = asset_manager.get_asset_info(chosen_mode) if asset_manager else None
+        if target_info and not target_info.get("installed", False):
+            print(c(YELLOW, f"\n  ℹ Model '{target_info.get('name')}' belum terpasang di folder ComfyUI checkpoints."))
+            dl_ask = input(f"  Download sekarang (~{target_info.get('size_mb', 0)} MB via high-speed curl)? [Y/n, default: Y]: ").strip().lower()
+            if dl_ask != "n":
+                print(c(CYAN, f"  ⏳ Memulai download {target_info.get('name')}..."))
+                ok = asset_manager.download_asset(chosen_mode)
+                if ok:
+                    print(c(GREEN, f"  ✓ Model '{target_info.get('name')}' berhasil diunduh dan siap digunakan!"))
+                else:
+                    print(c(RED, f"  ⚠️ Download belum selesai. Anda bisa melanjutkan nanti via 'waifu models'."))
     else:
         env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
-        env_vars["MEDIA_FALLBACK_CLOUD"] = "true" if allow_fallback else "false"
+        env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
+        env_vars["COMFYUI_CHECKPOINT"] = chosen_val
+        print(c(GREEN, f"  ✓ Model Foto dipilih: {chosen_val}"))
 
 def config_persona_voice(env_vars):
     print(c(BOLD + CYAN, "\n[Step 5/7: AI Girlfriend Persona & Voice Selection]"))
@@ -462,7 +551,14 @@ def run_menu():
         print(c(CYAN, f"  • Bot Token   : {tok_str}"))
         print(c(CYAN, f"  • Allowed UID : {env_vars.get('TELEGRAM_ALLOWED_USER_ID', '[All Users]') or '[All Users]'}"))
         print(c(CYAN, f"  • Chat LLM    : {env_vars.get('LLM_MODEL', 'default')} ({env_vars.get('LLM_BASE_URL', '')})"))
-        print(c(CYAN, f"  • Photo Engine: {env_vars.get('COMFYUI_URL', 'Disabled')} (Fallback: {env_vars.get('MEDIA_FALLBACK_CLOUD')})"))
+        cur_ckpt_disp = env_vars.get("COMFYUI_CHECKPOINT", "")
+        if not cur_ckpt_disp:
+            cur_ckpt_disp = "Auto (ComfyUI)" if env_vars.get("COMFYUI_URL") else ("Cloud Engine" if env_vars.get("MEDIA_FALLBACK_CLOUD") == "true" else "Disabled")
+        elif "anything" in cur_ckpt_disp.lower():
+            cur_ckpt_disp = "Anything XL (SDXL 1024px)"
+        elif "meina" in cur_ckpt_disp.lower():
+            cur_ckpt_disp = "MeinaMix v12 (SD 1.5)"
+        print(c(CYAN, f"  • Photo Model : {cur_ckpt_disp} ({env_vars.get('COMFYUI_URL', 'Disabled')})"))
         print(c(CYAN, f"  • Persona     : {env_vars.get('DEFAULT_PERSONA', 'runa').title()} | Voice: {env_vars.get('VOICE_NAME', '')}"))
         print(c(CYAN, f"  • Language    : {env_vars.get('BOT_LANGUAGE', 'id')}"))
         print("-" * 70)

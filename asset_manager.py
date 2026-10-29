@@ -38,12 +38,26 @@ ASSET_REGISTRY = {
         "type": "model",
         "subfolder": os.path.join("models", "checkpoints"),
         "filename": "meinamix_v12Final.safetensors",
-        "patterns": ["*meinamix*.safetensors", "*meina*.safetensors", "*anything*.safetensors", "*aom3*.safetensors"],
+        "patterns": ["*meinamix*.safetensors", "*meina*.safetensors", "*aom3*.safetensors"],
         "size_mb": 2033,
         "url": "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16",
         "fallback_url": "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V10%20-%20baked%20VAE.safetensors",
-        "description": "Checkpoint utama ilustrasi anime berkualitas tinggi untuk foto waifu konsisten.",
-        "required_for": "Semua generasi foto & PAP waifu"
+        "civitai_url": "https://civitai.com/models/119057/meinamix",
+        "description": "Checkpoint utama ilustrasi anime berkualitas tinggi untuk foto waifu konsisten (SD 1.5, cepat, hemat VRAM).",
+        "required_for": "Generasi foto & PAP waifu (SD 1.5)"
+    },
+    "anything_xl": {
+        "name": "万象熔炉 | Anything XL (SDXL Anime Checkpoint)",
+        "type": "model",
+        "subfolder": os.path.join("models", "checkpoints"),
+        "filename": "AnythingXL_xl.safetensors",
+        "patterns": ["*AnythingXL*.safetensors", "*anything*xl*.safetensors", "*Anything-XL*.safetensors", "*anythingxl*.safetensors"],
+        "size_mb": 6616,
+        "url": "https://huggingface.co/m4gnett/AnythingXL/resolve/main/AnythingXL_xl.safetensors",
+        "fallback_url": "https://huggingface.co/ACEGameAI/AnythingXL/resolve/main/AnythingXL.safetensors",
+        "civitai_url": "https://civitai.com/models/9409/or-anything-xl",
+        "description": "Checkpoint SDXL anime resolusi tinggi 1024px, detail tajam, estetik anime modern (Civitai #9409).",
+        "required_for": "Generasi foto & selfie waifu resolusi tinggi (SDXL)"
     },
     "animatediff_v2": {
         "name": "AnimateDiff v2 Motion Module (SD 1.5)",

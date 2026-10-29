@@ -81,18 +81,21 @@ Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsive
   - **Auto Startup & VRAM Pre-loading:** No Electron UI or manual buttons needed. When your computer boots, KoboldCPP silently spins up and loads the weights into VRAM instantly.
   - **VRAM Usage:** ~4.5 GB - 5.5 GB in Q4_K quantization.
 
-#### 2. 📷 Anime Photo & Selfie Engine: **MeinaMix v12**
-* **Model File:** `meinamix_v12Final.safetensors` *(Baked VAE)*
-* **Local Backend:** ComfyUI (Port `8188`)
-* **Download Link:** [Civitai - MeinaMix v12](https://civitai.com/models/7240/meinamix) *(Save file to `ComfyUI/models/checkpoints/`)*
-* **Optimal Preset (Pre-configured in Bot):**
-  - **Aspect Ratio:** **`3:4`** (576 x 768) — the golden portrait ratio for natural anime selfies.
-  - **Quality Preset:** **High** (28 steps, CFG 7.5).
-  - **Sampler & Scheduler:** **`DPM++ 2M Karras`** with **Clip Skip 2** (`CLIPSetLastLayer: -2`).
-* **Key Strengths:**
-  - Undisputed community benchmark for anime girl aesthetics with vibrant coloring, sparkling detailed eyes, and clean anatomy.
-  - Built-in VAE (*Baked VAE*) — no washed-out colors.
-  - Fast generation speed (~3–5 seconds per photo on an RTX 3050 6GB).
+#### 2. 📷 Anime Photo & Selfie Engine Options (ComfyUI)
+
+Anda dapat memilih model generasi gambar sesuai dengan spesifikasi GPU dan kebutuhan estetika Anda melalui `waifu setup` (Menu `[3]`) atau perintah `/setup` langsung di Telegram:
+
+* **Pilihan 1: MeinaMix v12 (Anime SD 1.5 - Hemat VRAM & Cepat)**
+  - **File:** `meinamix_v12Final.safetensors` (~2.0 GB)
+  - **Download:** [Civitai - MeinaMix v12](https://civitai.com/models/7240/meinamix) atau via `waifu models download meinamix`
+  - **Rekomendasi GPU:** 4GB - 8GB VRAM (Resolusi default 3:4 portrait: `576x768`, Sampler: `DPM++ 2M Karras`)
+  - **Kelebihan:** Sangat cepat (~3-5 detik), hemat resource, konsistensi wajah anime sangat tinggi.
+
+* **Pilihan 2: 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Detail)**
+  - **File:** `AnythingXL_xl.safetensors` (~6.6 GB)
+  - **Download:** [Civitai #9409 - Anything XL](https://civitai.com/models/9409/or-anything-xl) atau via `waifu models download anything_xl`
+  - **Rekomendasi GPU:** 8GB+ VRAM (Resolusi native SDXL 3:4 portrait: `896x1152` / `1024x1024`, Sampler: `Euler Ancestral Normal`)
+  - **Kelebihan:** Resolusi 1024px super tajam, detail pakaian, latar belakang, dan ekspresi jauh lebih kaya dan sinematik.
 
 ---
 

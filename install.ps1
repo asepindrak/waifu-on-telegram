@@ -290,6 +290,52 @@ if (-not $foundComfy) {
     }
 }
 
+function Select-And-Download-AnimeCheckpoint {
+    param (
+        [string]$targetComfyDir
+    )
+    $ckptDir = "$targetComfyDir\models\checkpoints"
+    if (-not (Test-Path $ckptDir)) { New-Item -ItemType Directory -Force -Path $ckptDir | Out-Null }
+
+    Write-Host "`n  🎨 Pilih Model Ilustrasi Anime untuk Generasi Foto Waifu (ComfyUI):" -ForegroundColor Cyan
+    Write-Host "    [1] ✨ MeinaMix v12 (Anime SD 1.5 - ~2.0 GB) [Rekomendasi GPU 4GB-8GB VRAM: Cepat & Ringan]" -ForegroundColor White
+    Write-Host "    [2] 🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - ~6.6 GB) [Rekomendasi GPU 8GB+ VRAM: 1024px Ultra Jernih]" -ForegroundColor White
+    Write-Host "    [3] ☁️ Lewati download model sekarang (Gunakan Cloud Fallback Engine / Unduh nanti)" -ForegroundColor White
+    $imgChoice = Read-Host "  Pilih model foto [1/2/3, default: 1]"
+    $imgChoice = $imgChoice.Trim()
+
+    $selectedCkpt = "meinamix_v12Final.safetensors"
+    if ($imgChoice -eq "2") {
+        $xlUrl = "https://huggingface.co/m4gnett/AnythingXL/resolve/main/AnythingXL_xl.safetensors"
+        $xlFallback = "https://huggingface.co/ACEGameAI/AnythingXL/resolve/main/AnythingXL.safetensors"
+        $xlDest = "$ckptDir\AnythingXL_xl.safetensors"
+        Download-FileWithProgress -Url $xlUrl -DestinationPath $xlDest -Description "万象熔炉 | Anything XL SDXL (~6.6 GB)" -FallbackUrl $xlFallback
+        $selectedCkpt = "AnythingXL_xl.safetensors"
+    } elseif ($imgChoice -eq "3") {
+        Write-Host "  [INFO] Melewati unduhan model lokal. Foto waifu dapat menggunakan Cloud Fallback Engine." -ForegroundColor DarkGray
+        $selectedCkpt = ""
+    } else {
+        $meinaUrl = "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16"
+        $meinaDest = "$ckptDir\meinamix_v12Final.safetensors"
+        $meinaFallback = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V10%20-%20baked%20VAE.safetensors"
+        Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback
+        $selectedCkpt = "meinamix_v12Final.safetensors"
+    }
+
+    if ($selectedCkpt) {
+        $envFile = "$installDir\.env"
+        if (Test-Path $envFile) {
+            $content = Get-Content $envFile -Raw
+            if ($content -match "COMFYUI_CHECKPOINT=") {
+                $content = $content -replace "COMFYUI_CHECKPOINT=.*", "COMFYUI_CHECKPOINT=$selectedCkpt"
+            } else {
+                $content += "`nCOMFYUI_CHECKPOINT=$selectedCkpt"
+            }
+            Set-Content -Path $envFile -Value $content -Force
+        }
+    }
+}
+
 if ($foundComfy) {
     Write-Host "  [OK] ComfyUI installation detected at: $foundComfy" -ForegroundColor Green
 
@@ -306,14 +352,7 @@ if ($foundComfy) {
         }
     }
     if (-not $hasCkpt) {
-        $dlCkpt = Read-Host "  Anime Checkpoint model not found. Auto-download MeinaMix SD 1.5 (~2 GB)? [Y/n, default: Y]"
-        if ($dlCkpt.Trim().ToLower() -ne "n") {
-            if (-not (Test-Path $ckptDir)) { New-Item -ItemType Directory -Force -Path $ckptDir | Out-Null }
-            $meinaUrl = "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16"
-            $meinaDest = "$ckptDir\meinamix_v12Final.safetensors"
-            $meinaFallback = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V10%20-%20baked%20VAE.safetensors"
-            Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback
-        }
+        Select-And-Download-AnimeCheckpoint -targetComfyDir $foundComfy
     }
 
     # Check AnimateDiff Motion Module (mm_sd_v15_v2.ckpt)
@@ -373,13 +412,7 @@ if ($foundComfy) {
             if ($detectedComfy) {
                 $foundComfy = $detectedComfy
                 Write-Host "  [OK] ComfyUI Portable ready at: $foundComfy" -ForegroundColor Green
-                # Download MeinaMix anime checkpoint
-                $ckptDir = "$foundComfy\models\checkpoints"
-                if (-not (Test-Path $ckptDir)) { New-Item -ItemType Directory -Force -Path $ckptDir | Out-Null }
-                $meinaUrl = "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16"
-                $meinaDest = "$ckptDir\meinamix_v12Final.safetensors"
-                $meinaFallback = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V10%20-%20baked%20VAE.safetensors"
-            Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback
+                Select-And-Download-AnimeCheckpoint -targetComfyDir $foundComfy
             }
         }
     }
