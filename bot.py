@@ -23,6 +23,7 @@ from memory_engine import MemoryEngine
 from reminder_engine import ReminderEngine
 from anniversary_engine import AnniversaryEngine
 import asset_manager
+from health_engine import HealthEngine
 from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
@@ -85,6 +86,17 @@ media_engine = MediaEngine(comfyui_url=COMFYUI_URL, allow_cloud_fallback=MEDIA_F
 memory_engine = MemoryEngine()
 reminder_engine = ReminderEngine()
 anniversary_engine = AnniversaryEngine()
+HEALTH_CHECK_INTERVAL = int(os.environ.get("HEALTH_CHECK_INTERVAL", "30"))
+HEALTH_CHECK_ENABLED = os.environ.get("HEALTH_CHECK_ENABLED", "true").lower() in ("true", "1", "yes")
+STARTUP_NOTIFICATION_ENABLED = os.environ.get("STARTUP_NOTIFICATION_ENABLED", "true").lower() in ("true", "1", "yes")
+SELF_HEALING_ENABLED = os.environ.get("SELF_HEALING_ENABLED", "true").lower() in ("true", "1", "yes")
+health_engine = HealthEngine(
+    llm_client=llm_client,
+    media_engine=media_engine,
+    check_interval=HEALTH_CHECK_INTERVAL,
+    enabled=HEALTH_CHECK_ENABLED,
+    self_healing_enabled=SELF_HEALING_ENABLED
+)
 voice_engine = VoiceEngine(
     voice_name=VOICE_NAME,
     groq_key=os.environ.get("GROQ_API_KEY"),
@@ -301,6 +313,22 @@ def is_authorized(user_id: int) -> bool:
     return user_id in ALLOWED_USER_IDS
 
 
+def get_notification_recipient_ids() -> List[int]:
+    """Returns all authorized recipient user IDs for broadcast notifications."""
+    recipients = set(ALLOWED_USER_IDS)
+    try:
+        for s_uid in memory_engine.data.get("profiles", {}).keys():
+            try:
+                uid_int = int(s_uid)
+                if is_authorized(uid_int):
+                    recipients.add(uid_int)
+            except ValueError:
+                pass
+    except Exception:
+        pass
+    return list(recipients)
+
+
 def get_persona_image_path(persona: dict):
     """Finds reference image file path for persona from personas/brief."""
     avatar_rel = persona.get("avatar_image", "")
@@ -459,6 +487,8 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
     cur_auto = "AKTIF ✅" if is_autorun_enabled() else "NONAKTIF ❌"
     cur_greet = "AKTIF ✅" if GREETINGS_ENABLED.get(user_id, True) else "NONAKTIF ❌"
     cur_proact = "AKTIF ✅" if proactive_engine.is_enabled(user_id) else "NONAKTIF ❌"
+    cur_health = "AKTIF 🟢" if health_engine.enabled else "NONAKTIF ⚪"
+    cur_heal = "AKTIF 🟢" if health_engine.self_healing_enabled else "NONAKTIF ⚪"
     fact_count = len(memory_engine.get_facts(user_id))
     rem_count = len(reminder_engine.get_active_reminders(user_id))
     u_dates = anniversary_engine.get_user_dates(user_id)
@@ -503,6 +533,8 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"🚀 **PC Autorun** : `{cur_auto}`\n"
         f"⏰ **Sapaan Jam** : `{cur_greet}` _(07:00, 12:30 & 22:00)_\n"
         f"💬 **Chat Duluan** : `{cur_proact}` _(Tanya kabar saat kamu sepi)_\n"
+        f"🩺 **Health Alert**: `{cur_health}` _(Cek berkala & lapor jika LLM mati)_\n"
+        f"🩹 **Self-Healing**: `{cur_heal}` _(Auto-restart saat service mati/crash)_\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 _Pilih tombol menu di bawah untuk mengubah pengaturan langsung dari Telegram:_"
     )
@@ -526,6 +558,9 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton(f"🚀 PC Autorun: {cur_auto}", callback_data="cfg_toggle:autorun"),
         types.InlineKeyboardButton(f"⏰ Sapaan: {cur_greet}", callback_data="cfg_toggle:greetings"),
         types.InlineKeyboardButton(f"💬 Chat Duluan: {cur_proact}", callback_data="cfg_toggle:proactive"),
+        types.InlineKeyboardButton(f"🩺 Health Alert: {cur_health}", callback_data="cfg_toggle:health_check"),
+        types.InlineKeyboardButton(f"🩹 Self-Healing: {cur_heal}", callback_data="cfg_toggle:self_healing"),
+        types.InlineKeyboardButton("🩹 Jalankan Self-Healing", callback_data="cfg_action:self_heal"),
         types.InlineKeyboardButton("📊 Status Diagnostik", callback_data="cfg_action:status"),
         types.InlineKeyboardButton("❓ Panduan Lengkap (/help)", callback_data="open_help_menu"),
         types.InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="cfg_submenu:dashboard")
@@ -1889,6 +1924,7 @@ def build_system_diagnostics_report(user_id: int) -> str:
         f"⚙️ **Sistem & Proses**:\n"
         f"• Bot Process  : `🟢 Berjalan (PID: {bot_pid})`\n"
         f"• PC Autorun   : `{autorun_str}`\n"
+        f"• Health Check : `{health_engine.get_status_summary()}`\n"
         f"• Buku Ingatan : `{facts_count} fakta tersimpan`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 _Ketik `/setup` untuk membuka panel kontrol dan pengaturan lengkap._"
@@ -1908,6 +1944,7 @@ def handle_status(message):
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("🔄 Segarkan Status", callback_data="cfg_action:status"),
+        types.InlineKeyboardButton("🩹 Self-Heal Services", callback_data="cfg_action:self_heal"),
         types.InlineKeyboardButton("⚙️ Panel Setup (/setup)", callback_data="cfg_submenu:dashboard")
     )
     bot.reply_to(message, report, reply_markup=markup, parse_mode="Markdown")
@@ -2200,6 +2237,21 @@ def callback_cfg_toggles(call):
         status_msg = "⏰ Sapaan Harian AKTIF (07:00, 12:30 & 22:00) 🔔" if not cur_g else "🔕 Sapaan Harian DINONAKTIFKAN"
         bot.answer_callback_query(call.id, status_msg, show_alert=True)
         show_setup_dashboard(chat_id, user_id, message_to_edit=mid)
+        return
+    elif target == "self_healing":
+        health_engine.self_healing_enabled = not health_engine.self_healing_enabled
+        update_env_variable("SELF_HEALING_ENABLED", "true" if health_engine.self_healing_enabled else "false")
+        status_msg = "🩹 Self-Healing Otomatis AKTIF 🟢 (Resurrect service saat crash)" if health_engine.self_healing_enabled else "🩹 Self-Healing Otomatis DINONAKTIFKAN ⚪"
+        bot.answer_callback_query(call.id, status_msg, show_alert=True)
+        show_setup_dashboard(chat_id, user_id, message_to_edit=mid)
+        return
+    elif target == "health_check":
+        health_engine.enabled = not health_engine.enabled
+        update_env_variable("HEALTH_CHECK_ENABLED", "true" if health_engine.enabled else "false")
+        status_msg = "🩺 Health Alert Berkala AKTIF 🟢 (Cek tiap 30s & lapor jika LLM mati)" if health_engine.enabled else "🩺 Health Alert Berkala DINONAKTIFKAN ⚪"
+        bot.answer_callback_query(call.id, status_msg, show_alert=True)
+        show_setup_dashboard(chat_id, user_id, message_to_edit=mid)
+        return
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_vengine:'))
@@ -2403,12 +2455,43 @@ def callback_cfg_status(call):
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("🔄 Segarkan Status", callback_data="cfg_action:status"),
+        types.InlineKeyboardButton("🩹 Self-Heal Services", callback_data="cfg_action:self_heal"),
         types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
     )
     try:
         bot.edit_message_text(report, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
     except Exception:
         pass
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'cfg_action:self_heal')
+def callback_cfg_self_heal(call):
+    if not is_authorized(call.from_user.id):
+        return
+    bot.answer_callback_query(call.id, "🩹 Memulai Self-Healing di background...")
+    def _run_heal():
+        results = health_engine.heal_all_services(bot, [call.from_user.id])
+        report = build_system_diagnostics_report(call.from_user.id)
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            types.InlineKeyboardButton("🔄 Segarkan Status", callback_data="cfg_action:status"),
+            types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+        )
+        try:
+            llm_stat = "🟢 Online" if results.get("llm") else "🔴 Gagal Pulih"
+            comfy_stat = "🟢 Online" if results.get("comfyui", True) else "🔴 Gagal Pulih"
+            music_stat = "🟢 Online" if results.get("music", True) else "🔴 Gagal Pulih"
+            summary = (
+                f"🩹 **Hasil Pengecekan Self-Healing:**\n"
+                f"• LLM Engine: {llm_stat}\n"
+                f"• ComfyUI: {comfy_stat}\n"
+                f"• Pemutar Musik: {music_stat}\n\n"
+                f"{report}"
+            )
+            bot.send_message(call.message.chat.id, summary, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            pass
+    threading.Thread(target=_run_heal, daemon=True).start()
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('help_sec:'))
@@ -4166,11 +4249,14 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
             # 1. Proactively check if Local LLM backend is online
             stat = llm_client.check_health()
             if not stat.get("online"):
+                health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=stat.get("error"))
                 backend_msg = (
-                    "Otak AI lokal aku (KoboldCPP) belum aktif nih.\n\n"
-                    "Coba jalankan layanan dari terminal dengan perintah:\n`waifu start --daemon`\n\n"
+                    "⚠️ **Service LLM Sedang Offline / Mati!** ⚠️\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Otak AI lokal aku (`{LLM_BASE_URL}`) belum aktif atau mati nih.\n\n"
+                    "👉 Coba jalankan layanan dari terminal dengan perintah:\n`waifu start --daemon`\n\n"
                     "Atau klik ganda file `start_services.bat` di folder PC kamu yaa sayang!\n"
-                    "Begitu aktif, kirim pesan lagi ke aku yaa."
+                    "Ketik `/status` untuk melihat laporan koneksi lengkap."
                 )
                 bot.reply_to(message, backend_msg, parse_mode="Markdown")
                 return
@@ -4206,13 +4292,16 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 reply_text, _ = llm_client.chat(messages, max_tokens=150)
             except Exception as e:
                 logger.error(f"Chat error / LLM timeout: {e}")
-                import random
-                fallbacks = [
-                    f"Halo! Tadi sempat ada kendala koneksi sebentar, tapi sekarang aku udah di sini kok. Kamu lagi apa?",
-                    f"Hai! Maaf tadi agak lambat responnya ya, koneksi lokalnya sempat tersendat. Lagi bahas apa tadi?",
-                    f"Aku di sini kok! Jaringanku udah normal lagi sekarang. Mau ngobrol apa nih?"
-                ]
-                reply_text = random.choice(fallbacks)
+                health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=str(e))
+                err_msg = (
+                    f"⚠️ **Service LLM Mengalami Gangguan / Timeout!** ⚠️\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Sayang, koneksi ke service LLM lokal (`{LLM_BASE_URL}`) gagal atau tidak merespon: `{e}`\n\n"
+                    f"👉 Silakan periksa apakah KoboldCPP / Ollama kamu hang/crash, atau jalankan `waifu start`.\n"
+                    f"Ketik `/status` untuk cek kondisi server."
+                )
+                bot.reply_to(message, err_msg, parse_mode="Markdown")
+                return
 
             if not reply_text or not reply_text.strip():
                 reply_text = "Aku dengerin kok, lagi mikirin apa nih?"
@@ -4535,6 +4624,22 @@ def main():
     setup_bot_commands()
     threading.Thread(target=schedule_daily_greetings, daemon=True).start()
     logger.info("✓ Daily Greetings Scheduler active (07:00 AM, 12:30 PM & 22:00 PM)")
+
+    # Startup ready notification worker (runs concurrently so polling starts immediately)
+    if STARTUP_NOTIFICATION_ENABLED:
+        def _startup_worker():
+            recipients = get_notification_recipient_ids()
+            if recipients:
+                health_engine.notify_startup_ready(
+                    bot=bot,
+                    recipients=recipients,
+                    persona=persona,
+                    max_wait_seconds=12
+                )
+        threading.Thread(target=_startup_worker, daemon=True).start()
+
+    # Start periodic service health monitor
+    health_engine.start_monitor(bot=bot, get_recipients_func=get_notification_recipient_ids)
 
     stat = llm_client.check_health()
     if stat.get("online"):

@@ -111,7 +111,7 @@ class TestVisionModelAndAutoUpdate(unittest.TestCase):
             with open(os.path.join(fake_tools_comfy, "main.py"), "w") as f:
                 f.write("# dummy main")
 
-            with patch.object(asset_manager, "PROJECT_ROOT", tmp_dir):
+            with patch.object(asset_manager, "PROJECT_ROOT", tmp_dir), patch.dict(os.environ, {"COMFYUI_DIR": ""}):
                 asset_manager._COMFYUI_DIR_CACHE = None
                 found = asset_manager.detect_comfyui_dir()
                 self.assertIsNotNone(found)

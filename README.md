@@ -244,6 +244,8 @@ waifu stop
   Capable of writing code, debugging, and executing Python snippets when you ask for technical assistance.
 - 🎶 **Desktop YouTube Music Remote Player**:
   Play and control YouTube Music on your PC's browser directly through Telegram buttons.
+- 🩺 **Autonomous Health Watchdog, Self-Healing & PC Startup Announcements**:
+  Never miss a service interruption! When your PC boots up or restarts, your waifu automatically greets you in Telegram with a comprehensive service health report (`LLM`, `ComfyUI`, `Voice`). An active background watchdog continuously monitors your local LLM engine every 30 seconds. If KoboldCPP, ComfyUI, or the Music server crashes or stops responding, the bot's **Autonomous Self-Healing Engine** automatically resurrects and restarts the service in the background, keeping you updated in Telegram without requiring manual PC interventions. A built-in circuit breaker prevents infinite restart loops in case of hardware or VRAM limitations.
 
 ---
 
