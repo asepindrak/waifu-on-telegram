@@ -306,8 +306,8 @@ function Select-And-Download-AnimeCheckpoint {
 
     $selectedCkpt = "meinamix_v12Final.safetensors"
     if ($imgChoice -eq "2") {
-        $xlUrl = "https://huggingface.co/m4gnett/AnythingXL/resolve/main/AnythingXL_xl.safetensors"
-        $xlFallback = "https://huggingface.co/ACEGameAI/AnythingXL/resolve/main/AnythingXL.safetensors"
+        $xlUrl = "https://huggingface.co/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors"
+        $xlFallback = "https://hf-mirror.com/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors"
         $xlDest = "$ckptDir\AnythingXL_xl.safetensors"
         Download-FileWithProgress -Url $xlUrl -DestinationPath $xlDest -Description "万象熔炉 | Anything XL SDXL (~6.6 GB)" -FallbackUrl $xlFallback
         $selectedCkpt = "AnythingXL_xl.safetensors"

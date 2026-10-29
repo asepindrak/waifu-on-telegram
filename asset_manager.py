@@ -53,8 +53,14 @@ ASSET_REGISTRY = {
         "filename": "AnythingXL_xl.safetensors",
         "patterns": ["*AnythingXL*.safetensors", "*anything*xl*.safetensors", "*Anything-XL*.safetensors", "*anythingxl*.safetensors"],
         "size_mb": 6616,
-        "url": "https://huggingface.co/m4gnett/AnythingXL/resolve/main/AnythingXL_xl.safetensors",
-        "fallback_url": "https://huggingface.co/ACEGameAI/AnythingXL/resolve/main/AnythingXL.safetensors",
+        "url": "https://huggingface.co/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors",
+        "fallback_url": "https://hf-mirror.com/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors",
+        "mirrors": [
+            "https://huggingface.co/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors",
+            "https://hf-mirror.com/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors",
+            "https://huggingface.co/genai-archive/anything-xl/resolve/main/anything-xl.safetensors",
+            "https://huggingface.co/m4gnett/AnythingXL/resolve/main/AnythingXL_xl.safetensors"
+        ],
         "civitai_url": "https://civitai.com/models/9409/or-anything-xl",
         "description": "Checkpoint SDXL anime resolusi tinggi 1024px, detail tajam, estetik anime modern (Civitai #9409).",
         "required_for": "Generasi foto & selfie waifu resolusi tinggi (SDXL)"
@@ -469,25 +475,46 @@ def check_all_assets() -> Dict[str, Dict[str, Any]]:
             results[key] = info
     return results
 
-def _download_file(url: str, target_path: str, fallback_url: Optional[str] = None, progress_callback=None) -> bool:
-    """Helper to download file with resume support via curl or requests."""
+def _download_file(url: str, target_path: str, fallback_url: Optional[str] = None, mirrors: Optional[list] = None, progress_callback=None) -> bool:
+    """Helper to download file with resume support via curl or requests across high-speed mirrors."""
     target_dir = os.path.dirname(target_path)
     if target_dir:
         os.makedirs(target_dir, exist_ok=True)
 
-    for dl_url in [url, fallback_url]:
-        if not dl_url:
-            continue
-        # Use curl if available for high-speed resumable downloads (-fL avoids saving HTML error pages)
+    candidate_urls = []
+    if url and url not in candidate_urls:
+        candidate_urls.append(url)
+    if fallback_url and fallback_url not in candidate_urls:
+        candidate_urls.append(fallback_url)
+    if mirrors:
+        for m in mirrors:
+            if m and m not in candidate_urls:
+                candidate_urls.append(m)
+
+    for idx, dl_url in enumerate(candidate_urls, 1):
+        if len(candidate_urls) > 1:
+            logger.info(f"Connecting to download mirror [{idx}/{len(candidate_urls)}]: {dl_url}")
+
         curl_path = shutil.which("curl")
         if curl_path:
             try:
-                cmd = [curl_path, "-fL", "-C", "-", "--retry", "3", "--progress-bar", "-o", target_path, dl_url]
+                # Add speed limit check (min 150KB/s over 20s) so curl fails over to faster mirror instead of crawling
+                cmd = [
+                    curl_path, "-fL", "-C", "-",
+                    "--retry", "2",
+                    "--speed-limit", "150000",
+                    "--speed-time", "20",
+                    "--progress-bar",
+                    "-o", target_path,
+                    dl_url
+                ]
                 ret = subprocess.run(cmd)
                 if ret.returncode == 0 and os.path.exists(target_path) and os.path.getsize(target_path) > 10 * 1024 * 1024:
                     return True
+                if idx < len(candidate_urls):
+                    print(f"\n  ℹ Kecepatan mirror rendah atau terputus. Mencoba mirror berkecepatan tinggi berikutnya [{idx + 1}/{len(candidate_urls)}]...")
             except Exception as e:
-                logger.warning(f"curl download failed: {e}")
+                logger.warning(f"curl download failed on {dl_url}: {e}")
 
         # Fallback to requests streaming download
         try:
@@ -551,6 +578,7 @@ def download_asset(asset_key: str, progress_callback=None) -> bool:
         url=info.get("url"),
         target_path=target_path,
         fallback_url=info.get("fallback_url"),
+        mirrors=info.get("mirrors"),
         progress_callback=progress_callback
     )
 
