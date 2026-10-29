@@ -501,8 +501,19 @@ def cmd_update():
                 if res.stdout.strip():
                     print(c(DIM, "    " + res.stdout.strip().replace("\n", "\n    ")))
             else:
-                notice = res.stderr.strip() or "Already up to date"
-                print(c(YELLOW, f"  ℹ Git notice: {notice}"))
+                notice = res.stderr.strip() or res.stdout.strip()
+                # If git pull is blocked by local changes or untracked conflicts
+                if any(x in notice for x in ["overwritten by merge", "stash them before you merge", "Aborting"]):
+                    print(c(YELLOW, "  ⚠️ Local code modifications detected. Auto-resolving and synchronizing with official GitHub release..."))
+                    subprocess.run(["git", "stash"], cwd=PROJECT_ROOT, capture_output=True)
+                    subprocess.run(["git", "fetch", "--tags", "origin", "main"], cwd=PROJECT_ROOT, capture_output=True)
+                    res_reset = subprocess.run(["git", "reset", "--hard", "origin/main"], cwd=PROJECT_ROOT, capture_output=True, text=True)
+                    if res_reset.returncode == 0:
+                        print(c(GREEN, "  ✓ Source code successfully synchronized with official release!"))
+                    else:
+                        print(c(YELLOW, f"  ℹ Git notice: {notice}"))
+                else:
+                    print(c(YELLOW, f"  ℹ Git notice: {notice}"))
         except Exception as e:
             print(c(YELLOW, f"  ⚠️ Git pull error: {e}"))
     else:
