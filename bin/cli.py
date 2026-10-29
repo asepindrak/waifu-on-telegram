@@ -646,19 +646,69 @@ def cmd_update():
     else:
         print(c(DIM, "\nStart your bot anytime with: waifu start --daemon\n"))
 
+def print_cli_help(unknown_cmd: str = None):
+    print_banner()
+    if unknown_cmd:
+        import difflib
+        valid_cmds = [
+            "start", "stop", "restart", "status", "setup", "config",
+            "update", "models", "persona", "language", "autorun",
+            "logs", "version", "uninstall", "help"
+        ]
+        matches = difflib.get_close_matches(unknown_cmd.lower(), valid_cmds, n=1, cutoff=0.4)
+        if matches:
+            print(c(BOLD + YELLOW, f"\n⚠️  Perintah '{unknown_cmd}' tidak dikenali. Mungkin maksud kamu: 'waifu {matches[0]}'?\n"))
+        else:
+            print(c(BOLD + RED, f"\n❌ Perintah '{unknown_cmd}' tidak dikenali.\n"))
+
+    print(c(BOLD + CYAN, "📋 DAFTAR PERINTAH RESMI ('waifu <command>'):"))
+    print(c(DIM, "─" * 70))
+    print(c(BOLD + MAGENTA, "  🚀 Kontrol Layanan & Status:"))
+    print(f"    {c(GREEN, 'waifu start')} [--daemon]       Mulai bot & AI engines (foreground / background)")
+    print(f"    {c(GREEN, 'waifu stop')}                  Hentikan bot & semua background services")
+    print(f"    {c(GREEN, 'waifu restart')}               Restart bot & daemon secara bersih")
+    print(f"    {c(GREEN, 'waifu status')}                Diagnostik kesehatan LLM, ComfyUI, Music & RAM/VRAM")
+    print(f"    {c(GREEN, 'waifu logs')}                  Pantau log aktivitas bot secara real-time")
+
+    print(c(BOLD + MAGENTA, "\n  ⚙️ Konfigurasi & Model AI:"))
+    print(f"    {c(GREEN, 'waifu setup')}                 Wizard konfigurasi interaktif (Token, Model, Voice)")
+    print(f"    {c(GREEN, 'waifu models')} [dl <nama>]    Kelola & download model (MeinaMix, Anything XL, dll.)")
+    print(f"    {c(GREEN, 'waifu persona')} <nama>        Ganti waifu (runa, akira, hina, shiro, yume)")
+    print(f"    {c(GREEN, 'waifu language')} [id|en|ja]   Ganti bahasa percakapan waifu (ID, EN, JA)")
+    print(f"    {c(GREEN, 'waifu autorun')} [on|off]      Atur bot berjalan otomatis saat PC boot")
+
+    print(c(BOLD + MAGENTA, "\n  🔄 Pemeliharaan & Info:"))
+    print(f"    {c(GREEN, 'waifu update')}                Update repository, dependensi, dan model AI")
+    print(f"    {c(GREEN, 'waifu version')}               Tampilkan versi Waifu on Telegram saat ini")
+    print(f"    {c(GREEN, 'waifu uninstall')}             Wizard uninstalasi lengkap & pembersihan sistem")
+
+    print(c(DIM, "─" * 70))
+    print(c(DIM, "💡 Contoh penggunaan:"))
+    print(c(DIM, "    waifu start --daemon"))
+    print(c(DIM, "    waifu models download anything_xl"))
+    print(c(DIM, "    waifu persona akira\n"))
+
 def main():
     if any(a in sys.argv[1:] for a in ("-v", "--version", "version")):
         print(c(BOLD + CYAN, f"💖 Waifu on Telegram v{get_version()}"))
         return
 
+    if any(a in sys.argv[1:] for a in ("-h", "--help", "help")):
+        print_cli_help()
+        return
+
+    if len(sys.argv) > 1 and sys.argv[1] in ("--daemon", "-d"):
+        cmd_start(daemon=True)
+        return
+
     parser = argparse.ArgumentParser(description="💖 Waifu on Telegram CLI", add_help=False)
-    parser.add_argument("command", nargs="?", default="status", choices=["start", "stop", "restart", "status", "setup", "config", "autorun", "persona", "language", "lang", "logs", "models", "model", "assets", "update", "uninstall", "release", "version", "--version", "-v", "help"])
+    parser.add_argument("command", nargs="?", default=None)
     parser.add_argument("arg", nargs="?", default=None)
     parser.add_argument("extra_args", nargs="*", default=[])
     parser.add_argument("--daemon", "-d", action="store_true", help="Run bot silently in background")
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
-    cmd = args.command
+    cmd = args.command.lower() if args.command else "status"
     if cmd == "start":
         cmd_start(daemon=args.daemon)
     elif cmd == "stop":
@@ -687,25 +737,10 @@ def main():
         cmd_update()
     elif cmd == "release":
         cmd_release(args.arg)
-    elif cmd in ("version", "--version", "-v"):
-        print(c(BOLD + CYAN, f"💖 Waifu on Telegram v{get_version()}"))
     elif cmd == "uninstall":
         cmd_uninstall()
-    elif cmd == "help":
-        print_banner()
-        print("Available CLI Commands:")
-        print("  waifu start [--daemon]   - Start bot (foreground or background daemon)")
-        print("  waifu stop               - Stop bot & services")
-        print("  waifu restart            - Restart bot in background")
-        print("  waifu status             - Check diagnostics for LLM, ComfyUI, & process")
-        print("  waifu setup              - Open interactive configuration manager")
-        print("  waifu update             - Pull latest updates & restart services")
-        print("  waifu models [dl <name>] - Manage AI models & ComfyUI extensions")
-        print("  waifu persona <name>     - Switch persona (runa, akira, hina, shiro, yume)")
-        print("  waifu language [id|en|ja] - Change waifu language (ID, EN, JA, or Custom)")
-        print("  waifu autorun [on|off]   - Configure autorun on system startup")
-        print("  waifu logs               - Inspect recent log activity")
-        print("  waifu uninstall          - Complete uninstallation and cleanup wizard")
+    else:
+        print_cli_help(unknown_cmd=args.command)
 
 if __name__ == "__main__":
     main()
