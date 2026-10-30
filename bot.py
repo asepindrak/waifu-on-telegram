@@ -224,6 +224,17 @@ def apply_ckpt_choice(choice: str) -> str:
         update_env_variable("COMFYUI_URL", "http://127.0.0.1:8188")
         update_env_variable("MEDIA_FALLBACK_CLOUD", "false")
         return "MeinaMix v12 (SD 1.5)"
+    elif choice == "aom3":
+        ckpt_name = "AOM3A1B_orangemixs.safetensors"
+        os.environ["COMFYUI_CHECKPOINT"] = ckpt_name
+        os.environ["COMFYUI_URL"] = "http://127.0.0.1:8188"
+        os.environ["MEDIA_FALLBACK_CLOUD"] = "false"
+        media_engine.comfyui_url = "http://127.0.0.1:8188"
+        media_engine.allow_cloud_fallback = False
+        update_env_variable("COMFYUI_CHECKPOINT", ckpt_name)
+        update_env_variable("COMFYUI_URL", "http://127.0.0.1:8188")
+        update_env_variable("MEDIA_FALLBACK_CLOUD", "false")
+        return "AbyssOrangeMix3 (AOM3A1B SD 1.5)"
     elif choice == "anything_xl":
         ckpt_name = "AnythingXL_xl.safetensors"
         os.environ["COMFYUI_CHECKPOINT"] = ckpt_name
@@ -549,6 +560,8 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         cur_ckpt = "Auto (ComfyUI Active)"
     elif "anything" in cur_ckpt.lower():
         cur_ckpt = "Anything XL (SDXL 1024px)"
+    elif any(k in cur_ckpt.lower() for k in ["aom", "orange"]):
+        cur_ckpt = "AbyssOrangeMix3 (AOM3A1B)"
     elif "meina" in cur_ckpt.lower():
         cur_ckpt = "MeinaMix v12 (SD 1.5)"
     elif len(cur_ckpt) > 28:
@@ -1687,16 +1700,18 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
 
     markup = types.InlineKeyboardMarkup(row_width=1)
     is_meina = ("meina" in cur_ckpt.lower())
+    is_aom = any(k in cur_ckpt.lower() for k in ["aom", "orange"])
     is_anything = ("anything" in cur_ckpt.lower() or "xl" in cur_ckpt.lower())
     is_auto = (not cur_ckpt and bool(cur_url))
 
     markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - Cepat & Hemat VRAM) {'✓' if is_meina else ''}", callback_data="cfg_set_ckpt:meinamix"))
+    markup.add(types.InlineKeyboardButton(f"🍊 AbyssOrangeMix3 (AOM3A1B SD 1.5 - Civitai #9942) {'✓' if is_aom else ''}", callback_data="cfg_set_ckpt:aom3"))
     markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - Ultra Jernih) {'✓' if is_anything else ''}", callback_data="cfg_set_ckpt:anything_xl"))
     markup.add(types.InlineKeyboardButton(f"🎯 Auto-detect ComfyUI {'✓' if is_auto else ''}", callback_data="cfg_set_ckpt:auto"))
 
     for idx, (source, cname) in enumerate(detected):
         lower_c = cname.lower()
-        if "meinamix" in lower_c or "anything" in lower_c:
+        if "meinamix" in lower_c or "anything" in lower_c or "aom" in lower_c or "orangemix" in lower_c:
             continue
         is_cur = (cur_ckpt.lower() in cname.lower() if cur_ckpt else False)
         short_c = cname.replace(".safetensors", "").replace(".ckpt", "")
@@ -1715,6 +1730,8 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
         active_display = "Auto (ComfyUI Active)" if cur_url else ("Cloud Engine" if cur_cloud else "Dinonaktifkan")
     elif "anything" in cur_ckpt.lower():
         active_display = "Anything XL (SDXL 1024px)"
+    elif any(k in cur_ckpt.lower() for k in ["aom", "orange"]):
+        active_display = "AbyssOrangeMix3 (AOM3A1B)"
     elif "meina" in cur_ckpt.lower():
         active_display = "MeinaMix v12 (SD 1.5)"
     else:

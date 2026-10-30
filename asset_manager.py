@@ -49,7 +49,7 @@ ASSET_REGISTRY = {
         "type": "model",
         "subfolder": os.path.join("models", "checkpoints"),
         "filename": "meinamix_v12Final.safetensors",
-        "patterns": ["*meinamix*.safetensors", "*meina*.safetensors", "*aom3*.safetensors"],
+        "patterns": ["*meinamix*.safetensors", "*meina*.safetensors"],
         "size_mb": 2033,
         "url": "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors",
         "fallback_url": "https://hf-mirror.com/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors",
@@ -62,6 +62,25 @@ ASSET_REGISTRY = {
         "civitai_url": "https://civitai.com/models/119057/meinamix",
         "description": "Checkpoint utama ilustrasi anime berkualitas tinggi untuk foto waifu konsisten (SD 1.5, cepat, hemat VRAM).",
         "required_for": "Generasi foto & PAP waifu (SD 1.5)"
+    },
+    "aom3": {
+        "name": "AbyssOrangeMix3 (AOM3A1B SD 1.5 Checkpoint)",
+        "type": "model",
+        "subfolder": os.path.join("models", "checkpoints"),
+        "filename": "AOM3A1B_orangemixs.safetensors",
+        "patterns": ["*AOM3*.safetensors", "*aom3*.safetensors", "*orangemix*.safetensors", "*OrangeMix*.safetensors"],
+        "size_mb": 2034,
+        "url": "https://huggingface.co/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors",
+        "fallback_url": "https://hf-mirror.com/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors",
+        "mirrors": [
+            "https://huggingface.co/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors",
+            "https://hf-mirror.com/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors",
+            "https://civitai.com/api/download/models/17233?type=Model&format=SafeTensor&size=pruned&fp=fp16"
+        ],
+        "civarchive_url": "https://civarchive.com/models/9942?modelVersionId=17233",
+        "civitai_url": "https://civitai.com/models/9942/abyssorangemix3-aom3",
+        "description": "Checkpoint anime legendaris AOM3A1B (Civitai #9942 / CivArchive), gaya anime tajam dan halus (SD 1.5, cepat, hemat VRAM).",
+        "required_for": "Generasi foto & PAP waifu (SD 1.5 AOM3)"
     },
     "anything_xl": {
         "name": "万象熔炉 | Anything XL (SDXL Anime Checkpoint)",

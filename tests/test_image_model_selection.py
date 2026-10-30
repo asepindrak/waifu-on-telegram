@@ -42,8 +42,26 @@ class TestImageModelSelection(unittest.TestCase):
         self.assertIn("huggingface.co", asset["url"])
         self.assertTrue(asset["size_mb"] > 6000)
 
+    def test_aom3_registered_in_asset_manager(self):
+        """Verify that AbyssOrangeMix3 (AOM3A1B) is properly registered in asset_manager with CivArchive & Civitai metadata."""
+        self.assertIn("aom3", asset_manager.ASSET_REGISTRY)
+        asset = asset_manager.ASSET_REGISTRY["aom3"]
+        self.assertEqual(asset["filename"], "AOM3A1B_orangemixs.safetensors")
+        self.assertIn("9942", asset["civitai_url"])
+        self.assertIn("17233", asset["civarchive_url"])
+        self.assertIn("WarriorMama777/OrangeMixs", asset["url"])
+        self.assertTrue(asset["size_mb"] > 1800)
+
     def test_apply_ckpt_choice_in_bot(self):
-        """Verify that selecting anything_xl or meinamix in Telegram bot updates environment cleanly."""
+        """Verify that selecting aom3, anything_xl, or meinamix in Telegram bot updates environment cleanly."""
+        with patch("bot.update_env_variable") as mock_update:
+            label = bot.apply_ckpt_choice("aom3")
+            self.assertEqual(label, "AbyssOrangeMix3 (AOM3A1B SD 1.5)")
+            self.assertEqual(os.environ.get("COMFYUI_CHECKPOINT"), "AOM3A1B_orangemixs.safetensors")
+            self.assertEqual(os.environ.get("COMFYUI_URL"), "http://127.0.0.1:8188")
+            self.assertEqual(os.environ.get("MEDIA_FALLBACK_CLOUD"), "false")
+            mock_update.assert_any_call("COMFYUI_CHECKPOINT", "AOM3A1B_orangemixs.safetensors")
+
         with patch("bot.update_env_variable") as mock_update:
             label = bot.apply_ckpt_choice("anything_xl")
             self.assertEqual(label, "Anything XL (SDXL 1024px)")
@@ -76,14 +94,22 @@ class TestImageModelSelection(unittest.TestCase):
             self.assertEqual((w_sd, h_sd), (576, 768))
 
     def test_setup_config_image_model_choice(self):
-        """Verify that setup.py config_image_model properly prompts and configures Anything XL."""
+        """Verify that setup.py config_image_model properly prompts and configures AOM3 and Anything XL."""
         env_vars = {}
-        with patch("builtins.input", side_effect=["2", "n"]):  # Choice 2 is Anything XL, do not download now
+        with patch("builtins.input", side_effect=["2", "n"]):  # Choice 2 is AbyssOrangeMix3, do not download now
             with patch("setup.scan_image_models", return_value=[]):
                 setup.config_image_model(env_vars)
-                self.assertEqual(env_vars.get("COMFYUI_CHECKPOINT"), "AnythingXL_xl.safetensors")
+                self.assertEqual(env_vars.get("COMFYUI_CHECKPOINT"), "AOM3A1B_orangemixs.safetensors")
                 self.assertEqual(env_vars.get("COMFYUI_URL"), "http://127.0.0.1:8188")
                 self.assertEqual(env_vars.get("MEDIA_FALLBACK_CLOUD"), "false")
+
+        env_vars_xl = {}
+        with patch("builtins.input", side_effect=["3", "n"]):  # Choice 3 is Anything XL, do not download now
+            with patch("setup.scan_image_models", return_value=[]):
+                setup.config_image_model(env_vars_xl)
+                self.assertEqual(env_vars_xl.get("COMFYUI_CHECKPOINT"), "AnythingXL_xl.safetensors")
+                self.assertEqual(env_vars_xl.get("COMFYUI_URL"), "http://127.0.0.1:8188")
+                self.assertEqual(env_vars_xl.get("MEDIA_FALLBACK_CLOUD"), "false")
 
     def test_setup_manage_models_menu_render(self):
         """Verify that setup.py manage_models_menu renders without NameError (such as DIM)."""

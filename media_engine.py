@@ -77,6 +77,9 @@ class MediaEngine:
             info = asset_manager.get_asset_info("anything_xl")
             if info and info.get("installed") and info.get("target_path"):
                 return os.path.basename(info["target_path"])
+            info = asset_manager.get_asset_info("aom3")
+            if info and info.get("installed") and info.get("target_path"):
+                return os.path.basename(info["target_path"])
             info = asset_manager.get_asset_info("meinamix")
             if info and info.get("installed") and info.get("target_path"):
                 return os.path.basename(info["target_path"])

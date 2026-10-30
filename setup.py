@@ -309,6 +309,16 @@ def config_image_model(env_vars):
     else:
         meina_tag = c(YELLOW, "[PERLU DOWNLOAD ~2.0 GB]")
 
+    aom_info = asset_manager.get_asset_info("aom3") if asset_manager else None
+    aom_inst = aom_info.get("installed", False) if aom_info else False
+    aom_incomp = aom_info.get("incomplete", False) if aom_info else False
+    if aom_inst:
+        aom_tag = c(GREEN, "[TERPASANG]")
+    elif aom_incomp:
+        aom_tag = c(YELLOW, f"[TERPUTUS: {aom_info.get('current_size_mb')} MB / ~2.0 GB ({aom_info.get('percent_complete')}%) - BISA RESUME]")
+    else:
+        aom_tag = c(YELLOW, "[PERLU DOWNLOAD ~2.0 GB]")
+
     anything_info = asset_manager.get_asset_info("anything_xl") if asset_manager else None
     anything_inst = anything_info.get("installed", False) if anything_info else False
     anything_incomp = anything_info.get("incomplete", False) if anything_info else False
@@ -327,7 +337,14 @@ def config_image_model(env_vars):
         "meinamix",
         "meinamix_v12Final.safetensors"
     ))
-    # 2. Anything XL
+    # 2. AbyssOrangeMix3 (AOM3A1B)
+    options.append((
+        f"🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Civitai #9942) {aom_tag}\n"
+        f"     ↳ Anime legendaris, gaya tajam & dinamis (Rekomendasi GPU 4GB - 8GB)",
+        "aom3",
+        "AOM3A1B_orangemixs.safetensors"
+    ))
+    # 3. Anything XL
     options.append((
         f"🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Civitai #9409) {anything_tag}\n"
         f"     ↳ Resolusi 1024px ultra jernih, detail anime kaya (Rekomendasi GPU 8GB+ VRAM)",
@@ -335,11 +352,11 @@ def config_image_model(env_vars):
         "AnythingXL_xl.safetensors"
     ))
 
-    # 3. Other detected local checkpoints
+    # 4. Other detected local checkpoints
     detected_img = scan_image_models()
     for source, ckpt_name in detected_img:
         lower_c = ckpt_name.lower()
-        if "meina" in lower_c or "anything" in lower_c:
+        if "meina" in lower_c or "anything" in lower_c or "aom" in lower_c or "orangemix" in lower_c:
             continue
         options.append((
             f"🎨 {ckpt_name} (Local ComfyUI Checkpoint)",
@@ -347,21 +364,21 @@ def config_image_model(env_vars):
             ckpt_name
         ))
 
-    # 4. Auto detect
+    # 5. Auto detect
     options.append((
         "🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif di ComfyUI)",
         "auto",
         ""
     ))
 
-    # 5. Cloud Engine
+    # 6. Cloud Engine
     options.append((
         "☁️ Cloud Fallback Engine (Pollinations AI - Cepat, Free Cloud GPU, 0 VRAM)",
         "cloud",
         ""
     ))
 
-    # 6. Disable
+    # 7. Disable
     options.append((
         "❌ Nonaktifkan fitur foto / selfie",
         "disabled",
@@ -399,7 +416,7 @@ def config_image_model(env_vars):
         env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
         env_vars["COMFYUI_CHECKPOINT"] = ""
         print(c(GREEN, "  ✓ Model Foto dipilih: Auto-detect ComfyUI"))
-    elif chosen_mode in ("meinamix", "anything_xl"):
+    elif chosen_mode in ("meinamix", "aom3", "anything_xl"):
         env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
         env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
         env_vars["COMFYUI_CHECKPOINT"] = chosen_val
@@ -551,7 +568,7 @@ def manage_models_menu():
         print("  [0] 🔙 Kembali ke Menu Utama")
         print("-" * 70)
 
-        sel = input("Pilih nomor model untuk diunduh [1-5, D, 0]: ").strip().lower()
+        sel = input(f"Pilih nomor model untuk diunduh [1-{len(keys)}, D, 0]: ").strip().lower()
         if sel in ("0", "b", "exit", "q"):
             break
         elif sel == "d":
