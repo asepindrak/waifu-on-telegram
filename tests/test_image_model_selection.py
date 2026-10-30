@@ -85,5 +85,11 @@ class TestImageModelSelection(unittest.TestCase):
                 self.assertEqual(env_vars.get("COMFYUI_URL"), "http://127.0.0.1:8188")
                 self.assertEqual(env_vars.get("MEDIA_FALLBACK_CLOUD"), "false")
 
+    def test_setup_manage_models_menu_render(self):
+        """Verify that setup.py manage_models_menu renders without NameError (such as DIM)."""
+        with patch("builtins.input", return_value="0"):
+            # Should exit cleanly on 0
+            setup.manage_models_menu()
+
 if __name__ == "__main__":
     unittest.main()
