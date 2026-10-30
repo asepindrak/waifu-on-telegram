@@ -343,7 +343,7 @@ if ($foundComfy) {
     $ckptDir = "$foundComfy\models\checkpoints"
     $hasCkpt = $false
     if (Test-Path $ckptDir) {
-        $ckpts = Get-ChildItem -Path $ckptDir -Filter "*.safetensors" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 10*1024*1024 }
+        $ckpts = Get-ChildItem -Path $ckptDir -Filter "*.safetensors" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1500*1024*1024 }
         if ($ckpts.Count -gt 0) {
             $hasCkpt = $true
             $ckptCount = $ckpts.Count

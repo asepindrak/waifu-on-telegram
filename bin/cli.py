@@ -461,7 +461,13 @@ def cmd_models(subcmd=None, target=None):
             else:
                 print(c(RED, f"❌ Failed to install custom node '{info.get('name')}'. Check Git installation."))
         else:
-            print(c(CYAN, f"⏳ Downloading model: {info.get('name')} (~{info.get('size_mb')} MB)..."))
+            if info.get("installed", False):
+                print(c(GREEN, f"  ✓ Model '{info.get('name')}' is already complete and verified ({info.get('current_size_mb')} MB)."))
+                return
+            if info.get("incomplete", False):
+                print(c(CYAN, f"⏳ Resuming download for model: {info.get('name')} ({info.get('current_size_mb')} MB / ~{info.get('size_mb')} MB, {info.get('percent_complete')}%)..."))
+            else:
+                print(c(CYAN, f"⏳ Downloading model: {info.get('name')} (~{info.get('size_mb')} MB)..."))
             print(c(DIM, f"Target: {info.get('target_path')}"))
             ok = asset_manager.download_asset(target)
             if ok:
@@ -474,8 +480,16 @@ def cmd_models(subcmd=None, target=None):
     assets = asset_manager.check_all_assets()
     for key, info in assets.items():
         installed = info.get("installed", False)
-        status_tag = c(GREEN, "[INSTALLED]") if installed else c(YELLOW, "[MISSING]  ")
-        size_str = f"({info.get('current_size_mb', 0)} MB)" if installed else f"(~{info.get('size_mb', 0)} MB required)"
+        incomplete = info.get("incomplete", False)
+        if installed:
+            status_tag = c(GREEN, "[INSTALLED] ")
+            size_str = f"({info.get('current_size_mb', 0)} MB)"
+        elif incomplete:
+            status_tag = c(YELLOW, "[INCOMPLETE]")
+            size_str = f"({info.get('current_size_mb', 0)} MB / ~{info.get('size_mb', 0)} MB, {info.get('percent_complete', 0)}% downloaded)"
+        else:
+            status_tag = c(YELLOW, "[MISSING]   ")
+            size_str = f"(~{info.get('size_mb', 0)} MB required)"
         print(f"  {status_tag} {c(BOLD, key)}: {info.get('name')} {size_str}")
         print(c(DIM, f"             Target: {info.get('target_path') or info.get('target_dir')}"))
         print(c(DIM, f"             Used for: {info.get('required_for', '-')}\n"))
