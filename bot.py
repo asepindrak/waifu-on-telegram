@@ -113,7 +113,8 @@ health_engine.idle_engine = idle_engine
 voice_engine = VoiceEngine(
     voice_name=VOICE_NAME,
     groq_key=os.environ.get("GROQ_API_KEY"),
-    openai_key=os.environ.get("OPENAI_API_KEY")
+    openai_key=os.environ.get("OPENAI_API_KEY"),
+    llm_client=llm_client
 )
 
 USER_VOICE_MODES: dict = {}      # user_id -> 'always' | 'match_vn' | 'off'
@@ -279,7 +280,7 @@ def apply_voice_speaker(speaker: str) -> str:
     return v_name
 
 
-def apply_language_choice(choice: str) -> Tuple[str, str]:
+def apply_language_choice(choice: str, change_voice: bool = False) -> Tuple[str, str]:
     """Applies, normalizes, and persists waifu language choice."""
     global BOT_LANGUAGE
     c = choice.strip()
@@ -308,7 +309,8 @@ def apply_language_choice(choice: str) -> Tuple[str, str]:
     BOT_LANGUAGE = norm_key
     os.environ["BOT_LANGUAGE"] = norm_key
     update_env_variable("BOT_LANGUAGE", norm_key)
-    if default_voice:
+    # Only override voice speaker if change_voice is explicitly requested or voice is unconfigured
+    if default_voice and (change_voice or not voice_engine.default_voice):
         apply_voice_speaker(default_voice)
     return norm_key, label
 
@@ -4448,7 +4450,15 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
             if should_voice:
                 def send_voice():
-                    vn_path = voice_engine.generate_voice_note(reply_text[:160])
+                    clean_for_vn = voice_engine.clean_text_for_speech(reply_text)
+                    if len(clean_for_vn) > 200:
+                        m = re.search(r'^(.*[.!?])\s', clean_for_vn[:220])
+                        if m:
+                            clean_for_vn = m.group(1)
+                        else:
+                            clean_for_vn = clean_for_vn[:180].rsplit(' ', 1)[0]
+
+                    vn_path = voice_engine.generate_voice_note(clean_for_vn)
                     if vn_path:
                         try:
                             with open(vn_path, "rb") as vn_file:
