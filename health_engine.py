@@ -154,7 +154,14 @@ class HealthEngine:
 
         if os.path.isfile(kcpp_exe) and model_path:
             mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
-            cmd = [kcpp_exe, "--model", model_path] + mm_args + ["--gpulayers", "99", "--port", "5001"]
+            cmd = [
+                kcpp_exe, "--model", model_path,
+                "--port", "5001",
+                "--gpulayers", "99",
+                "--contextsize", "4096",
+                "--smartcontext",
+                "--threads", "4"
+            ] + mm_args
             if sys.platform == "win32":
                 cmd += ["--usecublas", "normal", "--quiet"]
                 popen_kwargs = {"creationflags": 0x08000000 | 0x00000200}

@@ -7,7 +7,7 @@ import io
 import urllib.parse
 import logging
 import requests
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, Callable
 
 try:
     import photo_vault
@@ -130,15 +130,25 @@ class MediaEngine:
             return table.get(ar, (576, 768))
 
     @staticmethod
-    def get_quality_params(quality: str = "high") -> Tuple[int, float]:
-        """Returns (steps, cfg) based on desired quality preset."""
+    def get_quality_params(quality: str = "high", is_sdxl: bool = False) -> Tuple[int, float]:
+        """Returns (steps, cfg) tailored for SD 1.5 vs SDXL."""
         q = quality.lower().strip()
-        if q in ("ultra", "best", "very_high"):
-            return 32, 8.0
-        elif q in ("fast", "low", "standard"):
-            return 20, 7.0
-        else: # high (MeinaMix sweet spot)
-            return 28, 7.5
+        if is_sdxl:
+            # SDXL (Anything XL) sweet spots: lower CFG (5.5-6.5) prevents oversaturation and lowers VRAM/steps
+            if q in ("ultra", "best", "very_high"):
+                return 26, 6.5
+            elif q in ("fast", "low", "standard"):
+                return 18, 5.5
+            else: # high (SDXL optimal speed & fidelity)
+                return 22, 6.0
+        else:
+            # SD 1.5 (MeinaMix)
+            if q in ("ultra", "best", "very_high"):
+                return 32, 8.0
+            elif q in ("fast", "low", "standard"):
+                return 20, 7.0
+            else: # high (MeinaMix sweet spot)
+                return 28, 7.5
 
     def generate_image_comfyui(
         self,
@@ -149,7 +159,8 @@ class MediaEngine:
         width: Optional[int] = None,
         height: Optional[int] = None,
         steps: Optional[int] = None,
-        cfg: Optional[float] = None
+        cfg: Optional[float] = None,
+        progress_callback: Optional[Callable[[str], None]] = None
     ) -> Optional[bytes]:
         """Runs standard Text-to-Image workflow on local ComfyUI with optimal anime settings."""
         ckpts = self.get_available_checkpoints()
@@ -214,7 +225,7 @@ class MediaEngine:
 
         # Determine Quality Parameters (steps & cfg)
         qual = quality or os.environ.get("IMAGE_QUALITY", "high")
-        def_steps, def_cfg = self.get_quality_params(qual)
+        def_steps, def_cfg = self.get_quality_params(qual, is_sdxl=is_sdxl)
         if steps is None:
             steps = def_steps
         if cfg is None:
@@ -226,13 +237,20 @@ class MediaEngine:
 
         seed = random.randint(10000000, 99999999)
 
-        # Detect optional external VAE (e.g. orangemix.vae.pt)
+        # Detect optional external VAE (e.g. orangemix.vae.pt for SD 1.5)
         available_vaes = self.get_available_vaes()
         chosen_vae = None
-        for v in available_vaes:
-            if any(k in v.lower() for k in ["orangemix", "anime", "vae-ft", "kl-f8"]):
-                chosen_vae = v
-                break
+        if not is_sdxl:
+            for v in available_vaes:
+                if any(k in v.lower() for k in ["orangemix", "anime", "vae-ft", "kl-f8"]):
+                    chosen_vae = v
+                    break
+        else:
+            # For SDXL, only use external VAE if explicitly matching sdxl
+            for v in available_vaes:
+                if "sdxl" in v.lower():
+                    chosen_vae = v
+                    break
 
         workflow = {
             "4": {
@@ -305,9 +323,22 @@ class MediaEngine:
                 self.last_error = "ComfyUI tidak mengembalikan prompt_id."
                 return None
 
+            m_label = "Anything XL (SDXL)" if is_sdxl else "MeinaMix (SD 1.5)"
+            start_poll = time.time()
+            last_cb_time = 0.0
+
             # Poll history for completion
             for _ in range(160):  # Wait up to 240 seconds
                 time.sleep(1.5)
+                elapsed_sec = int(time.time() - start_poll)
+
+                if progress_callback and (time.time() - last_cb_time >= 3.0):
+                    last_cb_time = time.time()
+                    if elapsed_sec < 10:
+                        progress_callback(f"Memuat model {m_label} ke GPU... ({elapsed_sec}s)")
+                    else:
+                        progress_callback(f"Merender gambar waifu ({m_label}, {elapsed_sec}s)...")
+
                 try:
                     h_res = requests.get(f"{self.comfyui_url}/history/{prompt_id}", timeout=5)
                 except Exception:
@@ -331,6 +362,8 @@ class MediaEngine:
 
                         outputs = task.get("outputs", {})
                         if "9" in outputs and "images" in outputs["9"]:
+                            if progress_callback:
+                                progress_callback("Mendekode gambar & menyempurnakan hasil... ✨")
                             img_info = outputs["9"]["images"][0]
                             img_name = img_info["filename"]
                             subfolder = img_info.get("subfolder", "")
@@ -385,7 +418,8 @@ class MediaEngine:
         scene: str = "",
         outfit_label: str = "",
         is_nude: bool = False,
-        user_query: str = ""
+        user_query: str = "",
+        progress_callback: Optional[Callable[[str], None]] = None
     ) -> Tuple[Optional[bytes], str]:
         """
         Main entry for photo generation.
@@ -403,7 +437,8 @@ class MediaEngine:
                 effective_prompt,
                 negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
                 aspect_ratio=aspect_ratio,
-                quality=quality
+                quality=quality,
+                progress_callback=progress_callback
             )
             if local_img:
                 # Automatically save high-quality local render to Photo Vault

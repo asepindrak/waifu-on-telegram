@@ -184,7 +184,14 @@ def start_auxiliary_services():
                         break
             if model_path:
                 mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
-                cmd = [kcpp_exe, "--model", model_path] + mm_args + ["--gpulayers", "99", "--port", "5001"]
+                cmd = [
+                    kcpp_exe, "--model", model_path,
+                    "--port", "5001",
+                    "--gpulayers", "99",
+                    "--contextsize", "4096",
+                    "--smartcontext",
+                    "--threads", "4"
+                ] + mm_args
                 if platform.system() == "Windows":
                     cmd += ["--usecublas", "normal", "--quiet"]
                 else:

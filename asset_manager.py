@@ -21,6 +21,11 @@ ASSET_REGISTRY = {
         "patterns": ["*Qwythos*9B*.gguf", "*Mythos*9B*.gguf", "*Qwythos*.gguf"],
         "size_mb": 5512,
         "url": "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf",
+        "fallback_url": "https://hf-mirror.com/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf",
+        "mirrors": [
+            "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf",
+            "https://hf-mirror.com/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+        ],
         "description": "Model chat/roleplay uncensored terbaik (Abliterated Claude-Mythos reasoning, 1M context).",
         "required_for": "Otak Utama Chat & Roleplay Waifu (Locally Uncensored)"
     },
@@ -31,6 +36,11 @@ ASSET_REGISTRY = {
         "patterns": ["*Qwythos*mmproj*.gguf", "*mmproj-model-bf16*.gguf", "*mmproj*.gguf"],
         "size_mb": 879,
         "url": "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf",
+        "fallback_url": "https://hf-mirror.com/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf",
+        "mirrors": [
+            "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf",
+            "https://hf-mirror.com/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf"
+        ],
         "description": "Vision projector agar waifu bisa melihat dan mengomentari foto dari user.",
         "required_for": "Fitur Vision (Melihat Foto dari User)"
     },
@@ -41,8 +51,14 @@ ASSET_REGISTRY = {
         "filename": "meinamix_v12Final.safetensors",
         "patterns": ["*meinamix*.safetensors", "*meina*.safetensors", "*aom3*.safetensors"],
         "size_mb": 2033,
-        "url": "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16",
-        "fallback_url": "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V10%20-%20baked%20VAE.safetensors",
+        "url": "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors",
+        "fallback_url": "https://hf-mirror.com/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors",
+        "mirrors": [
+            "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors",
+            "https://hf-mirror.com/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors",
+            "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V10%20-%20baked%20VAE.safetensors",
+            "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16"
+        ],
         "civitai_url": "https://civitai.com/models/119057/meinamix",
         "description": "Checkpoint utama ilustrasi anime berkualitas tinggi untuk foto waifu konsisten (SD 1.5, cepat, hemat VRAM).",
         "required_for": "Generasi foto & PAP waifu (SD 1.5)"
@@ -335,7 +351,7 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
                 extra_args = ["--cpu"] if _should_use_cpu(py_embed) else []
                 return {
                     "cwd": cdir,
-                    "cmd": [py_embed, "-s", main_py, "--windows-standalone-build", "--port", "8188", "--listen", "127.0.0.1"] + extra_args
+                    "cmd": [py_embed, "-s", main_py, "--windows-standalone-build", "--port", "8188", "--listen", "127.0.0.1", "--disable-auto-launch", "--fast"] + extra_args
                 }
 
     # 2. Check virtual environments in cdir or parent
@@ -346,14 +362,14 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
                 extra_args = ["--cpu"] if _should_use_cpu(v_py) else []
                 return {
                     "cwd": cdir,
-                    "cmd": [v_py, main_py, "--port", "8188", "--listen", "127.0.0.1"] + extra_args
+                    "cmd": [v_py, main_py, "--port", "8188", "--listen", "127.0.0.1", "--disable-auto-launch", "--fast"] + extra_args
                 }
 
     # 3. Fallback to system python
     extra_args = ["--cpu"] if _should_use_cpu(sys.executable) else []
     return {
         "cwd": cdir,
-        "cmd": [sys.executable, main_py, "--port", "8188", "--listen", "127.0.0.1"] + extra_args
+        "cmd": [sys.executable, main_py, "--port", "8188", "--listen", "127.0.0.1", "--disable-auto-launch", "--fast"] + extra_args
     }
 
 def _get_min_model_bytes(spec: dict, candidate_path: Optional[str] = None) -> int:
@@ -560,12 +576,13 @@ def _download_file(url: str, target_path: str, fallback_url: Optional[str] = Non
         curl_path = shutil.which("curl")
         if curl_path:
             try:
-                # Add speed limit check (min 150KB/s over 20s) so curl fails over to faster mirror instead of crawling
+                # Robust curl with automatic resume (-C -), retries, and browser User-Agent
                 cmd = [
                     curl_path, "-fL", "-C", "-",
-                    "--retry", "2",
-                    "--speed-limit", "150000",
-                    "--speed-time", "20",
+                    "--retry", "5",
+                    "--retry-delay", "2",
+                    "--connect-timeout", "30",
+                    "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                     "--progress-bar",
                     "-o", target_path,
                     dl_url
@@ -574,24 +591,26 @@ def _download_file(url: str, target_path: str, fallback_url: Optional[str] = Non
                 if ret.returncode == 0 and os.path.exists(target_path) and os.path.getsize(target_path) >= min_bytes:
                     return True
                 if idx < len(candidate_urls):
-                    print(f"\n  ℹ Kecepatan mirror rendah atau terputus. Mencoba mirror berkecepatan tinggi berikutnya [{idx + 1}/{len(candidate_urls)}]...")
+                    print(f"\n  ℹ Mirror terputus atau tidak lengkap. Mencoba mirror berkecepatan tinggi berikutnya [{idx + 1}/{len(candidate_urls)}]...")
             except Exception as e:
                 logger.warning(f"curl download failed on {dl_url}: {e}")
 
         # Fallback to requests streaming download
         try:
             import requests
-            headers = {}
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
             initial_pos = 0
             if os.path.exists(target_path):
                 initial_pos = os.path.getsize(target_path)
                 headers["Range"] = f"bytes={initial_pos}-"
 
-            with requests.get(dl_url, headers=headers, stream=True, timeout=60) as r:
+            with requests.get(dl_url, headers=headers, stream=True, timeout=90) as r:
                 if r.status_code in (200, 206):
                     mode = "ab" if r.status_code == 206 else "wb"
-                    total_len = int(r.headers.get("content-length", 0)) + initial_pos
-                    dl = initial_pos
+                    dl = initial_pos if r.status_code == 206 else 0
+                    total_len = int(r.headers.get("content-length", 0)) + dl
                     with open(target_path, mode) as f:
                         for chunk in r.iter_content(chunk_size=1024 * 1024):
                             if chunk:

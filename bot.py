@@ -2928,9 +2928,23 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
 
     def run_gen():
         try:
-            if not media_engine.allow_cloud_fallback:
-                idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id)
             with ChatActionLoop(bot, chat_id, "upload_photo"):
+                if not media_engine.allow_cloud_fallback:
+                    idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id)
+
+                def photo_progress(stage_text: str):
+                    if status_msg and bot and chat_id:
+                        try:
+                            bot.send_chat_action(chat_id, "upload_photo")
+                            bot.edit_message_text(
+                                f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕\n⏳ _{stage_text}_",
+                                chat_id=chat_id,
+                                message_id=status_msg.message_id,
+                                parse_mode="Markdown"
+                            )
+                        except Exception:
+                            pass
+
                 neg_p = persona.get("negative_prompt", "")
                 if extra_neg:
                     neg_p += f", {extra_neg}"
@@ -2947,7 +2961,8 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                     scene=detected_scene,
                     outfit_label=outfit_label,
                     is_nude=is_nude,
-                    user_query=user_text
+                    user_query=user_text,
+                    progress_callback=photo_progress
                 )
             if img_bytes:
                 USER_LAST_PHOTO_CONTEXT[user_id]["img_bytes"] = img_bytes
@@ -4308,7 +4323,10 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
         persona = persona_mgr.get_active_persona()
 
         with ChatActionLoop(bot, message.chat.id, "typing"):
-            # 1. Proactively check if Local LLM backend is online
+            # 1. Proactively ensure LLM is awake (wakes from Smart Idle if sleeping)
+            idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
+
+            # 2. Check if Local LLM backend is online
             stat = llm_client.check_health()
             if not stat.get("online"):
                 health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=stat.get("error"))
@@ -4323,7 +4341,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 bot.reply_to(message, backend_msg, parse_mode="Markdown")
                 return
 
-            # 2. Record activity for proactive check-ins & learn facts
+            # 3. Record activity for proactive check-ins & learn facts
             proactive_engine.record_user_activity(message.from_user.id)
             memory_engine.auto_extract_facts(user_text, message.from_user.id)
 

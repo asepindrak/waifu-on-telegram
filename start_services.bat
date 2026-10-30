@@ -43,7 +43,7 @@ if exist "%KOBOLD_EXE%" (
             ) else (
                 echo [1/4] Starting KoboldCPP LLM Server with auto-loaded model...
             )
-            start "KoboldCPP Brain" /b "%KOBOLD_EXE%" --model "%KOBOLD_MODEL%" %MMPROJ_ARG% --gpulayers 99 --port 5001 --usecublas normal --quiet
+            start "KoboldCPP Brain" /b "%KOBOLD_EXE%" --model "%KOBOLD_MODEL%" %MMPROJ_ARG% --gpulayers 99 --port 5001 --contextsize 4096 --smartcontext --threads 4 --usecublas normal --quiet
             timeout /t 3 >nul
         ) else (
             echo [1/4] KoboldCPP LLM is already running on port 5001.

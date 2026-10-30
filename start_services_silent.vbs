@@ -42,7 +42,7 @@ If FSO.FileExists(ScriptDir & "\tools\koboldcpp.exe") Then
         Dim portCheck
         portCheck = WshShell.Run("powershell -NoProfile -Command ""$t = New-Object System.Net.Sockets.TcpClient; try { $t.Connect('127.0.0.1', 5001); $t.Close(); exit 0 } catch { exit 1 }""", 0, True)
         If portCheck <> 0 Then
-            WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && tools\koboldcpp.exe --model """ & modelFile & """" & mmprojArg & " --gpulayers 99 --port 5001 --usecublas normal --quiet", 0, False
+            WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && tools\koboldcpp.exe --model """ & modelFile & """" & mmprojArg & " --gpulayers 99 --port 5001 --contextsize 4096 --smartcontext --threads 4 --usecublas normal --quiet", 0, False
             WScript.Sleep 4000
         End If
     End If

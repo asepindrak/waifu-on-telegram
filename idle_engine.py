@@ -189,7 +189,14 @@ class IdleEngine:
 
                 if os.path.isfile(kcpp_exe) and model_path:
                     mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
-                    cmd = [kcpp_exe, "--model", model_path] + mm_args + ["--gpulayers", "99", "--port", "5001"]
+                    cmd = [
+                        kcpp_exe, "--model", model_path,
+                        "--port", "5001",
+                        "--gpulayers", "99",
+                        "--contextsize", "4096",
+                        "--smartcontext",
+                        "--threads", "4"
+                    ] + mm_args
                     if sys.platform == "win32":
                         cmd += ["--usecublas", "normal", "--quiet"]
                         popen_kwargs = {"creationflags": 0x08000000 | 0x00000200}
@@ -217,7 +224,7 @@ class IdleEngine:
 
             return False
 
-    def wake_comfyui(self, timeout_seconds: int = 25) -> bool:
+    def wake_comfyui(self, timeout_seconds: int = 40) -> bool:
         """
         Wakes ComfyUI generator on-demand when a photo/video is requested.
         """
@@ -279,7 +286,34 @@ class IdleEngine:
             except Exception:
                 pass
 
-        ok = self.wake_llm()
+        stop_feedback = threading.Event()
+
+        def _feedback_loop():
+            start_t = time.time()
+            while not stop_feedback.is_set():
+                stop_feedback.wait(2.5)
+                if stop_feedback.is_set():
+                    break
+                elapsed = int(time.time() - start_t)
+                if bot and chat_id and waking_msg:
+                    try:
+                        bot.send_chat_action(chat_id, "typing")
+                        bot.edit_message_text(
+                            f"🌸 *Waifu lagi bangun dari mode hemat daya...* ({elapsed}s) ✨",
+                            chat_id=chat_id,
+                            message_id=waking_msg.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+
+        fb_thread = threading.Thread(target=_feedback_loop, daemon=True)
+        fb_thread.start()
+        try:
+            ok = self.wake_llm()
+        finally:
+            stop_feedback.set()
+            fb_thread.join(timeout=1.0)
 
         # Clean up temporary status message
         if waking_msg and bot and chat_id:
@@ -308,13 +342,40 @@ class IdleEngine:
                 bot.send_chat_action(chat_id, "upload_photo")
                 waking_msg = bot.send_message(
                     chat_id,
-                    "📸 *Menyiapkan studio foto ComfyUI di PC...* (~5-10 detik) ✨",
+                    "📸 *Menyiapkan studio foto ComfyUI di PC...* (~5-15 detik) ✨",
                     parse_mode="Markdown"
                 )
             except Exception:
                 pass
 
-        ok = self.wake_comfyui()
+        stop_feedback = threading.Event()
+
+        def _comfy_feedback_loop():
+            start_t = time.time()
+            while not stop_feedback.is_set():
+                stop_feedback.wait(2.5)
+                if stop_feedback.is_set():
+                    break
+                elapsed = int(time.time() - start_t)
+                if bot and chat_id and waking_msg:
+                    try:
+                        bot.send_chat_action(chat_id, "upload_photo")
+                        bot.edit_message_text(
+                            f"📸 *Menyiapkan studio foto ComfyUI di PC...* ({elapsed}s) ✨",
+                            chat_id=chat_id,
+                            message_id=waking_msg.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+
+        fb_thread = threading.Thread(target=_comfy_feedback_loop, daemon=True)
+        fb_thread.start()
+        try:
+            ok = self.wake_comfyui()
+        finally:
+            stop_feedback.set()
+            fb_thread.join(timeout=1.0)
 
         if waking_msg and bot and chat_id:
             try:

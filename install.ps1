@@ -17,14 +17,27 @@ function Download-FileWithProgress {
         [string]$Url,
         [string]$DestinationPath,
         [string]$Description,
-        [string]$FallbackUrl = ""
+        [string]$FallbackUrl = "",
+        [long]$MinExpectedBytes = 0
     )
+    $minCheck = $MinExpectedBytes
+    if ($minCheck -le 0) {
+        if ($DestinationPath -match '\.(safetensors|gguf|ckpt)$') {
+            $minCheck = [long](500 * 1024 * 1024)
+        } else {
+            $minCheck = [long](20 * 1024 * 1024)
+        }
+    }
+
     if (Test-Path $DestinationPath) {
         $size = (Get-Item $DestinationPath).Length
-        if ($size -gt 1024*1024) {
+        if ($size -ge $minCheck) {
             $sizeMb = [math]::Round($size / 1MB, 1)
-            Write-Host "  [OK] $Description already downloaded: $DestinationPath ($sizeMb MB)" -ForegroundColor Green
+            Write-Host "  [OK] $Description already verified and complete: $DestinationPath ($sizeMb MB)" -ForegroundColor Green
             return $true
+        } else {
+            $sizeMb = [math]::Round($size / 1MB, 1)
+            Write-Host "  [INFO] Unduhan sebelumnya belum lengkap ($sizeMb MB). Melanjutkan unduhan (resume -C -)..." -ForegroundColor Yellow
         }
     }
 
@@ -41,30 +54,30 @@ function Download-FileWithProgress {
 
         try {
             if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-                & curl.exe -fL -C - --retry 3 --progress-bar -o "$DestinationPath" "$dlUrl"
+                & curl.exe -fL -C - --retry 5 --retry-delay 2 --connect-timeout 30 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" --progress-bar -o "$DestinationPath" "$dlUrl"
             } else {
                 Import-Module BitsTransfer -ErrorAction SilentlyContinue
                 if (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue) {
                     Start-BitsTransfer -Source $dlUrl -Destination $DestinationPath -DisplayName $Description
                 } else {
                     $wc = New-Object System.Net.WebClient
+                    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                     $wc.DownloadFile($dlUrl, $DestinationPath)
                 }
             }
             if (Test-Path $DestinationPath) {
                 $fSize = (Get-Item $DestinationPath).Length
-                if ($fSize -gt 1024*1024) {
+                if ($fSize -ge $minCheck) {
                     $fSizeMb = [math]::Round($fSize / 1MB, 1)
-                    Write-Host "  [OK] $Description downloaded successfully ($fSizeMb MB)" -ForegroundColor Green
+                    Write-Host "  [OK] $Description downloaded and verified successfully ($fSizeMb MB)" -ForegroundColor Green
                     return $true
                 } else {
-                    Remove-Item -Path $DestinationPath -Force -ErrorAction SilentlyContinue
-                    Write-Host "  [!] Download resulted in invalid/empty file ($fSize bytes). Retrying fallback..." -ForegroundColor Yellow
+                    $fSizeMb = [math]::Round($fSize / 1MB, 1)
+                    Write-Host "  [!] File unduhan belum mencapai ukuran minimum ($fSizeMb MB / min $([math]::Round($minCheck/1MB)) MB). Mencoba URL alternatif..." -ForegroundColor Yellow
                 }
             }
         } catch {
             Write-Host "  [!] Attempt failed: $_" -ForegroundColor Yellow
-            Remove-Item -Path $DestinationPath -Force -ErrorAction SilentlyContinue
         }
     }
     Write-Host "  [!] All download attempts failed for $Description." -ForegroundColor Red
@@ -192,8 +205,9 @@ if ($existingGgufs.Count -eq 0) {
         $dlModel = Read-Host "  Auto-download uncensored 'Huihui-Qwythos-9B-Claude-Mythos-5-1M' Q4_K model (~5.5 GB)? [Y/n, default: Y]"
         if ($dlModel.Trim().ToLower() -ne "n") {
             $qwythosUrl = "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+            $qwythosFallback = "https://hf-mirror.com/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
             $destGguf = "$modelsDir\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
-            Download-FileWithProgress -Url $qwythosUrl -DestinationPath $destGguf -Description "Huihui-Qwythos 9B Abliterated Q4_K (~5.5 GB)"
+            Download-FileWithProgress -Url $qwythosUrl -DestinationPath $destGguf -Description "Huihui-Qwythos 9B Abliterated Q4_K (~5.5 GB)" -FallbackUrl $qwythosFallback -MinExpectedBytes ([long](3800*1024*1024))
         }
     }
 } else {
@@ -224,8 +238,9 @@ if ($existingMmproj.Count -eq 0) {
         $dlVision = Read-Host "  Auto-download Huihui-Qwythos Vision Adapter (~879 MB) so waifu can see photos? [Y/n, default: Y]"
         if ($dlVision.Trim().ToLower() -ne "n") {
             $visionUrl = "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf"
+            $visionFallback = "https://hf-mirror.com/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf"
             $destMmproj = "$modelsDir\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
-            Download-FileWithProgress -Url $visionUrl -DestinationPath $destMmproj -Description "Huihui-Qwythos Vision Adapter (~879 MB)"
+            Download-FileWithProgress -Url $visionUrl -DestinationPath $destMmproj -Description "Huihui-Qwythos Vision Adapter (~879 MB)" -FallbackUrl $visionFallback -MinExpectedBytes ([long](600*1024*1024))
         }
     }
 } else {
@@ -309,16 +324,16 @@ function Select-And-Download-AnimeCheckpoint {
         $xlUrl = "https://huggingface.co/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors"
         $xlFallback = "https://hf-mirror.com/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors"
         $xlDest = "$ckptDir\AnythingXL_xl.safetensors"
-        Download-FileWithProgress -Url $xlUrl -DestinationPath $xlDest -Description "万象熔炉 | Anything XL SDXL (~6.6 GB)" -FallbackUrl $xlFallback
+        Download-FileWithProgress -Url $xlUrl -DestinationPath $xlDest -Description "万象熔炉 | Anything XL SDXL (~6.6 GB)" -FallbackUrl $xlFallback -MinExpectedBytes ([long](4500*1024*1024))
         $selectedCkpt = "AnythingXL_xl.safetensors"
     } elseif ($imgChoice -eq "3") {
         Write-Host "  [INFO] Melewati unduhan model lokal. Foto waifu dapat menggunakan Cloud Fallback Engine." -ForegroundColor DarkGray
         $selectedCkpt = ""
     } else {
-        $meinaUrl = "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16"
+        $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
         $meinaDest = "$ckptDir\meinamix_v12Final.safetensors"
-        $meinaFallback = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V10%20-%20baked%20VAE.safetensors"
-        Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback
+        $meinaFallback = "https://hf-mirror.com/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
+        Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11/v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback -MinExpectedBytes ([long](1500*1024*1024))
         $selectedCkpt = "meinamix_v12Final.safetensors"
     }
 
