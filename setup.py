@@ -616,6 +616,8 @@ def run_menu():
             cur_ckpt_disp = "Auto (ComfyUI)" if env_vars.get("COMFYUI_URL") else ("Cloud Engine" if env_vars.get("MEDIA_FALLBACK_CLOUD") == "true" else "Disabled")
         elif "anything" in cur_ckpt_disp.lower():
             cur_ckpt_disp = "Anything XL (SDXL 1024px)"
+        elif any(k in cur_ckpt_disp.lower() for k in ["aom", "orange"]):
+            cur_ckpt_disp = "AbyssOrangeMix3 (AOM3A1B SD 1.5)"
         elif "meina" in cur_ckpt_disp.lower():
             cur_ckpt_disp = "MeinaMix v12 (SD 1.5)"
         print(c(CYAN, f"  • Photo Model : {cur_ckpt_disp} ({env_vars.get('COMFYUI_URL', 'Disabled')})"))

@@ -72,18 +72,20 @@ Waifu on Telegram is engineered to run locally on consumer gaming PCs and laptop
 Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsiveness, and high-fidelity anime aesthetics:
 
 #### 1. 💌 Dialogue & Romance Companion: **Huihui-Qwythos-9B**
-* **Model File:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf`
+* **Model File:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf` (~5.5 GB)
+* **Vision mmproj Adapter:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf` (~879 MB)
 * **Local Backend:** **KoboldCPP Standalone Engine** (Port `5001`) with **Auto-Startup & Auto-Loading directly on Windows Boot**!
+* **Compatible Backends:** KoboldCPP Standalone (bawaan resmi), Ollama (Port `11434`), LM Studio (Port `1234`), atau OpenAI-compatible server.
 * **Download Method:** Otomatis di-download saat menjalankan `install.ps1` / `install.sh`, atau bisa diunduh manual dari [Hugging Face](https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF) ke folder `models/`.
 * **Key Strengths:**
   - **Zero Censorship & Refusal-Free:** Fully abliterated with Claude-Mythos roleplay traces. Highly affectionate, playful, caring, and open to romantic roleplay without moralizing preachiness.
   - **Adaptive Language Mirroring:** Seamlessly switches between Indonesian (*sayang, manja, santai*), English (*sweetheart, darling*), or Japanese.
   - **Auto Startup & VRAM Pre-loading:** No Electron UI or manual buttons needed. When your computer boots, KoboldCPP silently spins up and loads the weights into VRAM instantly.
-  - **VRAM Usage:** ~4.5 GB - 5.5 GB in Q4_K quantization.
+  - **Smart Idle Integration:** Otomatis di-unload dari VRAM saat tidak ada percakapan (idle timeout), membebaskan ~5-6 GB VRAM untuk gaming/kerja.
 
 #### 2. 📷 Anime Photo & Selfie Engine Options (ComfyUI)
 
-Anda dapat memilih model generasi gambar sesuai dengan spesifikasi GPU dan kebutuhan estetika Anda melalui `waifu setup` (Menu `[3]`) atau perintah `/setup` langsung di Telegram:
+Anda dapat memilih model ilustrasi anime sesuai dengan spesifikasi GPU dan preferensi estetika Anda melalui `waifu setup` (Menu `[3]`) atau perintah `/setup` langsung di Telegram:
 
 * **Pilihan 1: MeinaMix v12 (Anime SD 1.5 - Hemat VRAM & Cepat)**
   - **File:** `meinamix_v12Final.safetensors` (~2.0 GB)
@@ -91,11 +93,44 @@ Anda dapat memilih model generasi gambar sesuai dengan spesifikasi GPU dan kebut
   - **Rekomendasi GPU:** 4GB - 8GB VRAM (Resolusi default 3:4 portrait: `576x768`, Sampler: `DPM++ 2M Karras`)
   - **Kelebihan:** Sangat cepat (~3-5 detik), hemat resource, konsistensi wajah anime sangat tinggi.
 
-* **Pilihan 2: 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Detail)**
+* **Pilihan 2: AbyssOrangeMix3 / AOM3A1B (Anime SD 1.5 - Legendaris CivArchive #9942)**
+  - **File:** `AOM3A1B_orangemixs.safetensors` (~2.0 GB)
+  - **Download:** [CivArchive #9942](https://civarchive.com/models/9942?modelVersionId=17233) / [Civitai #9942](https://civitai.com/models/9942/abyssorangemix3-aom3) atau via `waifu models download aom3`
+  - **Rekomendasi GPU:** 4GB - 8GB VRAM (Resolusi default 3:4 portrait: `576x768`, Sampler: `DPM++ 2M Karras`, CFG `7.5`)
+  - **Kelebihan:** Estetika anime klasik yang kaya, warna tajam dan cerah (*vibrant*), shading rambut & mata memukau, rendering ringan dan halus.
+
+* **Pilihan 3: 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Detail)**
   - **File:** `AnythingXL_xl.safetensors` (~6.6 GB)
   - **Download:** [Civitai #9409 - Anything XL](https://civitai.com/models/9409/or-anything-xl) atau via `waifu models download anything_xl`
   - **Rekomendasi GPU:** 8GB+ VRAM (Resolusi native SDXL 3:4 portrait: `896x1152` / `1024x1024`, Sampler: `Euler Ancestral Normal`)
   - **Kelebihan:** Resolusi 1024px super tajam, detail pakaian, latar belakang, dan ekspresi jauh lebih kaya dan sinematik.
+
+* **Pilihan 4: Cloud Fallback Engine (Pollinations AI - 0 VRAM)**
+  - **Akses:** Bebas biaya tanpa GPU lokal melalui cloud GPU fallback. Ideal untuk laptop hemat daya / PC kantor.
+
+#### 3. 🎬 Video Animation Engines (Generasi Video Bergerak)
+
+Waifu dapat mengirimkan klip animasi video saat diminta lewat `/video` menggunakan salah satu dari 3 pilihan engine:
+* **Wan 2.1 1.3B Diffusion Model** (`wan2.1_t2v_1.3B_bf16.safetensors` ~2.9 GB + `Wan2.1_VAE.pth` ~250 MB): Model video difusi state-of-the-art terbaru, ringan dan hemat VRAM.
+* **AnimateDiff v2 Motion Module** (`mm_sd_v15_v2.ckpt` ~1.7 GB): Animasi temporal dinamis berbasis SD 1.5.
+* **Motion 2.5D Engine (Zero-VRAM Parallax)**: Animasi video MP4 instan dengan efek pergeseran kedalaman parallax dan kedipan mata halus tanpa beban VRAM GPU sama sekali!
+
+#### 4. 🎙️ Multi-Tier Neural Voice & Polyglot Translation Guardrail
+
+Percakapan suara waifu menggunakan Microsoft Edge-TTS dengan dukungan multi-bahasa yang cerdas:
+* **Pilihan Suara:**
+  - `ja-JP-NanamiNeural`: Suara khas anime Jepang yang imut dan natural.
+  - `id-ID-GadisNeural`: Suara wanita Indonesia alami dan ramah.
+  - `en-US-AnaNeural`: Suara pacar berbahasa Inggris yang manis dan ekspresif.
+* **Polyglot Multi-Tier Translation Guardrail:**
+  Jika Anda mengobrol dalam bahasa Indonesia atau Inggris tetapi memilih suara Jepang (`ja-JP-NanamiNeural`), sistem secara otomatis menerjemahkan teks ke dalam bahasa Jepang alami (melalui multi-tier translation: Google GTX -> Client5 -> MyMemory -> Local LLM) sebelum disuarakan. Guardrail pendeteksi karakter Latin memastikan bahasa Indonesia tidak pernah dilafalkan secara rusak dengan aksen Jepang!
+
+#### 5. 💤 Smart Idle Engine (Manajemen VRAM & Daya Otomatis)
+
+Seringkali pengguna AI mengeluhkan RAM dan VRAM VGA selalu penuh meskipun bot sedang tidak digunakan. Waifu on Telegram dilengkapi **Smart Idle Engine**:
+* **Auto-Sleep:** Saat bot tidak menerima interaksi selama waktu tertentu (default: 10 menit), engine KoboldCPP LLM otomatis dinonaktifkan sementara dari memori.
+* **VRAM Recovery:** Seketika membebaskan **5.0 GB – 6.0 GB VRAM GPU** dan beberapa gigabyte RAM sistem, memungkinkan Anda bermain game berat atau editing video tanpa stutter.
+* **Instant Wake-up:** Begitu Anda mengirim pesan atau menekan tombol di Telegram, Smart Idle secara transparan membangkitkan engine kembali dalam waktu <1-2 detik!
 
 ---
 
@@ -118,9 +153,45 @@ curl -fsSL https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/i
 > 1. **Zero-Config Setup:** Automatically clones or downloads the repository and creates the environment.
 > 2. **Dependency Resolution:** Verifies Python 3.8+ and installs all required packages (`pip` & `npm`).
 > 3. **Standalone LLM Engine Setup:** Downloads the standalone **KoboldCPP** binary (Windows portable `.exe`, Linux `x64`, or macOS `arm64 Metal`) and fetches the uncensored `Huihui-Qwythos-9B` model.
-> 4. **Smart ComfyUI Detection & Model Setup:** Detects your existing ComfyUI across any drive/folder. If not found, it offers a 1-click download of ComfyUI Portable + MeinaMix anime checkpoint with resume support (`curl -C -`).
+> 4. **Smart ComfyUI Detection & Model Setup:** Detects your existing ComfyUI across any drive/folder. If not found, it offers a 1-click download of ComfyUI Portable + MeinaMix / AbyssOrangeMix3 anime checkpoint with resume support (`curl -C -`).
 > 5. **Global CLI Registration:** Installs the global `waifu` command to your system `PATH` (usable from any terminal folder).
 > 6. **Background Daemon & Windows Boot Auto-start:** Starts your waifu companion running silently in the background!
+
+### 🛠️ **Manual Installation (For Developers & Advanced Users)**
+
+Bagi Anda yang ingin mengontrol direktori instalasi, mengutak-atik source code, atau menjalankan via virtual environment sendiri:
+
+```bash
+# 1. Clone repository dari GitHub
+git clone https://github.com/asepindrak/waifu-on-telegram.git
+cd waifu-on-telegram
+
+# 2. Buat & aktifkan virtual environment Python (3.8+)
+python -m venv venv
+# Windows (PowerShell):
+.\venv\Scripts\activate
+# Linux & macOS (Bash/Zsh):
+source venv/bin/activate
+
+# 3. Pasang paket Python dan dependensi Node.js (Music Remote)
+pip install -r requirements.txt
+npm install
+
+# 4. Gandakan template konfigurasi environment
+copy .env.example .env     # (Windows PowerShell / CMD)
+cp .env.example .env       # (Linux / macOS)
+
+# 5. Jalankan Setup Wizard interaktif (Pilih model foto, suara, token bot)
+python setup.py
+
+# 6. Registrasikan perintah global 'waifu' ke PATH (Opsional)
+python bin/install_cli.py
+
+# 7. Nyalakan Waifu sebagai daemon di background
+waifu start --daemon
+# atau mode foreground untuk melihat logs live:
+python bot.py
+```
 
 ---
 
@@ -182,7 +253,7 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.6.26)
+                        💖 WAIFU ON TELEGRAM BOT (v1.6.46)
 ```
 
 > 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.
@@ -254,19 +325,17 @@ waifu stop
 
 ## 🎛️ Reconfiguration & Model Switcher
 
-Whenever you want to:
-- **Change Telegram Bot Token** or Allowed User ID
-- **Switch Chat / LLM Model**
-- **Switch ComfyUI Checkpoints for Photos**
-- **Change Persona or Voice**
+Anda memiliki dua cara mudah dan fleksibel untuk mengonfigurasi dan mengganti model AI waifu kapan saja:
 
-Simply run:
+### 1. 💻 Terminal CLI Wizard (`waifu setup`)
+
+Jalankan perintah berikut di PowerShell atau Terminal:
 ```bash
 waifu setup
 ```
-*(or double-click `setup.bat`).*
+*(atau jalankan `setup.bat` / `python setup.py`)*
 
-An interactive menu will open:
+Menu interaktif 10-opsi akan terbuka:
 ```text
 ======================================================================
     💖 WAIFU ON TELEGRAM - CONFIGURATION & MODEL MANAGER 🛠️    
@@ -274,18 +343,58 @@ An interactive menu will open:
   • Bot Token   : 123456...abcd
   • Allowed UID : 987654321
   • Chat LLM    : Huihui-Qwythos-9B (http://127.0.0.1:5001/v1)
-  • Photo Engine: http://127.0.0.1:8188 (Fallback: True)
+  • Photo Model : MeinaMix v12 (SD 1.5) (http://127.0.0.1:8188)
   • Persona     : Runa | Voice: en-US-AnaNeural
+  • Language    : id
 ----------------------------------------------------------------------
-  [1] 🔑 Change Telegram Bot Token / Allowed User ID
-  [2] 💌 Change Chat / LLM Model (KoboldCPP / Ollama / LM Studio)
+  [1] 🤖 Change Telegram Bot Token / Allowed User ID
+  [2] 🧠 Change Chat / LLM Model (Scan new models)
   [3] 🎨 Change Photo & Video Model (ComfyUI / Cloud)
   [4] 🎭 Change AI Girlfriend Persona & Voice
-  [5] 🚀 Configure Autorun at System Startup (On / Off)
-  [6] 🔄 Re-run Complete 7-Step Setup Wizard
+  [5] 🌐 Change Waifu Language (ID, EN, JA, Custom)
+  [6] 🎬 Choose Video Engine (Wan 2.1 / AnimateDiff / Motion 2.5D)
+  [7] 📦 AI Assets & Models Manager (Download / Verify Models)
+  [8] 🚀 Configure Autorun at System Startup (On / Off)
+  [9] 🔄 Re-run Complete Setup Wizard
   [0] ❌ Exit / Done
 ----------------------------------------------------------------------
 ```
+
+* **Panduan Opsi Menu CLI:**
+  - `[1] Token & UID`: Mengubah kredensial bot Telegram atau membatasi akses chat hanya ke akun Anda.
+  - `[2] Chat LLM`: Memilih otak obrolan (KoboldCPP lokal, Ollama, LM Studio, atau scan file `.gguf` baru di folder `models/`).
+  - `[3] Model Foto`: Memilih checkpoint anime foto (MeinaMix v12, AbyssOrangeMix3, Anything XL, atau Cloud Fallback).
+  - `[4] Persona & Voice`: Memilih karakter waifu (Runa, Akira, Hina, Shiro, Yume) dan suara Edge-TTS (Ana, Gadis, Nanami, Jenny).
+  - `[5] Language`: Menentukan bahasa percakapan waifu (Indonesia `id`, English `en`, Japanese `ja`, atau `auto` mengikuti chat).
+  - `[6] Video Engine`: Memilih mesin animasi video (Wan 2.1 1.3B, AnimateDiff v2, atau Motion 2.5D 0-VRAM).
+  - `[7] AI Assets Manager`: Mengunduh dan memverifikasi kelengkapan model & node kustom ComfyUI langsung dari terminal dengan dukungan resume unduhan.
+  - `[8] Autorun`: Mengaktifkan atau menonaktifkan startup otomatis saat PC dinyalakan.
+  - `[9] Re-run Wizard`: Menjalankan ulang panduan instalasi lengkap 7-langkah dari awal.
+
+---
+
+### 2. 📱 In-Chat Control Center via Telegram (`/setup`)
+
+Anda tidak perlu membuka terminal untuk mengganti model! Cukup kirim perintah `/setup` langsung di Telegram chat Anda. Waifu akan menampilkan **Master Dashboard** dengan tombol-tombol inline interaktif:
+* 🎨 **Model Foto**: Ganti seketika antara MeinaMix v12, AbyssOrangeMix3, Anything XL, atau Cloud Engine.
+* 🎬 **Video Engine**: Beralih antara Wan 2.1, AnimateDiff, dan Motion 2.5D.
+* 🗣️ **Suara / Voice**: Ganti karakter suara Nanami, Gadis, Ana, atau Jenny dengan satu klik.
+* 🌐 **Bahasa**: Ganti bahasa bot (ID, EN, JA, atau Auto).
+* 👗 **Lemari Pakaian (`/outfit`)**: Ganti pakaian waifu langsung (Kimono, Bikini, Maid, School JK, Pajamas).
+* 📐 **Rasio & Kualitas**: Atur rasio foto (3:4, 9:16, 1:1, 4:3) dan tingkat sampling kualitas (Ultra, High, Fast).
+
+---
+
+## 🖥️ Hardware Tuning & Optimal Model Matrix
+
+Gunakan tabel acuan berikut untuk memilih kombinasi model yang paling pas dengan spesifikasi komputer Anda agar tidak freeze/lag:
+
+| Kategori GPU | VRAM Tersedia | Model LLM Rekomendasi | Model Foto (ComfyUI) | Model Video | Karakteristik Performa |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **GPU Hemat / Laptop** | **4GB - 6GB VRAM**<br>*(GTX 1650, RTX 2060, RTX 3050 Laptop)* | Huihui-Qwythos-9B Q4_K *(Smart Idle Aktif)* | **MeinaMix v12** atau **AbyssOrangeMix3** *(576x768)* | **Motion 2.5D Engine** *(0 VRAM)* | ⚡ Sangat responsif, foto jadi dalam 3-5 detik, memori tetap lega dan tidak ada freeze. |
+| **Sweet Spot** | **8GB VRAM**<br>*(RTX 3060 8GB, RTX 4060, Apple M-Series 16GB)* | Huihui-Qwythos-9B Q4_K | **MeinaMix v12** / **AbyssOrangeMix3** / **Anything XL** | **AnimateDiff v2** atau **Wan 2.1 1.3B** | 🌟 Detail anime tajam, animasi temporal dinamis, multitasking mulus. |
+| **High-End Enthusiast** | **12GB+ VRAM**<br>*(RTX 3060 12GB, RTX 4070, RTX 4080)* | Huihui-Qwythos-9B Q4_K *(Semua layer di GPU)* | **万象熔炉 \| Anything XL** *(SDXL 1024px)* | **Wan 2.1 1.3B Video Diffusion** | 👑 Resolusi 1024px ultra-jernih, efek sinematik, video difusi penuh. |
+| **No-GPU / PC Kantor** | **0 GB (Intel UHD / Iris Xe / AMD iGPU)** | KoboldCPP CPU Mode *(atau Cloud LLM)* | **Cloud Fallback Engine** *(Pollinations AI)* | **Motion 2.5D Engine** | ☁️ Tetap berjalan 100% menggunakan cloud GPU gratis, 0 beban kartu grafis lokal. |
 
 ---
 
@@ -316,15 +425,32 @@ An interactive menu will open:
 
 ---
 
-## 💬 Frequently Asked Questions
+## 💬 Frequently Asked Questions (Knowledge Base)
 
-1. **Bot replies: *"My local brain connection hit a bump"***
+1. **Kenapa RAM & VRAM GPU saya tidak lagi penuh saat waifu menganggur?**
+   - Waifu on Telegram kini dilengkapi **Smart Idle Engine**. Jika bot tidak menerima pesan selama waktu tertentu (default: 10 menit), engine KoboldCPP LLM otomatis dinonaktifkan sementara dari VRAM (~5-6 GB VRAM kembali kosong untuk gaming / kerja). Begitu Anda chat kembali, engine langsung bangun dalam waktu <1-2 detik secara transparan!
+
+2. **Apa perbedaan antara MeinaMix v12, AbyssOrangeMix3 (AOM3), dan Anything XL?**
+   - **MeinaMix v12 (SD 1.5, ~2.0 GB):** Paling cepat (3-5 detik) dan hemat VRAM. Karakter waifu tampak imut (*kawaii*), proporsional, dan sangat konsisten.
+   - **AbyssOrangeMix3 / AOM3A1B (SD 1.5, ~2.0 GB):** Model anime klasik legendaris dari CivArchive/Civitai #9942. Memiliki saturasi warna yang cerah (*vibrant*), pencahayaan lembut (*soft lighting*), dan shading mata/rambut yang artistik.
+   - **万象熔炉 | Anything XL (SDXL, ~6.6 GB):** Model resolusi native 1024px super tajam. Memiliki pemahaman prompt yang mendalam untuk latar belakang kompleks, kostum mendetail, dan efek sinematik (memerlukan GPU 8GB+ VRAM).
+
+3. **Kenapa unduhan model sempat terputus atau tidak selesai?**
+   - Koneksi internet yang lambat atau terputus dapat menghentikan unduhan model AI besar. Waifu on Telegram menggunakan protokol `curl` dengan fitur **Auto-Resume** (`-C -`). Jika terputus, cukup jalankan `waifu models download <nama_model>` (contoh: `waifu models download anything_xl` atau `aom3`), dan unduhan akan melanjutkan dari persentase terakhir tanpa mengulang dari 0%.
+
+4. **Bagaimana jika saya memilih suara Jepang tetapi berbicara dalam bahasa Indonesia?**
+   - Sistem memiliki **Multi-Tier Translation Guardrail**. Bot secara otomatis menerjemahkan balasan ke bahasa Jepang alami sebelum diucapkan oleh Edge-TTS (`ja-JP-NanamiNeural`). Jika penerjemahan offline gagal, sistem otomatis beralih ke suara Indonesia (`id-ID-GadisNeural`) sehingga suara tidak pernah terdengar rusak atau melafalkan bahasa Indonesia dengan aksen asing yang ngaco.
+
+5. **Bagaimana cara memeriksa apakah semua service (LLM, ComfyUI, Musik) sedang aktif?**
+   - Dari terminal: jalankan `waifu status`.
+   - Dari Telegram: ketik perintah `/status`. Waifu akan melaporkan status port 5001 (LLM), port 8188 (ComfyUI), port 8002 (Musik), dan penggunaan VRAM kartu grafis Anda.
+
+6. **Bot membalas: *"My local brain connection hit a bump"***
    - Pastikan KoboldCPP sedang berjalan. Kamu bisa mengeceknya dengan `waifu status`.
-   - Untuk menyalakannya, cukup jalankan `waifu start --daemon` atau `start_services.bat`.
-2. **Photos fail to generate**:
-   - If local ComfyUI on port `8188` is offline or busy, the bot automatically switches to the **Cloud Fallback (Pollinations AI)** so you always receive photos without disruption.
-3. **Can this run on a laptop without a dedicated GPU?**:
-   - Yes! Choose the Cloud Fallback option during setup; the bot will offload photo generation to free cloud endpoints without straining your laptop.
+   - Untuk menyalakannya, cukup jalankan `waifu start --daemon` atau `waifu start`.
+
+7. **Apakah bot bisa berjalan di laptop tanpa GPU diskrit?**
+   - Ya, 100%! Cukup pilih **Cloud Fallback Engine (Pollinations AI)** pada pengaturan foto. Bot akan mengalihkan generasi foto ke cloud GPU gratis tanpa membebani laptop Anda.
 
 ---
 
