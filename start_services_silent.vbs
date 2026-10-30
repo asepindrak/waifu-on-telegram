@@ -48,12 +48,12 @@ If FSO.FileExists(ScriptDir & "\tools\koboldcpp.exe") Then
     End If
 End If
 
-' 2. Start ComfyUI Generator if present and not already running
+' 2. Start ComfyUI Generator if present and not on-demand
 Dim comfyRunning
 comfyRunning = WshShell.Run("powershell -NoProfile -Command ""if ((Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*main.py*' -and $_.CommandLine -like '*8188*' }) -or (Test-NetConnection -ComputerName 127.0.0.1 -Port 8188 -InformationLevel Quiet -WarningAction SilentlyContinue)) { exit 0 } else { exit 1 }""", 0, True)
 If comfyRunning <> 0 Then
     Dim comfyCheck
-    comfyCheck = WshShell.Run("python -c ""import asset_manager; spec = asset_manager.get_comfyui_launch_spec(); exit(0 if spec else 1)""", 0, True)
+    comfyCheck = WshShell.Run("python -c ""import os, asset_manager; from dotenv import load_dotenv; load_dotenv(); exit(1 if os.environ.get('COMFYUI_ON_DEMAND','true').lower() in ('1','true','yes') else (0 if asset_manager.get_comfyui_launch_spec() else 1))""", 0, True)
     If comfyCheck = 0 Then
         WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && python -c ""import asset_manager, subprocess; spec = asset_manager.get_comfyui_launch_spec(); subprocess.run(spec['cmd'], cwd=spec['cwd'])"" >> comfyui.log 2>&1", 0, False
         WScript.Sleep 4000

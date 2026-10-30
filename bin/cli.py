@@ -196,7 +196,11 @@ def start_auxiliary_services():
                     pass
 
     # 2. ComfyUI (Port 8188)
-    if not is_port_listening(8188) and asset_manager:
+    comfyui_on_demand = os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")
+    media_cloud = os.environ.get("MEDIA_FALLBACK_CLOUD", "false").lower() in ("true", "1", "yes")
+    if comfyui_on_demand and not media_cloud:
+        print(c(CYAN, "  💤 ComfyUI on standby (On-Demand Mode: otomatis aktif saat ada request foto/video)"))
+    elif not is_port_listening(8188) and asset_manager and not media_cloud:
         spec = asset_manager.get_comfyui_launch_spec()
         if spec:
             try:
@@ -272,12 +276,17 @@ def cmd_status():
     else:
         import urllib.request
         print(c(BOLD + CYAN, f"System Status Diagnostics (v{get_version()}):"))
-        for name, url in [("Local LLM (KoboldCPP 5001)", "http://127.0.0.1:5001/v1/models"), ("ComfyUI (8188)", "http://127.0.0.1:8188/system_stats")]:
+        smart_idle = os.environ.get("SMART_IDLE_ENABLED", "true").lower() in ("true", "1", "yes")
+        on_demand = os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")
+        for name, url, is_idle in [("Local LLM (KoboldCPP 5001)", "http://127.0.0.1:5001/v1/models", smart_idle), ("ComfyUI (8188)", "http://127.0.0.1:8188/system_stats", on_demand)]:
             try:
                 with urllib.request.urlopen(url, timeout=2) as r:
                     print(f"  ✓ {name}: " + c(GREEN, "ONLINE"))
             except Exception:
-                print(f"  🔴 {name}: " + c(RED, "OFFLINE"))
+                if is_idle:
+                    print(f"  💤 {name}: " + c(CYAN, "STANDBY / TIDUR (Smart Idle)"))
+                else:
+                    print(f"  🔴 {name}: " + c(RED, "OFFLINE"))
 
 def cmd_setup():
     setup_py = os.path.join(PROJECT_ROOT, "setup.py")

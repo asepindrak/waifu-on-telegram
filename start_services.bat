@@ -51,19 +51,19 @@ if exist "%KOBOLD_EXE%" (
     )
 )
 
-:: 2. Start ComfyUI Photo Generator on port 8188 if not already running
-powershell -NoProfile -Command "$tcp = New-Object System.Net.Sockets.TcpClient; try { $tcp.Connect('127.0.0.1', 8188); $tcp.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
-if errorlevel 1 (
-    python -c "import asset_manager; spec = asset_manager.get_comfyui_launch_spec(); exit(0 if spec else 1)" >nul 2>&1
-    if not errorlevel 1 (
+:: 2. Start ComfyUI Photo Generator on port 8188 if not already running and not on-demand
+python -c "import os, asset_manager; from dotenv import load_dotenv; load_dotenv(); exit(1 if os.environ.get('COMFYUI_ON_DEMAND','true').lower() in ('1','true','yes') else (0 if asset_manager.get_comfyui_launch_spec() else 1))" >nul 2>&1
+if not errorlevel 1 (
+    powershell -NoProfile -Command "$tcp = New-Object System.Net.Sockets.TcpClient; try { $tcp.Connect('127.0.0.1', 8188); $tcp.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
+    if errorlevel 1 (
         echo [2/4] Starting ComfyUI Photo Generator (safe VRAM mode)...
         start "ComfyUI Generator" /b python -c "import asset_manager, subprocess; spec = asset_manager.get_comfyui_launch_spec(); subprocess.run(spec['cmd'], cwd=spec['cwd'])" >nul 2>&1
         timeout /t 3 >nul
     ) else (
-        echo [2/4] ComfyUI not detected locally. Photo Vault album will be used for photos.
+        echo [2/4] ComfyUI Generator is already active on port 8188.
     )
 ) else (
-    echo [2/4] ComfyUI Generator is already active on port 8188.
+    echo [2/4] ComfyUI on standby (On-Demand Mode: auto-starts on photo/video request).
 )
 
 :: 3. Start Music Remote Server if node exists

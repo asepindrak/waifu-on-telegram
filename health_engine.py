@@ -50,7 +50,8 @@ class HealthEngine:
         check_interval: int = 30,
         enabled: bool = True,
         self_healing_enabled: bool = True,
-        project_root: Optional[str] = None
+        project_root: Optional[str] = None,
+        idle_engine=None
     ):
         self.llm_client = llm_client
         self.media_engine = media_engine
@@ -58,6 +59,7 @@ class HealthEngine:
         self.enabled = enabled
         self.self_healing_enabled = self_healing_enabled
         self.project_root = project_root or os.path.dirname(os.path.abspath(__file__))
+        self.idle_engine = idle_engine
 
         self.last_llm_online: Optional[bool] = None
         self.last_media_online: Optional[bool] = None
@@ -446,17 +448,24 @@ class HealthEngine:
             greeting = f"Halo sayang! Aku sudah online dan siap menemani obrolan serta aktivitasmu~ 🥰"
 
         # Service badges
+        is_idle_sleeping = bool(self.idle_engine and self.idle_engine.enabled and self.idle_engine.is_llm_sleeping)
         if is_llm_online:
             llm_badge = f"🟢 **ONLINE** (`{stat.get('backend', 'KoboldCPP')}` - `{stat.get('model', 'Active Model')}`)"
+        elif is_idle_sleeping:
+            llm_badge = "💤 **STANDBY / TIDUR** (Mode Hemat Daya • Bangun Otomatis Saat Chat)"
         else:
             llm_badge = f"🔴 **OFFLINE / MATI** (`{self.llm_client.base_url}`)"
 
+        is_comfy_ondemand = bool(self.idle_engine and self.idle_engine.enabled and self.idle_engine.comfyui_on_demand)
         if is_media_online:
             media_badge = f"🟢 **ONLINE** (`{media_stat.get('backend', 'ComfyUI Local')}`)"
+        elif is_comfy_ondemand:
+            media_badge = "💤 **ON-DEMAND** (Standby • Otomatis Aktif Saat Request Foto)"
         else:
             media_badge = "🟡 **Mode Cadangan / Vault Siap**"
 
         healing_badge = "🟢 **Aktif (Auto-Restart)**" if self.self_healing_enabled else "⚪ **Nonaktif**"
+        power_badge = "🟢 **Aktif (Smart Idle)**" if (self.idle_engine and self.idle_engine.enabled) else "⚪ **Nonaktif**"
 
         status_body = (
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -464,11 +473,12 @@ class HealthEngine:
             f"🎨 **Generator Foto** : {media_badge}\n"
             f"🎙️ **Voice & Audio**   : 🟢 **Aktif**\n"
             f"🩹 **Self-Healing**    : {healing_badge}\n"
+            f"⚡ **Hemat Daya (Idle)**: {power_badge}\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━"
         )
 
         warning_section = ""
-        if not is_llm_online:
+        if not is_llm_online and not is_idle_sleeping:
             warning_section = (
                 f"\n\n⚠️ **PERHATIAN: Service LLM Belum Aktif!**\n"
                 f"Otak waifu belum terhubung ke server LLM (`{self.llm_client.base_url}`).\n"
@@ -575,6 +585,7 @@ class HealthEngine:
                 # 1. LLM Health Check
                 stat = self.llm_client.check_health()
                 online = bool(stat.get("online"))
+                is_sleeping = bool(self.idle_engine and self.idle_engine.enabled and self.idle_engine.is_llm_sleeping)
 
                 with self.lock:
                     if online:
@@ -584,7 +595,7 @@ class HealthEngine:
                         if was_offline:
                             self.llm_offline_alert_sent = False
                             self.broadcast_recovery(bot, recipients, stat)
-                    else:
+                    elif not is_sleeping:
                         self.consecutive_llm_failures += 1
                         should_alert = (self.consecutive_llm_failures >= 2 or self.last_llm_online is True) and not self.llm_offline_alert_sent
                         if should_alert:
@@ -592,12 +603,13 @@ class HealthEngine:
                             self.llm_offline_alert_sent = True
                             self.broadcast_failure(bot, recipients, stat)
 
-                # If LLM is offline and self-healing enabled, attempt automatic self-healing
-                if not online and self.self_healing_enabled and self.can_attempt_heal("llm"):
+                # If LLM is offline, not intentionally sleeping, and self-healing enabled, attempt automatic self-healing
+                if not online and not is_sleeping and self.self_healing_enabled and self.can_attempt_heal("llm"):
                     self.attempt_heal_service("llm", bot, recipients)
 
                 # 2. Auxiliary Check: ComfyUI (Port 8188)
-                if self.self_healing_enabled and not is_port_listening(8188) and self.can_attempt_heal("comfyui"):
+                is_comfy_ondemand = bool(self.idle_engine and self.idle_engine.enabled and (self.idle_engine.comfyui_on_demand or self.idle_engine.is_comfyui_sleeping))
+                if not is_comfy_ondemand and self.self_healing_enabled and not is_port_listening(8188) and self.can_attempt_heal("comfyui"):
                     try:
                         import asset_manager
                         if asset_manager.detect_comfyui_dir():

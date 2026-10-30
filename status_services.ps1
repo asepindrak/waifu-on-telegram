@@ -100,7 +100,12 @@ foreach ($target in $llmPorts) {
 }
 
 if (-not $llmOnline) {
-    Write-Host "  [OFFLINE] Local LLM Engine: OFFLINE / Unreachable (Checked ports 5001, 8127, 11434, 1234)" -ForegroundColor Red
+    $smartIdle = $env:SMART_IDLE_ENABLED
+    if (-not $smartIdle -or $smartIdle -eq "true") {
+        Write-Host "  [STANDBY] Local LLM Engine: STANDBY / TIDUR (Smart Idle: VRAM Bebas • Bangun Otomatis Saat Chat)" -ForegroundColor Cyan
+    } else {
+        Write-Host "  [OFFLINE] Local LLM Engine: OFFLINE / Unreachable (Checked ports 5001, 8127, 11434, 1234)" -ForegroundColor Red
+    }
 }
 
 # 3. Check ComfyUI (Port 8188) & Checkpoint
@@ -119,7 +124,12 @@ try {
     Write-Host "            Device: $gpu" -ForegroundColor DarkCyan
     Write-Host "            Photo Model: $comfyCkpt" -ForegroundColor DarkCyan
 } catch {
-    Write-Host "  [OFFLINE] ComfyUI Generator (Port 8188): OFFLINE (Smart Photo Vault active)" -ForegroundColor Yellow
+    $onDemand = $env:COMFYUI_ON_DEMAND
+    if (-not $onDemand -or $onDemand -eq "true") {
+        Write-Host "  [STANDBY] ComfyUI Generator (Port 8188): STANDBY ON-DEMAND (Tidur hemat VRAM • Aktif otomatis saat minta foto)" -ForegroundColor Cyan
+    } else {
+        Write-Host "  [OFFLINE] ComfyUI Generator (Port 8188): OFFLINE (Smart Photo Vault active)" -ForegroundColor Yellow
+    }
 }
 
 # 4. Video Engine

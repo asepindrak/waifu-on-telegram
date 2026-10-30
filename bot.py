@@ -24,6 +24,7 @@ from reminder_engine import ReminderEngine
 from anniversary_engine import AnniversaryEngine
 import asset_manager
 from health_engine import HealthEngine
+from idle_engine import IdleEngine
 from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
@@ -97,6 +98,18 @@ health_engine = HealthEngine(
     enabled=HEALTH_CHECK_ENABLED,
     self_healing_enabled=SELF_HEALING_ENABLED
 )
+SMART_IDLE_ENABLED = os.environ.get("SMART_IDLE_ENABLED", "true").lower() in ("true", "1", "yes")
+IDLE_TIMEOUT_MINUTES = int(os.environ.get("IDLE_TIMEOUT_MINUTES", "10"))
+COMFYUI_ON_DEMAND = os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")
+
+idle_engine = IdleEngine(
+    health_engine=health_engine,
+    project_root=PROJECT_ROOT,
+    enabled=SMART_IDLE_ENABLED,
+    idle_timeout_minutes=IDLE_TIMEOUT_MINUTES,
+    comfyui_on_demand=COMFYUI_ON_DEMAND
+)
+health_engine.idle_engine = idle_engine
 voice_engine = VoiceEngine(
     voice_name=VOICE_NAME,
     groq_key=os.environ.get("GROQ_API_KEY"),
@@ -1888,8 +1901,8 @@ def build_system_diagnostics_report(user_id: int) -> str:
     media_stat = media_engine.check_status()
     persona = persona_mgr.get_active_persona()
 
-    status_icon = "🟢 Online" if llm_stat.get("online") else "🔴 Offline"
-    media_icon = "🟢 Active" if media_stat.get("online") else "🟡 Cloud Fallback"
+    status_icon = "💤 Tidur (VRAM Bebas • Bangun Otomatis)" if (idle_engine.enabled and idle_engine.is_llm_sleeping) else ("🟢 Online" if llm_stat.get("online") else "🔴 Offline")
+    media_icon = "💤 Standby On-Demand (Hemat VRAM)" if (idle_engine.enabled and idle_engine.comfyui_on_demand and not media_stat.get("online")) else ("🟢 Active" if media_stat.get("online") else "🟡 Cloud Fallback")
 
     # Resolve LLM model name
     raw_model = llm_stat.get("model", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
@@ -1967,6 +1980,7 @@ def build_system_diagnostics_report(user_id: int) -> str:
         f"• Bot Process  : `🟢 Berjalan (PID: {bot_pid})`\n"
         f"• PC Autorun   : `{autorun_str}`\n"
         f"• Health Check : `{health_engine.get_status_summary()}`\n"
+        f"• Mode Hemat   : `{idle_engine.get_status_summary()}`\n"
         f"• Buku Ingatan : `{facts_count} fakta tersimpan`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 _Ketik `/setup` untuk membuka panel kontrol dan pengaturan lengkap._"
@@ -2914,6 +2928,8 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
 
     def run_gen():
         try:
+            if not media_engine.allow_cloud_fallback:
+                idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id)
             with ChatActionLoop(bot, chat_id, "upload_photo"):
                 neg_p = persona.get("negative_prompt", "")
                 if extra_neg:
@@ -3133,6 +3149,9 @@ def process_video_request(
                 prompt_missing_asset_download(chat_id, user_id, missing, status_msg=status_msg)
                 return
 
+            if VIDEO_ENGINE in ("wan21", "animatediff") and not media_engine.allow_cloud_fallback:
+                idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id)
+
             with ChatActionLoop(bot, chat_id, "upload_video"):
                 neg_p = persona.get("negative_prompt", "")
                 if extra_neg:
@@ -3250,6 +3269,7 @@ def handle_incoming_photo(message):
 
     def _vision_task():
         persona = persona_mgr.get_active_persona()
+        idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
         with ChatActionLoop(bot, message.chat.id, "typing"):
             try:
                 file_info = bot.get_file(message.photo[-1].file_id)
@@ -4331,6 +4351,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
             messages.append({"role": "user", "content": user_text})
 
             try:
+                idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
                 reply_text, _ = llm_client.chat(messages, max_tokens=150)
             except Exception as e:
                 logger.error(f"Chat error / LLM timeout: {e}")
@@ -4467,6 +4488,7 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
             {"role": "user", "content": prompt}
         ]
         try:
+            idle_engine.ensure_llm_active()
             text, _ = llm_client.chat(messages, max_tokens=150)
         except Exception:
             text = None
@@ -4682,6 +4704,10 @@ def main():
 
     # Start periodic service health monitor
     health_engine.start_monitor(bot=bot, get_recipients_func=get_notification_recipient_ids)
+
+    # Start Smart Idle & Dynamic Power Saver monitor
+    if idle_engine.enabled:
+        idle_engine.start()
 
     stat = llm_client.check_health()
     if stat.get("online"):
