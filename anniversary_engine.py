@@ -4,6 +4,7 @@ import json
 import time
 import datetime
 import logging
+import threading
 from typing import Dict, Any, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,29 @@ MONTH_NAMES_ID = [
 ]
 
 
+def _atomic_write_json(file_path: str, data: Any):
+    dir_name = os.path.dirname(os.path.abspath(file_path))
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    temp_file = os.path.join(dir_name, f".{os.path.basename(file_path)}.{os.getpid()}_{int(time.time() * 1000)}.tmp")
+    try:
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except Exception:
+                pass
+        os.replace(temp_file, file_path)
+    except Exception as e:
+        if os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except Exception:
+                pass
+        raise e
+
+
 class AnniversaryEngine:
     """Manages birthdays, anniversaries, countdowns, and anniversary celebration dispatches."""
 
@@ -37,6 +61,7 @@ class AnniversaryEngine:
             project_root = os.path.dirname(os.path.abspath(__file__))
             data_file = os.path.join(project_root, "data", "special_dates.json")
         self.data_file = data_file
+        self.lock = threading.Lock()
         self.data: Dict[str, Any] = {}
         self.load_data()
 
@@ -50,92 +75,106 @@ class AnniversaryEngine:
 
     def load_data(self):
         """Loads special dates from JSON."""
-        if os.path.exists(self.data_file):
-            try:
-                with open(self.data_file, "r", encoding="utf-8") as f:
-                    self.data = json.load(f)
-            except Exception as e:
-                logger.error(f"Error loading {self.data_file}: {e}")
+        with self.lock:
+            if os.path.exists(self.data_file):
+                try:
+                    with open(self.data_file, "r", encoding="utf-8") as f:
+                        self.data = json.load(f)
+                except Exception as e:
+                    logger.error(f"Error loading {self.data_file}: {e}")
+                    self.data = {}
+            else:
                 self.data = {}
-        else:
-            self.data = {}
-            self._ensure_dir()
-            self.save_data()
+                self._ensure_dir()
+                self._save_data_unlocked()
 
-    def save_data(self):
-        """Saves special dates to disk."""
-        self._ensure_dir()
+    def _save_data_unlocked(self):
         try:
-            with open(self.data_file, "w", encoding="utf-8") as f:
-                json.dump(self.data, f, ensure_ascii=False, indent=2)
+            _atomic_write_json(self.data_file, self.data)
         except Exception as e:
             logger.error(f"Error saving {self.data_file}: {e}")
 
+    def save_data(self):
+        """Saves special dates to disk atomically."""
+        with self.lock:
+            self._save_data_unlocked()
+
     def get_user_dates(self, user_id: int) -> Dict[str, Any]:
         """Returns the dictionary of special dates for a user."""
-        s_uid = str(user_id)
-        if s_uid not in self.data:
-            self.data[s_uid] = {
-                "birthday": None,
-                "anniversary": None,
-                "last_celebrated": {}
-            }
-        return self.data[s_uid]
+        with self.lock:
+            s_uid = str(user_id)
+            if s_uid not in self.data:
+                self.data[s_uid] = {
+                    "birthday": None,
+                    "anniversary": None,
+                    "last_celebrated": {}
+                }
+            return self.data[s_uid]
 
     def set_birthday(self, user_id: int, day: int, month: int, year: Optional[int] = None) -> Dict[str, Any]:
         """Sets user's birthday."""
-        user_dates = self.get_user_dates(user_id)
-        m_name = MONTH_NAMES_ID[month] if 1 <= month <= 12 else str(month)
-        label = f"{day} {m_name}"
-        if year:
-            label += f" {year}"
+        with self.lock:
+            s_uid = str(user_id)
+            if s_uid not in self.data:
+                self.data[s_uid] = {"birthday": None, "anniversary": None, "last_celebrated": {}}
+            user_dates = self.data[s_uid]
 
-        b_data = {
-            "day": day,
-            "month": month,
-            "year": year,
-            "label": label,
-            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
-        }
-        user_dates["birthday"] = b_data
-        self.save_data()
-        logger.info(f"Set birthday for user {user_id}: {label}")
-        return b_data
+            m_name = MONTH_NAMES_ID[month] if 1 <= month <= 12 else str(month)
+            label = f"{day} {m_name}"
+            if year:
+                label += f" {year}"
+
+            b_data = {
+                "day": day,
+                "month": month,
+                "year": year,
+                "label": label,
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            user_dates["birthday"] = b_data
+            self._save_data_unlocked()
+            logger.info(f"Set birthday for user {user_id}: {label}")
+            return b_data
 
     def set_anniversary(self, user_id: int, day: int, month: int, year: Optional[int] = None) -> Dict[str, Any]:
         """Sets anniversary / first meeting date."""
-        user_dates = self.get_user_dates(user_id)
-        m_name = MONTH_NAMES_ID[month] if 1 <= month <= 12 else str(month)
-        label = f"{day} {m_name}"
-        if year:
-            label += f" {year}"
+        with self.lock:
+            s_uid = str(user_id)
+            if s_uid not in self.data:
+                self.data[s_uid] = {"birthday": None, "anniversary": None, "last_celebrated": {}}
+            user_dates = self.data[s_uid]
 
-        a_data = {
-            "day": day,
-            "month": month,
-            "year": year,
-            "label": label,
-            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
-        }
-        user_dates["anniversary"] = a_data
-        self.save_data()
-        logger.info(f"Set anniversary for user {user_id}: {label}")
-        return a_data
+            m_name = MONTH_NAMES_ID[month] if 1 <= month <= 12 else str(month)
+            label = f"{day} {m_name}"
+            if year:
+                label += f" {year}"
+
+            a_data = {
+                "day": day,
+                "month": month,
+                "year": year,
+                "label": label,
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            user_dates["anniversary"] = a_data
+            self._save_data_unlocked()
+            logger.info(f"Set anniversary for user {user_id}: {label}")
+            return a_data
 
     def delete_date(self, user_id: int, date_type: str) -> bool:
         """Removes a date (birthday or anniversary)."""
-        user_dates = self.get_user_dates(user_id)
-        if date_type in user_dates and user_dates[date_type] is not None:
-            user_dates[date_type] = None
-            self.save_data()
-            return True
-        return False
+        with self.lock:
+            s_uid = str(user_id)
+            if s_uid in self.data and date_type in self.data[s_uid] and self.data[s_uid][date_type] is not None:
+                self.data[s_uid][date_type] = None
+                self._save_data_unlocked()
+                return True
+            return False
 
     @staticmethod
     def get_countdown(day: int, month: int) -> int:
         """Returns days remaining until the next occurrence of day/month (0 means today!)."""
         today = datetime.date.today()
-        # Handle leap year Feb 29 safely
         try:
             this_year_date = datetime.date(today.year, month, day)
         except ValueError:
@@ -162,37 +201,38 @@ class AnniversaryEngine:
         cur_month = today.month
 
         celebrations = []
-        target_uids = [str(user_id)] if user_id else list(self.data.keys())
+        with self.lock:
+            target_uids = [str(user_id)] if user_id else list(self.data.keys())
 
-        for s_uid in target_uids:
-            u_info = self.data.get(s_uid, {})
-            last_celeb = u_info.setdefault("last_celebrated", {})
+            for s_uid in target_uids:
+                u_info = self.data.get(s_uid, {})
+                last_celeb = u_info.setdefault("last_celebrated", {})
 
-            # Check birthday
-            b = u_info.get("birthday")
-            if b and b.get("day") == cur_day and b.get("month") == cur_month:
-                if last_celeb.get("birthday") != cur_year:
-                    age = (cur_year - b["year"]) if b.get("year") else None
-                    celebrations.append({
-                        "user_id": int(s_uid),
-                        "type": "birthday",
-                        "label": b.get("label", "Ulang Tahun"),
-                        "years": age,
-                        "year_num": cur_year
-                    })
+                # Check birthday
+                b = u_info.get("birthday")
+                if b and b.get("day") == cur_day and b.get("month") == cur_month:
+                    if last_celeb.get("birthday") != cur_year:
+                        age = (cur_year - b["year"]) if b.get("year") else None
+                        celebrations.append({
+                            "user_id": int(s_uid),
+                            "type": "birthday",
+                            "label": b.get("label", "Ulang Tahun"),
+                            "years": age,
+                            "year_num": cur_year
+                        })
 
-            # Check anniversary
-            a = u_info.get("anniversary")
-            if a and a.get("day") == cur_day and a.get("month") == cur_month:
-                if last_celeb.get("anniversary") != cur_year:
-                    years_together = (cur_year - a["year"]) if a.get("year") else None
-                    celebrations.append({
-                        "user_id": int(s_uid),
-                        "type": "anniversary",
-                        "label": a.get("label", "Anniversary"),
-                        "years": years_together,
-                        "year_num": cur_year
-                    })
+                # Check anniversary
+                a = u_info.get("anniversary")
+                if a and a.get("day") == cur_day and a.get("month") == cur_month:
+                    if last_celeb.get("anniversary") != cur_year:
+                        years_together = (cur_year - a["year"]) if a.get("year") else None
+                        celebrations.append({
+                            "user_id": int(s_uid),
+                            "type": "anniversary",
+                            "label": a.get("label", "Anniversary"),
+                            "years": years_together,
+                            "year_num": cur_year
+                        })
 
         return celebrations
 
@@ -200,18 +240,16 @@ class AnniversaryEngine:
         """Marks that celebration was dispatched for the given year."""
         if year is None:
             year = datetime.date.today().year
-        u_info = self.get_user_dates(user_id)
-        u_info.setdefault("last_celebrated", {})[event_type] = year
-        self.save_data()
+        with self.lock:
+            s_uid = str(user_id)
+            if s_uid in self.data:
+                self.data[s_uid].setdefault("last_celebrated", {})[event_type] = year
+                self._save_data_unlocked()
 
     @staticmethod
     def parse_date(raw_text: str) -> Optional[Tuple[int, int, Optional[int], str]]:
         """
         Parses date string into (day, month, year, formatted_label).
-        Supports:
-          - "15 agustus", "15 agustus 1998"
-          - "15/08", "15/08/2000", "15-08-1998"
-          - "agustus 15"
         """
         text = raw_text.strip().lower()
         if not text:
@@ -261,13 +299,11 @@ class AnniversaryEngine:
         """
         Detects if user naturally talked about their birthday or anniversary.
         Returns (date_type, day, month, year, formatted_label) or None.
-        date_type is 'birthday' or 'anniversary'.
         """
         clean = chat_text.strip()
 
         def _clean_trailing(s: str) -> str:
             val = s.strip().rstrip(".!~?,")
-            # Loop strip trailing words
             while True:
                 new_val = re.sub(r'(?:\s+\b(?:lho|ya|yaa|dong|sayang|nih|sweetheart|babe|darling|manis)\b)+$', '', val, flags=re.IGNORECASE).strip()
                 if new_val == val:

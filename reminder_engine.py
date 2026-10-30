@@ -4,9 +4,33 @@ import json
 import time
 import datetime
 import logging
+import threading
 from typing import Dict, Any, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+def _atomic_write_json(file_path: str, data: Any):
+    dir_name = os.path.dirname(os.path.abspath(file_path))
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    temp_file = os.path.join(dir_name, f".{os.path.basename(file_path)}.{os.getpid()}_{int(time.time() * 1000)}.tmp")
+    try:
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except Exception:
+                pass
+        os.replace(temp_file, file_path)
+    except Exception as e:
+        if os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except Exception:
+                pass
+        raise e
 
 
 class ReminderEngine:
@@ -17,6 +41,7 @@ class ReminderEngine:
             project_root = os.path.dirname(os.path.abspath(__file__))
             data_file = os.path.join(project_root, "data", "reminders.json")
         self.data_file = data_file
+        self.lock = threading.Lock()
         self.reminders: List[Dict[str, Any]] = []
         self.load_data()
 
@@ -30,25 +55,28 @@ class ReminderEngine:
 
     def load_data(self):
         """Loads reminders from JSON storage."""
-        if os.path.exists(self.data_file):
-            try:
-                with open(self.data_file, "r", encoding="utf-8") as f:
-                    self.reminders = json.load(f)
-            except Exception as e:
-                logger.error(f"Error loading reminders from {self.data_file}: {e}")
-                self.reminders = []
-        else:
-            self._ensure_dir()
-            self.save_data()
+        with self.lock:
+            if os.path.exists(self.data_file):
+                try:
+                    with open(self.data_file, "r", encoding="utf-8") as f:
+                        self.reminders = json.load(f)
+                except Exception as e:
+                    logger.error(f"Error loading reminders from {self.data_file}: {e}")
+                    self.reminders = []
+            else:
+                self._ensure_dir()
+                self._save_data_unlocked()
 
-    def save_data(self):
-        """Saves current reminders list to disk."""
-        self._ensure_dir()
+    def _save_data_unlocked(self):
         try:
-            with open(self.data_file, "w", encoding="utf-8") as f:
-                json.dump(self.reminders, f, ensure_ascii=False, indent=2)
+            _atomic_write_json(self.data_file, self.reminders)
         except Exception as e:
             logger.error(f"Error saving reminders to {self.data_file}: {e}")
+
+    def save_data(self):
+        """Saves current reminders list to disk atomically."""
+        with self.lock:
+            self._save_data_unlocked()
 
     def add_reminder(
         self,
@@ -74,65 +102,70 @@ class ReminderEngine:
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "triggered": False
         }
-        self.reminders.append(item)
-        self.save_data()
+        with self.lock:
+            self.reminders.append(item)
+            self._save_data_unlocked()
         logger.info(f"Reminder added: '{clean_task}' at {remind_time_str} for user {user_id}")
         return item
 
     def get_active_reminders(self, user_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """Returns untriggered reminders, sorted by remind_time ascending."""
-        res = [r for r in self.reminders if not r.get("triggered")]
-        if user_id:
-            res = [r for r in res if r.get("user_id") == user_id]
-        return sorted(res, key=lambda x: x.get("remind_time", 0))
+        with self.lock:
+            res = [r for r in self.reminders if not r.get("triggered")]
+            if user_id:
+                res = [r for r in res if r.get("user_id") == user_id]
+            return sorted(res, key=lambda x: x.get("remind_time", 0))
 
     def get_due_reminders(self) -> List[Dict[str, Any]]:
         """Returns all reminders that are due for delivery right now."""
         now = time.time()
-        due = []
-        for r in self.reminders:
-            if not r.get("triggered") and r.get("remind_time", 0) <= now:
-                due.append(r)
-        return due
+        with self.lock:
+            due = []
+            for r in self.reminders:
+                if not r.get("triggered") and r.get("remind_time", 0) <= now:
+                    due.append(r)
+            return due
 
     def mark_triggered(self, reminder_id: str):
         """Marks reminder as triggered, or advances to next day if daily recurring."""
-        for r in self.reminders:
-            if r.get("id") == reminder_id:
-                if r.get("recurring") == "daily":
-                    # Advance 24 hours
-                    r["remind_time"] += 86400
-                    r["triggered"] = False
-                else:
-                    r["triggered"] = True
-                break
-        self.save_data()
+        with self.lock:
+            for r in self.reminders:
+                if r.get("id") == reminder_id:
+                    if r.get("recurring") == "daily":
+                        r["remind_time"] += 86400
+                        r["triggered"] = False
+                    else:
+                        r["triggered"] = True
+                    break
+            self._save_data_unlocked()
 
     def snooze_reminder(self, reminder_id: str, minutes: int = 10) -> Optional[Dict[str, Any]]:
         """Snoozes a reminder by N minutes."""
         now = time.time()
-        for r in self.reminders:
-            if r.get("id") == reminder_id:
-                new_time = max(r.get("remind_time", now), now) + (minutes * 60)
-                dt = datetime.datetime.fromtimestamp(new_time)
-                r["remind_time"] = new_time
-                r["remind_time_str"] = f"{minutes}m lagi ({dt.strftime('%H:%M')})"
-                r["triggered"] = False
-                self.save_data()
-                return r
-        return None
+        with self.lock:
+            for r in self.reminders:
+                if r.get("id") == reminder_id:
+                    new_time = max(r.get("remind_time", now), now) + (minutes * 60)
+                    dt = datetime.datetime.fromtimestamp(new_time)
+                    r["remind_time"] = new_time
+                    r["remind_time_str"] = f"{minutes}m lagi ({dt.strftime('%H:%M')})"
+                    r["triggered"] = False
+                    self._save_data_unlocked()
+                    return r
+            return None
 
     def delete_reminder(self, reminder_id: str, user_id: Optional[int] = None) -> bool:
         """Removes a reminder by ID."""
-        initial_len = len(self.reminders)
-        self.reminders = [
-            r for r in self.reminders
-            if not (r.get("id") == reminder_id and (user_id is None or r.get("user_id") == user_id))
-        ]
-        if len(self.reminders) < initial_len:
-            self.save_data()
-            return True
-        return False
+        with self.lock:
+            initial_len = len(self.reminders)
+            self.reminders = [
+                r for r in self.reminders
+                if not (r.get("id") == reminder_id and (user_id is None or r.get("user_id") == user_id))
+            ]
+            if len(self.reminders) < initial_len:
+                self._save_data_unlocked()
+                return True
+            return False
 
     @staticmethod
     def parse_reminder_text(raw_text: str) -> Optional[Tuple[float, str, str]]:
@@ -197,7 +230,6 @@ class ReminderEngine:
             if 0 <= hh <= 23 and 0 <= mm <= 59:
                 target_dt = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
                 if target_dt <= now:
-                    # Time has already passed today -> schedule for tomorrow
                     target_dt += datetime.timedelta(days=1)
                     lbl = f"Besok jam {hh:02d}:{mm:02d}"
                 else:
@@ -222,15 +254,12 @@ class ReminderEngine:
             m = re.search(p, clean, re.IGNORECASE)
             if m:
                 sub = m.group(1).strip().rstrip(".!~")
-                # Remove common trailing fillers
                 sub = re.sub(r'\b(ya|yaa|dong|sayang|sweetheart|babe|darling)\b$', '', sub, flags=re.IGNORECASE).strip()
 
-                # Try direct parsing: "30 menit lagi meeting kantor"
                 res = cls.parse_reminder_text(sub)
                 if res:
                     return res
 
-                # Try reverse: "meeting kantor jam 15:30" or "angkat jemuran 30 menit lagi"
                 m_rev = re.search(
                     r'^(.*?)(?:\s+)(?:pada\s+|di\s+|jam\s+|pukul\s+)?(\d{1,2}[:.]\d{2}|\d+\s*(?:m|min|menit|h|jam))\s*(?:lagi|nanti)?$',
                     sub,
