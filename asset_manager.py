@@ -8,6 +8,14 @@ import platform
 import tempfile
 from typing import Optional, Dict, Any, List, Tuple
 
+if sys.platform == "win32":
+    try:
+        import ctypes
+        # Suppress Windows modal crash / bad image error dialogs (SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX)
+        ctypes.windll.kernel32.SetErrorMode(0x0001 | 0x0002 | 0x8000)
+    except Exception:
+        pass
+
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -327,6 +335,58 @@ def detect_comfyui_dir() -> Optional[str]:
 
     return None
 
+_REPAIRED_PY_EXES = set()
+
+def check_and_repair_comfyui_environment(py_exe: str) -> None:
+    """
+    Checks for corrupted C++ binaries like torchvision's image_stable.pyd (Bad Image 0xc0e90002)
+    and quarantines them so ComfyUI starts cleanly without crashing or triggering Windows error popups.
+    """
+    if not py_exe or not os.path.isfile(py_exe) or py_exe in _REPAIRED_PY_EXES:
+        return
+    _REPAIRED_PY_EXES.add(py_exe)
+    py_dir = os.path.dirname(py_exe)
+    for site_sub in [
+        os.path.join(py_dir, "Lib", "site-packages"),
+        os.path.join(py_dir, "lib", "site-packages"),
+    ]:
+        if not os.path.isdir(site_sub):
+            continue
+        torchvision_dir = os.path.join(site_sub, "torchvision")
+        if os.path.isdir(torchvision_dir):
+            for bad_pyd in ["image_stable.pyd", "image.pyd"]:
+                pyd_path = os.path.join(torchvision_dir, bad_pyd)
+                if os.path.isfile(pyd_path):
+                    is_corrupt = False
+                    try:
+                        if os.path.getsize(pyd_path) == 0:
+                            is_corrupt = True
+                        else:
+                            probe = subprocess.run(
+                                [py_exe, "-s", "-c", "import torchvision; from torchvision.io import image"],
+                                capture_output=True,
+                                timeout=15,
+                                creationflags=0x08000000 if sys.platform == "win32" else 0
+                            )
+                            if probe.returncode != 0:
+                                err = probe.stderr.decode("utf-8", errors="ignore")
+                                if "0xc0e90002" in err or "Bad Image" in err or "DLL load failed" in err:
+                                    is_corrupt = True
+                    except Exception:
+                        pass
+
+                    if is_corrupt:
+                        logger.warning(f"Detected corrupt torchvision binary '{bad_pyd}'. Quarantining...")
+                        try:
+                            bak_path = pyd_path + ".corrupt.bak"
+                            if os.path.exists(bak_path):
+                                os.remove(bak_path)
+                            os.rename(pyd_path, bak_path)
+                            logger.info(f"Quarantined {pyd_path} -> {bak_path}. Torchvision fallback will be used.")
+                        except Exception as e_rename:
+                            logger.error(f"Failed to quarantine {pyd_path}: {e_rename}")
+
+
 _COMFYUI_FORCE_CPU: Optional[bool] = None
 
 def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
@@ -355,7 +415,8 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
             probe = subprocess.run(
                 [py_exe, "-s", "-c", "import torch; exit(0 if torch.cuda.is_available() else 1)"],
                 capture_output=True,
-                timeout=45
+                timeout=45,
+                creationflags=0x08000000 if sys.platform == "win32" else 0
             )
             _COMFYUI_FORCE_CPU = (probe.returncode != 0)
         except Exception:
@@ -367,6 +428,7 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
         for py_dir in ["python_embeded", "python_embedded", "python"]:
             py_embed = os.path.join(base, py_dir, "python.exe")
             if os.path.isfile(py_embed):
+                check_and_repair_comfyui_environment(py_embed)
                 extra_args = ["--cpu"] if _should_use_cpu(py_embed) else []
                 return {
                     "cwd": cdir,
@@ -378,6 +440,7 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
         for venv_dir in [".venv", "venv"]:
             v_py = os.path.join(base, venv_dir, "Scripts", "python.exe") if platform.system() == "Windows" else os.path.join(base, venv_dir, "bin", "python")
             if os.path.isfile(v_py):
+                check_and_repair_comfyui_environment(v_py)
                 extra_args = ["--cpu"] if _should_use_cpu(v_py) else []
                 return {
                     "cwd": cdir,

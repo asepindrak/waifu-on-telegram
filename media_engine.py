@@ -459,7 +459,9 @@ class MediaEngine:
                         )
                     except Exception as e_save:
                         logger.warning(f"Failed to auto-archive photo to vault: {e_save}")
-                return local_img, "ComfyUI Local"
+                active_ckpt = self.get_active_checkpoint()
+                clean_name = os.path.splitext(active_ckpt)[0]
+                return local_img, f"Local ComfyUI ({clean_name})"
         else:
             self.last_error = "ComfyUI URL belum dikonfigurasi (pastikan ComfyUI lokal aktif di port 8188)."
 
@@ -475,8 +477,9 @@ class MediaEngine:
                 )
                 if matched:
                     vault_img, meta = matched
+                    p_name = meta.get('persona', persona).title()
                     logger.info(f"Retrieved matching photo from vault: {meta.get('filename')} (Scene: {meta.get('scene')})")
-                    return vault_img, "Vault Archive (Saved Photo)"
+                    return vault_img, f"Photo Vault (Arsip Lokal: {p_name})"
             except Exception as e_find:
                 logger.warning(f"Error querying photo vault: {e_find}")
 

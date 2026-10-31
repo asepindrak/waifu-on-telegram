@@ -1,6 +1,23 @@
 # Health & Status Checker for Waifu on Telegram
 $vPath = Join-Path $PSScriptRoot "VERSION"
 $version = if (Test-Path $vPath) { (Get-Content $vPath).Trim() } else { "1.6.26" }
+
+# Load .env variables into environment if present
+$envFile = Join-Path $PSScriptRoot ".env"
+if (Test-Path $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $parts = $line -split "=", 2
+            $k = $parts[0].Trim()
+            $v = $parts[1].Trim().Trim('"').Trim("'")
+            if (-not [System.Environment]::GetEnvironmentVariable($k)) {
+                [System.Environment]::SetEnvironmentVariable($k, $v)
+            }
+        }
+    }
+}
+
 Write-Host "====================================================================" -ForegroundColor Magenta
 Write-Host "       WAIFU ON TELEGRAM v$version - SYSTEM STATUS DIAGNOSTICS      " -ForegroundColor Magenta
 Write-Host "====================================================================" -ForegroundColor Magenta
@@ -91,8 +108,8 @@ foreach ($target in $llmPorts) {
             } elseif ($modelsRes.models -and $modelsRes.models.Count -gt 0) {
                 $detectedModel = Split-Path -Leaf $modelsRes.models[0].name
             }
-            Write-Host "  [ONLINE]  $bName LLM: ONLINE (Port $p)" -ForegroundColor Green
-            Write-Host "            Model: $detectedModel" -ForegroundColor DarkCyan
+            Write-Host "  [ONLINE]  $bName LLM: ONLINE (Port $p - Load Penuh)" -ForegroundColor Green
+            Write-Host "            Active Model: $detectedModel" -ForegroundColor DarkCyan
             $llmOnline = $true
             break
         } catch {}
@@ -120,10 +137,15 @@ if (-not $llmOnline) {
         (Join-Path $env:APPDATA "Locally Uncensored\models")
     )
     $hasGguf = $false
+    $targetGgufName = "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
     foreach ($md in $modelDirs) {
         if (Test-Path $md) {
             $ggufs = Get-ChildItem -Path $md -Filter "*.gguf" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*mmproj*" }
-            if ($ggufs -and $ggufs.Count -gt 0) { $hasGguf = $true; break }
+            if ($ggufs -and $ggufs.Count -gt 0) {
+                $hasGguf = $true
+                $targetGgufName = $ggufs[0].Name
+                break
+            }
         }
     }
 
@@ -131,8 +153,10 @@ if (-not $llmOnline) {
     if ($hasKcpp -and $hasGguf) {
         if (-not $smartIdle -or $smartIdle -eq "true") {
             Write-Host "  [STANDBY] Local LLM Engine: STANDBY / TIDUR (Smart Idle: VRAM Bebas • Bangun Otomatis Saat Chat)" -ForegroundColor Cyan
+            Write-Host "            Target Model: $targetGgufName (Siap Load Saat Chat)" -ForegroundColor DarkCyan
         } else {
             Write-Host "  [OFFLINE] Local LLM Engine: OFFLINE / Unreachable (Checked ports 5001, 8127, 11434, 1234)" -ForegroundColor Red
+            Write-Host "            Target Model: $targetGgufName" -ForegroundColor DarkCyan
         }
     } else {
         $missingParts = @()
@@ -146,6 +170,7 @@ if (-not $llmOnline) {
 
 # 3. Check ComfyUI (Port 8188) & Checkpoint
 $comfyCkpt = "Auto"
+$comfyOnline = $false
 try {
     $res = Invoke-RestMethod -Uri "http://127.0.0.1:8188/system_stats" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
     $gpu = $res.devices[0].name
@@ -156,9 +181,10 @@ try {
             $comfyCkpt = $ckptList[0]
         }
     } catch {}
-    Write-Host "  [ONLINE]  ComfyUI Generator: ONLINE (Port 8188)" -ForegroundColor Green
+    Write-Host "  [ONLINE]  ComfyUI Generator: ONLINE (Port 8188 - Load Penuh)" -ForegroundColor Green
     Write-Host "            Device: $gpu" -ForegroundColor DarkCyan
-    Write-Host "            Photo Model: $comfyCkpt" -ForegroundColor DarkCyan
+    Write-Host "            Photo Model: $comfyCkpt (Aktif di ComfyUI)" -ForegroundColor DarkCyan
+    $comfyOnline = $true
 } catch {
     $comfyDirCandidates = @(
         (Join-Path $PSScriptRoot "ComfyUI"),
@@ -167,21 +193,52 @@ try {
         (Join-Path $PSScriptRoot "..\ComfyUI_windows_portable\ComfyUI")
     )
     $hasComfyDir = $false
+    $targetCkpt = $env:COMFYUI_CHECKPOINT
+    if (-not $targetCkpt) { $targetCkpt = "AnythingXL_xl.safetensors" }
+    $ckptInstalled = $false
+
     foreach ($cd in $comfyDirCandidates) {
-        if (Test-Path (Join-Path $cd "main.py")) { $hasComfyDir = $true; break }
+        if (Test-Path (Join-Path $cd "main.py")) {
+            $hasComfyDir = $true
+            $cFile = Join-Path $cd "models\checkpoints\$targetCkpt"
+            if (Test-Path $cFile) {
+                $ckptInstalled = $true
+            } else {
+                $anyCkpt = Get-ChildItem -Path (Join-Path $cd "models\checkpoints") -Filter "*.safetensors" -File -ErrorAction SilentlyContinue
+                if ($anyCkpt -and $anyCkpt.Count -gt 0) {
+                    $targetCkpt = $anyCkpt[0].Name
+                    $ckptInstalled = $true
+                }
+            }
+            break
+        }
     }
 
     $onDemand = $env:COMFYUI_ON_DEMAND
+    $badge = if ($ckptInstalled) { "(Terpasang [OK])" } else { "(Perlu Download)" }
     if ($hasComfyDir) {
         if (-not $onDemand -or $onDemand -eq "true") {
             Write-Host "  [STANDBY] ComfyUI Generator (Port 8188): STANDBY ON-DEMAND (Tidur hemat VRAM • Aktif otomatis saat minta foto)" -ForegroundColor Cyan
+            Write-Host "            Target Model: $targetCkpt $badge" -ForegroundColor DarkCyan
         } else {
             Write-Host "  [OFFLINE] ComfyUI Generator (Port 8188): OFFLINE" -ForegroundColor Yellow
+            Write-Host "            Target Model: $targetCkpt $badge" -ForegroundColor DarkCyan
         }
     } else {
         Write-Host "  [NOT READY] ComfyUI Generator: Folder ComfyUI belum terdeteksi (Fallback Cloud/Pollinations aktif jika diaktifkan)" -ForegroundColor Yellow
     }
 }
+
+# Photo Vault stats
+$vaultPath = Join-Path $PSScriptRoot "data\photo_vault\catalog.json"
+$vaultCount = 0
+if (Test-Path $vaultPath) {
+    try {
+        $vaultData = Get-Content $vaultPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($vaultData) { $vaultCount = @($vaultData).Count }
+    } catch {}
+}
+Write-Host "  [VAULT]   Photo Vault: $vaultCount foto di arsip galeri lokal (Fallback Semantik Aktif [OK])" -ForegroundColor Cyan
 
 # 4. Video Engine
 $vEngine = $env:VIDEO_ENGINE

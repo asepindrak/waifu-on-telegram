@@ -10,6 +10,15 @@ import datetime
 import platform
 import subprocess
 from typing import Optional, Dict, Any, Tuple, List
+
+if sys.platform == "win32":
+    try:
+        import ctypes
+        # Suppress Windows modal crash / bad image error dialogs (SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX)
+        ctypes.windll.kernel32.SetErrorMode(0x0001 | 0x0002 | 0x8000)
+    except Exception:
+        pass
+
 from dotenv import load_dotenv
 import telebot
 from telebot import types
@@ -1977,19 +1986,19 @@ def build_system_diagnostics_report(user_id: int) -> str:
 
     spec = asset_manager.get_llm_launch_spec() if asset_manager else None
     if llm_stat.get("online"):
-        status_icon = "🟢 Online"
+        status_icon = "🟢 Online (Load Penuh)"
     elif idle_engine.enabled and spec:
-        status_icon = "💤 Tidur (VRAM Bebas • Bangun Otomatis)"
+        status_icon = "💤 Standby / Tidur (VRAM Bebas • Bangun Otomatis Saat Chat)"
     else:
         status_icon = "🔴 Offline (Model/Binary belum terpasang)"
 
     comfy_spec = asset_manager.get_comfyui_launch_spec() if asset_manager else None
     if media_stat.get("online"):
-        media_icon = "🟢 Active (Port 8188)"
+        media_icon = "🟢 Online (Port 8188 - Load Penuh)"
     elif idle_engine.enabled and idle_engine.comfyui_on_demand and comfy_spec:
-        media_icon = "💤 Standby On-Demand (Hemat VRAM)"
+        media_icon = "💤 Standby On-Demand (Tidur Hemat VRAM • Bangun Saat Foto)"
     else:
-        media_icon = "⚪ Offline (ComfyUI belum terdeteksi)"
+        media_icon = "⚪ Offline / Belum Terdeteksi"
 
     # Resolve LLM model name
     raw_model = llm_stat.get("model", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
@@ -2014,8 +2023,19 @@ def build_system_diagnostics_report(user_id: int) -> str:
     score, rel_status = persona_mgr.get_relationship_status(user_id)
     affinity_score = memory_engine.get_affinity(user_id)
 
-    # Resolve Photo model checkpoint
+    # Resolve Photo model checkpoint and installation status
     cur_ckpt = media_stat.get("active_checkpoint") or media_engine.get_active_checkpoint()
+    cdir = asset_manager.detect_comfyui_dir() if asset_manager else None
+    ckpt_installed = False
+    if cdir and cur_ckpt:
+        ckpt_path = os.path.join(cdir, "models", "checkpoints", cur_ckpt)
+        ckpt_installed = os.path.isfile(ckpt_path)
+    ckpt_badge = "_(Terpasang ✓)_" if ckpt_installed else ("_(Aktif di ComfyUI ✓)_" if media_stat.get("online") else "_(Perlu Download)_")
+
+    # Resolve Photo Vault Archive stats
+    import photo_vault
+    vault_stats = photo_vault.get_vault_stats()
+    vault_str = f"`{vault_stats.get('total', 0)} foto` _(Arsip Galeri Lokal Aktif ✓)_"
 
     # Resolve Video Engine & Video model
     v_engine_label = VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)
@@ -2056,7 +2076,8 @@ def build_system_diagnostics_report(user_id: int) -> str:
         f"🎨 **Generator Visual (Port 8188)**: {media_icon}\n"
         f"• Backend      : `{media_stat.get('backend', 'ComfyUI Local')}`\n"
         f"• Device / GPU : `{media_stat.get('device', 'CUDA')}`\n"
-        f"• **Model Foto** : `{cur_ckpt}`\n"
+        f"• **Model Foto** : `{cur_ckpt}` {ckpt_badge}\n"
+        f"• **Photo Vault**: {vault_str}\n"
         f"• **Engine Video**: `{v_engine_label}` {v_ready_badge}\n"
         f"• **Model Video**: {v_model_str}\n"
         f"• Rasio/Preset : `{ar}` | `{qual}`\n\n"
@@ -3128,13 +3149,14 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                 caption = None
 
             if is_nude:
-                fallback_caption = f"Khusus buat kamu ya sayang, jangan diliatin ke siapa-siapa 💕 ({source})"
+                fallback_caption = f"Khusus buat kamu ya sayang, jangan diliatin ke siapa-siapa 💕"
             else:
                 if "Vault" in source:
-                    fallback_caption = f"Ini foto manis dari galeri aku ya sayang~ ({source})"
+                    fallback_caption = f"Ini foto manis dari galeri aku ya sayang~"
                 else:
-                    fallback_caption = f"Spesial buat kamu nih sayang 💕 ({source})"
+                    fallback_caption = f"Spesial buat kamu nih sayang 💕"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
+            full_caption = f"{clean_caption}\n\n📷 *Model:* `{source}`"
 
             if status_msg and hasattr(status_msg, "message_id"):
                 try:
@@ -3164,9 +3186,13 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
 
             for attempt in range(2):
                 try:
-                    bot.send_photo(chat_id, img_to_send, caption=clean_caption, reply_markup=markup, timeout=90)
+                    bot.send_photo(chat_id, img_to_send, caption=full_caption, reply_markup=markup, parse_mode="Markdown", timeout=90)
                     break
                 except Exception as e_send:
+                    if "can't parse entities" in str(e_send).lower():
+                        plain_caption = full_caption.replace("*", "").replace("`", "").replace("_", "")
+                        bot.send_photo(chat_id, img_to_send, caption=plain_caption, reply_markup=markup, timeout=90)
+                        break
                     if attempt == 0:
                         logger.warning(f"send_photo attempt 1 timed out ({e_send}), retrying in 2s...")
                         time.sleep(2)

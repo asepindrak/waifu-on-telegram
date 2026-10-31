@@ -28,6 +28,12 @@ if sys.platform == "win32":
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+    try:
+        import ctypes
+        # Suppress Windows modal crash / bad image error dialogs (SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX)
+        ctypes.windll.kernel32.SetErrorMode(0x0001 | 0x0002 | 0x8000)
+    except Exception:
+        pass
 
 
 
@@ -285,15 +291,34 @@ def cmd_status():
         print(c(BOLD + CYAN, f"System Status Diagnostics (v{get_version()}):"))
         smart_idle = os.environ.get("SMART_IDLE_ENABLED", "true").lower() in ("true", "1", "yes")
         on_demand = os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")
-        for name, url, is_idle in [("Local LLM (KoboldCPP 5001)", "http://127.0.0.1:5001/v1/models", smart_idle), ("ComfyUI (8188)", "http://127.0.0.1:8188/system_stats", on_demand)]:
+        llm_model = os.environ.get("LOCAL_LLM_MODEL", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
+        photo_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "AnythingXL_xl.safetensors")
+
+        for name, url, is_idle, model_name in [
+            ("Local LLM (KoboldCPP 5001)", "http://127.0.0.1:5001/v1/models", smart_idle, llm_model),
+            ("ComfyUI Generator (8188)", "http://127.0.0.1:8188/system_stats", on_demand, photo_ckpt)
+        ]:
             try:
                 with urllib.request.urlopen(url, timeout=2) as r:
-                    print(f"  ✓ {name}: " + c(GREEN, "ONLINE"))
+                    print(f"  ✓ {name}: " + c(GREEN, "ONLINE (Load Penuh)"))
+                    print(c(DIM, f"    Active Model: {model_name}"))
             except Exception:
                 if is_idle:
-                    print(f"  💤 {name}: " + c(CYAN, "STANDBY / TIDUR (Smart Idle)"))
+                    print(f"  💤 {name}: " + c(CYAN, "STANDBY / TIDUR (Hemat VRAM)"))
+                    print(c(DIM, f"    Target Model: {model_name} (Siap On-Demand)"))
                 else:
                     print(f"  🔴 {name}: " + c(RED, "OFFLINE"))
+
+        # Photo Vault info
+        vault_catalog = os.path.join(PROJECT_ROOT, "data", "photo_vault", "catalog.json")
+        v_count = 0
+        if os.path.exists(vault_catalog):
+            try:
+                with open(vault_catalog, "r", encoding="utf-8") as vf:
+                    v_count = len(json.load(vf))
+            except Exception:
+                pass
+        print(f"  📂 Photo Vault: {v_count} foto tersimpan di arsip galeri lokal " + c(GREEN, "(Arsip Lokal Aktif ✓)"))
 
 def cmd_setup():
     setup_py = os.path.join(PROJECT_ROOT, "setup.py")

@@ -236,3 +236,17 @@ def find_matching_photo(
     except Exception as e:
         logger.error(f"Failed to read image from vault ({best_path}): {e}")
         return None
+
+
+def get_vault_stats() -> Dict[str, Any]:
+    """Returns statistics about archived photos in the local vault."""
+    catalog = load_catalog()
+    personas: Dict[str, int] = {}
+    for item in catalog:
+        p = item.get("persona", "unknown")
+        personas[p] = personas.get(p, 0) + 1
+    return {
+        "total": len(catalog),
+        "by_persona": personas,
+        "vault_dir": VAULT_DIR
+    }

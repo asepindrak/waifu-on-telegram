@@ -15,6 +15,14 @@ import subprocess
 from typing import Optional, Dict, Any, List, Callable
 from telebot import types
 
+if sys.platform == "win32":
+    try:
+        import ctypes
+        # Suppress Windows modal crash / bad image error dialogs (SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX)
+        ctypes.windll.kernel32.SetErrorMode(0x0001 | 0x0002 | 0x8000)
+    except Exception:
+        pass
+
 logger = logging.getLogger("HealthEngine")
 
 
