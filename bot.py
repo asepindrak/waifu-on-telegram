@@ -4843,6 +4843,16 @@ def setup_bot_commands():
 
 
 def main():
+    # Ensure no zombie duplicate KoboldCpp processes exist from previous crashes or uncoordinated launches
+    try:
+        from health_engine import get_koboldcpp_process_count, kill_all_koboldcpp
+        k_count = get_koboldcpp_process_count()
+        if k_count > 1:
+            logger.warning(f"⚠️ Detected {k_count} duplicate KoboldCPP processes thrashing memory! Terminating duplicates to free RAM...")
+            kill_all_koboldcpp()
+    except Exception as e:
+        logger.debug(f"Startup duplicate cleanup check: {e}")
+
     persona = persona_mgr.get_active_persona()
     logger.info("=" * 60)
     logger.info(f"💖 Waifu on Telegram v{get_version()} ({persona.get('name')}) is starting...")

@@ -71,8 +71,8 @@ class IdleEngine:
         self.last_llm_activity = time.time()
         self.last_comfyui_activity = time.time()
 
-        self.is_llm_sleeping = False
-        self.is_comfyui_sleeping = False
+        self.is_llm_sleeping = not is_port_listening(5001)
+        self.is_comfyui_sleeping = not is_port_listening(8188)
 
         self.wake_lock = threading.Lock()
         self.state_lock = threading.Lock()
@@ -251,6 +251,7 @@ class IdleEngine:
             return True
 
         if self.is_llm_ready():
+            self.is_llm_sleeping = False
             self.record_activity()
             return True
 
@@ -348,6 +349,7 @@ class IdleEngine:
             return True
 
         if self.is_comfyui_ready():
+            self.is_comfyui_sleeping = False
             self.record_activity(is_media=True)
             return True
 

@@ -6,47 +6,57 @@ echo ============================================================
 echo   Starting Waifu on Telegram Services...
 echo ============================================================
 
-:: 1. Start KoboldCPP LLM Engine if available & not already running
-set KOBOLD_EXE=%~dp0tools\koboldcpp.exe
-set KOBOLD_MODEL=
-if exist "%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" (
-    set "KOBOLD_MODEL=%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+:: 1. Start KoboldCPP LLM Engine if available & not smart idle & not already running
+python -c "import os; from dotenv import load_dotenv; load_dotenv(); exit(0 if os.environ.get('SMART_IDLE_ENABLED','true').lower() in ('1','true','yes') else 1)" >nul 2>&1
+if not errorlevel 1 (
+    echo [1/4] Local LLM on standby (Smart Idle: VRAM bebas ^• Bangun otomatis saat chat)
 ) else (
-    for /f "delims=" %%F in ('dir /b /s "%~dp0models\*.gguf" 2^>nul ^| findstr /v /i "mmproj"') do (
-        if not defined KOBOLD_MODEL set "KOBOLD_MODEL=%%F"
+    set KOBOLD_EXE=%~dp0tools\koboldcpp.exe
+    set KOBOLD_MODEL=
+    if exist "%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" (
+        set "KOBOLD_MODEL=%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+    ) else (
+        for /f "delims=" %%F in ('dir /b /s "%~dp0models\*.gguf" 2^>nul ^| findstr /v /i "mmproj"') do (
+            if not defined KOBOLD_MODEL set "KOBOLD_MODEL=%%F"
+        )
     )
-)
 
-:: Auto-detect mmproj vision adapter
-set KOBOLD_MMPROJ=
-if exist "%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf" (
-    set "KOBOLD_MMPROJ=%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
-) else if exist "%~dp0models\mmproj-model-bf16.gguf" (
-    set "KOBOLD_MMPROJ=%~dp0models\mmproj-model-bf16.gguf"
-) else (
-    for /f "delims=" %%F in ('dir /b /s "%~dp0models\*mmproj*.gguf" 2^>nul') do (
-        if not defined KOBOLD_MMPROJ set "KOBOLD_MMPROJ=%%F"
+    :: Auto-detect mmproj vision adapter
+    set KOBOLD_MMPROJ=
+    if exist "%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf" (
+        set "KOBOLD_MMPROJ=%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
+    ) else if exist "%~dp0models\mmproj-model-bf16.gguf" (
+        set "KOBOLD_MMPROJ=%~dp0models\mmproj-model-bf16.gguf"
+    ) else (
+        for /f "delims=" %%F in ('dir /b /s "%~dp0models\*mmproj*.gguf" 2^>nul') do (
+            if not defined KOBOLD_MMPROJ set "KOBOLD_MMPROJ=%%F"
+        )
     )
-)
 
-set MMPROJ_ARG=
-if defined KOBOLD_MMPROJ (
-    set "MMPROJ_ARG=--mmproj \"%KOBOLD_MMPROJ%\""
-)
+    set MMPROJ_ARG=
+    if defined KOBOLD_MMPROJ (
+        set "MMPROJ_ARG=--mmproj \"%KOBOLD_MMPROJ%\""
+    )
 
-if exist "%KOBOLD_EXE%" (
-    if defined KOBOLD_MODEL (
-        powershell -NoProfile -Command "$tcp = New-Object System.Net.Sockets.TcpClient; try { $tcp.Connect('127.0.0.1', 5001); $tcp.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
-        if errorlevel 1 (
-            if defined KOBOLD_MMPROJ (
-                echo [1/4] Starting KoboldCPP LLM Server with auto-loaded model and Vision mmproj...
+    if exist "%KOBOLD_EXE%" (
+        if defined KOBOLD_MODEL (
+            powershell -NoProfile -Command "if (Get-Process koboldcpp -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }" >nul 2>&1
+            if not errorlevel 1 (
+                echo [1/4] KoboldCPP LLM is already running in background.
             ) else (
-                echo [1/4] Starting KoboldCPP LLM Server with auto-loaded model...
+                powershell -NoProfile -Command "$tcp = New-Object System.Net.Sockets.TcpClient; try { $tcp.Connect('127.0.0.1', 5001); $tcp.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
+                if errorlevel 1 (
+                    if defined KOBOLD_MMPROJ (
+                        echo [1/4] Starting KoboldCPP LLM Server with auto-loaded model and Vision mmproj...
+                    ) else (
+                        echo [1/4] Starting KoboldCPP LLM Server with auto-loaded model...
+                    )
+                    start "KoboldCPP Brain" /b "%KOBOLD_EXE%" --model "%KOBOLD_MODEL%" %MMPROJ_ARG% --gpulayers 99 --port 5001 --contextsize 4096 --smartcontext --threads 4 --usecublas normal --quiet
+                    timeout /t 3 >nul
+                ) else (
+                    echo [1/4] KoboldCPP LLM is already running on port 5001.
+                )
             )
-            start "KoboldCPP Brain" /b "%KOBOLD_EXE%" --model "%KOBOLD_MODEL%" %MMPROJ_ARG% --gpulayers 99 --port 5001 --contextsize 4096 --smartcontext --threads 4 --usecublas normal --quiet
-            timeout /t 3 >nul
-        ) else (
-            echo [1/4] KoboldCPP LLM is already running on port 5001.
         )
     )
 )

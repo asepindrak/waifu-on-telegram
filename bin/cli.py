@@ -173,40 +173,50 @@ def start_auxiliary_services():
         popen_kwargs = {"start_new_session": True}
 
     # 1. KoboldCPP (Port 5001)
-    if not is_port_listening(5001):
-        kcpp_exe = os.path.join(PROJECT_ROOT, "tools", "koboldcpp.exe" if platform.system() == "Windows" else "koboldcpp")
-        if os.path.isfile(kcpp_exe):
-            models_dir = os.path.join(PROJECT_ROOT, "models")
-            model_path = None
-            mmproj_path = None
-            if os.path.isdir(models_dir):
-                for f in os.listdir(models_dir):
-                    if f.endswith(".gguf") and "mmproj" not in f.lower():
-                        model_path = os.path.join(models_dir, f)
-                        break
-                for f in os.listdir(models_dir):
-                    if f.endswith(".gguf") and "mmproj" in f.lower():
-                        mmproj_path = os.path.join(models_dir, f)
-                        break
-            if model_path:
-                mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
-                cmd = [
-                    kcpp_exe, "--model", model_path,
-                    "--port", "5001",
-                    "--gpulayers", "99",
-                    "--contextsize", "4096",
-                    "--smartcontext",
-                    "--threads", "4"
-                ] + mm_args
-                if platform.system() == "Windows":
-                    cmd += ["--usecublas", "normal", "--quiet"]
-                else:
-                    cmd += ["--quiet"]
-                try:
-                    subprocess.Popen(cmd, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
-                    print(c(GREEN, "  ✓ KoboldCPP LLM Server active on port 5001"))
-                except Exception:
-                    pass
+    smart_idle = os.environ.get("SMART_IDLE_ENABLED", "true").lower() in ("true", "1", "yes")
+    if smart_idle:
+        print(c(CYAN, "  💤 Local LLM on standby (Smart Idle: VRAM bebas • Bangun otomatis saat chat)"))
+    else:
+        kcpp_running = False
+        try:
+            from health_engine import get_koboldcpp_process_count
+            kcpp_running = (get_koboldcpp_process_count() > 0)
+        except Exception:
+            pass
+        if not kcpp_running and not is_port_listening(5001):
+            kcpp_exe = os.path.join(PROJECT_ROOT, "tools", "koboldcpp.exe" if platform.system() == "Windows" else "koboldcpp")
+            if os.path.isfile(kcpp_exe):
+                models_dir = os.path.join(PROJECT_ROOT, "models")
+                model_path = None
+                mmproj_path = None
+                if os.path.isdir(models_dir):
+                    for f in os.listdir(models_dir):
+                        if f.endswith(".gguf") and "mmproj" not in f.lower():
+                            model_path = os.path.join(models_dir, f)
+                            break
+                    for f in os.listdir(models_dir):
+                        if f.endswith(".gguf") and "mmproj" in f.lower():
+                            mmproj_path = os.path.join(models_dir, f)
+                            break
+                if model_path:
+                    mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
+                    cmd = [
+                        kcpp_exe, "--model", model_path,
+                        "--port", "5001",
+                        "--gpulayers", "99",
+                        "--contextsize", "4096",
+                        "--smartcontext",
+                        "--threads", "4"
+                    ] + mm_args
+                    if platform.system() == "Windows":
+                        cmd += ["--usecublas", "normal", "--quiet"]
+                    else:
+                        cmd += ["--quiet"]
+                    try:
+                        subprocess.Popen(cmd, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
+                        print(c(GREEN, "  ✓ KoboldCPP LLM Server active on port 5001"))
+                    except Exception:
+                        pass
 
     # 2. ComfyUI (Port 8188)
     comfyui_on_demand = os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")

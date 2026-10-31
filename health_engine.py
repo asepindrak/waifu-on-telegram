@@ -50,6 +50,39 @@ def is_port_listening(port: int, host: str = "127.0.0.1", timeout: float = 0.5) 
         return False
 
 
+def get_koboldcpp_process_count() -> int:
+    """Returns number of active koboldcpp processes running on host OS."""
+    try:
+        if sys.platform == "win32":
+            out = subprocess.check_output(
+                ["tasklist", "/FI", "IMAGENAME eq koboldcpp.exe", "/FO", "CSV", "/NH"],
+                creationflags=0x08000000
+            ).decode("utf-8", errors="ignore")
+            lines = [l for l in out.strip().splitlines() if "koboldcpp.exe" in l.lower()]
+            return len(lines)
+        else:
+            out = subprocess.check_output(["pgrep", "-f", "koboldcpp"]).decode("utf-8", errors="ignore")
+            lines = [l for l in out.strip().splitlines() if l.strip()]
+            return len(lines)
+    except Exception:
+        return 0
+
+
+def kill_all_koboldcpp() -> None:
+    """Forcefully terminates all running KoboldCPP instances on host OS."""
+    try:
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/IM", "koboldcpp.exe"],
+                capture_output=True,
+                creationflags=0x08000000
+            )
+        else:
+            subprocess.run(["pkill", "-9", "-f", "koboldcpp"], capture_output=True)
+    except Exception as e:
+        logger.warning(f"Error terminating KoboldCPP processes: {e}")
+
+
 class HealthEngine:
     def __init__(
         self,
@@ -132,12 +165,33 @@ class HealthEngine:
     def heal_llm(self) -> bool:
         """
         Attempts to automatically start or resurrect the local LLM service (KoboldCPP / Ollama).
+        Guarantees strict singleton execution: prevents multiple KoboldCPP instances from spawning.
         Returns True if service is running and healthy.
         """
         if is_port_listening(5001):
             stat = self.llm_client.check_health()
             if stat.get("online"):
                 return True
+
+        # Strict Singleton Guard: Check for duplicate or currently loading KoboldCPP instances
+        proc_count = get_koboldcpp_process_count()
+        if proc_count > 1:
+            logger.warning(f"Detected {proc_count} duplicate KoboldCPP processes thrashing system RAM. Terminating duplicates...")
+            kill_all_koboldcpp()
+            time.sleep(1)
+        elif proc_count == 1:
+            logger.info("KoboldCPP process is already running (loading model weights). Waiting for port 5001...")
+            for sec in range(1, 40):
+                time.sleep(1)
+                if is_port_listening(5001):
+                    stat = self.llm_client.check_health()
+                    if stat.get("online"):
+                        logger.info(f"Existing KoboldCPP became ready in {sec}s.")
+                        return True
+            # Process was running but didn't open port 5001 in 40s - terminate before spawning fresh
+            logger.warning("Existing KoboldCPP process timed out binding port 5001. Restarting cleanly...")
+            kill_all_koboldcpp()
+            time.sleep(1)
 
         # 1. Use smart discovery from asset_manager
         spec = None
@@ -150,7 +204,7 @@ class HealthEngine:
         if spec and spec.get("cmd"):
             popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
             try:
-                logger.info(f"Self-healing: Spawning KoboldCPP LLM Server ({os.path.basename(spec.get('model', ''))})...")
+                logger.info(f"Self-healing: Spawning single KoboldCPP LLM Server ({os.path.basename(spec.get('model', ''))})...")
                 log_path = os.path.join(self.project_root, "koboldcpp.log")
                 with open(log_path, "a", encoding="utf-8") as f_log:
                     subprocess.Popen(
@@ -459,9 +513,10 @@ class HealthEngine:
             stat = self.llm_client.check_health()
 
         is_llm_online = bool(stat.get("online"))
-        # Auto-heal LLM on startup if still offline and self-healing enabled
-        if not is_llm_online and self.self_healing_enabled:
-            logger.info("LLM offline at startup. Attempting immediate self-healing...")
+        is_smart_idle = bool(self.idle_engine and self.idle_engine.enabled)
+        # Auto-heal LLM on startup ONLY if smart idle is disabled (otherwise LLM sleeps to save RAM/VRAM)
+        if not is_llm_online and self.self_healing_enabled and not is_smart_idle:
+            logger.info("LLM offline at startup (Smart Idle disabled). Attempting immediate self-healing...")
             if self.heal_llm():
                 is_llm_online = True
                 stat = self.llm_client.check_health()
