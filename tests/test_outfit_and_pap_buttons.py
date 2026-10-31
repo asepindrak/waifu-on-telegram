@@ -18,13 +18,10 @@ class TestOutfitAndPapButtons(unittest.TestCase):
         self.mock_call.message.message_id = 777
         self.mock_call.message.text = "Pilih skenario foto"
         self.patch_answer = patch.object(bot.bot, "answer_callback_query")
-        self.patch_chat_action = patch.object(bot.bot, "send_chat_action")
         self.mock_answer = self.patch_answer.start()
-        self.mock_chat_action = self.patch_chat_action.start()
 
     def tearDown(self):
         self.patch_answer.stop()
-        self.patch_chat_action.stop()
 
     @patch("bot.is_authorized", return_value=True)
     @patch("bot.persona_mgr")

@@ -2601,7 +2601,10 @@ def callback_cfg_status(call):
         types.InlineKeyboardButton("🩹 Self-Heal Services", callback_data="cfg_action:self_heal"),
         types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
     )
-    safe_edit_message_text(report, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    try:
+        bot.edit_message_text(report, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    except Exception:
+        pass
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'cfg_action:self_heal')
@@ -2617,17 +2620,20 @@ def callback_cfg_self_heal(call):
             types.InlineKeyboardButton("🔄 Segarkan Status", callback_data="cfg_action:status"),
             types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
         )
-        llm_stat = "🟢 Online" if results.get("llm") else "🔴 Gagal Pulih"
-        comfy_stat = "🟢 Online" if results.get("comfyui", True) else "🔴 Gagal Pulih"
-        music_stat = "🟢 Online" if results.get("music", True) else "🔴 Gagal Pulih"
-        summary = (
-            f"🩹 **Hasil Pengecekan Self-Healing:**\n"
-            f"• LLM Engine: {llm_stat}\n"
-            f"• ComfyUI: {comfy_stat}\n"
-            f"• Pemutar Musik: {music_stat}\n\n"
-            f"{report}"
-        )
-        safe_send_message(call.message.chat.id, summary, reply_markup=markup, parse_mode="Markdown")
+        try:
+            llm_stat = "🟢 Online" if results.get("llm") else "🔴 Gagal Pulih"
+            comfy_stat = "🟢 Online" if results.get("comfyui", True) else "🔴 Gagal Pulih"
+            music_stat = "🟢 Online" if results.get("music", True) else "🔴 Gagal Pulih"
+            summary = (
+                f"🩹 **Hasil Pengecekan Self-Healing:**\n"
+                f"• LLM Engine: {llm_stat}\n"
+                f"• ComfyUI: {comfy_stat}\n"
+                f"• Pemutar Musik: {music_stat}\n\n"
+                f"{report}"
+            )
+            bot.send_message(call.message.chat.id, summary, reply_markup=markup, parse_mode="Markdown")
+        except Exception:
+            pass
     threading.Thread(target=_run_heal, daemon=True).start()
 
 
