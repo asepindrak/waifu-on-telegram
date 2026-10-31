@@ -111,7 +111,7 @@ Anda dapat memilih model ilustrasi anime sesuai dengan spesifikasi GPU dan prefe
 #### 3. 🎬 Video Animation Engines (Generasi Video Bergerak)
 
 Waifu dapat mengirimkan klip animasi video saat diminta lewat `/video` menggunakan salah satu dari 3 pilihan engine:
-* **Wan 2.1 1.3B Diffusion Model** (`wan2.1_t2v_1.3B_bf16.safetensors` ~2.9 GB + `Wan2.1_VAE.pth` ~250 MB): Model video difusi state-of-the-art terbaru, ringan dan hemat VRAM.
+* **Wan 2.1 1.3B Diffusion Model** (`wan2.1_t2v_1.3B_bf16.safetensors` ~2.7 GB + `wan_2.1_vae.safetensors` ~240 MB): Model video difusi state-of-the-art terbaru, ringan dan hemat VRAM.
 * **AnimateDiff v2 Motion Module** (`mm_sd_v15_v2.ckpt` ~1.7 GB): Animasi temporal dinamis berbasis SD 1.5.
 * **Motion 2.5D Engine (Zero-VRAM Parallax)**: Animasi video MP4 instan dengan efek pergeseran kedalaman parallax dan kedipan mata halus tanpa beban VRAM GPU sama sekali!
 
@@ -253,7 +253,7 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.6.51)
+                        💖 WAIFU ON TELEGRAM BOT (v1.6.52)
 ```
 
 > 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.

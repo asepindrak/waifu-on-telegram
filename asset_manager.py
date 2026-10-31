@@ -137,9 +137,16 @@ ASSET_REGISTRY = {
         "type": "model",
         "subfolder": os.path.join("models", "diffusion_models"),
         "filename": "wan2.1_t2v_1.3B_bf16.safetensors",
-        "patterns": ["*wan2.1*1.3B*.safetensors", "*wan2.1_t2v_1.3B*.safetensors", "*wan*1.3B*.safetensors"],
-        "size_mb": 2900,
-        "url": "https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B/resolve/main/wan2.1_t2v_1.3B_bf16.safetensors",
+        "patterns": ["*wan2.1*1.3B*.safetensors", "*wan2.1_t2v_1.3B*.safetensors", "*wan*1.3B*.safetensors", "*Wan2_1*1_3B*.safetensors"],
+        "size_mb": 2700,
+        "url": "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors",
+        "fallback_url": "https://hf-mirror.com/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors",
+        "mirrors": [
+            "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors",
+            "https://hf-mirror.com/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors",
+            "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-T2V-1_3B_bf16.safetensors",
+            "https://hf-mirror.com/Kijai/WanVideo_comfy/resolve/main/Wan2_1-T2V-1_3B_bf16.safetensors"
+        ],
         "description": "Model video generasi baru Wan 2.1 1.3B (ringan & hemat VRAM).",
         "required_for": "Video Engine Wan 2.1"
     },
@@ -148,9 +155,16 @@ ASSET_REGISTRY = {
         "type": "model",
         "subfolder": os.path.join("models", "vae"),
         "filename": "wan_2.1_vae.safetensors",
-        "patterns": ["*wan*vae*.safetensors", "*wan*vae*.pth"],
-        "size_mb": 250,
-        "url": "https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B/resolve/main/Wan2.1_VAE.pth",
+        "patterns": ["*wan*vae*.safetensors", "*wan*vae*.pth", "*Wan2_1_VAE*.safetensors"],
+        "size_mb": 240,
+        "url": "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors",
+        "fallback_url": "https://hf-mirror.com/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors",
+        "mirrors": [
+            "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors",
+            "https://hf-mirror.com/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors",
+            "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1_VAE_bf16.safetensors",
+            "https://hf-mirror.com/Kijai/WanVideo_comfy/resolve/main/Wan2_1_VAE_bf16.safetensors"
+        ],
         "description": "Autoencoder khusus video latents untuk Wan 2.1.",
         "required_for": "Video Engine Wan 2.1"
     }
@@ -786,6 +800,14 @@ def _download_file(url: str, target_path: str, fallback_url: Optional[str] = Non
         os.makedirs(target_dir, exist_ok=True)
 
     min_bytes = _get_min_model_bytes({"size_mb": min_size_mb or 0}, target_path)
+
+    # Clean up accidental tiny/corrupt files (e.g. HTML 404 responses or 0-byte aborts)
+    if os.path.exists(target_path) and os.path.getsize(target_path) < 4096:
+        try:
+            os.remove(target_path)
+            logger.info(f"Cleaned up tiny stub file before download: {target_path}")
+        except Exception:
+            pass
 
     candidate_urls = []
     if url and url not in candidate_urls:

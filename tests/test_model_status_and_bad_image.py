@@ -50,6 +50,41 @@ class TestModelStatusAndBadImage(unittest.TestCase):
         self.assertIn("Photo Vault", report)
         self.assertIn("Engine Video", report)
 
+    def test_wan21_download_urls_and_mirrors_configured(self):
+        """Wan 2.1 1.3B and VAE assets point to valid Comfy-Org Hugging Face repos with mirrors."""
+        info_model = asset_manager.ASSET_REGISTRY.get("wan21_1.3b")
+        info_vae = asset_manager.ASSET_REGISTRY.get("wan21_vae")
+
+        self.assertIsNotNone(info_model)
+        self.assertIn("Comfy-Org/Wan_2.1_ComfyUI_repackaged", info_model["url"])
+        self.assertIn("fallback_url", info_model)
+        self.assertIn("mirrors", info_model)
+        self.assertGreaterEqual(len(info_model["mirrors"]), 2)
+
+        self.assertIsNotNone(info_vae)
+        self.assertIn("Comfy-Org/Wan_2.1_ComfyUI_repackaged", info_vae["url"])
+        self.assertIn("fallback_url", info_vae)
+        self.assertIn("mirrors", info_vae)
+
+    def test_download_file_cleans_up_stub_file(self):
+        """_download_file deletes stub files smaller than 4096 bytes before attempting resume/download."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub_file = os.path.join(tmpdir, "model_stub.safetensors")
+            with open(stub_file, "wb") as f:
+                f.write(b"404 Not Found HTML page")  # tiny stub file
+
+            self.assertTrue(os.path.exists(stub_file))
+            # Test with dummy url and mocked subprocess/requests
+            with patch("shutil.which", return_value=None), patch("requests.get") as mock_req:
+                mock_resp = MagicMock()
+                mock_resp.status_code = 500
+                mock_req.return_value.__enter__.return_value = mock_resp
+                asset_manager._download_file("http://invalid.url", stub_file)
+
+            # The tiny stub file should have been cleaned up
+            self.assertFalse(os.path.exists(stub_file))
+
 
 if __name__ == "__main__":
     unittest.main()
