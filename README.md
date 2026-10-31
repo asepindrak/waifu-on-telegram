@@ -253,7 +253,7 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.6.47)
+                        💖 WAIFU ON TELEGRAM BOT (v1.6.48)
 ```
 
 > 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.

@@ -131,6 +131,40 @@ class HealthEngine:
             if stat.get("online"):
                 return True
 
+        # 1. Use smart discovery from asset_manager
+        spec = None
+        try:
+            import asset_manager
+            spec = asset_manager.get_llm_launch_spec()
+        except Exception as e_spec:
+            logger.warning(f"Error querying LLM launch spec: {e_spec}")
+
+        if spec and spec.get("cmd"):
+            popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
+            try:
+                logger.info(f"Self-healing: Spawning KoboldCPP LLM Server ({os.path.basename(spec.get('model', ''))})...")
+                log_path = os.path.join(self.project_root, "koboldcpp.log")
+                with open(log_path, "a", encoding="utf-8") as f_log:
+                    subprocess.Popen(
+                        spec["cmd"],
+                        cwd=spec["cwd"],
+                        stdout=f_log,
+                        stderr=f_log,
+                        **popen_kwargs
+                    )
+                # Wait up to 35s for model weights to load into VRAM
+                for sec in range(1, 36):
+                    time.sleep(1)
+                    if is_port_listening(5001):
+                        # Give KoboldCPP a brief moment to finish binding endpoint
+                        stat = self.llm_client.check_health()
+                        if stat.get("online"):
+                            logger.info(f"Self-healing: KoboldCPP restored successfully in {sec}s.")
+                            return True
+            except Exception as e:
+                logger.error(f"Self-healing failed to spawn KoboldCPP via spec: {e}")
+
+        # 2. Legacy fallback search
         kcpp_name = "koboldcpp.exe" if sys.platform == "win32" else "koboldcpp"
         kcpp_exe = os.path.join(self.project_root, "tools", kcpp_name)
         if not os.path.isfile(kcpp_exe):
@@ -152,7 +186,7 @@ class HealthEngine:
                     mmproj_path = os.path.join(models_dir, f)
                     break
 
-        if os.path.isfile(kcpp_exe) and model_path:
+        if not spec and os.path.isfile(kcpp_exe) and model_path:
             mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
             cmd = [
                 kcpp_exe, "--model", model_path,
@@ -170,21 +204,22 @@ class HealthEngine:
                 popen_kwargs = {"start_new_session": True}
 
             try:
-                logger.info(f"Self-healing: Spawning KoboldCPP LLM Server ({os.path.basename(model_path)})...")
-                subprocess.Popen(
-                    cmd,
-                    cwd=self.project_root,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    **popen_kwargs
-                )
-                # Wait up to 15s for model weights to load into VRAM
-                for _ in range(15):
+                logger.info(f"Self-healing: Spawning KoboldCPP LLM Server (fallback: {os.path.basename(model_path)})...")
+                log_path = os.path.join(self.project_root, "koboldcpp.log")
+                with open(log_path, "a", encoding="utf-8") as f_log:
+                    subprocess.Popen(
+                        cmd,
+                        cwd=self.project_root,
+                        stdout=f_log,
+                        stderr=f_log,
+                        **popen_kwargs
+                    )
+                for sec in range(1, 36):
                     time.sleep(1)
                     if is_port_listening(5001):
                         stat = self.llm_client.check_health()
                         if stat.get("online"):
-                            logger.info("Self-healing: KoboldCPP restored successfully.")
+                            logger.info(f"Self-healing: KoboldCPP restored successfully in {sec}s.")
                             return True
             except Exception as e:
                 logger.error(f"Self-healing failed to spawn KoboldCPP: {e}")

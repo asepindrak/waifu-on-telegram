@@ -100,11 +100,47 @@ foreach ($target in $llmPorts) {
 }
 
 if (-not $llmOnline) {
+    # Check if KoboldCPP binary and GGUF model exist on disk
+    $kcppPaths = @(
+        (Join-Path $PSScriptRoot "tools\koboldcpp.exe"),
+        (Join-Path $PSScriptRoot "tools\koboldcpp"),
+        (Join-Path $env:LOCALAPPDATA "Programs\KoboldCPP\koboldcpp.exe")
+    )
+    $hasKcpp = $false
+    foreach ($kp in $kcppPaths) {
+        if (Test-Path $kp) { $hasKcpp = $true; break }
+    }
+    if (-not $hasKcpp) {
+        $whichK = Get-Command "koboldcpp" -ErrorAction SilentlyContinue
+        if ($whichK) { $hasKcpp = $true }
+    }
+
+    $modelDirs = @(
+        (Join-Path $PSScriptRoot "models"),
+        (Join-Path $env:APPDATA "Locally Uncensored\models")
+    )
+    $hasGguf = $false
+    foreach ($md in $modelDirs) {
+        if (Test-Path $md) {
+            $ggufs = Get-ChildItem -Path $md -Filter "*.gguf" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*mmproj*" }
+            if ($ggufs -and $ggufs.Count -gt 0) { $hasGguf = $true; break }
+        }
+    }
+
     $smartIdle = $env:SMART_IDLE_ENABLED
-    if (-not $smartIdle -or $smartIdle -eq "true") {
-        Write-Host "  [STANDBY] Local LLM Engine: STANDBY / TIDUR (Smart Idle: VRAM Bebas • Bangun Otomatis Saat Chat)" -ForegroundColor Cyan
+    if ($hasKcpp -and $hasGguf) {
+        if (-not $smartIdle -or $smartIdle -eq "true") {
+            Write-Host "  [STANDBY] Local LLM Engine: STANDBY / TIDUR (Smart Idle: VRAM Bebas • Bangun Otomatis Saat Chat)" -ForegroundColor Cyan
+        } else {
+            Write-Host "  [OFFLINE] Local LLM Engine: OFFLINE / Unreachable (Checked ports 5001, 8127, 11434, 1234)" -ForegroundColor Red
+        }
     } else {
-        Write-Host "  [OFFLINE] Local LLM Engine: OFFLINE / Unreachable (Checked ports 5001, 8127, 11434, 1234)" -ForegroundColor Red
+        $missingParts = @()
+        if (-not $hasKcpp) { $missingParts += "koboldcpp.exe" }
+        if (-not $hasGguf) { $missingParts += "model .gguf" }
+        $missStr = $missingParts -join " & "
+        Write-Host "  [NOT READY] Local LLM Engine: BELUM TERPASANG ($missStr belum ada)" -ForegroundColor Yellow
+        Write-Host "              Jalankan 'python setup.py' -> Opsi [7] atau taruh model di folder models\" -ForegroundColor DarkYellow
     }
 }
 
@@ -124,11 +160,26 @@ try {
     Write-Host "            Device: $gpu" -ForegroundColor DarkCyan
     Write-Host "            Photo Model: $comfyCkpt" -ForegroundColor DarkCyan
 } catch {
+    $comfyDirCandidates = @(
+        (Join-Path $PSScriptRoot "ComfyUI"),
+        (Join-Path $PSScriptRoot "tools\ComfyUI"),
+        (Join-Path $PSScriptRoot "..\ComfyUI"),
+        (Join-Path $PSScriptRoot "..\ComfyUI_windows_portable\ComfyUI")
+    )
+    $hasComfyDir = $false
+    foreach ($cd in $comfyDirCandidates) {
+        if (Test-Path (Join-Path $cd "main.py")) { $hasComfyDir = $true; break }
+    }
+
     $onDemand = $env:COMFYUI_ON_DEMAND
-    if (-not $onDemand -or $onDemand -eq "true") {
-        Write-Host "  [STANDBY] ComfyUI Generator (Port 8188): STANDBY ON-DEMAND (Tidur hemat VRAM • Aktif otomatis saat minta foto)" -ForegroundColor Cyan
+    if ($hasComfyDir) {
+        if (-not $onDemand -or $onDemand -eq "true") {
+            Write-Host "  [STANDBY] ComfyUI Generator (Port 8188): STANDBY ON-DEMAND (Tidur hemat VRAM • Aktif otomatis saat minta foto)" -ForegroundColor Cyan
+        } else {
+            Write-Host "  [OFFLINE] ComfyUI Generator (Port 8188): OFFLINE" -ForegroundColor Yellow
+        }
     } else {
-        Write-Host "  [OFFLINE] ComfyUI Generator (Port 8188): OFFLINE (Smart Photo Vault active)" -ForegroundColor Yellow
+        Write-Host "  [NOT READY] ComfyUI Generator: Folder ComfyUI belum terdeteksi (Fallback Cloud/Pollinations aktif jika diaktifkan)" -ForegroundColor Yellow
     }
 }
 

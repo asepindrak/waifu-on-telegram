@@ -148,7 +148,7 @@ class IdleEngine:
                 logger.error(f"Error putting ComfyUI to sleep: {e}")
                 return False
 
-    def wake_llm(self, timeout_seconds: int = 25) -> bool:
+    def wake_llm(self, timeout_seconds: int = 40) -> bool:
         """
         Wakes KoboldCPP on-demand.
         Loads model weights into VRAM and waits until port 5001 is responsive.
@@ -166,50 +166,22 @@ class IdleEngine:
             if self.health_engine and hasattr(self.health_engine, "heal_llm"):
                 started = self.health_engine.heal_llm()
             else:
-                # Direct launch fallback
-                kcpp_name = "koboldcpp.exe" if sys.platform == "win32" else "koboldcpp"
-                kcpp_exe = os.path.join(self.project_root, "tools", kcpp_name)
-                if not os.path.isfile(kcpp_exe):
-                    which_kcpp = shutil.which("koboldcpp")
-                    if which_kcpp:
-                        kcpp_exe = which_kcpp
-
-                models_dir = os.path.join(self.project_root, "models")
-                model_path = None
-                mmproj_path = None
-                if os.path.isdir(models_dir):
-                    for f in os.listdir(models_dir):
-                        if f.endswith(".gguf") and "mmproj" not in f.lower():
-                            model_path = os.path.join(models_dir, f)
-                            break
-                    for f in os.listdir(models_dir):
-                        if f.endswith(".gguf") and "mmproj" in f.lower():
-                            mmproj_path = os.path.join(models_dir, f)
-                            break
-
-                if os.path.isfile(kcpp_exe) and model_path:
-                    mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
-                    cmd = [
-                        kcpp_exe, "--model", model_path,
-                        "--port", "5001",
-                        "--gpulayers", "99",
-                        "--contextsize", "4096",
-                        "--smartcontext",
-                        "--threads", "4"
-                    ] + mm_args
-                    if sys.platform == "win32":
-                        cmd += ["--usecublas", "normal", "--quiet"]
-                        popen_kwargs = {"creationflags": 0x08000000 | 0x00000200}
-                    else:
-                        cmd += ["--quiet"]
-                        popen_kwargs = {"start_new_session": True}
-                    try:
-                        subprocess.Popen(cmd, cwd=self.project_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
+                # Direct launch fallback using asset_manager discovery
+                try:
+                    import asset_manager
+                    spec = asset_manager.get_llm_launch_spec(project_root=self.project_root)
+                    if spec:
+                        popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
+                        kcpp_log = os.path.join(self.project_root, "koboldcpp.log")
+                        with open(kcpp_log, "a", encoding="utf-8") as f_kcpp:
+                            subprocess.Popen(spec["cmd"], cwd=spec["cwd"], stdout=f_kcpp, stderr=f_kcpp, **popen_kwargs)
                         started = True
-                    except Exception as e:
-                        logger.error(f"Failed to launch KoboldCPP: {e}")
+                        logger.info(f"⚡ Smart Idle: Started KoboldCPP fallback process using {spec['cmd'][0]}")
+                except Exception as e:
+                    logger.error(f"Failed to launch KoboldCPP on-demand fallback: {e}")
 
             if not started and not is_port_listening(5001):
+                logger.warning("⚡ Smart Idle: Could not launch KoboldCPP (binary or model missing).")
                 return False
 
             # Wait for port and readiness
@@ -222,6 +194,7 @@ class IdleEngine:
                     return True
                 time.sleep(1)
 
+            logger.warning(f"⚡ Smart Idle: Timed out ({timeout_seconds}s) waiting for KoboldCPP readiness.")
             return False
 
     def wake_comfyui(self, timeout_seconds: int = 40) -> bool:
@@ -310,15 +283,49 @@ class IdleEngine:
         fb_thread = threading.Thread(target=_feedback_loop, daemon=True)
         fb_thread.start()
         try:
-            ok = self.wake_llm()
+            ok = self.wake_llm(timeout_seconds=40)
         finally:
             stop_feedback.set()
             fb_thread.join(timeout=1.0)
 
-        # Clean up temporary status message
+        # Handle feedback message
         if waking_msg and bot and chat_id:
+            if ok:
+                try:
+                    bot.delete_message(chat_id, waking_msg.message_id)
+                except Exception:
+                    pass
+                try:
+                    bot.send_chat_action(chat_id, "typing")
+                except Exception:
+                    pass
+            else:
+                err_text = (
+                    "⚠️ *Waifu belum bisa dibangunkan otomatis!*\n\n"
+                    "Engine AI lokal (KoboldCPP) tidak merespons di port 5001.\n"
+                    "Kemungkinan model LLM belum terpasang atau file binary belum ditemukan.\n\n"
+                    "💡 *Solusi:*\n"
+                    "• Ketik `/status` untuk melihat diagnosa lengkap\n"
+                    "• Atau jalankan `start_services.bat` di folder PC kamu."
+                )
+                try:
+                    bot.edit_message_text(
+                        err_text,
+                        chat_id=chat_id,
+                        message_id=waking_msg.message_id,
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    try:
+                        bot.send_message(chat_id, err_text.replace("*", ""))
+                    except Exception:
+                        pass
+        elif not ok and bot and chat_id:
             try:
-                bot.delete_message(chat_id, waking_msg.message_id)
+                bot.send_message(
+                    chat_id,
+                    "⚠️ Otak AI lokal (KoboldCPP) belum aktif di port 5001. Silakan ketik /status untuk informasi lebih lanjut."
+                )
             except Exception:
                 pass
 
@@ -378,10 +385,33 @@ class IdleEngine:
             fb_thread.join(timeout=1.0)
 
         if waking_msg and bot and chat_id:
-            try:
-                bot.delete_message(chat_id, waking_msg.message_id)
-            except Exception:
-                pass
+            if ok:
+                try:
+                    bot.delete_message(chat_id, waking_msg.message_id)
+                except Exception:
+                    pass
+                try:
+                    bot.send_chat_action(chat_id, "upload_photo")
+                except Exception:
+                    pass
+            else:
+                err_text = (
+                    "⚠️ *Studio foto ComfyUI belum dapat dinyalakan!*\n\n"
+                    "Layanan ComfyUI di port 8188 tidak merespons.\n"
+                    "💡 Periksa apakah ComfyUI sudah terinstall atau jalankan `start_services.bat`."
+                )
+                try:
+                    bot.edit_message_text(
+                        err_text,
+                        chat_id=chat_id,
+                        message_id=waking_msg.message_id,
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    try:
+                        bot.send_message(chat_id, err_text.replace("*", ""))
+                    except Exception:
+                        pass
 
         self.record_activity(is_media=True)
         return ok

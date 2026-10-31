@@ -98,6 +98,24 @@ class TestIdleEngine(unittest.TestCase):
         self.assertIn("Aktif", summary)
         self.assertIn("10m", summary)
 
+    def test_ensure_llm_active_failure_edits_message_with_error(self):
+        """When LLM waking fails, ensure_llm_active informs user instead of deleting status and staying silent."""
+        mock_bot = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.message_id = 999
+        mock_bot.send_message.return_value = mock_msg
+
+        with patch.object(self.idle_engine, "wake_llm", return_value=False), \
+             patch.object(self.idle_engine, "is_llm_ready", return_value=False):
+            ok = self.idle_engine.ensure_llm_active(bot=mock_bot, chat_id=123)
+            self.assertFalse(ok)
+            # Must NOT delete message
+            mock_bot.delete_message.assert_not_called()
+            # Must edit message into informative error explanation
+            self.assertTrue(mock_bot.edit_message_text.called)
+            edit_args = mock_bot.edit_message_text.call_args[0]
+            self.assertIn("belum bisa dibangunkan", edit_args[0])
+
 
 if __name__ == "__main__":
     unittest.main()

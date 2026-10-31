@@ -391,6 +391,152 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
         "cmd": [sys.executable, main_py, "--port", "8188", "--listen", "127.0.0.1", "--disable-auto-launch", "--fast"] + extra_args
     }
 
+
+def get_llm_launch_spec(project_root: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Intelligently discovers KoboldCPP binary, GGUF chat model, and mmproj vision adapter.
+    Scans project tools/, standard installation paths, and environment directories.
+    Returns: {"cmd": list, "cwd": str, "exe": str, "model": str, "mmproj": Optional[str]} or None
+    """
+    root = project_root or PROJECT_ROOT
+
+    # 1. Locate KoboldCPP executable
+    kcpp_name = "koboldcpp.exe" if platform.system() == "Windows" else "koboldcpp"
+    candidates_exe = [
+        os.path.join(root, "tools", kcpp_name),
+        os.path.join(root, "tools", "KoboldCPP", kcpp_name),
+        os.path.join(root, "tools", "koboldcpp_cu12.exe" if platform.system() == "Windows" else "koboldcpp_cu12"),
+        os.path.join(root, "tools", "koboldcpp_nocuda.exe" if platform.system() == "Windows" else "koboldcpp_nocuda"),
+        os.path.join(root, kcpp_name),
+    ]
+    which_kcpp = shutil.which("koboldcpp") or shutil.which("koboldcpp.exe")
+    if which_kcpp:
+        candidates_exe.append(which_kcpp)
+
+    if platform.system() == "Windows":
+        user_home = os.path.expanduser("~")
+        candidates_exe.extend([
+            r"C:\KoboldCPP\koboldcpp.exe",
+            r"D:\KoboldCPP\koboldcpp.exe",
+            os.path.join(user_home, "AppData", "Local", "Programs", "KoboldCPP", "koboldcpp.exe"),
+            os.path.join(user_home, "Downloads", "koboldcpp.exe"),
+            os.path.join(user_home, "Desktop", "koboldcpp.exe"),
+        ])
+
+    kcpp_exe = None
+    for cand in candidates_exe:
+        if cand and os.path.isfile(cand):
+            kcpp_exe = os.path.abspath(cand)
+            break
+
+    if not kcpp_exe:
+        cand_default = os.path.join(root, "tools", kcpp_name)
+        if os.path.isfile(cand_default):
+            kcpp_exe = os.path.abspath(cand_default)
+
+    if not kcpp_exe:
+        return None
+
+    # 2. Locate Chat / LLM Model (.gguf)
+    models_dirs = [
+        os.path.join(root, "models"),
+        detect_locally_uncensored_dir()
+    ]
+    env_model = os.environ.get("LLM_MODEL", "").strip()
+    model_path = None
+    if env_model and os.path.isfile(env_model) and env_model.endswith(".gguf"):
+        model_path = os.path.abspath(env_model)
+
+    mmproj_path = None
+
+    if not model_path:
+        info_qwy = get_asset_info("qwythos_9b")
+        if info_qwy and info_qwy.get("installed") and info_qwy.get("target_path"):
+            model_path = info_qwy["target_path"]
+
+    for m_dir in models_dirs:
+        if not m_dir or not os.path.isdir(m_dir):
+            continue
+        if not model_path:
+            try:
+                for f in os.listdir(m_dir):
+                    if f.endswith(".gguf") and "mmproj" not in f.lower():
+                        model_path = os.path.join(m_dir, f)
+                        break
+            except Exception:
+                pass
+            if not model_path:
+                for r_dir, _, files in os.walk(m_dir):
+                    for f in files:
+                        if f.endswith(".gguf") and "mmproj" not in f.lower():
+                            model_path = os.path.join(r_dir, f)
+                            break
+                    if model_path:
+                        break
+
+        if not mmproj_path:
+            try:
+                for f in os.listdir(m_dir):
+                    if f.endswith(".gguf") and "mmproj" in f.lower():
+                        mmproj_path = os.path.join(m_dir, f)
+                        break
+            except Exception:
+                pass
+            if not mmproj_path:
+                for r_dir, _, files in os.walk(m_dir):
+                    for f in files:
+                        if f.endswith(".gguf") and "mmproj" in f.lower():
+                            mmproj_path = os.path.join(r_dir, f)
+                            break
+                    if mmproj_path:
+                        break
+
+    if not model_path or not os.path.isfile(model_path):
+        return None
+
+    if not mmproj_path:
+        info_vis = get_asset_info("qwythos_vision")
+        if info_vis and info_vis.get("installed") and info_vis.get("target_path"):
+            mmproj_path = info_vis["target_path"]
+
+    mm_args = ["--mmproj", mmproj_path] if (mmproj_path and os.path.isfile(mmproj_path)) else []
+
+    port = os.environ.get("LLM_PORT", "5001")
+    gpu_layers = os.environ.get("LLM_GPU_LAYERS", "99")
+    ctx_size = os.environ.get("LLM_CONTEXT_SIZE", "4096")
+    threads = os.environ.get("LLM_THREADS", "4")
+
+    cmd = [
+        kcpp_exe,
+        "--model", model_path,
+        "--port", str(port),
+        "--gpulayers", str(gpu_layers),
+        "--contextsize", str(ctx_size),
+        "--smartcontext",
+        "--threads", str(threads)
+    ] + mm_args
+
+    if platform.system() == "Windows":
+        cmd += ["--usecublas", "normal", "--quiet"]
+    else:
+        cmd += ["--quiet"]
+
+    return {
+        "cmd": cmd,
+        "cwd": root,
+        "exe": kcpp_exe,
+        "model": model_path,
+        "mmproj": mmproj_path
+    }
+
+def safe_getsize(path: str) -> int:
+    """Safely returns file size or 0 if file does not physically exist or stat fails."""
+    try:
+        return os.path.getsize(path)
+    except Exception:
+        return 0
+
+
 def _get_min_model_bytes(spec: dict, candidate_path: Optional[str] = None) -> int:
     expected_size_mb = spec.get("size_mb", 0)
     if candidate_path:
@@ -428,7 +574,7 @@ def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:
             p = os.path.join(cdir, spec["filename"])
             min_bytes = _get_min_model_bytes(spec, p)
             if os.path.isfile(p):
-                sz = os.path.getsize(p)
+                sz = safe_getsize(p)
                 if sz >= min_bytes:
                     found_file = p
                     found_size = sz
@@ -442,7 +588,7 @@ def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:
                     for m in matches:
                         min_m_bytes = _get_min_model_bytes(spec, m)
                         if os.path.isfile(m):
-                            sz = os.path.getsize(m)
+                            sz = safe_getsize(m)
                             if sz >= min_m_bytes:
                                 found_file = m
                                 found_size = sz
@@ -510,7 +656,7 @@ def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:
             p = os.path.join(sdir, spec["filename"])
             min_bytes = _get_min_model_bytes(spec, p)
             if os.path.isfile(p):
-                sz = os.path.getsize(p)
+                sz = safe_getsize(p)
                 if sz >= min_bytes:
                     found_file = p
                     found_size = sz
@@ -528,7 +674,7 @@ def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:
                         for m in matches:
                             min_m_bytes = _get_min_model_bytes(spec, m)
                             if os.path.isfile(m):
-                                sz = os.path.getsize(m)
+                                sz = safe_getsize(m)
                                 if sz >= min_m_bytes:
                                     found_file = m
                                     found_size = sz

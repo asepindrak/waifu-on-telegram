@@ -127,6 +127,41 @@ BOT_LANGUAGE = os.environ.get("BOT_LANGUAGE", "id")
 AWAITING_CUSTOM_LANG: dict = {}      # user_id -> bool
 
 
+# --- Telegram Safe Messaging Helpers ---
+
+def safe_reply_to(message, text, reply_markup=None, parse_mode="Markdown"):
+    """
+    Safely replies to a message with automatic Markdown fallback to plain text
+    if Telegram API rejects parsing entities (400 Bad Request).
+    """
+    try:
+        return bot.reply_to(message, text, parse_mode=parse_mode, reply_markup=reply_markup)
+    except Exception as e:
+        logger.warning(f"safe_reply_to failed with {parse_mode=}: {e}. Retrying as plain text.")
+        try:
+            clean_text = text.replace("*", "").replace("_", "").replace("`", "")
+            return bot.reply_to(message, clean_text, reply_markup=reply_markup)
+        except Exception as e2:
+            logger.error(f"Fatal error in safe_reply_to: {e2}")
+            return None
+
+
+def safe_send_message(chat_id: int, text: str, reply_markup=None, parse_mode="Markdown"):
+    """
+    Safely sends a message to chat_id with automatic Markdown fallback to plain text.
+    """
+    try:
+        return bot.send_message(chat_id, text, parse_mode=parse_mode, reply_markup=reply_markup)
+    except Exception as e:
+        logger.warning(f"safe_send_message failed with {parse_mode=}: {e}. Retrying as plain text.")
+        try:
+            clean_text = text.replace("*", "").replace("_", "").replace("`", "")
+            return bot.send_message(chat_id, clean_text, reply_markup=reply_markup)
+        except Exception as e2:
+            logger.error(f"Fatal error in safe_send_message: {e2}")
+            return None
+
+
 # --- Configuration Helper Functions ---
 
 def is_autorun_enabled() -> bool:
@@ -2930,6 +2965,9 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
         except Exception as e_send:
             logger.warning(f"Could not send photo status message: {e_send}")
 
+    # Ensure LLM is awake before scene extraction
+    idle_engine.ensure_llm_active(bot=bot, chat_id=chat_id)
+
     history = persona_mgr.get_chat_history(user_id)
     detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
     visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
@@ -3153,6 +3191,9 @@ def process_video_request(
             status_msg = bot.send_message(chat_id, status_text, parse_mode="Markdown")
         except Exception as e_send:
             logger.warning(f"Could not send video status message: {e_send}")
+
+    # Ensure LLM is awake before scene extraction
+    idle_engine.ensure_llm_active(bot=bot, chat_id=chat_id)
 
     history = persona_mgr.get_chat_history(user_id)
     detected_scene = scene_override or persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
@@ -4205,285 +4246,294 @@ def handle_text_messages(message):
 def process_text_chat(message, user_text: str, is_voice: bool = False):
     """Main conversation processor running asynchronously with continuous typing status."""
     def _execute():
-        is_media, media_type = persona_mgr.detect_media_request(user_text)
-        if is_media and media_type == "video":
-            process_video_request(message, user_text)
-            return
-        elif is_media and media_type == "photo":
-            process_photo_request(message, user_text)
-            return
-
-        # Check natural reminder request in conversational chat
-        rem_res = ReminderEngine.extract_reminder_from_chat(user_text)
-        if rem_res:
-            rem_epoch, rem_str, rem_task = rem_res
-            item = reminder_engine.add_reminder(
-                user_id=message.from_user.id,
-                chat_id=message.chat.id,
-                task=rem_task,
-                remind_time=rem_epoch,
-                remind_time_str=rem_str
-            )
-            persona = persona_mgr.get_active_persona()
-            p_name = persona.get("name", "Waifu")
-            confirm_msg = (
-                f"⏰ **Siap sayang, {p_name} catat ya!** 🥰\n\n"
-                f"Aku bakal ingetin kamu:\n"
-                f"📌 *{rem_task}*\n"
-                f"🕒 *Waktu:* {rem_str}\n\n"
-                f"Tenang aja, pas jamnya tiba aku langsung kabarin kamu! Semangat yaa~"
-            )
-            markup = types.InlineKeyboardMarkup()
-            markup.add(
-                types.InlineKeyboardButton("📋 Lihat Semua Pengingat", callback_data="open_reminders_menu"),
-                types.InlineKeyboardButton("❌ Batalkan", callback_data=f"rem_del:{item['id']}")
-            )
-
-            v_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
-            should_voice = (v_mode == "always") or (v_mode == "match_vn" and is_voice)
-            if should_voice:
-                voice_text = f"Siap sayang! Aku bakal ingetin kamu buat {rem_task} {rem_str}. Tenang aja, aku selalu ada buat kamu!"
-                vn_path = voice_engine.generate_voice(voice_text, voice_name=persona.get("voice"))
-                if vn_path and os.path.exists(vn_path):
-                    try:
-                        with open(vn_path, 'rb') as vf:
-                            bot.send_voice(message.chat.id, vf, caption=confirm_msg, parse_mode="Markdown", reply_markup=markup, reply_to_message_id=message.message_id)
-                    except Exception as ve:
-                        logger.error(f"Error sending reminder ack voice: {ve}")
-                    try:
-                        os.remove(vn_path)
-                    except Exception:
-                        pass
-                    return
-            bot.reply_to(message, confirm_msg, parse_mode="Markdown", reply_markup=markup)
-            return
-
-        # Check if user is currently answering a date wizard prompt (Birthday / Anniversary)
-        if message.from_user.id in USER_DATE_WIZARD:
-            target_field = USER_DATE_WIZARD.pop(message.from_user.id)
-            if user_text.lower().strip() in ('batal', 'cancel', 'kembali', 'exit'):
-                bot.reply_to(message, "Pengaturan tanggal dibatalkan.")
+        try:
+            is_media, media_type = persona_mgr.detect_media_request(user_text)
+            if is_media and media_type == "video":
+                process_video_request(message, user_text)
+                return
+            elif is_media and media_type == "photo":
+                process_photo_request(message, user_text)
                 return
 
-            parsed = AnniversaryEngine.parse_date(user_text)
-            if parsed:
-                day, month, year, label = parsed
+            # Check natural reminder request in conversational chat
+            rem_res = ReminderEngine.extract_reminder_from_chat(user_text)
+            if rem_res:
+                rem_epoch, rem_str, rem_task = rem_res
+                item = reminder_engine.add_reminder(
+                    user_id=message.from_user.id,
+                    chat_id=message.chat.id,
+                    task=rem_task,
+                    remind_time=rem_epoch,
+                    remind_time_str=rem_str
+                )
                 persona = persona_mgr.get_active_persona()
                 p_name = persona.get("name", "Waifu")
-                if target_field == "birthday":
+                confirm_msg = (
+                    f"⏰ **Siap sayang, {p_name} catat ya!** 🥰\n\n"
+                    f"Aku bakal ingetin kamu:\n"
+                    f"📌 *{rem_task}*\n"
+                    f"🕒 *Waktu:* {rem_str}\n\n"
+                    f"Tenang aja, pas jamnya tiba aku langsung kabarin kamu! Semangat yaa~"
+                )
+                markup = types.InlineKeyboardMarkup()
+                markup.add(
+                    types.InlineKeyboardButton("📋 Lihat Semua Pengingat", callback_data="open_reminders_menu"),
+                    types.InlineKeyboardButton("❌ Batalkan", callback_data=f"rem_del:{item['id']}")
+                )
+
+                v_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
+                should_voice = (v_mode == "always") or (v_mode == "match_vn" and is_voice)
+                if should_voice:
+                    voice_text = f"Siap sayang! Aku bakal ingetin kamu buat {rem_task} {rem_str}. Tenang aja, aku selalu ada buat kamu!"
+                    vn_path = voice_engine.generate_voice(voice_text, voice_name=persona.get("voice"))
+                    if vn_path and os.path.exists(vn_path):
+                        try:
+                            with open(vn_path, 'rb') as vf:
+                                bot.send_voice(message.chat.id, vf, caption=confirm_msg, parse_mode="Markdown", reply_markup=markup, reply_to_message_id=message.message_id)
+                        except Exception as ve:
+                            logger.error(f"Error sending reminder ack voice: {ve}")
+                        try:
+                            os.remove(vn_path)
+                        except Exception:
+                            pass
+                        return
+                safe_reply_to(message, confirm_msg, reply_markup=markup)
+                return
+
+            # Check if user is currently answering a date wizard prompt (Birthday / Anniversary)
+            if message.from_user.id in USER_DATE_WIZARD:
+                target_field = USER_DATE_WIZARD.pop(message.from_user.id)
+                if user_text.lower().strip() in ('batal', 'cancel', 'kembali', 'exit'):
+                    safe_reply_to(message, "Pengaturan tanggal dibatalkan.", parse_mode=None)
+                    return
+
+                parsed = AnniversaryEngine.parse_date(user_text)
+                if parsed:
+                    day, month, year, label = parsed
+                    persona = persona_mgr.get_active_persona()
+                    p_name = persona.get("name", "Waifu")
+                    if target_field == "birthday":
+                        anniversary_engine.set_birthday(message.from_user.id, day, month, year)
+                        memory_engine.update_profile(message.from_user.id, birthday=label)
+                        cd = anniversary_engine.get_countdown(day, month)
+                        cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                        reply_msg = (
+                            f"🎂 **Hari Ulang Tahunmu Berhasil Dicatat!** 🥰\n\n"
+                            f"Tanggal: **{label}** _({cd_str})_\n\n"
+                            f"Pas hari ulang tahunmu tiba, {p_name} bakal siapin ucapan dan foto spesial buat kamu! 🎂"
+                        )
+                    else:
+                        anniversary_engine.set_anniversary(message.from_user.id, day, month, year)
+                        cd = anniversary_engine.get_countdown(day, month)
+                        cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                        reply_msg = (
+                            f"💍 **Hari Anniversary Kita Berhasil Dicatat!** 🥰\n\n"
+                            f"Tanggal: **{label}** _({cd_str})_\n\n"
+                            f"Aku senang banget kita punya tanggal jadian resmi sayang. Nanti pas hari anniversary kita, siap-siap dapat kado spesial dari aku yaa! 💕"
+                        )
+                    markup = types.InlineKeyboardMarkup()
+                    markup.add(types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu"))
+                    safe_reply_to(message, reply_msg, reply_markup=markup)
+                    return
+                else:
+                    USER_DATE_WIZARD[message.from_user.id] = target_field
+                    safe_reply_to(
+                        message,
+                        "⚠️ Format tanggal belum dikenali sayang. Coba ketik seperti: `15 Agustus 1998` atau `24/10/2000` yaa! (Atau ketik `batal`)"
+                    )
+                    return
+
+            # Check natural special date mention in chat (e.g. "sayang ultahku 15 agustus lho")
+            spec_date_res = AnniversaryEngine.extract_special_dates_from_chat(user_text)
+            if spec_date_res:
+                dtype, day, month, year, label = spec_date_res
+                persona = persona_mgr.get_active_persona()
+                p_name = persona.get("name", "Waifu")
+                if dtype == "birthday":
                     anniversary_engine.set_birthday(message.from_user.id, day, month, year)
                     memory_engine.update_profile(message.from_user.id, birthday=label)
                     cd = anniversary_engine.get_countdown(day, month)
                     cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
-                    reply_msg = (
-                        f"🎂 **Hari Ulang Tahunmu Berhasil Dicatat!** 🥰\n\n"
-                        f"Tanggal: **{label}** _({cd_str})_\n\n"
-                        f"Pas hari ulang tahunmu tiba, {p_name} bakal siapin ucapan dan foto spesial buat kamu! 🎂"
+                    conf_msg = (
+                        f"🎂 **Wah, {p_name} catat yaa sayang!** 🥰\n\n"
+                        f"Hari ulang tahunmu tanggal **{label}** ({cd_str}) kan? "
+                        f"Aku pasti bakal ingat pas harinya tiba! 🎉"
                     )
                 else:
                     anniversary_engine.set_anniversary(message.from_user.id, day, month, year)
                     cd = anniversary_engine.get_countdown(day, month)
                     cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
-                    reply_msg = (
-                        f"💍 **Hari Anniversary Kita Berhasil Dicatat!** 🥰\n\n"
-                        f"Tanggal: **{label}** _({cd_str})_\n\n"
-                        f"Aku senang banget kita punya tanggal jadian resmi sayang. Nanti pas hari anniversary kita, siap-siap dapat kado spesial dari aku yaa! 💕"
+                    conf_msg = (
+                        f"💍 **Sip! {p_name} catat ya!** ✨\n\n"
+                        f"Tanggal jadian kita **{label}** ({cd_str})! "
+                        f"Aku bahagia banget bisa sama kamu sayang, aku bakal selalu rayain hari istimewa kita! 💕"
                     )
                 markup = types.InlineKeyboardMarkup()
                 markup.add(types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu"))
-                bot.reply_to(message, reply_msg, reply_markup=markup, parse_mode="Markdown")
-                return
-            else:
-                USER_DATE_WIZARD[message.from_user.id] = target_field
-                bot.reply_to(
-                    message,
-                    "⚠️ Format tanggal belum dikenali sayang. Coba ketik seperti: `15 Agustus 1998` atau `24/10/2000` yaa! (Atau ketik `batal`)"
-                )
+                safe_reply_to(message, conf_msg, reply_markup=markup)
                 return
 
-        # Check natural special date mention in chat (e.g. "sayang ultahku 15 agustus lho")
-        spec_date_res = AnniversaryEngine.extract_special_dates_from_chat(user_text)
-        if spec_date_res:
-            dtype, day, month, year, label = spec_date_res
+            if user_text.startswith("```python") and user_text.endswith("```"):
+                code = user_text.replace("```python", "").replace("```", "").strip()
+                with ChatActionLoop(bot, message.chat.id, "typing"):
+                    ok, res = CodeRunner.execute_python(code)
+                    tag = "✅ Execution Output:" if ok else "❌ Execution Error:"
+                    safe_reply_to(message, f"💻 **{tag}**\n```\n{res}\n```")
+                return
+
             persona = persona_mgr.get_active_persona()
-            p_name = persona.get("name", "Waifu")
-            if dtype == "birthday":
-                anniversary_engine.set_birthday(message.from_user.id, day, month, year)
-                memory_engine.update_profile(message.from_user.id, birthday=label)
-                cd = anniversary_engine.get_countdown(day, month)
-                cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
-                conf_msg = (
-                    f"🎂 **Wah, {p_name} catat yaa sayang!** 🥰\n\n"
-                    f"Hari ulang tahunmu tanggal **{label}** ({cd_str}) kan? "
-                    f"Aku pasti bakal ingat pas harinya tiba! 🎉"
-                )
-            else:
-                anniversary_engine.set_anniversary(message.from_user.id, day, month, year)
-                cd = anniversary_engine.get_countdown(day, month)
-                cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
-                conf_msg = (
-                    f"💍 **Sip! {p_name} catat ya!** ✨\n\n"
-                    f"Tanggal jadian kita **{label}** ({cd_str})! "
-                    f"Aku bahagia banget bisa sama kamu sayang, aku bakal selalu rayain hari istimewa kita! 💕"
-                )
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu"))
-            bot.reply_to(message, conf_msg, reply_markup=markup, parse_mode="Markdown")
-            return
 
-        if user_text.startswith("```python") and user_text.endswith("```"):
-            code = user_text.replace("```python", "").replace("```", "").strip()
             with ChatActionLoop(bot, message.chat.id, "typing"):
-                ok, res = CodeRunner.execute_python(code)
-                tag = "✅ Execution Output:" if ok else "❌ Execution Error:"
-                bot.reply_to(message, f"💻 **{tag}**\n```\n{res}\n```", parse_mode="Markdown")
-            return
+                # 1. Proactively ensure LLM is awake (wakes from Smart Idle if sleeping)
+                llm_active = idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
+                if not llm_active:
+                    logger.warning("Local LLM engine could not be awakened.")
+                    return
 
-        persona = persona_mgr.get_active_persona()
+                # 2. Check if Local LLM backend is online
+                stat = llm_client.check_health()
+                if not stat.get("online"):
+                    health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=stat.get("error"))
+                    backend_msg = (
+                        "⚠️ *Service LLM Sedang Offline / Belum Siap!*\n\n"
+                        f"Otak AI lokal (`{LLM_BASE_URL}`) belum merespon permintaan chat.\n\n"
+                        "👉 Coba jalankan layanan dari terminal dengan perintah:\n`waifu start --daemon`\n\n"
+                        "Atau klik ganda file `start_services.bat` di folder PC kamu yaa sayang!\n"
+                        "Ketik `/status` untuk melihat laporan koneksi lengkap."
+                    )
+                    safe_reply_to(message, backend_msg)
+                    return
 
-        with ChatActionLoop(bot, message.chat.id, "typing"):
-            # 1. Proactively ensure LLM is awake (wakes from Smart Idle if sleeping)
-            idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
+                # 3. Record activity for proactive check-ins & learn facts
+                proactive_engine.record_user_activity(message.from_user.id)
+                memory_engine.auto_extract_facts(user_text, message.from_user.id)
 
-            # 2. Check if Local LLM backend is online
-            stat = llm_client.check_health()
-            if not stat.get("online"):
-                health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=stat.get("error"))
-                backend_msg = (
-                    "⚠️ **Service LLM Sedang Offline / Mati!** ⚠️\n"
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"Otak AI lokal aku (`{LLM_BASE_URL}`) belum aktif atau mati nih.\n\n"
-                    "👉 Coba jalankan layanan dari terminal dengan perintah:\n`waifu start --daemon`\n\n"
-                    "Atau klik ganda file `start_services.bat` di folder PC kamu yaa sayang!\n"
-                    "Ketik `/status` untuk melihat laporan koneksi lengkap."
+                # 3. Construct system instruction with injected student routine & memory context
+                cur_hour = time.localtime().tm_hour
+                routine = student_schedule.get_hourly_routine(cur_hour, persona_key=persona_mgr.active_key)
+                p_prof = student_schedule.STUDENT_PROFILES.get(persona_mgr.active_key.lower(), student_schedule.STUDENT_PROFILES["runa"])
+                
+                system_inst = persona.get("system_instruction", "")
+                system_inst += (
+                    f" KEGIATAN MAHASISWI HARI INI: Jam {cur_hour:02d}:00, kegiatanmu saat ini: {routine['activity_desc']}. "
+                    f"Kamu adalah mahasiswi ({p_prof['major']}). "
+                    "PANDUAN PENTING: Jawab pesan pasanganmu secara wajar, santai, dan relevan dengan topik serta kehidupan mahasiswimu. "
+                    "Jangan lebay, jangan bersikap hiperbola atau teatrikal. Jawab langsung maksimal 1-3 kalimat seperti chat asli.\n"
+                    "INISIATIF KIRIM PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan, outfit, atau sekadar memanjakan pacarmu karena kangen! Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat pacar yang manis dan wajar (misal: 'Lagi rebahan santai nih sayang, kangen kamu deh 💕 [ACTION: SEND_PAP]' atau 'Liat deh penampilanku hari ini, cocok ga buat kamu? 🥰 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu ('biar kamu percaya aku beneran ada di sini', 'nih buktinya', 'biar kamu yakin', 'jangan bohong lagi'). Kamu adalah pacar nyata yang percaya diri, hangat, dan penuh cinta."
                 )
-                bot.reply_to(message, backend_msg, parse_mode="Markdown")
-                return
+                mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
+                if mem_context:
+                    system_inst += "\n" + mem_context
 
-            # 3. Record activity for proactive check-ins & learn facts
-            proactive_engine.record_user_activity(message.from_user.id)
-            memory_engine.auto_extract_facts(user_text, message.from_user.id)
+                history = persona_mgr.get_chat_history(message.from_user.id)
 
-            # 3. Construct system instruction with injected student routine & memory context
-            cur_hour = time.localtime().tm_hour
-            routine = student_schedule.get_hourly_routine(cur_hour, persona_key=persona_mgr.active_key)
-            p_prof = student_schedule.STUDENT_PROFILES.get(persona_mgr.active_key.lower(), student_schedule.STUDENT_PROFILES["runa"])
-            
-            system_inst = persona.get("system_instruction", "")
-            system_inst += (
-                f" KEGIATAN MAHASISWI HARI INI: Jam {cur_hour:02d}:00, kegiatanmu saat ini: {routine['activity_desc']}. "
-                f"Kamu adalah mahasiswi ({p_prof['major']}). "
-                "PANDUAN PENTING: Jawab pesan pasanganmu secara wajar, santai, dan relevan dengan topik serta kehidupan mahasiswimu. "
-                "Jangan lebay, jangan bersikap hiperbola atau teatrikal. Jawab langsung maksimal 1-3 kalimat seperti chat asli.\n"
-                "INISIATIF KIRIM PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan, outfit, atau sekadar memanjakan pacarmu karena kangen! Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat pacar yang manis dan wajar (misal: 'Lagi rebahan santai nih sayang, kangen kamu deh 💕 [ACTION: SEND_PAP]' atau 'Liat deh penampilanku hari ini, cocok ga buat kamu? 🥰 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu ('biar kamu percaya aku beneran ada di sini', 'nih buktinya', 'biar kamu yakin', 'jangan bohong lagi'). Kamu adalah pacar nyata yang percaya diri, hangat, dan penuh cinta."
-            )
-            mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
-            if mem_context:
-                system_inst += "\n" + mem_context
+                messages = [{"role": "system", "content": system_inst}]
+                messages.extend(history)
+                messages.append({"role": "user", "content": user_text})
 
-            history = persona_mgr.get_chat_history(message.from_user.id)
+                try:
+                    idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
+                    reply_text, _ = llm_client.chat(messages, max_tokens=150)
+                except Exception as e:
+                    logger.error(f"Chat error / LLM timeout: {e}")
+                    health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=str(e))
+                    err_msg = (
+                        f"⚠️ *Service LLM Mengalami Gangguan / Timeout!*\n\n"
+                        f"Sayang, koneksi ke service LLM lokal (`{LLM_BASE_URL}`) gagal atau tidak merespon: `{e}`\n\n"
+                        f"👉 Silakan periksa apakah KoboldCPP hang/crash, atau jalankan `start_services.bat`.\n"
+                        f"Ketik `/status` untuk cek kondisi server."
+                    )
+                    safe_reply_to(message, err_msg)
+                    return
 
-            messages = [{"role": "system", "content": system_inst}]
-            messages.extend(history)
-            messages.append({"role": "user", "content": user_text})
+                if not reply_text or not reply_text.strip():
+                    reply_text = "Aku dengerin kok, lagi mikirin apa nih?"
 
-            try:
-                idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
-                reply_text, _ = llm_client.chat(messages, max_tokens=150)
-            except Exception as e:
-                logger.error(f"Chat error / LLM timeout: {e}")
-                health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=str(e))
-                err_msg = (
-                    f"⚠️ **Service LLM Mengalami Gangguan / Timeout!** ⚠️\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"Sayang, koneksi ke service LLM lokal (`{LLM_BASE_URL}`) gagal atau tidak merespon: `{e}`\n\n"
-                    f"👉 Silakan periksa apakah KoboldCPP / Ollama kamu hang/crash, atau jalankan `waifu start`.\n"
-                    f"Ketik `/status` untuk cek kondisi server."
-                )
-                bot.reply_to(message, err_msg, parse_mode="Markdown")
-                return
+                # Check if waifu takes initiative to send spontaneous PAP photo
+                has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
+                has_pap_phrase = any(phrase in reply_text.lower() for phrase in [
+                    "aku fotoin ya", "aku kirim foto ya", "nih foto spesial buat kamu", "aku pap buat kamu"
+                ])
 
-            if not reply_text or not reply_text.strip():
-                reply_text = "Aku dengerin kok, lagi mikirin apa nih?"
+                should_send_photo = has_action_tag or has_pap_phrase
 
-            # Check if waifu takes initiative to send spontaneous PAP photo
-            has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
-            has_pap_phrase = any(phrase in reply_text.lower() for phrase in [
-                "aku fotoin ya", "aku kirim foto ya", "nih foto spesial buat kamu", "aku pap buat kamu"
-            ])
+                # Clean action tag from text so user only sees natural dialogue
+                clean_reply = re.sub(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", "", reply_text, flags=re.IGNORECASE).strip()
+                if not clean_reply:
+                    clean_reply = "Lagi kangen banget sama kamu nih sayang 💕"
 
-            should_send_photo = has_action_tag or has_pap_phrase
+                new_aff = persona_mgr.increase_affinity(message.from_user.id, delta=1)
+                memory_engine.set_affinity(message.from_user.id, new_aff)
+                persona_mgr.add_message(message.from_user.id, "user", user_text)
+                persona_mgr.add_message(message.from_user.id, "assistant", clean_reply)
 
-            # Clean action tag from text so user only sees natural dialogue
-            clean_reply = re.sub(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", "", reply_text, flags=re.IGNORECASE).strip()
-            if not clean_reply:
-                clean_reply = "Lagi kangen banget sama kamu nih sayang 💕"
+                safe_reply_to(message, clean_reply, parse_mode=None)
 
-            new_aff = persona_mgr.increase_affinity(message.from_user.id, delta=1)
-            memory_engine.set_affinity(message.from_user.id, new_aff)
-            persona_mgr.add_message(message.from_user.id, "user", user_text)
-            persona_mgr.add_message(message.from_user.id, "assistant", clean_reply)
-
-            bot.reply_to(message, clean_reply)
-
-            if should_send_photo:
-                def _send_spontaneous_photo():
-                    try:
-                        time.sleep(1.5)  # Natural human pause as if snapping a quick selfie
-                        photo_prompt = clean_reply if clean_reply else f"{routine['activity_desc']}"
-                        process_photo_request(message, user_text=photo_prompt, is_proof=False)
-                    except Exception as e_photo:
-                        logger.error(f"Error sending spontaneous photo: {e_photo}")
-
-                threading.Thread(target=_send_spontaneous_photo, daemon=True).start()
-
-            # Auto-diary entry every 6 turns
-            if len(history) > 0 and len(history) % 6 == 0:
-                def _auto_diary():
-                    try:
-                        d_prompt = [
-                            {
-                                "role": "system",
-                                "content": f"You are {persona.get('name')}. Write 1 short sweet sentence in your private diary about today's chat with your partner in casual Indonesian."
-                            },
-                            {
-                                "role": "user",
-                                "content": f"User said: '{user_text}'. What do you feel?"
-                            }
-                        ]
-                        d_text, _ = llm_client.chat(d_prompt, max_tokens=60)
-                        if d_text:
-                            memory_engine.add_diary_entry(message.from_user.id, d_text)
-                    except Exception:
-                        pass
-                threading.Thread(target=_auto_diary, daemon=True).start()
-
-            user_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
-            should_voice = False
-            if user_mode == "always" and VOICE_ENABLED:
-                should_voice = (is_voice or len(reply_text) < 220)
-            elif user_mode == "match_vn" and is_voice and VOICE_ENABLED:
-                should_voice = True
-
-            if should_voice:
-                def send_voice():
-                    clean_for_vn = voice_engine.clean_text_for_speech(reply_text)
-                    if len(clean_for_vn) > 200:
-                        m = re.search(r'^(.*[.!?])\s', clean_for_vn[:220])
-                        if m:
-                            clean_for_vn = m.group(1)
-                        else:
-                            clean_for_vn = clean_for_vn[:180].rsplit(' ', 1)[0]
-
-                    vn_path = voice_engine.generate_voice_note(clean_for_vn)
-                    if vn_path:
+                if should_send_photo:
+                    def _send_spontaneous_photo():
                         try:
-                            with open(vn_path, "rb") as vn_file:
-                                bot.send_voice(message.chat.id, vn_file)
-                        finally:
-                            if os.path.exists(vn_path):
-                                os.remove(vn_path)
-                threading.Thread(target=send_voice, daemon=True).start()
+                            time.sleep(1.5)  # Natural human pause as if snapping a quick selfie
+                            photo_prompt = clean_reply if clean_reply else f"{routine['activity_desc']}"
+                            process_photo_request(message, user_text=photo_prompt, is_proof=False)
+                        except Exception as e_photo:
+                            logger.error(f"Error sending spontaneous photo: {e_photo}")
+
+                    threading.Thread(target=_send_spontaneous_photo, daemon=True).start()
+
+                # Auto-diary entry every 6 turns
+                if len(history) > 0 and len(history) % 6 == 0:
+                    def _auto_diary():
+                        try:
+                            d_prompt = [
+                                {
+                                    "role": "system",
+                                    "content": f"You are {persona.get('name')}. Write 1 short sweet sentence in your private diary about today's chat with your partner in casual Indonesian."
+                                },
+                                {
+                                    "role": "user",
+                                    "content": f"User said: '{user_text}'. What do you feel?"
+                                }
+                            ]
+                            d_text, _ = llm_client.chat(d_prompt, max_tokens=60)
+                            if d_text:
+                                memory_engine.add_diary_entry(message.from_user.id, d_text)
+                        except Exception:
+                            pass
+                    threading.Thread(target=_auto_diary, daemon=True).start()
+
+                user_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
+                should_voice = False
+                if user_mode == "always" and VOICE_ENABLED:
+                    should_voice = (is_voice or len(reply_text) < 220)
+                elif user_mode == "match_vn" and is_voice and VOICE_ENABLED:
+                    should_voice = True
+
+                if should_voice:
+                    def send_voice():
+                        clean_for_vn = voice_engine.clean_text_for_speech(reply_text)
+                        if len(clean_for_vn) > 200:
+                            m = re.search(r'^(.*[.!?])\s', clean_for_vn[:220])
+                            if m:
+                                clean_for_vn = m.group(1)
+                            else:
+                                clean_for_vn = clean_for_vn[:180].rsplit(' ', 1)[0]
+
+                        vn_path = voice_engine.generate_voice_note(clean_for_vn)
+                        if vn_path:
+                            try:
+                                with open(vn_path, "rb") as vn_file:
+                                    bot.send_voice(message.chat.id, vn_file)
+                            finally:
+                                if os.path.exists(vn_path):
+                                    os.remove(vn_path)
+                    threading.Thread(target=send_voice, daemon=True).start()
+
+        except Exception as e_proc:
+            logger.error(f"Error handling message in process_text_chat: {e_proc}", exc_info=True)
+            safe_reply_to(
+                message,
+                f"⚠️ *Maaf sayang, ada sedikit gangguan saat memproses pesan:*\n`{e_proc}`\n\nKetik `/status` untuk mengecek status bot."
+            )
 
     threading.Thread(target=_execute, daemon=True).start()
 
