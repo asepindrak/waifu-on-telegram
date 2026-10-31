@@ -17,11 +17,14 @@ class TestOutfitAndPapButtons(unittest.TestCase):
         self.mock_call.message.chat.id = 12345
         self.mock_call.message.message_id = 777
         self.mock_call.message.text = "Pilih skenario foto"
-        self.patch_answer = patch.object(bot.bot, "answer_callback_query")
+        self.patch_answer = patch.object(bot.telebot.TeleBot, "answer_callback_query")
+        self.patch_chat_action = patch.object(bot.telebot.TeleBot, "send_chat_action")
         self.mock_answer = self.patch_answer.start()
+        self.mock_chat_action = self.patch_chat_action.start()
 
     def tearDown(self):
         self.patch_answer.stop()
+        self.patch_chat_action.stop()
 
     @patch("bot.is_authorized", return_value=True)
     @patch("bot.persona_mgr")
@@ -61,8 +64,8 @@ class TestOutfitAndPapButtons(unittest.TestCase):
 
     @patch("bot.is_authorized", return_value=True)
     @patch("bot.media_engine")
-    @patch("bot.bot.edit_message_text")
-    def test_process_photo_request_updates_menu_message_instantly(self, mock_bot_edit, mock_media, mock_auth):
+    @patch("bot.safe_edit_message_text")
+    def test_process_photo_request_updates_menu_message_instantly(self, mock_safe_edit, mock_media, mock_auth):
         """process_photo_request replaces the menu message with loading status without blocking."""
         self.mock_call.data = "pap_sc:beach"
         mock_media.generate_photo.return_value = (None, "Failed")
@@ -71,11 +74,11 @@ class TestOutfitAndPapButtons(unittest.TestCase):
         bot.process_photo_request(self.mock_call, "beach vacation")
         import time
         for _ in range(20):
-            if mock_bot_edit.called:
+            if mock_safe_edit.called:
                 break
             time.sleep(0.05)
 
-        self.assertTrue(mock_bot_edit.called)
+        self.assertTrue(mock_safe_edit.called)
 
 
 if __name__ == "__main__":
