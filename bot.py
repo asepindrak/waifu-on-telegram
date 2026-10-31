@@ -162,6 +162,23 @@ def safe_send_message(chat_id: int, text: str, reply_markup=None, parse_mode="Ma
             return None
 
 
+def safe_edit_message_text(text: str, chat_id: int, message_id: int, reply_markup=None, parse_mode="Markdown"):
+    """
+    Safely edits a message with automatic Markdown fallback to plain text
+    if Telegram API rejects parsing entities (400 Bad Request).
+    """
+    try:
+        return bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=reply_markup, parse_mode=parse_mode)
+    except Exception as e:
+        logger.warning(f"safe_edit_message_text failed with {parse_mode=}: {e}. Retrying as plain text.")
+        try:
+            clean_text = text.replace("*", "").replace("_", "").replace("`", "")
+            return bot.edit_message_text(clean_text, chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
+        except Exception as e2:
+            logger.error(f"Fatal error in safe_edit_message_text: {e2}")
+            return None
+
+
 # --- Configuration Helper Functions ---
 
 def is_autorun_enabled() -> bool:
@@ -1243,7 +1260,10 @@ def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, ye
             )
 
         # 1. Generate celebration photo
-        bot.send_chat_action(chat_id, "upload_photo")
+        try:
+            bot.send_chat_action(chat_id, "upload_photo")
+        except Exception:
+            pass
         img_bytes, used_fallback = media_engine.generate_photo(
             prompt=photo_prompt,
             negative_prompt=persona.get("negative_prompt", ""),
@@ -1955,8 +1975,21 @@ def build_system_diagnostics_report(user_id: int) -> str:
     media_stat = media_engine.check_status()
     persona = persona_mgr.get_active_persona()
 
-    status_icon = "💤 Tidur (VRAM Bebas • Bangun Otomatis)" if (idle_engine.enabled and idle_engine.is_llm_sleeping) else ("🟢 Online" if llm_stat.get("online") else "🔴 Offline")
-    media_icon = "💤 Standby On-Demand (Hemat VRAM)" if (idle_engine.enabled and idle_engine.comfyui_on_demand and not media_stat.get("online")) else ("🟢 Active" if media_stat.get("online") else "🟡 Cloud Fallback")
+    spec = asset_manager.get_llm_launch_spec() if asset_manager else None
+    if llm_stat.get("online"):
+        status_icon = "🟢 Online"
+    elif idle_engine.enabled and spec:
+        status_icon = "💤 Tidur (VRAM Bebas • Bangun Otomatis)"
+    else:
+        status_icon = "🔴 Offline (Model/Binary belum terpasang)"
+
+    comfy_spec = asset_manager.get_comfyui_launch_spec() if asset_manager else None
+    if media_stat.get("online"):
+        media_icon = "🟢 Active (Port 8188)"
+    elif idle_engine.enabled and idle_engine.comfyui_on_demand and comfy_spec:
+        media_icon = "💤 Standby On-Demand (Hemat VRAM)"
+    else:
+        media_icon = "⚪ Offline (ComfyUI belum terdeteksi)"
 
     # Resolve LLM model name
     raw_model = llm_stat.get("model", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
@@ -2568,10 +2601,7 @@ def callback_cfg_status(call):
         types.InlineKeyboardButton("🩹 Self-Heal Services", callback_data="cfg_action:self_heal"),
         types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
     )
-    try:
-        bot.edit_message_text(report, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
-    except Exception:
-        pass
+    safe_edit_message_text(report, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'cfg_action:self_heal')
@@ -2587,20 +2617,17 @@ def callback_cfg_self_heal(call):
             types.InlineKeyboardButton("🔄 Segarkan Status", callback_data="cfg_action:status"),
             types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
         )
-        try:
-            llm_stat = "🟢 Online" if results.get("llm") else "🔴 Gagal Pulih"
-            comfy_stat = "🟢 Online" if results.get("comfyui", True) else "🔴 Gagal Pulih"
-            music_stat = "🟢 Online" if results.get("music", True) else "🔴 Gagal Pulih"
-            summary = (
-                f"🩹 **Hasil Pengecekan Self-Healing:**\n"
-                f"• LLM Engine: {llm_stat}\n"
-                f"• ComfyUI: {comfy_stat}\n"
-                f"• Pemutar Musik: {music_stat}\n\n"
-                f"{report}"
-            )
-            bot.send_message(call.message.chat.id, summary, reply_markup=markup, parse_mode="Markdown")
-        except Exception:
-            pass
+        llm_stat = "🟢 Online" if results.get("llm") else "🔴 Gagal Pulih"
+        comfy_stat = "🟢 Online" if results.get("comfyui", True) else "🔴 Gagal Pulih"
+        music_stat = "🟢 Online" if results.get("music", True) else "🔴 Gagal Pulih"
+        summary = (
+            f"🩹 **Hasil Pengecekan Self-Healing:**\n"
+            f"• LLM Engine: {llm_stat}\n"
+            f"• ComfyUI: {comfy_stat}\n"
+            f"• Pemutar Musik: {music_stat}\n\n"
+            f"{report}"
+        )
+        safe_send_message(call.message.chat.id, summary, reply_markup=markup, parse_mode="Markdown")
     threading.Thread(target=_run_heal, daemon=True).start()
 
 
@@ -2864,12 +2891,15 @@ def show_pap_scenario_menu(chat_id: int, user_id: int, message_to_edit: Optional
 @bot.callback_query_handler(func=lambda call: call.data.startswith('pap_sc:'))
 def callback_pap_scenario(call):
     if not is_authorized(call.from_user.id):
-        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        try:
+            bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        except Exception:
+            pass
         return
     sc_key = call.data.split(":", 1)[1]
     if sc_key == "cancel":
-        bot.answer_callback_query(call.id, "Batal meminta foto")
         try:
+            bot.answer_callback_query(call.id, "Batal meminta foto")
             bot.delete_message(call.message.chat.id, call.message.message_id)
         except Exception:
             pass
@@ -2880,12 +2910,10 @@ def callback_pap_scenario(call):
         sc_key = random.choice(list(SCENARIO_PROMPTS.keys()))
 
     prompt = SCENARIO_PROMPTS.get(sc_key, "relaxing at home, looking at viewer happily")
-    bot.answer_callback_query(call.id, "📸 Menyiapkan foto...")
-    if call.message.text and "Pilih suasana" in call.message.text:
-        try:
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-        except Exception:
-            pass
+    try:
+        bot.answer_callback_query(call.id, "📸 Menyiapkan foto...")
+    except Exception:
+        pass
     process_photo_request(call, prompt)
 
 
@@ -2938,68 +2966,75 @@ def sanitize_chat_caption(text: Optional[str], fallback: str) -> str:
 
 def process_photo_request(target, user_text: str, is_proof: bool = False):
     """Generates and delivers consistent girlfriend photo with caption matching conversation context."""
-    persona = persona_mgr.get_active_persona()
-
-    if isinstance(target, types.CallbackQuery):
-        chat_id = target.message.chat.id
-        user_id = target.from_user.id
-        reply_to_target = target.message
-    elif hasattr(target, "message") and target.message:
-        chat_id = target.message.chat.id
-        user_id = target.from_user.id
-        reply_to_target = target.message
-    else:
-        chat_id = target.chat.id
-        user_id = target.from_user.id
-        reply_to_target = target
-
-    bot.send_chat_action(chat_id, "upload_photo")
-
-    status_msg = None
-    status_text = f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕"
-    try:
-        status_msg = bot.reply_to(reply_to_target, status_text, parse_mode="Markdown")
-    except Exception:
+    def _execute():
+        chat_id = None
         try:
-            status_msg = bot.send_message(chat_id, status_text, parse_mode="Markdown")
-        except Exception as e_send:
-            logger.warning(f"Could not send photo status message: {e_send}")
+            if isinstance(target, types.CallbackQuery):
+                chat_id = target.message.chat.id
+                user_id = target.from_user.id
+                reply_to_target = target.message
+                is_callback = True
+            elif hasattr(target, "message") and target.message:
+                chat_id = target.message.chat.id
+                user_id = target.from_user.id
+                reply_to_target = target.message
+                is_callback = True
+            else:
+                chat_id = target.chat.id
+                user_id = target.from_user.id
+                reply_to_target = target
+                is_callback = False
 
-    # Ensure LLM is awake before scene extraction
-    idle_engine.ensure_llm_active(bot=bot, chat_id=chat_id)
+            persona = persona_mgr.get_active_persona()
 
-    history = persona_mgr.get_chat_history(user_id)
-    detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
-    visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
-        user_text, user_id=user_id, scene_override=detected_scene, history=history
-    )
-    logger.info(f"Visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
+            try:
+                bot.send_chat_action(chat_id, "upload_photo")
+            except Exception:
+                pass
 
-    # Save exact scenario context so 'Pose Lain' never loses outfit or setting
-    USER_LAST_PHOTO_CONTEXT[user_id] = {
-        "user_text": user_text,
-        "detected_scene": detected_scene,
-        "outfit_label": outfit_label,
-        "is_nude": is_nude
-    }
+            status_msg = None
+            status_text = f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕"
+            if is_callback and hasattr(reply_to_target, "message_id"):
+                # Instant UI feedback: transform the scenario menu directly into loading message
+                status_msg = safe_edit_message_text(status_text, chat_id=chat_id, message_id=reply_to_target.message_id)
+                if not status_msg:
+                    status_msg = reply_to_target
+            else:
+                status_msg = safe_reply_to(reply_to_target, status_text)
 
-    def run_gen():
-        try:
+            if not status_msg:
+                status_msg = safe_send_message(chat_id, status_text)
+
+            history = persona_mgr.get_chat_history(user_id)
+            detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
+            visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
+                user_text, user_id=user_id, scene_override=detected_scene, history=history
+            )
+            logger.info(f"Visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
+
+            # Save exact scenario context so 'Pose Lain' never loses outfit or setting
+            USER_LAST_PHOTO_CONTEXT[user_id] = {
+                "user_text": user_text,
+                "detected_scene": detected_scene,
+                "outfit_label": outfit_label,
+                "is_nude": is_nude
+            }
+
             with ChatActionLoop(bot, chat_id, "upload_photo"):
                 if not media_engine.allow_cloud_fallback:
                     idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id)
 
                 def photo_progress(stage_text: str):
-                    if status_msg and bot and chat_id:
+                    if status_msg and hasattr(status_msg, "message_id"):
                         try:
-                            bot.send_chat_action(chat_id, "upload_photo")
-                            bot.edit_message_text(
+                            safe_edit_message_text(
                                 f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕\n⏳ _{stage_text}_",
                                 chat_id=chat_id,
                                 message_id=status_msg.message_id,
                                 parse_mode="Markdown"
                             )
                         except Exception:
+                            pass
                             pass
 
                 neg_p = persona.get("negative_prompt", "")
@@ -3029,15 +3064,17 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                 fail_text = (
                     f"⚠️ *Fotonya gagal dibuat...*\n\n"
                     f"⚠️ **Penyebab:**\n`{err_detail}`\n\n"
-                    f"💡 _Pastikan ComfyUI lokal aktif di `{COMFYUI_URL}` dengan checkpoint lengkap (seperti MeinaMix). Fallback Pollinations telah dimatikan agar hasil tidak melenceng._"
+                    f"💡 *Pastikan ComfyUI lokal aktif di `{COMFYUI_URL}` dengan model anime (seperti MeinaMix atau Anything XL).*"
                 )
-                if status_msg:
-                    try:
-                        bot.edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id, parse_mode="Markdown")
-                    except Exception:
-                        bot.send_message(chat_id, fail_text, parse_mode="Markdown")
+                fail_markup = types.InlineKeyboardMarkup(row_width=2)
+                fail_markup.add(
+                    types.InlineKeyboardButton("🔄 Coba Lagi", callback_data="regen_photo:last"),
+                    types.InlineKeyboardButton("⚙️ Panel Setup", callback_data="cfg_submenu:dashboard")
+                )
+                if status_msg and hasattr(status_msg, "message_id"):
+                    safe_edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id, reply_markup=fail_markup)
                 else:
-                    bot.send_message(chat_id, fail_text, parse_mode="Markdown")
+                    safe_send_message(chat_id, fail_text, reply_markup=fail_markup)
                 return
 
             history = persona_mgr.get_chat_history(user_id)
@@ -3053,7 +3090,7 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
 
             cap_guide = (
                 f" You just took a sweet, cute photo to send to your beloved boyfriend on Telegram. "
-                f"Write 1 natural, affectionate, and playful girlfriend chat caption accompanying the photo (e.g. 'Lagi santai rebahan nih sayang, kepikiran kamu terus 💕' or 'Spesial buat kamu nih, suka ga? 🅰'). "
+                f"Write 1 natural, affectionate, and playful girlfriend chat caption accompanying the photo (e.g. 'Lagi santai rebahan nih sayang, kepikiran kamu terus 💕' or 'Spesial buat kamu nih, suka ga? 🥰'). "
                 f"DILARANG KERAS bersikap defensif atau meyakinkan keberadaan ('biar percaya', 'biar yakin', 'beneran ada di sini', 'nih buktinya', 'diliatin aja'). "
                 f"STRICT: Chat 1-on-1 with boyfriend. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip yuk'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
             )
@@ -3093,7 +3130,7 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                     fallback_caption = f"Spesial buat kamu nih sayang 💕 ({source})"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
 
-            if status_msg:
+            if status_msg and hasattr(status_msg, "message_id"):
                 try:
                     bot.delete_message(chat_id, status_msg.message_id)
                 except Exception:
@@ -3136,10 +3173,10 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
             persona_mgr.add_message(user_id, "assistant", f"[Sent selfie: {detected_scene}] {clean_caption}")
 
         except Exception as e:
-            logger.error(f"Error in photo delivery: {e}")
-            bot.send_message(chat_id, f"⚠️ Failed to send photo: {e}")
+            logger.error(f"Error in photo delivery: {e}", exc_info=True)
+            safe_send_message(chat_id, f"⚠️ Gagal mengirimkan foto: `{e}`")
 
-    threading.Thread(target=run_gen, daemon=True).start()
+    threading.Thread(target=_execute, daemon=True).start()
 
 
 @bot.message_handler(commands=['video', 'anim', 'animate', 'klip'])
@@ -3165,58 +3202,62 @@ def process_video_request(
     is_nude_override: Optional[bool] = None
 ):
     """Generates and delivers consistent girlfriend animated video clip with caption and voice."""
-    persona = persona_mgr.get_active_persona()
+    def _execute():
+        persona = persona_mgr.get_active_persona()
 
-    if isinstance(target, types.CallbackQuery):
-        chat_id = target.message.chat.id
-        user_id = target.from_user.id
-        reply_to_target = target.message
-    elif hasattr(target, "message") and target.message:
-        chat_id = target.message.chat.id
-        user_id = target.from_user.id
-        reply_to_target = target.message
-    else:
-        chat_id = target.chat.id
-        user_id = target.from_user.id
-        reply_to_target = target
+        if isinstance(target, types.CallbackQuery):
+            chat_id = target.message.chat.id
+            user_id = target.from_user.id
+            reply_to_target = target.message
+            is_callback = True
+        elif hasattr(target, "message") and target.message:
+            chat_id = target.message.chat.id
+            user_id = target.from_user.id
+            reply_to_target = target.message
+            is_callback = True
+        else:
+            chat_id = target.chat.id
+            user_id = target.from_user.id
+            reply_to_target = target
+            is_callback = False
 
-    bot.send_chat_action(chat_id, "record_video")
-
-    status_msg = None
-    status_text = f"🎬 *{persona.get('name')} lagi merekam video...*"
-    try:
-        status_msg = bot.reply_to(reply_to_target, status_text, parse_mode="Markdown")
-    except Exception:
         try:
-            status_msg = bot.send_message(chat_id, status_text, parse_mode="Markdown")
-        except Exception as e_send:
-            logger.warning(f"Could not send video status message: {e_send}")
+            bot.send_chat_action(chat_id, "record_video")
+        except Exception:
+            pass
 
-    # Ensure LLM is awake before scene extraction
-    idle_engine.ensure_llm_active(bot=bot, chat_id=chat_id)
+        status_msg = None
+        status_text = f"🎬 *{persona.get('name')} lagi merekam video...*"
+        if is_callback and hasattr(reply_to_target, "message_id"):
+            status_msg = safe_edit_message_text(status_text, chat_id=chat_id, message_id=reply_to_target.message_id)
+            if not status_msg:
+                status_msg = reply_to_target
+        else:
+            status_msg = safe_reply_to(reply_to_target, status_text)
 
-    history = persona_mgr.get_chat_history(user_id)
-    detected_scene = scene_override or persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
-    visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
-        user_text, user_id=user_id, scene_override=detected_scene, history=history
-    )
-    if outfit_override:
-        outfit_label = outfit_override
-    if is_nude_override is not None:
-        is_nude = is_nude_override
+        if not status_msg:
+            status_msg = safe_send_message(chat_id, status_text)
 
-    logger.info(f"Video visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude}, Has Base Img: {bool(base_image_bytes)})")
+        history = persona_mgr.get_chat_history(user_id)
+        detected_scene = scene_override or persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
+        visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
+            user_text, user_id=user_id, scene_override=detected_scene, history=history
+        )
+        if outfit_override:
+            outfit_label = outfit_override
+        if is_nude_override is not None:
+            is_nude = is_nude_override
 
-    # Save exact scenario context so subsequent requests preserve full details
-    USER_LAST_PHOTO_CONTEXT[user_id] = {
-        "user_text": user_text,
-        "detected_scene": detected_scene,
-        "outfit_label": outfit_label,
-        "is_nude": is_nude,
-        "img_bytes": base_image_bytes
-    }
+        logger.info(f"Video visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude}, Has Base Img: {bool(base_image_bytes)})")
 
-    def run_video_gen():
+        USER_LAST_PHOTO_CONTEXT[user_id] = {
+            "user_text": user_text,
+            "detected_scene": detected_scene,
+            "outfit_label": outfit_label,
+            "is_nude": is_nude,
+            "img_bytes": base_image_bytes
+        }
+
         try:
             # Check model asset readiness before initiating render
             is_ready, missing = asset_manager.ensure_video_engine_assets(VIDEO_ENGINE)
@@ -3249,15 +3290,12 @@ def process_video_request(
                 fail_text = (
                     f"⚠️ *Videonya gagal dibuat...*\n\n"
                     f"⚠️ **Penyebab:**\n`{err_detail}`\n\n"
-                    f"💡 _Pastikan ComfyUI lokal aktif di `{COMFYUI_URL}`._"
+                    f"💡 *Pastikan ComfyUI lokal aktif di `{COMFYUI_URL}`.*"
                 )
-                if status_msg:
-                    try:
-                        bot.edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id, parse_mode="Markdown")
-                    except Exception:
-                        bot.send_message(chat_id, fail_text, parse_mode="Markdown")
+                if status_msg and hasattr(status_msg, "message_id"):
+                    safe_edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id)
                 else:
-                    bot.send_message(chat_id, fail_text, parse_mode="Markdown")
+                    safe_send_message(chat_id, fail_text)
                 return
 
             history = persona_mgr.get_chat_history(user_id)
@@ -3301,7 +3339,7 @@ def process_video_request(
                 fallback_caption = f"Ini videonya yaa ({source})"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
 
-            if status_msg:
+            if status_msg and hasattr(status_msg, "message_id"):
                 try:
                     bot.delete_message(chat_id, status_msg.message_id)
                 except Exception:
@@ -3330,10 +3368,10 @@ def process_video_request(
             persona_mgr.add_message(user_id, "assistant", f"[Sent video clip: {detected_scene}] {clean_caption}")
 
         except Exception as e:
-            logger.error(f"Error in video delivery: {e}")
-            bot.send_message(chat_id, f"⚠️ Gagal mengirim video: {e}")
+            logger.error(f"Error in video delivery: {e}", exc_info=True)
+            safe_send_message(chat_id, f"⚠️ Gagal mengirim video: `{e}`")
 
-    threading.Thread(target=run_video_gen, daemon=True).start()
+    threading.Thread(target=_execute, daemon=True).start()
 
 
 @bot.message_handler(content_types=['photo'])
