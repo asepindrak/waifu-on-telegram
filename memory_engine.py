@@ -227,7 +227,10 @@ class MemoryEngine:
             })
             for k, v in kwargs.items():
                 if v is not None:
-                    prof[k] = str(v).strip()
+                    if isinstance(v, bool):
+                        prof[k] = v
+                    else:
+                        prof[k] = str(v).strip()
             self._save_data_unlocked()
 
     # --- Facts & Knowledge Management ---
@@ -439,13 +442,20 @@ class MemoryEngine:
             for f in selected_facts:
                 lines.append(f"  - {f['fact']}")
 
+        # Panggilan / Pet name directive based on user preference
+        call_name = prof.get("call_name")
+        if call_name:
+            lines.append(f"• User's Calling Preference: Panggil user '{call_name}'.")
+        else:
+            lines.append("• Panggilan & Kata Ganti: Gunakan kata ganti netral/akrab 'kamu'. DILARANG memanggil 'sayang', 'babe', atau panggilan mesra lainnya KECUALI jika user yang meminta atau memanggilmu sayang lebih dulu.")
+
         if not lines:
             return ""
 
         return (
-            "\n[LONG-TERM MEMORY & KNOWLEDGE ABOUT YOUR PARTNER]\n"
+            "\n[LONG-TERM MEMORY & KNOWLEDGE ABOUT USER]\n"
             + "\n".join(lines)
-            + "\n(Naturally reference these memories, personal preferences, and names when relevant to express deep personal intimacy and caring without sounding repetitive.)\n"
+            + "\n(Naturally reference these memories, personal preferences, and names when relevant to express deep personal connection and attentive caring without sounding repetitive.)\n"
         )
 
     # --- Automatic Memory Learning ---
@@ -458,18 +468,30 @@ class MemoryEngine:
         learned = []
         lower = user_text.lower().strip()
 
-        # 1. Name detection
-        name_patterns = [
-            r"(?:nama (?:saya|aku)|panggil (?:saya|aku)|namaku) (?:adalah )?([A-Za-z0-9_-]+)",
-            r"(?:my name is|call me) ([A-Za-z0-9_-]+)"
-        ]
-        for pat in name_patterns:
-            m = re.search(pat, user_text, re.IGNORECASE)
-            if m:
-                val = m.group(1).strip()
-                if len(val) >= 2 and val.lower() not in ("siapa", "ya", "dong", "deh", "bukan", "what"):
-                    self.update_profile(user_id, name=val)
-                    learned.append(f"Nama: {val}")
+        # 0. Calling preference / Pet name detection
+        if re.search(r"\b(?:jangan|gak\s+usah|tidak\s+usah|jangan\s+lagi|nggak\s+usah)\s+panggil\s+(?:aku\s+|saya\s+)?(?:sayang|ayang|babe|bebe)\b", lower):
+            self.update_profile(user_id, call_name="", allow_pet_name=False)
+            learned.append("Panggilan: Gunakan 'kamu' (jangan panggil sayang)")
+        elif re.search(r"\bpanggil\s+(?:aku|saya)\s+(?:sayang|ayang|babe|bebe)\b", lower):
+            self.update_profile(user_id, call_name="sayang", allow_pet_name=True)
+            learned.append("Panggilan: sayang")
+        else:
+            # 1. Name detection (only if not preceded by negative 'jangan')
+            name_patterns = [
+                r"(?:nama (?:saya|aku)|panggil (?:saya|aku)|namaku) (?:adalah )?([A-Za-z0-9_-]+)",
+                r"(?:my name is|call me) ([A-Za-z0-9_-]+)"
+            ]
+            for pat in name_patterns:
+                m = re.search(pat, user_text, re.IGNORECASE)
+                if m:
+                    val = m.group(1).strip()
+                    if len(val) >= 2 and val.lower() not in ("siapa", "ya", "dong", "deh", "bukan", "what", "aja", "dulu"):
+                        if val.lower() in ("sayang", "ayang", "babe"):
+                            self.update_profile(user_id, call_name=val, allow_pet_name=True)
+                            learned.append(f"Panggilan: {val}")
+                        else:
+                            self.update_profile(user_id, name=val, call_name=val)
+                            learned.append(f"Nama: {val}")
 
         # 2. Favorite / Likes
         like_patterns = [

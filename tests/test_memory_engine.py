@@ -122,6 +122,24 @@ class TestMemoryEngine(unittest.TestCase):
         self.assertIn("Bandung", prof["location"])
         self.assertIn("desainer", prof["job"].lower())
 
+    def test_calling_preference_detection(self):
+        """Verify calling preference and pet name consent detection."""
+        # 1. User asks to be called sayang
+        learned = self.engine.auto_extract_facts("Mulai sekarang panggil aku sayang yaa", self.user_id)
+        prof = self.engine.get_profile(self.user_id)
+        self.assertEqual(prof.get("call_name"), "sayang")
+        self.assertTrue(prof.get("allow_pet_name"))
+
+        # 2. User explicitly asks not to be called sayang
+        learned = self.engine.auto_extract_facts("Jangan panggil aku sayang dong", self.user_id)
+        prof = self.engine.get_profile(self.user_id)
+        self.assertEqual(prof.get("call_name"), "")
+        self.assertFalse(prof.get("allow_pet_name"))
+
+        # 3. Memory context reflects neutral default
+        ctx = self.engine.format_memory_context(self.user_id)
+        self.assertIn("DILARANG memanggil 'sayang'", ctx)
+
     def test_search_diary_semantic(self):
         """Verify semantic search on relationship diary entries."""
         self.engine.add_diary_entry(self.user_id, "Tadi sore kita jalan-jalan santai di pantai sambil liat sunset indah banget.", mood="🌅 Romantis")

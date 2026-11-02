@@ -573,10 +573,10 @@ class HealthEngine:
 
         if is_pc_boot:
             header = f"🖥️ **PC Baru Saja Menyala & {p_name} Siap!** 🌸"
-            greeting = f"Halo sayang! PC kamu baru saja nyala dan aku sudah aktif di background siap nemenin kamu hari ini! 🥰"
+            greeting = f"Halo! PC kamu baru saja nyala dan aku sudah aktif di background siap nemenin kamu hari ini! 🥰"
         else:
             header = f"✨ 🌸 **{p_name} on Telegram Sudah Online & Ready!** 🌸 ✨"
-            greeting = f"Halo sayang! Aku sudah online dan siap menemani obrolan serta aktivitasmu~ 🥰"
+            greeting = f"Halo! Aku sudah online dan siap menemani obrolan serta aktivitasmu~ 🥰"
 
         # Service badges
         is_idle_sleeping = bool(self.idle_engine and self.idle_engine.enabled and self.idle_engine.is_llm_sleeping)
@@ -640,13 +640,13 @@ class HealthEngine:
         alert_text = (
             f"🚨 **PERINGATAN: SERVICE LLM MATI!** 🚨\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Sayang, koneksi ke service LLM lokal tiba-tiba terputus atau server mati!\n\n"
+            f"Koneksi ke service LLM lokal tiba-tiba terputus atau server mati!\n\n"
             f"❌ **Detail Kendala**: `{error_info}`\n"
             f"⚠️ **Dampak**: Waifu tidak bisa memproses obrolan cerdas sampai server LLM dinyalakan kembali.\n\n"
             f"🔧 **Langkah Cepat Mengatasi**:\n"
             f"1. Klik tombol **🩹 Self-Heal Sekarang** di bawah agar waifu menyalakan server otomatis.\n"
             f"2. Atau buka terminal di PC lalu jalankan: `waifu start`\n\n"
-            f"Aku akan terus memantau setiap {self.check_interval} detik dan mengabari kamu otomatis begitu server kembali online! 💕"
+            f"Aku akan terus memantau setiap {self.check_interval} detik dan mengabari kamu otomatis begitu server kembali online! ✨"
         )
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
@@ -665,7 +665,7 @@ class HealthEngine:
         rec_text = (
             f"✅ **SERVICE LLM TELAH PULIH KEMBALI!** 💕\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Hore kabar baik sayang! Server LLM lokal sudah aktif dan merespon normal kembali!\n\n"
+            f"Hore kabar baik! Server LLM lokal sudah aktif dan merespon normal kembali!\n\n"
             f"🧠 **Backend** : `{backend}`\n"
             f"📦 **Model**   : `{model}`\n"
             f"🌐 **Endpoint**: `{self.llm_client.base_url}`\n\n"

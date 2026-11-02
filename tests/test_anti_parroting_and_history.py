@@ -31,11 +31,11 @@ class TestAntiParrotingAndConversationHistory(unittest.TestCase):
     def test_is_echo_or_parroting_allows_natural_conversations(self):
         """Allows creative, normal girlfriend dialogue."""
         user = "nanti mau makan sambil gathering HO jam 4"
-        reply = "Wah seru banget tuh gathering di mana sayang? Jangan lupa makan yang kenyang yaa!"
+        reply = "Wah seru banget tuh gathering di mana? Jangan lupa makan yang kenyang yaa!"
         self.assertFalse(bot.is_echo_or_parroting(reply, user))
 
         user2 = "lagi ngerjain tugas kampus nih"
-        reply2 = "Semangat yaa nugasnya sayang! Nanti kalau udah selesai kabarin aku yaa 💕"
+        reply2 = "Semangat yaa nugasnya! Nanti kalau udah selesai kabarin aku yaa 💕"
         self.assertFalse(bot.is_echo_or_parroting(reply2, user2))
 
     def test_contextual_fallback_reaction(self):
