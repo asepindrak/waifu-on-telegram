@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
-from cli_chat import WaifuCLISession, open_media_file, get_default_user_id
+from cli_chat import WaifuCLISession, open_media_file, get_default_user_id, CLILoader
 import cli_chat
 
 
@@ -20,6 +20,26 @@ class TestWaifuCLIChat(unittest.TestCase):
         with patch.dict(os.environ, {"TELEGRAM_ALLOWED_USER_ID": "6402709138"}):
             uid = get_default_user_id()
             self.assertEqual(uid, 6402709138)
+
+    def test_cli_loader_lifecycle(self):
+        """Tests smooth CLI loader spinner lifecycle, status updating, and stop."""
+        loader = CLILoader("Sedang memuat...", emoji="🌸")
+        loader.is_tty = False
+        with loader:
+            loader.set_status("Tahap rendering foto...", emoji="🎨")
+            self.assertEqual(loader.text, "Tahap rendering foto...")
+            self.assertEqual(loader.emoji, "🎨")
+        # Ensure stopped cleanly
+        self.assertIsNone(loader._thread)
+
+        # Test TTY mode thread start and clean stop
+        loader_tty = CLILoader("Memproses...", emoji="⚡")
+        loader_tty.is_tty = True
+        loader_tty.start()
+        self.assertIsNotNone(loader_tty._thread)
+        loader_tty.set_status("Finishing...", emoji="✨")
+        loader_tty.stop(success_message="Berhasil!")
+        self.assertIsNone(loader_tty._thread)
 
     @patch("cli_chat.open_media_file")
     def test_cli_session_shared_history_and_chat(self, mock_open):

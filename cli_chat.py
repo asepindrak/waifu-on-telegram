@@ -5,6 +5,7 @@ Allows chatting directly from terminal/CLI with full parity to Telegram chat:
 - Natural personality, dynamic relationship progression (aku/kamu default)
 - Active daily life story arc & student routine context
 - Auto-opens generated photos (PAP) and videos in default system viewer
+- Dynamic aesthetic loading spinners with multi-stage progress
 """
 
 import os
@@ -94,6 +95,87 @@ def get_default_user_id() -> int:
     return 1
 
 
+class CLILoader:
+    """
+    Aesthetic, smooth, thread-safe CLI spinner & multi-stage status indicator.
+    Supports animated braille spinner frames, elapsed timer, stage updates, and graceful fallback.
+    """
+    SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+    def __init__(self, text: str = "Memuat...", emoji: str = "🌸", color: str = MAGENTA):
+        self.text = text
+        self.emoji = emoji
+        self.color = color
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._start_time = time.time()
+        self.is_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+
+    def set_status(self, text: str, emoji: Optional[str] = None, color: Optional[str] = None):
+        """Thread-safely updates the status message and optional emoji/color."""
+        self.text = text
+        if emoji:
+            self.emoji = emoji
+        if color:
+            self.color = color
+        if not self.is_tty:
+            sys.stdout.write(f"  {self.emoji} {self.text}\n")
+            sys.stdout.flush()
+
+    def _spin(self):
+        idx = 0
+        try:
+            if self.is_tty:
+                sys.stdout.write("\033[?25l")
+                sys.stdout.flush()
+
+            while not self._stop_event.is_set():
+                frame = self.SPINNER_FRAMES[idx % len(self.SPINNER_FRAMES)]
+                elapsed = time.time() - self._start_time
+                line = f"\r\033[K  {self.emoji} {c(self.color, frame)} {c(BOLD, self.text)} {c(DIM, f'({elapsed:.1f}s)')}"
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                idx += 1
+                if self._stop_event.wait(0.08):
+                    break
+        except Exception:
+            pass
+        finally:
+            if self.is_tty:
+                sys.stdout.write("\r\033[K\033[?25h")
+                sys.stdout.flush()
+
+    def start(self):
+        self._start_time = time.time()
+        self._stop_event.clear()
+        if self.is_tty:
+            self._thread = threading.Thread(target=self._spin, daemon=True)
+            self._thread.start()
+        else:
+            sys.stdout.write(f"  {self.emoji} {self.text}...\n")
+            sys.stdout.flush()
+        return self
+
+    def stop(self, success_message: Optional[str] = None, emoji: str = "✓"):
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=0.4)
+        self._thread = None
+        if self.is_tty:
+            sys.stdout.write("\r\033[K\033[?25h")
+            if success_message:
+                elapsed = time.time() - self._start_time
+                sys.stdout.write(f"  {c(GREEN, emoji)} {c(DIM, success_message)} {c(DIM, f'({elapsed:.1f}s)')}\n")
+            sys.stdout.flush()
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
+
+
 class WaifuCLISession:
     def __init__(self, user_id: Optional[int] = None):
         self.user_id = user_id or get_default_user_id()
@@ -146,73 +228,80 @@ class WaifuCLISession:
         print(c(DIM, "─" * 74) + "\n")
 
     def handle_photo_request(self, user_text: str):
-        """Generates photo, saves to output/, opens it automatically, and generates caption."""
+        """Generates photo, saves to output/, opens it automatically, and generates caption with smooth loading."""
         persona = self.persona_mgr.get_active_persona()
         p_name = persona.get("name", "Waifu")
-        print(f"\n📸 {c(CYAN, f'{p_name} sedang menyiapkan foto untukmu...')}")
 
-        # Ensure ComfyUI active
-        self.idle_engine.ensure_comfyui_active()
+        with CLILoader(f"{p_name} sedang menyiapkan foto untukmu...", emoji="📸") as loader:
+            # Ensure ComfyUI active
+            if getattr(self.idle_engine, "is_comfyui_sleeping", False):
+                loader.set_status("Membangunkan ComfyUI & memeriksa GPU...", emoji="⚡")
+            self.idle_engine.ensure_comfyui_active()
 
-        history = self.persona_mgr.get_chat_history(self.user_id)
-        detected_scene = self.persona_mgr.extract_contextual_scene(
-            user_text, user_id=self.user_id, llm_client=self.llm_client, history=history
-        )
-        if not detected_scene:
-            story_photo = self.story_engine.get_story_photo_suggestion(self.persona_mgr.active_key)
-            if story_photo and story_photo.get("danbooru_tags"):
-                detected_scene = story_photo["danbooru_tags"]
+            loader.set_status("Menganalisis konsep visual & suasana outfit...", emoji="🎨")
+            history = self.persona_mgr.get_chat_history(self.user_id)
+            detected_scene = self.persona_mgr.extract_contextual_scene(
+                user_text, user_id=self.user_id, llm_client=self.llm_client, history=history
+            )
+            if not detected_scene:
+                story_photo = self.story_engine.get_story_photo_suggestion(self.persona_mgr.active_key)
+                if story_photo and story_photo.get("danbooru_tags"):
+                    detected_scene = story_photo["danbooru_tags"]
 
-        visual_prompt, extra_neg, is_nude, outfit_label = self.persona_mgr.craft_visual_prompt_full(
-            user_text, user_id=self.user_id, scene_override=detected_scene, history=history
-        )
+            visual_prompt, extra_neg, is_nude, outfit_label = self.persona_mgr.craft_visual_prompt_full(
+                user_text, user_id=self.user_id, scene_override=detected_scene, history=history
+            )
 
-        neg_p = persona.get("negative_prompt", "")
-        if extra_neg:
-            neg_p += f", {extra_neg}"
+            neg_p = persona.get("negative_prompt", "")
+            if extra_neg:
+                neg_p += f", {extra_neg}"
 
-        print(c(DIM, f"  [Rendering ComfyUI: Outfit '{outfit_label}'...]"))
-        img_bytes, source = self.media_engine.generate_photo(
-            visual_prompt,
-            negative_prompt=neg_p,
-            aspect_ratio="3:4",
-            quality="high",
-            persona=self.persona_mgr.active_key,
-            scene=detected_scene,
-            outfit_label=outfit_label,
-            is_nude=is_nude,
-            user_query=user_text
-        )
+            loader.set_status(f"Rendering difusi ComfyUI (Outfit: '{outfit_label}')...", emoji="✨")
+            img_bytes, source = self.media_engine.generate_photo(
+                visual_prompt,
+                negative_prompt=neg_p,
+                aspect_ratio="3:4",
+                quality="high",
+                persona=self.persona_mgr.active_key,
+                scene=detected_scene,
+                outfit_label=outfit_label,
+                is_nude=is_nude,
+                user_query=user_text
+            )
 
-        if not img_bytes:
-            err = getattr(self.media_engine, "last_error", None) or "ComfyUI tidak merespon."
-            print(f"⚠️ {c(RED, f'Gagal membuat foto: {err}')}\n")
-            return
+            if not img_bytes:
+                loader.stop()
+                err = getattr(self.media_engine, "last_error", None) or "ComfyUI tidak merespon."
+                print(f"⚠️ {c(RED, f'Gagal membuat foto: {err}')}\n")
+                return
 
-        # Save to output/
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        f_name = f"{self.persona_mgr.active_key}_{ts}.jpg"
-        save_path = os.path.join(self.output_dir, f_name)
-        with open(save_path, "wb") as f:
-            f.write(img_bytes)
+            loader.set_status("Menyimpan & membuka foto di layar...", emoji="🖼️")
+            # Save to output/
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            f_name = f"{self.persona_mgr.active_key}_{ts}.jpg"
+            save_path = os.path.join(self.output_dir, f_name)
+            with open(save_path, "wb") as f:
+                f.write(img_bytes)
 
-        # Open automatically
-        open_media_file(save_path)
+            # Open automatically
+            open_media_file(save_path)
+
+            loader.set_status("Menulis pesan manis untuk fotonya...", emoji="💌")
+            # Caption
+            cap_prompt = [
+                {
+                    "role": "system",
+                    "content": f"{persona.get('system_instruction', '')}\nWrite 1 natural, warm, and playful chat caption accompanying the photo you just sent. Under 2 sentences in casual Indonesian."
+                },
+                {
+                    "role": "user",
+                    "content": f"User asked: '{user_text}'. Give a cute caption for the photo."
+                }
+            ]
+            caption, _ = self.llm_client.chat(cap_prompt, max_tokens=60)
+            caption = caption.strip('"\n ') if caption else "Ini foto buat kamu, gimana menurutmu? 💕"
+
         print(f"✨ {c(GREEN, 'Foto berhasil dibuat & dibuka:')} {c(BOLD, save_path)}")
-
-        # Caption
-        cap_prompt = [
-            {
-                "role": "system",
-                "content": f"{persona.get('system_instruction', '')}\nWrite 1 natural, warm, and playful chat caption accompanying the photo you just sent. Under 2 sentences in casual Indonesian."
-            },
-            {
-                "role": "user",
-                "content": f"User asked: '{user_text}'. Give a cute caption for the photo."
-            }
-        ]
-        caption, _ = self.llm_client.chat(cap_prompt, max_tokens=60)
-        caption = caption.strip('"\n ') if caption else "Ini foto buat kamu, gimana menurutmu? 💕"
         print(f"🌸 {c(BOLD + MAGENTA, p_name)}: {caption}\n")
 
         # Save to history
@@ -220,35 +309,42 @@ class WaifuCLISession:
         self.persona_mgr.add_message(self.user_id, "assistant", f"{caption} [PHOTO: {f_name}]")
 
     def handle_video_request(self, user_text: str):
-        """Generates video animation, saves to output/, opens it automatically, and generates caption."""
+        """Generates video animation, saves to output/, opens it automatically, and generates caption with smooth loading."""
         persona = self.persona_mgr.get_active_persona()
         p_name = persona.get("name", "Waifu")
-        print(f"\n🎬 {c(CYAN, f'{p_name} sedang membuat video klip animasi untukmu...')}")
 
-        self.idle_engine.ensure_comfyui_active()
-        visual_prompt, _, _, outfit_label = self.persona_mgr.craft_visual_prompt_full(
-            user_text, user_id=self.user_id
-        )
+        with CLILoader(f"{p_name} sedang membuat video klip animasi untukmu...", emoji="🎬") as loader:
+            if getattr(self.idle_engine, "is_comfyui_sleeping", False):
+                loader.set_status("Membangunkan ComfyUI & memeriksa engine video...", emoji="⚡")
+            self.idle_engine.ensure_comfyui_active()
 
-        print(c(DIM, f"  [Rendering Neural Video Engine ({os.environ.get('VIDEO_ENGINE', 'animatediff')})...]"))
-        video_bytes, source = self.media_engine.generate_video(
-            visual_prompt=visual_prompt,
-            aspect_ratio="3:4"
-        )
+            loader.set_status("Merancang scene & frame visual gerakan...", emoji="🎨")
+            visual_prompt, _, _, outfit_label = self.persona_mgr.craft_visual_prompt_full(
+                user_text, user_id=self.user_id
+            )
 
-        if not video_bytes:
-            print(f"⚠️ {c(RED, 'Gagal membuat video klip animasinya...')}\n")
-            return
+            v_eng = os.environ.get("VIDEO_ENGINE", "animatediff")
+            loader.set_status(f"Rendering animasi neural video ({v_eng})...", emoji="🎥")
+            video_bytes, source = self.media_engine.generate_video(
+                visual_prompt=visual_prompt,
+                aspect_ratio="3:4"
+            )
 
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        f_name = f"{self.persona_mgr.active_key}_{ts}.mp4"
-        save_path = os.path.join(self.output_dir, f_name)
-        with open(save_path, "wb") as f:
-            f.write(video_bytes)
+            if not video_bytes:
+                loader.stop()
+                print(f"⚠️ {c(RED, 'Gagal membuat video klip animasinya...')}\n")
+                return
 
-        open_media_file(save_path)
+            loader.set_status("Menyimpan & memutar video klip di layar...", emoji="✨")
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            f_name = f"{self.persona_mgr.active_key}_{ts}.mp4"
+            save_path = os.path.join(self.output_dir, f_name)
+            with open(save_path, "wb") as f:
+                f.write(video_bytes)
+
+            open_media_file(save_path)
+
         print(f"✨ {c(GREEN, 'Video animasi berhasil dibuat & dibuka:')} {c(BOLD, save_path)}")
-
         caption = f"Ini video animasi pendek dari aku! Semoga kamu suka yaa ✨"
         print(f"🌸 {c(BOLD + MAGENTA, p_name)}: {caption}\n")
 
@@ -316,14 +412,19 @@ class WaifuCLISession:
         messages.extend(history)
         messages.append({"role": "user", "content": user_text})
 
-        # Ensure LLM awake
-        self.idle_engine.ensure_llm_active()
+        with CLILoader(f"{p_name} sedang memikirkan balasan...", emoji="💭") as loader:
+            # Ensure LLM awake
+            if getattr(self.idle_engine, "is_llm_sleeping", False):
+                loader.set_status("Membangunkan KoboldCPP ke memori...", emoji="⚡")
+            self.idle_engine.ensure_llm_active()
 
-        try:
-            raw_reply, _ = self.llm_client.chat(messages, max_tokens=150)
-        except Exception as e:
-            print(f"⚠️ {c(RED, f'Koneksi ke LLM lokal gagal: {e}')}\n")
-            return
+            loader.set_status(f"{p_name} sedang mengetik...", emoji="🌸")
+            try:
+                raw_reply, _ = self.llm_client.chat(messages, max_tokens=150)
+            except Exception as e:
+                loader.stop()
+                print(f"⚠️ {c(RED, f'Koneksi ke LLM lokal gagal: {e}')}\n")
+                return
 
         if not raw_reply or not raw_reply.strip():
             raw_reply = "Ehh maaf, tadi aku agak melamun sebentar... Kamu ngomong apa tadi?"
@@ -344,7 +445,7 @@ class WaifuCLISession:
 
         # If LLM triggered spontaneous PAP
         if has_pap_action:
-            print(f"📸 {c(CYAN, f'{p_name} mengambil foto selfie kegiatan untukmu...')}")
+            print(f"📸 {c(CYAN, f'{p_name} berinisiatif mengambil foto kegiatan untukmu...')}")
             photo_prompt = clean_reply or routine["activity_desc"]
             self.handle_photo_request(photo_prompt)
 
@@ -387,8 +488,9 @@ class WaifuCLISession:
                 continue
 
             if low in ("/story", "/cerita", "/arc", "/episode"):
-                persona = self.persona_mgr.get_active_persona()
-                card = self.story_engine.format_story_summary_card(self.persona_mgr.active_key, persona.get("name", "Waifu"))
+                with CLILoader("Mengambil rangkuman cerita hari ini...", emoji="📖"):
+                    persona = self.persona_mgr.get_active_persona()
+                    card = self.story_engine.format_story_summary_card(self.persona_mgr.active_key, persona.get("name", "Waifu"))
                 print(f"\n{card}\n")
                 continue
 
@@ -397,39 +499,37 @@ class WaifuCLISession:
                 if len(parts) > 1:
                     new_p = parts[1].lower()
                     if new_p in self.persona_mgr.personas:
-                        self.persona_mgr.set_active_persona(new_p)
-                        p = self.persona_mgr.get_active_persona()
-                        pn = p.get('name', 'Waifu')
-                        pa = p.get('archetype', 'Companion')
-                        print(f"\n✨ {c(GREEN, f'Berganti karakter ke {pn} ({pa})!')}\n")
+                        with CLILoader(f"Memuat persona {new_p.capitalize()}...", emoji="🎭"):
+                            self.persona_mgr.set_active_persona(new_p)
+                            new_info = self.persona_mgr.get_active_persona()
+                        print(f"✨ Berpindah ke persona: {c(BOLD + GREEN, new_info.get('name', new_p))} ({new_info.get('archetype', '')})\n")
                     else:
-                        print(f"⚠️ Karakter '{new_p}' tidak ditemukan. Pilihan: runa, akira, hina, shiro, yume\n")
+                        valid = ", ".join(self.persona_mgr.personas.keys())
+                        print(f"⚠️ Persona '{new_p}' tidak ditemukan. Pilihan tersedia: {valid}\n")
                 else:
                     curr = self.persona_mgr.get_active_persona()
-                    print(f"\nPersona aktif saat ini: {c(BOLD + GREEN, curr.get('name'))}. Pilihan: runa, akira, hina, shiro, yume\n")
+                    print(f"ℹ️ Persona aktif saat ini: {c(BOLD + GREEN, curr.get('name'))}. Ketik '/persona <nama>' untuk mengganti.\n")
                 continue
 
             if low in ("/clear", "/reset"):
                 self.persona_mgr.clear_history(self.user_id)
-                print(f"\n🧹 {c(YELLOW, 'Riwayat percakapan telah dibersihkan.')}\n")
+                print(f"🧹 {c(GREEN, 'Riwayat obrolan sesi ini berhasil dibersihkan!')}\n")
                 continue
 
-            # Check photo intent
-            if low.startswith("/pap") or low.startswith("/photo") or any(k in low for k in ("pap dong", "kirim pap", "kirim foto", "minta foto", "foto kamu", "selfie dong")):
+            # Check if user specifically asking for photo/PAP
+            is_pap_request = bool(re.search(r"\b(pap|foto|selfie|kirim foto|minta foto|liat foto)\b", low))
+            is_video_request = bool(re.search(r"\b(video|animasi|klip|bergerak)\b", low))
+
+            if low.startswith("/pap") or low.startswith("/foto") or (is_pap_request and not is_video_request):
                 self.handle_photo_request(user_input)
-                continue
-
-            # Check video intent
-            if low.startswith("/video") or any(k in low for k in ("kirim video", "bikin video", "video dong", "minta video")):
+            elif low.startswith("/video") or is_video_request:
                 self.handle_video_request(user_input)
-                continue
-
-            # Regular conversation turn
-            self.process_message(user_input)
+            else:
+                self.process_message(user_input)
 
 
 def start_cli_chat(user_id: Optional[int] = None):
-    """Entry point for CLI chat."""
+    """Entry point for CLI interactive chat session."""
     session = WaifuCLISession(user_id=user_id)
     session.run_interactive_loop()
 
