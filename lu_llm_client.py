@@ -213,6 +213,10 @@ class LocallyUncensoredClient:
             "model": self.model,
             "messages": payload_messages,
             "temperature": temperature,
+            "top_p": 0.9,
+            "presence_penalty": 0.3,
+            "frequency_penalty": 0.3,
+            "repetition_penalty": 1.1,
             "max_tokens": max_tokens,
             "chat_template_kwargs": {"enable_thinking": False},
             "reasoning_budget": 0,
@@ -230,10 +234,21 @@ class LocallyUncensoredClient:
                     timeout=self.timeout
                 )
 
-                # If backend rejected reasoning kwargs (400 Bad Request), fallback to standard payload
+                # If backend rejected extension kwargs (400 Bad Request), fallback progressively
                 if resp.status_code == 400:
                     payload.pop("chat_template_kwargs", None)
                     payload.pop("reasoning_budget", None)
+                    payload.pop("repetition_penalty", None)
+                    resp = requests.post(
+                        f"{self.base_url}/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=self.timeout
+                    )
+                if resp.status_code == 400:
+                    payload.pop("presence_penalty", None)
+                    payload.pop("frequency_penalty", None)
+                    payload.pop("top_p", None)
                     resp = requests.post(
                         f"{self.base_url}/chat/completions",
                         headers=headers,

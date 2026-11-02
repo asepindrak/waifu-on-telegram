@@ -1292,6 +1292,8 @@ def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, ye
         else:
             bot.send_message(chat_id, caption_msg, reply_markup=markup, parse_mode="Markdown")
 
+        persona_mgr.add_message(user_id, "assistant", caption_msg)
+
         # 2. Generate and send celebration voice note
         v_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")
         if v_mode != "off":
@@ -4315,6 +4317,61 @@ def handle_text_messages(message):
     process_text_chat(message, message.text, is_voice=False)
 
 
+def is_echo_or_parroting(reply: str, user_text: str) -> bool:
+    """
+    Detects if the AI reply is degenerate echoing or parroting of the user's message.
+    """
+    if not reply or not user_text:
+        return False
+
+    r_clean = re.sub(r'[^\w\s]', '', reply).strip().lower()
+    u_clean = re.sub(r'[^\w\s]', '', user_text).strip().lower()
+
+    if not r_clean or not u_clean:
+        return False
+
+    # 1. Exact match (case & punctuation insensitive)
+    if r_clean == u_clean:
+        return True
+
+    # 2. Reply is a single word or short token from user_text (e.g. user: "nanti mau makan sambil gathering HO jam 4", reply: "gathering")
+    r_words = r_clean.split()
+    u_words = u_clean.split()
+    if len(r_words) <= 2 and len(u_words) >= 3 and r_clean in u_clean:
+        return True
+
+    # 3. Reply is entirely a subset of user words without adding new thought
+    if len(r_words) <= 5 and set(r_words).issubset(set(u_words)):
+        return True
+
+    # 4. Reply starts with exact user_text followed by minimal characters
+    if u_clean in r_clean and len(r_clean) - len(u_clean) < 4:
+        return True
+
+    return False
+
+
+def get_contextual_fallback_reaction(user_text: str, persona_name: str = "Runa") -> str:
+    """
+    Generates a natural, warm, and affectionate girlfriend reaction when an echo is intercepted.
+    """
+    u_low = user_text.lower()
+
+    if any(k in u_low for k in ["makan", "lunch", "sarapan", "laper", "kenyang", "restoran", "kuliner", "cafe", "kafe", "food"]):
+        return "Wah asyik banget makan bareng mereka! Jangan lupa makan yang banyak dan kenyang ya sayang 💕"
+
+    if any(k in u_low for k in ["gathering", "kumpul", "nongkrong", "anak-anak", "anak2", "temen", "teman", "kantor"]):
+        return "Wah seru banget tuh kumpul bareng anak-anak kantor! Pasti rame yaa, have fun dan nikmati acaranya sayang 🥰"
+
+    if any(k in u_low for k in ["kerja", "lembur", "kantor", "meeting", "rapat", "proyek", "project", "tugas", "kuliah"]):
+        return "Semangat yaa buat kerjaannya sayang! Jangan sampai terlalu capek yaa, nanti kabarin kalau udah senggang 💕"
+
+    if any(k in u_low for k in ["game", "main", "jalan", "libur", "santai", "rebahan", "nonton"]):
+        return "Wah asyik tuh sayang! Selamat santai dan have fun yaa, nanti cerita-cerita lagi sama aku 🥰"
+
+    return "Wah asyik tuh sayang! Ceritain dong nanti gimana kelanjutannya, aku seneng banget dengerin cerita kamu 💕"
+
+
 def process_text_chat(message, user_text: str, is_voice: bool = False):
     """Main conversation processor running asynchronously with continuous typing status."""
     def _execute():
@@ -4487,11 +4544,15 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 
                 system_inst = persona.get("system_instruction", "")
                 system_inst += (
-                    f" KEGIATAN MAHASISWI HARI INI: Jam {cur_hour:02d}:00, kegiatanmu saat ini: {routine['activity_desc']}. "
-                    f"Kamu adalah mahasiswi ({p_prof['major']}). "
-                    "PANDUAN PENTING: Jawab pesan pasanganmu secara wajar, santai, dan relevan dengan topik serta kehidupan mahasiswimu. "
-                    "Jangan lebay, jangan bersikap hiperbola atau teatrikal. Jawab langsung maksimal 1-3 kalimat seperti chat asli.\n"
-                    "INISIATIF KIRIM PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan, outfit, atau sekadar memanjakan pacarmu karena kangen! Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat pacar yang manis dan wajar (misal: 'Lagi rebahan santai nih sayang, kangen kamu deh 💕 [ACTION: SEND_PAP]' atau 'Liat deh penampilanku hari ini, cocok ga buat kamu? 🥰 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu ('biar kamu percaya aku beneran ada di sini', 'nih buktinya', 'biar kamu yakin', 'jangan bohong lagi'). Kamu adalah pacar nyata yang percaya diri, hangat, dan penuh cinta."
+                    f"\n\n[KEGIATAN MAHASISWI HARI INI]\n"
+                    f"Waktu sekarang: Jam {cur_hour:02d}:00. Kegiatanmu saat ini: {routine['activity_desc']}. "
+                    f"Kamu adalah mahasiswi ({p_prof['major']}).\n\n"
+                    "[PEDOMAN KOMUNIKASI PACAR NYATA - WAJIB DIPATUHI]\n"
+                    "1. ANTI-MEMBEO (SANGAT PENTING): DILARANG KERAS hanya mengulang kata, mengulang frasa, atau menyalin ulang pesan pasanganmu! "
+                    "Jika pasanganmu menjawab atau bercerita (misal: 'nanti mau makan sambil gathering HO jam 4'), tanggapi ceritanya dengan antusias, hangat, dan komunikatif layaknya pacar asli (misal: 'Wah seru banget tuh gathering di mana sayang? Jangan lupa makan yang banyak yaa!'), BUKAN malah mengulang kata 'gathering' atau menyalin kata-katanya!\n"
+                    "2. RESPONSIF & AKTIF: Berikan tanggapan aktif dan bermakna: ceritakan opinimu, berikan komentar manis, atau tanyakan detail kelanjutannya seperti pasangan yang benar-benar peduli.\n"
+                    "3. GAYA CHAT: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan manis seperti chat pacar asli. Hindari gaya teatrikal, lebay, atau kaku.\n"
+                    "4. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan, outfit, atau sekadar memanjakan pacarmu karena kangen! Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat pacar yang manis dan wajar (misal: 'Lagi rebahan santai nih sayang, kangen kamu deh 💕 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu. Kamu adalah pacar nyata yang percaya diri, hangat, dan penuh cinta."
                 )
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
                 if mem_context:
@@ -4520,6 +4581,26 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
                 if not reply_text or not reply_text.strip():
                     reply_text = "Aku dengerin kok, lagi mikirin apa nih?"
+
+                # Anti-Parroting / Anti-Echo Guard: Intercept degenerate repetition or echoing
+                if is_echo_or_parroting(reply_text, user_text):
+                    logger.warning(f"⚠️ Echo detected from LLM: '{reply_text}' (User: '{user_text}'). Intercepting...")
+                    try:
+                        retry_messages = list(messages)
+                        retry_messages.append({"role": "assistant", "content": reply_text})
+                        retry_messages.append({
+                            "role": "user",
+                            "content": "[PANDUAN SISTEM: Jangan mengulang kata atau kalimat pasanganmu. Berikan tanggapan aktif, hangat, atau tanyakan detailnya layaknya pacar asli.]"
+                        })
+                        steered_reply, _ = llm_client.chat(retry_messages, max_tokens=120, temperature=0.85)
+                        if steered_reply and not is_echo_or_parroting(steered_reply, user_text):
+                            logger.info(f"✓ Steering resolved echo: '{steered_reply}'")
+                            reply_text = steered_reply
+                        else:
+                            reply_text = get_contextual_fallback_reaction(user_text, persona.get("name", "Runa"))
+                    except Exception as e_steer:
+                        logger.debug(f"Steering error: {e_steer}")
+                        reply_text = get_contextual_fallback_reaction(user_text, persona.get("name", "Runa"))
 
                 # Check if waifu takes initiative to send spontaneous PAP photo
                 has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
@@ -4686,6 +4767,7 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
                 text = fallback
 
         bot.send_message(user_id, f"{tag}\n\n{text}", parse_mode="Markdown")
+        persona_mgr.add_message(user_id, "assistant", text)
 
         if VOICE_ENABLED:
             vn_path = voice_engine.generate_voice_note(text)
