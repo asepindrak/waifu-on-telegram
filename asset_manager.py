@@ -373,32 +373,47 @@ def check_and_repair_comfyui_environment(py_exe: str) -> None:
                 if os.path.isfile(pyd_path):
                     is_corrupt = False
                     try:
-                        if os.path.getsize(pyd_path) == 0:
+                        sz = os.path.getsize(pyd_path)
+                        if sz < 1024:
                             is_corrupt = True
                         else:
+                            probe_code = (
+                                "import sys; "
+                                "import ctypes; "
+                                "(ctypes.windll.kernel32.SetErrorMode(0x8003) if sys.platform == 'win32' else None); "
+                                "import torchvision; "
+                                "from torchvision.io import image"
+                            )
                             probe = subprocess.run(
-                                [py_exe, "-s", "-c", "import torchvision; from torchvision.io import image"],
+                                [py_exe, "-s", "-c", probe_code],
                                 capture_output=True,
                                 timeout=15,
-                                creationflags=0x08000000 if sys.platform == "win32" else 0
+                                creationflags=0x08000000 | 0x00000200 if sys.platform == "win32" else 0
                             )
+                            # Any non-zero exit means the compiled .pyd fails to initialize or crashes DLL loader
                             if probe.returncode != 0:
-                                err = probe.stderr.decode("utf-8", errors="ignore")
-                                if "0xc0e90002" in err or "Bad Image" in err or "DLL load failed" in err:
-                                    is_corrupt = True
-                    except Exception:
-                        pass
+                                is_corrupt = True
+                    except Exception as e_probe:
+                        logger.debug(f"Torchvision probe exception on {pyd_path}: {e_probe}")
+                        is_corrupt = True
 
                     if is_corrupt:
-                        logger.warning(f"Detected corrupt torchvision binary '{bad_pyd}'. Quarantining...")
+                        logger.warning(f"Detected corrupt/incompatible torchvision binary '{bad_pyd}'. Quarantining...")
                         try:
                             bak_path = pyd_path + ".corrupt.bak"
                             if os.path.exists(bak_path):
-                                os.remove(bak_path)
+                                try:
+                                    os.remove(bak_path)
+                                except Exception:
+                                    pass
                             os.rename(pyd_path, bak_path)
-                            logger.info(f"Quarantined {pyd_path} -> {bak_path}. Torchvision fallback will be used.")
+                            logger.info(f"Quarantined {pyd_path} -> {bak_path}. Torchvision pure Python/PIL fallback will be used.")
                         except Exception as e_rename:
-                            logger.error(f"Failed to quarantine {pyd_path}: {e_rename}")
+                            try:
+                                os.remove(pyd_path)
+                                logger.info(f"Removed corrupt {pyd_path}. Torchvision pure Python/PIL fallback will be used.")
+                            except Exception as e_del:
+                                logger.error(f"Failed to quarantine or remove corrupt {pyd_path}: {e_del} (Rename error: {e_rename})")
 
 
 _COMFYUI_FORCE_CPU: Optional[bool] = None

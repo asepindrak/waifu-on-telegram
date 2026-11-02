@@ -307,7 +307,21 @@ class LocallyUncensoredClient:
         else:
             clean_reply = raw_content.strip()
 
-        # If clean_reply was empty because tokens ended during reasoning:
+        # Clean any leaked inner monologue / meta-reasoning from clean_reply
+        if clean_reply:
+            # Strip [Thinking: ...] or Thought: ... prefixes
+            clean_reply = re.sub(r'(?is)^\s*(?:\[thinking[:\s].*?\]|thought[:\s].*?(?:\n\n|\Z))', '', clean_reply).strip()
+            # If clean_reply contains English meta-instructions like "I need to..." or "moments spontaneously..."
+            lines = clean_reply.split('\n')
+            filtered_lines = []
+            for line in lines:
+                l_strip = line.strip()
+                if re.match(r'(?i)^(i need to|i should|i must|make sure not to|moments spontaneously|repeat their exact words)', l_strip):
+                    continue
+                filtered_lines.append(line)
+            clean_reply = '\n'.join(filtered_lines).strip()
+
+        # If clean_reply was empty because tokens ended during reasoning or was pure meta-leak:
         if not clean_reply and reasoning:
             # Look for quoted dialogue inside reasoning: e.g. "Lagi nunggu kamu kok, sayang!"
             quotes = re.findall(r'"([^"]{5,120})"', reasoning)

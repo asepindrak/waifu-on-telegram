@@ -258,7 +258,11 @@ def cmd_stop():
         subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True)
         subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq Waifu Music Server*"], capture_output=True)
         subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq KoboldCPP*"], capture_output=True)
-        subprocess.run(["taskkill", "/F", "/IM", "koboldcpp.exe"], capture_output=True)
+        try:
+            from health_engine import kill_all_koboldcpp
+            kill_all_koboldcpp()
+        except Exception:
+            subprocess.run(["taskkill", "/F", "/IM", "koboldcpp*.exe"], capture_output=True)
         subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq ComfyUI*"], capture_output=True)
         ps_comfy = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*main.py*" -and $_.CommandLine -like "*8188*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
         subprocess.run(["powershell", "-NoProfile", "-Command", ps_comfy], capture_output=True)

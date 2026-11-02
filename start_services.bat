@@ -6,9 +6,14 @@ echo ============================================================
 echo   Starting Waifu on Telegram Services...
 echo ============================================================
 
-:: 1. Start KoboldCPP LLM Engine if available & not smart idle & not already running
-python -c "import os; from dotenv import load_dotenv; load_dotenv(); exit(0 if os.environ.get('SMART_IDLE_ENABLED','true').lower() in ('1','true','yes') else 1)" >nul 2>&1
-if not errorlevel 1 (
+:: 1. Start KoboldCPP LLM Engine if available & Smart Idle is explicitly disabled & not already running
+set "KOBOLD_STANDBY=1"
+if exist "%~dp0.env" (
+    findstr /i /c:"SMART_IDLE_ENABLED=false" "%~dp0.env" >nul 2>&1 && set "KOBOLD_STANDBY=0"
+    findstr /i /c:"SMART_IDLE_ENABLED=0" "%~dp0.env" >nul 2>&1 && set "KOBOLD_STANDBY=0"
+    findstr /i /c:"SMART_IDLE_ENABLED=no" "%~dp0.env" >nul 2>&1 && set "KOBOLD_STANDBY=0"
+)
+if "%KOBOLD_STANDBY%"=="1" (
     echo [1/4] Local LLM on standby (Smart Idle: VRAM bebas ^• Bangun otomatis saat chat)
 ) else (
     set KOBOLD_EXE=%~dp0tools\koboldcpp.exe

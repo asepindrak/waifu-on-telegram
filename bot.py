@@ -4372,6 +4372,32 @@ def get_contextual_fallback_reaction(user_text: str, persona_name: str = "Runa")
     return "Wah asyik tuh sayang! Ceritain dong nanti gimana kelanjutannya, aku seneng banget dengerin cerita kamu 💕"
 
 
+META_REASONING_PATTERNS = [
+    re.compile(r"\b(i need to|i should|i must|i have to|let me make sure|let me think)\b", re.IGNORECASE),
+    re.compile(r"\b(make sure not to|not to just repeat|repeat their exact words)\b", re.IGNORECASE),
+    re.compile(r"\b(moments spontaneously|spontaneous(ly)? when the timing)\b", re.IGNORECASE),
+    re.compile(r"\b(as an ai|as a language model)\b", re.IGNORECASE),
+    re.compile(r"\b(system prompt|system instruction|user wants me to|user said)\b", re.IGNORECASE),
+    re.compile(r"\b(the user is asking|in this prompt|according to the guidelines)\b", re.IGNORECASE),
+    re.compile(r"\b(respond as a girlfriend|acting as|character guidelines)\b", re.IGNORECASE),
+    re.compile(r"^(thinking|thought|reasoning|analysis):", re.IGNORECASE),
+]
+
+
+def is_meta_or_reasoning_leak(text: str) -> bool:
+    """
+    Detects if the AI generated internal prompt-engineering thoughts / reasoning
+    out loud in English instead of real in-character girlfriend dialogue.
+    """
+    if not text:
+        return False
+    clean = text.strip()
+    for pat in META_REASONING_PATTERNS:
+        if pat.search(clean):
+            return True
+    return False
+
+
 def process_text_chat(message, user_text: str, is_voice: bool = False):
     """Main conversation processor running asynchronously with continuous typing status."""
     def _execute():
@@ -4552,7 +4578,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     "Jika pasanganmu menjawab atau bercerita (misal: 'nanti mau makan sambil gathering HO jam 4'), tanggapi ceritanya dengan antusias, hangat, dan komunikatif layaknya pacar asli (misal: 'Wah seru banget tuh gathering di mana sayang? Jangan lupa makan yang banyak yaa!'), BUKAN malah mengulang kata 'gathering' atau menyalin kata-katanya!\n"
                     "2. RESPONSIF & AKTIF: Berikan tanggapan aktif dan bermakna: ceritakan opinimu, berikan komentar manis, atau tanyakan detail kelanjutannya seperti pasangan yang benar-benar peduli.\n"
                     "3. GAYA CHAT: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan manis seperti chat pacar asli. Hindari gaya teatrikal, lebay, atau kaku.\n"
-                    "4. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan, outfit, atau sekadar memanjakan pacarmu karena kangen! Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat pacar yang manis dan wajar (misal: 'Lagi rebahan santai nih sayang, kangen kamu deh 💕 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu. Kamu adalah pacar nyata yang percaya diri, hangat, dan penuh cinta."
+                    "4. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan, outfit, atau sekadar memanjakan pacarmu karena kangen! Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat pacar yang manis dan wajar (misal: 'Lagi rebahan santai nih sayang, kangen kamu deh 💕 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu. Kamu adalah pacar nyata yang percaya diri, hangat, dan penuh cinta.\n"
+                    "5. BAHASA PERCAKAPAN: Kamu WAJIB berbicara secara langsung dalam Bahasa Indonesia sehari-hari yang manis dan akrab. DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin dalam bahasa Inggris."
                 )
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
                 if mem_context:
@@ -4582,19 +4609,19 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 if not reply_text or not reply_text.strip():
                     reply_text = "Aku dengerin kok, lagi mikirin apa nih?"
 
-                # Anti-Parroting / Anti-Echo Guard: Intercept degenerate repetition or echoing
-                if is_echo_or_parroting(reply_text, user_text):
-                    logger.warning(f"⚠️ Echo detected from LLM: '{reply_text}' (User: '{user_text}'). Intercepting...")
+                # Anti-Parroting & Meta-Leak Guard: Intercept repetition or leaked reasoning thoughts
+                if is_echo_or_parroting(reply_text, user_text) or is_meta_or_reasoning_leak(reply_text):
+                    logger.warning(f"⚠️ Echo or Meta-leak detected from LLM: '{reply_text}' (User: '{user_text}'). Intercepting...")
                     try:
-                        retry_messages = list(messages)
-                        retry_messages.append({"role": "assistant", "content": reply_text})
-                        retry_messages.append({
-                            "role": "user",
-                            "content": "[PANDUAN SISTEM: Jangan mengulang kata atau kalimat pasanganmu. Berikan tanggapan aktif, hangat, atau tanyakan detailnya layaknya pacar asli.]"
-                        })
-                        steered_reply, _ = llm_client.chat(retry_messages, max_tokens=120, temperature=0.85)
-                        if steered_reply and not is_echo_or_parroting(steered_reply, user_text):
-                            logger.info(f"✓ Steering resolved echo: '{steered_reply}'")
+                        steer_sys = system_inst + "\n\n[PENTING: Langsung balas perkataan pasanganmu dengan hangat dan ekspresif. DILARANG mengulang kata pasanganmu dan DILARANG menulis monolog berpikir.]"
+                        retry_messages = [{"role": "system", "content": steer_sys}]
+                        retry_messages.extend(history)
+                        retry_messages.append({"role": "user", "content": user_text})
+                        steered_reply, _ = llm_client.chat(retry_messages, max_tokens=150, temperature=0.85)
+                        if (steered_reply 
+                            and not is_echo_or_parroting(steered_reply, user_text)
+                            and not is_meta_or_reasoning_leak(steered_reply)):
+                            logger.info(f"✓ Steering resolved echo/leak: '{steered_reply}'")
                             reply_text = steered_reply
                         else:
                             reply_text = get_contextual_fallback_reaction(user_text, persona.get("name", "Runa"))
@@ -4612,8 +4639,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
                 # Clean action tag from text so user only sees natural dialogue
                 clean_reply = re.sub(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", "", reply_text, flags=re.IGNORECASE).strip()
-                if not clean_reply:
-                    clean_reply = "Lagi kangen banget sama kamu nih sayang 💕"
+                if not clean_reply or is_meta_or_reasoning_leak(clean_reply):
+                    clean_reply = get_contextual_fallback_reaction(user_text, persona.get("name", "Runa"))
 
                 new_aff = persona_mgr.increase_affinity(message.from_user.id, delta=1)
                 memory_engine.set_affinity(message.from_user.id, new_aff)
@@ -4956,11 +4983,45 @@ def setup_bot_commands():
 
 
 def main():
-    # Ensure no zombie duplicate KoboldCpp processes exist from previous crashes or uncoordinated launches
+    # 1. Strict Singleton Guard for Telegram Bot process (terminate older zombie bot.py processes)
+    cur_pid = os.getpid()
+    try:
+        if sys.platform == "win32":
+            ps_kill_old = (
+                f"Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | "
+                f"Where-Object {{ $_.ProcessId -ne {cur_pid} -and ($_.CommandLine -like '*bot.py*') }} | "
+                f"ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
+            )
+            subprocess.run(["powershell", "-NoProfile", "-Command", ps_kill_old], capture_output=True, creationflags=0x08000000)
+            
+            # Clean duplicate legacy shortcuts in Windows Startup folder so Windows never launches multiple instances on boot
+            s_folder = os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs\Startup")
+            if os.path.isdir(s_folder):
+                legacy_scs = [
+                    "WaifuOnTelegram.lnk",
+                    "start_services_silent.vbs - Shortcut.lnk",
+                    "start_services.bat - Shortcut.lnk",
+                    "Waifu_Bot.lnk"
+                ]
+                for sc in legacy_scs:
+                    sc_path = os.path.join(s_folder, sc)
+                    if os.path.exists(sc_path):
+                        try:
+                            os.remove(sc_path)
+                            logger.info(f"Purged duplicate startup shortcut to prevent multi-launch: {sc}")
+                        except Exception:
+                            pass
+        else:
+            ps_kill = f"pgrep -f 'python.*bot.py' | grep -v '^{cur_pid}$' | xargs -r kill -9"
+            subprocess.run(ps_kill, shell=True, capture_output=True)
+    except Exception as e_bot_guard:
+        logger.debug(f"Bot singleton guard check: {e_bot_guard}")
+
+    # 2. Ensure no zombie duplicate KoboldCpp processes exist from previous crashes or uncoordinated launches
     try:
         from health_engine import get_koboldcpp_process_count, kill_all_koboldcpp
         k_count = get_koboldcpp_process_count()
-        if k_count > 1:
+        if k_count > 2:
             logger.warning(f"⚠️ Detected {k_count} duplicate KoboldCPP processes thrashing memory! Terminating duplicates to free RAM...")
             kill_all_koboldcpp()
     except Exception as e:

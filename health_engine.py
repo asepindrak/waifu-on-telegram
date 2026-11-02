@@ -55,10 +55,10 @@ def get_koboldcpp_process_count() -> int:
     try:
         if sys.platform == "win32":
             out = subprocess.check_output(
-                ["tasklist", "/FI", "IMAGENAME eq koboldcpp.exe", "/FO", "CSV", "/NH"],
+                ["tasklist", "/FO", "CSV", "/NH"],
                 creationflags=0x08000000
             ).decode("utf-8", errors="ignore")
-            lines = [l for l in out.strip().splitlines() if "koboldcpp.exe" in l.lower()]
+            lines = [l for l in out.strip().splitlines() if "koboldcpp" in l.lower()]
             return len(lines)
         else:
             out = subprocess.check_output(["pgrep", "-f", "koboldcpp"]).decode("utf-8", errors="ignore")
@@ -72,8 +72,31 @@ def kill_all_koboldcpp() -> None:
     """Forcefully terminates all running KoboldCPP instances on host OS."""
     try:
         if sys.platform == "win32":
+            # 1. Kill by image wildcard (covers koboldcpp.exe, koboldcpp_cu12.exe, koboldcpp_nocuda.exe, etc.)
             subprocess.run(
-                ["taskkill", "/F", "/T", "/IM", "koboldcpp.exe"],
+                ["taskkill", "/F", "/T", "/IM", "koboldcpp*.exe"],
+                capture_output=True,
+                creationflags=0x08000000
+            )
+            # 2. Kill by Win32_Process command line matching
+            ps_kill = (
+                "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | "
+                "Where-Object { $_.Name -like '*koboldcpp*' -or $_.CommandLine -like '*koboldcpp*' -or $_.CommandLine -like '*Huihui-Qwythos*' } | "
+                "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+            )
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command", ps_kill],
+                capture_output=True,
+                creationflags=0x08000000
+            )
+            # 3. Release any ghost processes binding ports 5001-5005
+            ps_port_kill = (
+                "Get-NetTCPConnection -LocalPort 5001,5002,5003,5004,5005 -ErrorAction SilentlyContinue | "
+                "Select-Object -ExpandProperty OwningProcess -Unique | "
+                "ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"
+            )
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command", ps_port_kill],
                 capture_output=True,
                 creationflags=0x08000000
             )
@@ -82,6 +105,8 @@ def kill_all_koboldcpp() -> None:
     except Exception as e:
         logger.warning(f"Error terminating KoboldCPP processes: {e}")
 
+
+_KOBOLD_SPAWN_LOCK = threading.Lock()
 
 class HealthEngine:
     def __init__(
@@ -168,30 +193,31 @@ class HealthEngine:
         Guarantees strict singleton execution: prevents multiple KoboldCPP instances from spawning.
         Returns True if service is running and healthy.
         """
-        if is_port_listening(5001):
-            stat = self.llm_client.check_health()
-            if stat.get("online"):
-                return True
+        with _KOBOLD_SPAWN_LOCK:
+            if is_port_listening(5001):
+                stat = self.llm_client.check_health()
+                if stat.get("online"):
+                    return True
 
-        # Strict Singleton Guard: Check for duplicate or currently loading KoboldCPP instances
-        proc_count = get_koboldcpp_process_count()
-        if proc_count > 1:
-            logger.warning(f"Detected {proc_count} duplicate KoboldCPP processes thrashing system RAM. Terminating duplicates...")
-            kill_all_koboldcpp()
-            time.sleep(1)
-        elif proc_count == 1:
-            logger.info("KoboldCPP process is already running (loading model weights). Waiting for port 5001...")
-            for sec in range(1, 40):
+            # Strict Singleton Guard: Check for duplicate or currently loading KoboldCPP instances
+            proc_count = get_koboldcpp_process_count()
+            if proc_count > 2:
+                logger.warning(f"Detected {proc_count} duplicate KoboldCPP processes thrashing system RAM. Terminating duplicates...")
+                kill_all_koboldcpp()
                 time.sleep(1)
-                if is_port_listening(5001):
-                    stat = self.llm_client.check_health()
-                    if stat.get("online"):
-                        logger.info(f"Existing KoboldCPP became ready in {sec}s.")
-                        return True
-            # Process was running but didn't open port 5001 in 40s - terminate before spawning fresh
-            logger.warning("Existing KoboldCPP process timed out binding port 5001. Restarting cleanly...")
-            kill_all_koboldcpp()
-            time.sleep(1)
+            elif proc_count >= 1:
+                logger.info("KoboldCPP process is already running (loading model weights). Waiting for port 5001...")
+                for sec in range(1, 45):
+                    time.sleep(1)
+                    if is_port_listening(5001):
+                        stat = self.llm_client.check_health()
+                        if stat.get("online"):
+                            logger.info(f"Existing KoboldCPP became ready in {sec}s.")
+                            return True
+                # Process was running but didn't open port 5001 in 45s - terminate before spawning fresh
+                logger.warning("Existing KoboldCPP process timed out binding port 5001. Restarting cleanly...")
+                kill_all_koboldcpp()
+                time.sleep(1)
 
         # 1. Use smart discovery from asset_manager
         spec = None

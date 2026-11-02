@@ -11,6 +11,21 @@ Write-Host "========================================================" -Foregroun
 Write-Host ""
 
 $wsh = New-Object -ComObject WScript.Shell
+
+# Purge any duplicate/legacy shortcuts to prevent multiple bot processes running on boot
+$legacyShortcuts = @(
+    "WaifuOnTelegram.lnk",
+    "start_services_silent.vbs - Shortcut.lnk",
+    "start_services.bat - Shortcut.lnk",
+    "Waifu_Bot.lnk"
+)
+foreach ($legacy in $legacyShortcuts) {
+    $legPath = Join-Path $startupFolder $legacy
+    if (Test-Path $legPath) {
+        Remove-Item -Path $legPath -Force -ErrorAction SilentlyContinue
+        Write-Host "  [CLEAN] Removed obsolete shortcut: $legacy" -ForegroundColor DarkGray
+    }
+}
 $sc = $wsh.CreateShortcut($shortcutPath)
 $sc.TargetPath = "wscript.exe"
 $sc.Arguments = "`"$targetVbs`""

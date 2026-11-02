@@ -10,11 +10,25 @@ If FSO.FileExists("C:\Python315\python.exe") Then
     pyCmd = "C:\Python315\python.exe"
 End If
 
-' 1. Start KoboldCPP Engine if present & model available & NOT Smart Idle
-Dim smartIdleCheck
-smartIdleCheck = WshShell.Run(pyCmd & " -c ""import os; from dotenv import load_dotenv; load_dotenv(); exit(0 if os.environ.get('SMART_IDLE_ENABLED','true').lower() in ('1','true','yes') else 1)""", 0, True)
+' 1. Start KoboldCPP Engine if present & model available & Smart Idle is EXPLICITLY disabled
+Dim smartIdleDisabled
+smartIdleDisabled = False
+If FSO.FileExists(ScriptDir & "\.env") Then
+    Dim envStream, envLine
+    On Error Resume Next
+    Set envStream = FSO.OpenTextFile(ScriptDir & "\.env", 1)
+    Do Until envStream.AtEndOfStream
+        envLine = LCase(Trim(envStream.ReadLine))
+        If InStr(envLine, "smart_idle_enabled=false") > 0 Or InStr(envLine, "smart_idle_enabled=0") > 0 Or InStr(envLine, "smart_idle_enabled=no") > 0 Then
+            smartIdleDisabled = True
+            Exit Do
+        End If
+    Loop
+    envStream.Close
+    On Error GoTo 0
+End If
 
-If smartIdleCheck <> 0 And FSO.FileExists(ScriptDir & "\tools\koboldcpp.exe") Then
+If smartIdleDisabled And FSO.FileExists(ScriptDir & "\tools\koboldcpp.exe") Then
     Dim modelFile, mmprojFile, mmprojArg
     modelFile = ""
     mmprojFile = ""

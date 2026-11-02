@@ -112,14 +112,11 @@ class IdleEngine:
 
             logger.info("💤 Smart Idle: Terminating KoboldCPP LLM to free VRAM & RAM...")
             try:
-                if sys.platform == "win32":
-                    subprocess.run(
-                        ["taskkill", "/F", "/T", "/IM", "koboldcpp.exe"],
-                        capture_output=True,
-                        creationflags=0x08000000
-                    )
+                if self.health_engine and hasattr(self.health_engine, "kill_all_koboldcpp"):
+                    self.health_engine.kill_all_koboldcpp()
                 else:
-                    subprocess.run(["pkill", "-9", "-f", "koboldcpp"], capture_output=True)
+                    from health_engine import kill_all_koboldcpp
+                    kill_all_koboldcpp()
                 
                 time.sleep(1)
                 self.is_llm_sleeping = True

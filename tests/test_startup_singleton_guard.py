@@ -48,6 +48,21 @@ class TestStartupSingletonGuard(unittest.TestCase):
             he.notify_startup_ready(mock_bot, [12345], {"name": "Runa"}, max_wait_seconds=0)
             mock_heal.assert_not_called()
 
+    def test_heal_llm_terminates_multiple_duplicate_processes(self):
+        """When 5 KoboldCpp instances are thrashing RAM, heal_llm terminates all duplicates."""
+        mock_client = MagicMock()
+        mock_client.check_health.return_value = {"online": True}
+        he = health_engine.HealthEngine(llm_client=mock_client)
+
+        with patch("health_engine.is_port_listening", side_effect=[False, True]), \
+             patch("health_engine.get_koboldcpp_process_count", return_value=5), \
+             patch("health_engine.kill_all_koboldcpp") as mock_kill, \
+             patch("subprocess.Popen") as mock_popen, \
+             patch("asset_manager.get_llm_launch_spec", return_value={"cmd": ["koboldcpp.exe"], "cwd": "."}):
+            ok = he.heal_llm()
+            mock_kill.assert_called_once()
+            self.assertTrue(ok)
+
 
 if __name__ == "__main__":
     unittest.main()
