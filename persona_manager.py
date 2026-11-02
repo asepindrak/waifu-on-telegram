@@ -2,6 +2,7 @@ from student_schedule import detect_contextual_activity_and_outfit, get_hourly_r
 import os
 import re
 import json
+import time
 import logging
 from typing import Dict, Any, Optional, Tuple, List
 
@@ -200,8 +201,11 @@ class PersonaManager:
         self.user_affinity: Dict[int, int] = {}
         self.user_outfits: Dict[int, str] = {}
         self.outfits_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_outfits.json")
+        self.history_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "chat_history.json")
+        self._history_mtime = 0.0
         self._load_all_personas()
         self._load_user_outfits()
+        self._load_chat_history()
 
     def _load_user_outfits(self):
         """Loads user selected outfits from persistent JSON storage."""
@@ -215,6 +219,43 @@ class PersonaManager:
                 self.user_outfits = {}
         else:
             self.user_outfits = {}
+
+    
+    def _load_chat_history(self):
+        """Loads user chat histories from persistent JSON storage."""
+        if os.path.exists(self.history_file):
+            try:
+                with open(self.history_file, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                    self.user_conversations = {int(k): v for k, v in raw.items() if str(k).isdigit() and isinstance(v, list)}
+                self._history_mtime = os.path.getmtime(self.history_file)
+            except Exception as e:
+                logger.error(f"Error loading chat history from {self.history_file}: {e}")
+                self.user_conversations = {}
+        else:
+            self.user_conversations = {}
+
+    def _save_chat_history(self):
+        """Saves user chat histories to persistent JSON storage atomically."""
+        d = os.path.dirname(self.history_file)
+        if d and not os.path.exists(d):
+            try:
+                os.makedirs(d, exist_ok=True)
+            except Exception as e:
+                logger.error(f"Error creating dir for chat history: {e}")
+        temp_file = os.path.join(d, f".chat_history.{os.getpid()}_{int(time.time() * 1000)}.tmp")
+        try:
+            with open(temp_file, "w", encoding="utf-8") as f:
+                json.dump({str(k): v for k, v in self.user_conversations.items()}, f, ensure_ascii=False, indent=2)
+            os.replace(temp_file, self.history_file)
+            self._history_mtime = os.path.getmtime(self.history_file)
+        except Exception as e:
+            logger.error(f"Error saving chat history to {self.history_file}: {e}")
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except Exception:
+                    pass
 
     def _save_user_outfits(self):
         """Saves user selected outfits to persistent JSON storage."""
@@ -598,20 +639,29 @@ class PersonaManager:
         return prompt
 
     def get_chat_history(self, user_id: int) -> List[Dict[str, str]]:
-        """Returns chat history for user."""
+        """Returns chat history for user, re-syncing from disk if modified by other processes."""
+        if os.path.exists(self.history_file):
+            try:
+                mtime = os.path.getmtime(self.history_file)
+                if self._history_mtime < mtime:
+                    self._load_chat_history()
+            except Exception:
+                pass
         return self.user_conversations.setdefault(user_id, [])
 
     def add_message(self, user_id: int, role: str, content: str):
-        """Adds a message to history, keeping maximum 20 turns."""
+        """Adds a message to history, keeping maximum 20 turns, and persists atomically."""
         history = self.get_chat_history(user_id)
         history.append({"role": role, "content": content})
         if len(history) > 20:
             self.user_conversations[user_id] = history[-20:]
+        self._save_chat_history()
 
     def clear_history(self, user_id: int):
-        """Clears chat history for user."""
+        """Clears chat history for user and persists to disk."""
         if user_id in self.user_conversations:
             self.user_conversations[user_id] = []
+        self._save_chat_history()
 
     def get_affinity(self, user_id: int) -> int:
         """Returns affection points (0-100)."""

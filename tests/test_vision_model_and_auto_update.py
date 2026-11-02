@@ -32,10 +32,11 @@ class TestVisionModelAndAutoUpdate(unittest.TestCase):
         self.assertIn("models", info["target_path"])
 
     def test_download_asset_supports_llm_model(self):
-        with patch.object(asset_manager, "_download_file", return_value=True) as mock_dl:
-            ok = asset_manager.download_asset("qwythos_vision")
-            self.assertTrue(ok)
-            mock_dl.assert_called_once()
+        with patch.object(asset_manager, "get_asset_info", return_value={"name": "Vision Adapter", "type": "llm_model", "target_dir": "/tmp", "target_path": "/tmp/dummy.gguf", "url": "https://dummy", "mirrors": [], "installed": False}):
+            with patch.object(asset_manager, "_download_file", return_value=True) as mock_dl:
+                ok = asset_manager.download_asset("qwythos_vision")
+                self.assertTrue(ok)
+                mock_dl.assert_called_once()
 
     def test_start_scripts_support_mmproj(self):
         # 1. start_services.bat

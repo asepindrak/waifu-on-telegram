@@ -57,10 +57,11 @@ class TestMultiplatformInstallerLifecycle(unittest.TestCase):
                             comfy_dir = asset_manager.detect_comfyui_dir()
                             self.assertIsNone(comfy_dir, "ComfyUI should not be detected when none exists")
 
-                        # All assets should be reported as missing
-                        assets = asset_manager.check_all_assets()
-                        for key, info in assets.items():
-                            self.assertFalse(info.get("installed"), f"Asset {key} should be missing in fresh environment")
+                        with patch.object(asset_manager, "PROJECT_ROOT", self.mock_home):
+                            # All assets should be reported as missing
+                            assets = asset_manager.check_all_assets()
+                            for key, info in assets.items():
+                                self.assertFalse(info.get("installed"), f"Asset {key} should be missing in fresh environment")
 
                         # Local LLM models scanner should return empty list gracefully without throwing
                         with patch("setup.scan_local_llm_models", return_value=[]):

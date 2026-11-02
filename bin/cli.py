@@ -769,6 +769,15 @@ def cmd_update():
     else:
         print(c(DIM, "\nStart your bot anytime with: waifu start --daemon\n"))
 
+
+def cmd_chat():
+    """Starts the interactive CLI chat session with shared Telegram history."""
+    try:
+        from cli_chat import start_cli_chat
+        start_cli_chat()
+    except Exception as e:
+        print(c(RED, f"\n❌ Error starting CLI chat session: {e}\n"))
+
 def print_cli_help(unknown_cmd: str = None):
     print_banner()
     if unknown_cmd:
@@ -786,7 +795,10 @@ def print_cli_help(unknown_cmd: str = None):
 
     print(c(BOLD + CYAN, "📋 DAFTAR PERINTAH RESMI ('waifu <command>'):"))
     print(c(DIM, "─" * 70))
-    print(c(BOLD + MAGENTA, "  🚀 Kontrol Layanan & Status:"))
+    print(c(BOLD + MAGENTA, "  💬 Obrolan Langsung & Interaksi:"))
+    print(f"    {c(GREEN, 'waifu')} (atau {c(GREEN, 'waifu chat')})      Sesi chat CLI interaktif langsung (Auto-open foto & video!)")
+
+    print(c(BOLD + MAGENTA, "\n  🚀 Kontrol Layanan & Status:"))
     print(f"    {c(GREEN, 'waifu start')} [--daemon]       Mulai bot & AI engines (foreground / background)")
     print(f"    {c(GREEN, 'waifu stop')}                  Hentikan bot & semua background services")
     print(f"    {c(GREEN, 'waifu restart')}               Restart bot & daemon secara bersih")
@@ -832,8 +844,10 @@ def main():
     parser.add_argument("--daemon", "-d", action="store_true", help="Run bot silently in background")
     args, unknown = parser.parse_known_args()
 
-    cmd = args.command.lower() if args.command else "status"
-    if cmd == "start":
+    cmd = args.command.lower() if args.command else "chat"
+    if cmd in ("chat", "talk", "ngobrol"):
+        cmd_chat()
+    elif cmd == "start":
         cmd_start(daemon=args.daemon)
     elif cmd == "stop":
         cmd_stop()
