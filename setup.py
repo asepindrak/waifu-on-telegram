@@ -329,10 +329,17 @@ def config_image_model(env_vars):
     else:
         anything_tag = c(YELLOW, "[PERLU DOWNLOAD ~6.6 GB]")
 
+    hw = asset_manager.detect_hardware_profile() if asset_manager else None
+    rec_img_model = hw.get("recommended_image_model", "meinamix") if hw else "meinamix"
+    if hw:
+        print(c(BOLD + CYAN, f"  🎮 Hardware Terdeteksi: {hw['gpu_name']} ({hw['vram_gb']} GB VRAM • {hw['tier_label']})"))
+        print(c(GREEN, f"  💡 Rekomendasi Hardware: {hw['recommendation_text']}\n"))
+
     options = []
     # 1. MeinaMix v12
+    rec_meina_badge = " " + c(BOLD + GREEN, "⭐ [REKOMENDASI HARDWARE]") if rec_img_model == "meinamix" else ""
     options.append((
-        f"✨ MeinaMix v12 (Anime SD 1.5) {meina_tag}\n"
+        f"✨ MeinaMix v12 (Anime SD 1.5) {meina_tag}{rec_meina_badge}\n"
         f"     ↳ Cepat, estetik anime konsisten, hemat VRAM (Rekomendasi GPU 4GB - 8GB)",
         "meinamix",
         "meinamix_v12Final.safetensors"
@@ -345,9 +352,10 @@ def config_image_model(env_vars):
         "AOM3A1B_orangemixs.safetensors"
     ))
     # 3. Anything XL
+    rec_xl_badge = " " + c(BOLD + GREEN, "⭐ [REKOMENDASI HARDWARE]") if rec_img_model == "anything_xl" else ""
     options.append((
-        f"🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Civitai #9409) {anything_tag}\n"
-        f"     ↳ Resolusi 1024px ultra jernih, detail anime kaya (Rekomendasi GPU 8GB+ VRAM)",
+        f"🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Civitai #9409) {anything_tag}{rec_xl_badge}\n"
+        f"     ↳ Resolusi 1024px ultra jernih, detail anime kaya (Rekomendasi GPU 6GB - 8GB+ VRAM)",
         "anything_xl",
         "AnythingXL_xl.safetensors"
     ))
@@ -372,8 +380,9 @@ def config_image_model(env_vars):
     ))
 
     # 6. Cloud Engine
+    rec_cloud_badge = " " + c(BOLD + GREEN, "⭐ [REKOMENDASI HARDWARE]") if rec_img_model == "cloud" else ""
     options.append((
-        "☁️ Cloud Fallback Engine (Pollinations AI - Cepat, Free Cloud GPU, 0 VRAM)",
+        f"☁️ Cloud Fallback Engine (Pollinations AI - Cepat, Free Cloud GPU, 0 VRAM){rec_cloud_badge}",
         "cloud",
         ""
     ))
@@ -393,6 +402,12 @@ def config_image_model(env_vars):
     if cur_ckpt:
         for idx, (_, mode, val) in enumerate(options, 1):
             if val and val.lower() in cur_ckpt.lower():
+                default_idx = str(idx)
+                break
+    else:
+        # Auto-recommend default index based on GPU VRAM
+        for idx, (_, mode, _) in enumerate(options, 1):
+            if mode == rec_img_model:
                 default_idx = str(idx)
                 break
 
@@ -512,14 +527,35 @@ def config_video_engine(env_vars):
     """Configures the active Video Generation Engine (Wan 2.1, AnimateDiff, or Motion 2.5D)."""
     print(c(BOLD + CYAN, "\n[Video Generator Engine Selection]"))
     print("-" * 60)
-    cur_eng = env_vars.get("VIDEO_ENGINE", "wan21").lower().strip()
+    hw = asset_manager.detect_hardware_profile() if asset_manager else None
+    rec_video = hw.get("recommended_video_engine", "wan21") if hw else "wan21"
+
+    cur_eng = env_vars.get("VIDEO_ENGINE", "").lower().strip()
+    if not cur_eng:
+        cur_eng = rec_video
     print(f"Current Video Engine: {c(BOLD + GREEN, cur_eng.upper())}\n")
 
-    print("  1) 🌟 Wan 2.1 (1.3B AI Video - Model sudah terpasang di PC kamu!)")
-    print("  2) 🌸 AnimateDiff (SD 1.5 Anime - Hemat VRAM, butuh mm_sd_v15_v2.ckpt)")
-    print("  3) ⚡ Motion 2.5D Parallax (Super Cepat 1 detik, 0 VRAM)")
+    def_num = "1"
+    if cur_eng in ("wan", "wan21", "wan2.1"):
+        def_num = "1"
+    elif cur_eng in ("animatediff", "anim"):
+        def_num = "2"
+    elif cur_eng in ("motion", "parallax", "2.5d"):
+        def_num = "3"
+    else:
+        def_num = "1" if rec_video == "wan21" else ("2" if rec_video == "animatediff" else "3")
 
-    choice = input(f"\nSelect Video Engine [1-3, default: 1]: ").strip()
+    rec_wan_badge = " " + c(BOLD + GREEN, "⭐ [REKOMENDASI HARDWARE]") if rec_video == "wan21" else ""
+    rec_anim_badge = " " + c(BOLD + GREEN, "⭐ [REKOMENDASI HARDWARE]") if rec_video == "animatediff" else ""
+    rec_motion_badge = " " + c(BOLD + GREEN, "⭐ [REKOMENDASI HARDWARE]") if rec_video == "motion" else ""
+
+    print(f"  1) 🌟 Wan 2.1 (1.3B AI Video - Kualitas tinggi, rekomendasi GPU 6GB+ VRAM){rec_wan_badge}")
+    print(f"  2) 🌸 AnimateDiff (SD 1.5 Anime - Hemat VRAM, rekomendasi GPU 4GB VRAM){rec_anim_badge}")
+    print(f"  3) ⚡ Motion 2.5D Parallax (Super Cepat 1 detik, 0 VRAM, rekomendasi iGPU/CPU){rec_motion_badge}")
+
+    choice = input(f"\nSelect Video Engine [1-3, default: {def_num}]: ").strip()
+    if not choice:
+        choice = def_num
     if choice == "1" or choice.lower() in ("wan", "wan21", "wan2.1"):
         env_vars["VIDEO_ENGINE"] = "wan21"
         print(c(GREEN, "  ✓ Video Engine dipilih: Wan 2.1 1.3B 🌟"))

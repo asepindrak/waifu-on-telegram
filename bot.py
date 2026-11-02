@@ -2064,6 +2064,10 @@ def build_system_diagnostics_report(user_id: int) -> str:
     # Memory facts
     facts_count = len(memory_engine.get_facts(user_id))
 
+    # Hardware Auto-Tuning Profile
+    hw = asset_manager.detect_hardware_profile() if asset_manager else None
+    hw_str = f"`{hw['gpu_name']}` _({hw['vram_gb']} GB VRAM • {hw['tier_label']})_" if hw else "`Auto-Detect`"
+
     report = (
         f"📊 **Waifu on Telegram v{get_version()} - System Diagnostics**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -2071,6 +2075,8 @@ def build_system_diagnostics_report(user_id: int) -> str:
         f"👗 **Pakaian Aktif** : `{cur_outfit}`\n"
         f"🌐 **Bahasa Chat**   : `{lang_label}`\n"
         f"💖 **Status Hubungan**: **{rel_status}** (`{score}%` • `{affinity_score} pts`)\n\n"
+        f"🎮 **Hardware Auto-Tuning**:\n"
+        f"• Profil GPU   : {hw_str}\n\n"
         f"🧠 **Local LLM Engine**: {status_icon}\n"
         f"• Model Chat   : `{llm_model_name}`\n"
         f"• Vision Model : {vision_str}\n"

@@ -74,6 +74,38 @@ try {
     Write-Host "  [OUTFIT]  Current Outfit: $outfitName" -ForegroundColor Magenta
 } catch {}
 
+# 1b. Hardware & VRAM Auto-Tuning Profile
+try {
+    $gpuName = "CPU / Integrated Graphics"
+    $vramMB = 0
+    if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) {
+        try {
+            $nvsmi = & nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits 2>$null
+            if ($nvsmi) {
+                $parts = $nvsmi[0] -split ','
+                $gpuName = $parts[0].Trim()
+                $vramMB = [int]$parts[1].Trim()
+            }
+        } catch {}
+    }
+    if ($vramMB -eq 0) {
+        try {
+            $vc = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | Sort-Object AdapterRAM -Descending | Select-Object -First 1
+            if ($vc -and $vc.AdapterRAM -gt 0) {
+                $gpuName = $vc.Name
+                $vramMB = [int]($vc.AdapterRAM / 1MB)
+            }
+        } catch {}
+    }
+    $vramGB = [math]::Round($vramMB / 1024, 1)
+    $tierLabel = "Entry / iGPU / Office PC"
+    if ($vramMB -ge 7800) { $tierLabel = "High-End (SDXL & Wan 2.1 Ready)" }
+    elseif ($vramMB -ge 5800) { $tierLabel = "Mid-Range (SDXL & Wan 2.1 Compatible)" }
+    elseif ($vramMB -ge 2000) { $tierLabel = "Compact (SD 1.5 MeinaMix & AnimateDiff)" }
+
+    Write-Host "  [HARDWARE] GPU & VRAM: $gpuName ($vramGB GB VRAM • $tierLabel)" -ForegroundColor Yellow
+} catch {}
+
 # 2. Check Local LLM (KoboldCPP 5001 / Locally Uncensored 8127 / Ollama 11434 / LM Studio 1234)
 $llmOnline = $false
 $llmPorts = @(

@@ -312,13 +312,58 @@ function Select-And-Download-AnimeCheckpoint {
     $ckptDir = "$targetComfyDir\models\checkpoints"
     if (-not (Test-Path $ckptDir)) { New-Item -ItemType Directory -Force -Path $ckptDir | Out-Null }
 
+    # Hardware Auto-Tuning Probe
+    $gpuName = "CPU / Integrated Graphics"
+    $vramMB = 0
+    if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) {
+        try {
+            $nvsmi = & nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits 2>$null
+            if ($nvsmi) {
+                $parts = $nvsmi[0] -split ','
+                $gpuName = $parts[0].Trim()
+                $vramMB = [int]$parts[1].Trim()
+            }
+        } catch {}
+    }
+    if ($vramMB -eq 0) {
+        try {
+            $vc = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | Sort-Object AdapterRAM -Descending | Select-Object -First 1
+            if ($vc -and $vc.AdapterRAM -gt 0) {
+                $gpuName = $vc.Name
+                $vramMB = [int]($vc.AdapterRAM / 1MB)
+            }
+        } catch {}
+    }
+    $vramGB = [math]::Round($vramMB / 1024, 1)
+
+    $defaultChoice = "1"
+    $defaultLabel = "MeinaMix v12 (SD 1.5)"
+    $recVideo = "animatediff"
+    if ($vramMB -ge 5800) {
+        $defaultChoice = "3"
+        $defaultLabel = "Anything XL (SDXL 1024px Ultra Jernih)"
+        $recVideo = "wan21"
+    } elseif ($vramMB -ge 2000) {
+        $defaultChoice = "1"
+        $defaultLabel = "MeinaMix v12 (SD 1.5 Cepat & Hemat VRAM)"
+        $recVideo = "animatediff"
+    } else {
+        $defaultChoice = "4"
+        $defaultLabel = "Cloud Fallback Engine (0 VRAM / Ringan)"
+        $recVideo = "motion"
+    }
+
+    Write-Host "`n  🎮 Hardware GPU: $gpuName ($vramGB GB VRAM)" -ForegroundColor Yellow
+    Write-Host "  💡 Rekomendasi Auto-Tuning: [$defaultChoice] $defaultLabel (Video: $recVideo)" -ForegroundColor Green
+
     Write-Host "`n  🎨 Pilih Model Ilustrasi Anime untuk Generasi Foto Waifu (ComfyUI):" -ForegroundColor Cyan
-    Write-Host "    [1] ✨ MeinaMix v12 (Anime SD 1.5 - ~2.0 GB) [Rekomendasi GPU 4GB-8GB VRAM: Cepat & Ringan]" -ForegroundColor White
+    Write-Host "    [1] ✨ MeinaMix v12 (Anime SD 1.5 - ~2.0 GB) [Rekomendasi GPU 4GB VRAM: Cepat & Ringan]" -ForegroundColor White
     Write-Host "    [2] 🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - ~2.0 GB) [Civitai #9942: Cepat, Halus & Dinamis]" -ForegroundColor White
-    Write-Host "    [3] 🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - ~6.6 GB) [Rekomendasi GPU 8GB+ VRAM: 1024px Ultra Jernih]" -ForegroundColor White
+    Write-Host "    [3] 🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - ~6.6 GB) [Rekomendasi GPU 6GB - 8GB+ VRAM: 1024px Ultra Jernih]" -ForegroundColor White
     Write-Host "    [4] ☁️ Lewati download model sekarang (Gunakan Cloud Fallback Engine / Unduh nanti)" -ForegroundColor White
-    $imgChoice = Read-Host "  Pilih model foto [1/2/3/4, default: 1]"
+    $imgChoice = Read-Host "  Pilih model foto [1/2/3/4, default: $defaultChoice]"
     $imgChoice = $imgChoice.Trim()
+    if (-not $imgChoice) { $imgChoice = $defaultChoice }
 
     $selectedCkpt = "meinamix_v12Final.safetensors"
     if ($imgChoice -eq "2") {
@@ -344,17 +389,20 @@ function Select-And-Download-AnimeCheckpoint {
         $selectedCkpt = "meinamix_v12Final.safetensors"
     }
 
-    if ($selectedCkpt) {
-        $envFile = "$installDir\.env"
-        if (Test-Path $envFile) {
-            $content = Get-Content $envFile -Raw
+    $envFile = "$installDir\.env"
+    if (Test-Path $envFile) {
+        $content = Get-Content $envFile -Raw
+        if ($selectedCkpt) {
             if ($content -match "COMFYUI_CHECKPOINT=") {
                 $content = $content -replace "COMFYUI_CHECKPOINT=.*", "COMFYUI_CHECKPOINT=$selectedCkpt"
             } else {
                 $content += "`nCOMFYUI_CHECKPOINT=$selectedCkpt"
             }
-            Set-Content -Path $envFile -Value $content -Force
         }
+        if (-not ($content -match "VIDEO_ENGINE=")) {
+            $content += "`nVIDEO_ENGINE=$recVideo"
+        }
+        Set-Content -Path $envFile -Value $content -Force
     }
 }
 

@@ -171,6 +171,134 @@ ASSET_REGISTRY = {
 }
 
 _COMFYUI_DIR_CACHE: Optional[str] = None
+_HARDWARE_PROFILE_CACHE: Optional[Dict[str, Any]] = None
+
+def detect_hardware_profile(refresh: bool = False) -> Dict[str, Any]:
+    """
+    Intelligently inspects GPU model, dedicated VRAM, and system memory.
+    Classifies the system into hardware tiers and returns optimal AI model defaults:
+      - 'high' (>=8GB VRAM): Anything XL (SDXL 1024px), Wan 2.1 Video, full GPU offload.
+      - 'mid' (6GB to <8GB VRAM): Anything XL (SDXL) or MeinaMix, Wan 2.1 / AnimateDiff.
+      - 'compact' (2GB to <6GB VRAM): MeinaMix v12 (SD 1.5 ~2GB), AnimateDiff, balanced layers.
+      - 'entry' (<2GB VRAM / iGPU / Office PC): Cloud Fallback Engine (0 VRAM), Motion 2.5D, CPU mode.
+    """
+    global _HARDWARE_PROFILE_CACHE
+    if _HARDWARE_PROFILE_CACHE and not refresh:
+        return _HARDWARE_PROFILE_CACHE
+
+    gpu_name = "CPU / Integrated Graphics"
+    vram_mb = 0
+    source = "fallback"
+
+    # 1. Probe NVIDIA SMI (most accurate for dedicated NVIDIA VRAM)
+    try:
+        cmd = ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"]
+        out = subprocess.check_output(
+            cmd,
+            timeout=3,
+            stderr=subprocess.DEVNULL,
+            creationflags=0x08000000 if sys.platform == "win32" else 0
+        ).decode("utf-8", errors="ignore").strip()
+        lines = [l.strip() for l in out.splitlines() if l.strip()]
+        if lines:
+            parts = lines[0].split(",")
+            gpu_name = parts[0].strip()
+            vram_mb = int(parts[1].strip())
+            source = "nvidia-smi"
+    except Exception:
+        pass
+
+    # 2. Windows WMI / CimInstance probe if nvidia-smi failed or unavailable
+    if vram_mb == 0 and sys.platform == "win32":
+        try:
+            ps_cmd = (
+                "Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | "
+                "Select-Object Name, AdapterRAM | ConvertTo-Json"
+            )
+            out = subprocess.check_output(
+                ["powershell", "-NoProfile", "-Command", ps_cmd],
+                timeout=5,
+                creationflags=0x08000000
+            ).decode("utf-8", errors="ignore").strip()
+            if out:
+                import json
+                data = json.loads(out)
+                if isinstance(data, dict):
+                    data = [data]
+                if isinstance(data, list) and data:
+                    valid_items = [d for d in data if isinstance(d, dict)]
+                    if valid_items:
+                        best = max(valid_items, key=lambda x: x.get("AdapterRAM") or 0)
+                        best_ram = best.get("AdapterRAM") or 0
+                        if best_ram > 0:
+                            gpu_name = best.get("Name", gpu_name)
+                            vram_mb = int(best_ram / (1024 * 1024))
+                            source = "win32_cim"
+        except Exception:
+            pass
+
+    # 3. macOS Apple Silicon unified memory probe
+    if vram_mb == 0 and sys.platform == "darwin":
+        try:
+            out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], timeout=3).decode().strip()
+            total_bytes = int(out)
+            vram_mb = int(total_bytes / (1024 * 1024))
+            gpu_name = "Apple Silicon (Unified Memory)"
+            source = "sysctl_darwin"
+        except Exception:
+            pass
+
+    vram_gb = round(vram_mb / 1024.0, 1) if vram_mb > 0 else 0.0
+
+    # Classification logic
+    if vram_mb >= 7800:
+        tier = "high"
+        rec_image = "anything_xl"
+        rec_image_file = "AnythingXL_xl.safetensors"
+        rec_video = "wan21"
+        rec_layers = 99
+        tier_label = "High-End GPU (8GB+ VRAM)"
+        recommendation_text = f"VRAM kamu {vram_gb} GB ({gpu_name}). Sangat mumpuni untuk Anything XL (SDXL 1024px) dan Wan 2.1 AI Video."
+    elif vram_mb >= 5800:
+        tier = "mid"
+        rec_image = "anything_xl"
+        rec_image_file = "AnythingXL_xl.safetensors"
+        rec_video = "wan21"
+        rec_layers = 99
+        tier_label = "Mid-Range Dedicated GPU (6GB - 7GB VRAM)"
+        recommendation_text = f"VRAM kamu {vram_gb} GB ({gpu_name}). Mumpuni untuk Anything XL (SDXL) dan Wan 2.1 Video secara lancar."
+    elif vram_mb >= 2000:
+        tier = "compact"
+        rec_image = "meinamix"
+        rec_image_file = "meinamix_v12Final.safetensors"
+        rec_video = "animatediff"
+        rec_layers = 20
+        tier_label = "Compact Dedicated GPU (2GB - 5GB VRAM)"
+        recommendation_text = f"VRAM kamu {vram_gb} GB ({gpu_name}). Direkomendasikan MeinaMix v12 (SD 1.5) & AnimateDiff agar cepat, konsisten, dan bebas OOM."
+    else:
+        tier = "entry"
+        rec_image = "cloud"
+        rec_image_file = ""
+        rec_video = "motion"
+        rec_layers = 0
+        tier_label = "Entry / iGPU / Office PC (<2GB VRAM)"
+        recommendation_text = f"PC kamu menggunakan grafis terintegrasi / CPU ({gpu_name}). Direkomendasikan Cloud Fallback Engine (0 VRAM) & Motion 2.5D agar ringan tanpa lag."
+
+    profile = {
+        "gpu_name": gpu_name,
+        "vram_mb": vram_mb,
+        "vram_gb": vram_gb,
+        "tier": tier,
+        "tier_label": tier_label,
+        "recommended_image_model": rec_image,
+        "recommended_image_file": rec_image_file,
+        "recommended_video_engine": rec_video,
+        "recommended_llm_layers": rec_layers,
+        "recommendation_text": recommendation_text,
+        "source": source
+    }
+    _HARDWARE_PROFILE_CACHE = profile
+    return profile
 
 def detect_locally_uncensored_dir() -> str:
     """Resolves cross-platform models directory for Locally Uncensored."""
@@ -594,7 +722,10 @@ def get_llm_launch_spec(project_root: Optional[str] = None) -> Optional[Dict[str
     mm_args = ["--mmproj", mmproj_path] if (mmproj_path and os.path.isfile(mmproj_path)) else []
 
     port = os.environ.get("LLM_PORT", "5001")
-    gpu_layers = os.environ.get("LLM_GPU_LAYERS", "99")
+    gpu_layers = os.environ.get("LLM_GPU_LAYERS")
+    if not gpu_layers:
+        hw = detect_hardware_profile()
+        gpu_layers = str(hw.get("recommended_llm_layers", 99))
     ctx_size = os.environ.get("LLM_CONTEXT_SIZE", "4096")
     threads = os.environ.get("LLM_THREADS", "4")
 

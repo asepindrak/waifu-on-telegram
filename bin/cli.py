@@ -445,6 +445,46 @@ def cmd_language(lang_arg: str = None):
     else:
         print(c(DIM, "Run 'waifu start' to begin chatting in your chosen language!\n"))
 
+def cmd_autotune():
+    print_banner()
+    import asset_manager
+    hw = asset_manager.detect_hardware_profile(refresh=True)
+    print(c(BOLD + CYAN, "🎮 HARDWARE GPU & VRAM AUTO-TUNER"))
+    print("-" * 60)
+    print(f"  Kartu Grafis  : {c(BOLD + GREEN, hw['gpu_name'])}")
+    print(f"  Total VRAM    : {c(BOLD + GREEN, str(hw['vram_gb']) + ' GB')} ({hw['vram_mb']} MB)")
+    print(f"  Hardware Tier : {c(BOLD + CYAN, hw['tier_label'])}")
+    print(f"\n  💡 Rekomendasi:")
+    print(f"    • Model Foto  : {c(BOLD + GREEN, hw['recommended_image_file'] or 'Cloud Fallback Engine')}")
+    print(f"    • Video Engine: {c(BOLD + GREEN, hw['recommended_video_engine'].upper())}")
+    print(f"    • LLM Layers  : {c(BOLD + GREEN, str(hw['recommended_llm_layers']))}")
+    print(f"\n  {c(DIM, hw['recommendation_text'])}")
+
+    env_file = os.path.join(PROJECT_ROOT, ".env")
+    if os.path.exists(env_file):
+        with open(env_file, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        changed = False
+        import re
+        if hw["recommended_image_file"]:
+            if "COMFYUI_CHECKPOINT=" in content:
+                content = re.sub(r"COMFYUI_CHECKPOINT=.*", f"COMFYUI_CHECKPOINT={hw['recommended_image_file']}", content)
+            else:
+                content += f"\nCOMFYUI_CHECKPOINT={hw['recommended_image_file']}"
+            changed = True
+        if "VIDEO_ENGINE=" in content:
+            content = re.sub(r"VIDEO_ENGINE=.*", f"VIDEO_ENGINE={hw['recommended_video_engine']}", content)
+            changed = True
+        else:
+            content += f"\nVIDEO_ENGINE={hw['recommended_video_engine']}"
+            changed = True
+
+        if changed:
+            with open(env_file, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(c(GREEN, f"\n✓ Konfigurasi .env berhasil di-tuning otomatis sesuai GPU PC kamu!"))
+
 def cmd_persona(name: str):
     env_file = os.path.join(PROJECT_ROOT, ".env")
     if not os.path.exists(env_file):
@@ -754,6 +794,7 @@ def print_cli_help(unknown_cmd: str = None):
     print(f"    {c(GREEN, 'waifu logs')}                  Pantau log aktivitas bot secara real-time")
 
     print(c(BOLD + MAGENTA, "\n  ⚙️ Konfigurasi & Model AI:"))
+    print(f"    {c(GREEN, 'waifu autotune')}              Deteksi GPU/VRAM & optimalkan model foto/video otomatis")
     print(f"    {c(GREEN, 'waifu setup')}                 Wizard konfigurasi interaktif (Token, Model, Voice)")
     print(f"    {c(GREEN, 'waifu models')} [dl <nama>]    Kelola & download model (MeinaMix, Anything XL, dll.)")
     print(f"    {c(GREEN, 'waifu persona')} <nama>        Ganti waifu (runa, akira, hina, shiro, yume)")
@@ -802,6 +843,8 @@ def main():
         cmd_status()
     elif cmd in ("setup", "config"):
         cmd_setup()
+    elif cmd in ("autotune", "tune", "hardware"):
+        cmd_autotune()
     elif cmd == "autorun":
         action = args.arg or "on"
         cmd_autorun(action)
