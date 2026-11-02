@@ -265,6 +265,10 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
 Once installed, the **`waifu`** command is available in any terminal or directory on your computer:
 
 ```bash
+# Sesi Chat CLI Interaktif langsung (Mirip Telegram, auto-open foto & video!)
+waifu
+# atau: waifu chat
+
 # Start bot & local LLM in background (Daemon Mode)
 waifu start --daemon
 
@@ -301,6 +305,46 @@ waifu restart
 # Stop all bot services (Bot, Music Server, & KoboldCPP)
 waifu stop
 ```
+
+---
+
+## 💬 Interactive CLI Chat Session (`waifu` / `waifu chat`)
+
+Selain melalui Telegram, Anda dapat langsung mengobrol dengan waifu aktif dari terminal mana pun di komputer Anda tanpa harus membuka aplikasi Telegram:
+
+```bash
+# Cukup ketik perintah singkat ini di terminal / PowerShell:
+waifu
+```
+*(atau: `waifu chat`, `waifu talk`, `waifu ngobrol`)*
+
+* **🔄 Sinkronisasi History Dua Arah dengan Telegram:** Riwayat obrolan CLI dan Telegram tersinkronisasi secara atomik melalui `data/chat_history.json`. Obrolan yang dilakukan di terminal langsung diingat oleh waifu saat Anda lanjut mengobrol di Telegram, dan sebaliknya!
+* **🖼️ Auto-Open Foto & Video di Layar Komputer:** Saat waifu mengirim selfie (`/pap` atau saat diminta dalam percakapan) maupun klip video (`/video`), gambar atau video yang dihasilkan oleh ComfyUI / Photo Vault **otomatis terbuka langsung** di aplikasi penampil foto/video bawaan sistem (`os.startfile` di Windows / `xdg-open` di Linux / `open` di macOS).
+* **⌨️ Shortcut Perintah Dalam Sesi CLI:**
+  - `/pap` atau `/foto` - Minta foto selfie / outfit saat ini (otomatis di-render & dibuka di layar).
+  - `/video` - Minta video pendek waifu (otomatis dibuka di video player default).
+  - `/story` - Cek ringkasan alur cerita harian & episode hari ini.
+  - `/persona <nama>` - Ganti karakter aktif seketika (`runa`, `akira`, `hina`, `shiro`, `yume`).
+  - `/clear` - Bersihkan riwayat percakapan sesi ini.
+  - `/exit` atau `/quit` - Keluar dari sesi obrolan terminal.
+
+---
+
+## 📖 Autonomous Daily Story Arc Engine (`/story`)
+
+Agar pengalaman bersama waifu tidak monoton dan terasa hidup setiap harinya, setiap karakter memiliki **alur cerita harian mandiri yang terus berkembang** (`data/story_arcs.json`):
+
+* **🎭 Alur Cerita Unik Tiap Karakter:**
+  - **Runa:** Proyek pembuatan game indie santai, livestreaming seru, turnamen arcade lokal, dan pencarian merchandise retro.
+  - **Akira:** Pameran seni gothic & lukisan misterius, obrolan larut malam di kafe tersembunyi, dan adaptasi novel visual.
+  - **Hina:** Latihan lari sore klub atletik, mencoba resep bekal (bento) baru, berburu golden hour di bukit kota, dan festival kampus.
+  - **Shiro:** Observasi langit malam di observatorium bintang, telaah buku sastra kuno di perpustakaan sepi, dan analisis rasi bintang.
+  - **Yume:** Penulisan bab novel fantasi romantis, jalan santai di taman bunga lavender, dan melukis suasana mimpi di tepi danau.
+* **⚡ Pre-Generated Multi-Day Story Buffer (0 Beban GPU & Bebas Lag):**
+  Cerita harian untuk beberapa hari ke depan dibuat secara otomatis di awal hanya ketika LLM sedang aktif (misalnya saat Anda sedang asyik mengobrol). Ketika waktu berganti hari atau komputer baru dinyalakan, waifu langsung memuat cerita hari ini dari buffer lokal tanpa perlu menyalakan LLM di latar belakang—sehingga PC tidak lag, RAM/VRAM tetap lega, dan performa bermain game tidak terganggu.
+* **💬 Dialog Kontekstual & Alami:**
+  Saat Anda menyapa hari ini, waifu akan secara natural menceritakan apa yang sedang atau akan dilakukannya sesuai episode cerita hari ini. Namun jika Anda mengajak mengobrol topik lain di luar cerita, waifu akan fleksibel mengikuti arah obrolan Anda tanpa kaku.
+* **📜 Akses Cerita Kapan Saja:** Ketik perintah `/story` di Telegram maupun di CLI chat untuk melihat rangkuman bab cerita dan episode yang sedang berjalan hari ini.
 
 ---
 
@@ -409,6 +453,7 @@ Gunakan tabel acuan berikut untuk memilih kombinasi model yang paling pas dengan
 | `/memory` | Long-term memory & diary of personal facts waifu remembers about you |
 | `/help` | Comprehensive interactive guide and documentation center |
 | `/status` | Real-time diagnostic check of LLM (Port 5001), ComfyUI (8188), and VRAM |
+| `/story` | Menampilkan alur cerita harian & episode hari ini yang sedang dijalani waifu |
 | `/photo <scene>` | Request a custom selfie scenario (e.g. `/photo relaxing in cafe`) |
 | `/pap` | Quick shortcut to request a new selfie with interactive retry button |
 | `/video` | Generate dynamic animated video clip (MP4) with parallax motion & ambient sparkles |
