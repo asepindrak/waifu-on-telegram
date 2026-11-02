@@ -31,6 +31,7 @@ from code_runner import CodeRunner
 from memory_engine import MemoryEngine
 from reminder_engine import ReminderEngine
 from anniversary_engine import AnniversaryEngine
+from story_engine import StoryEngine
 import asset_manager
 from health_engine import HealthEngine, is_port_listening
 from idle_engine import IdleEngine
@@ -97,6 +98,7 @@ media_engine = MediaEngine(comfyui_url=COMFYUI_URL, allow_cloud_fallback=MEDIA_F
 memory_engine = MemoryEngine()
 reminder_engine = ReminderEngine()
 anniversary_engine = AnniversaryEngine()
+story_engine = StoryEngine()
 HEALTH_CHECK_INTERVAL = int(os.environ.get("HEALTH_CHECK_INTERVAL", "30"))
 HEALTH_CHECK_ENABLED = os.environ.get("HEALTH_CHECK_ENABLED", "true").lower() in ("true", "1", "yes")
 STARTUP_NOTIFICATION_ENABLED = os.environ.get("STARTUP_NOTIFICATION_ENABLED", "true").lower() in ("true", "1", "yes")
@@ -544,6 +546,7 @@ def handle_welcome(message):
         f"✨ **Fitur Utama Bersama {name} (v{get_version()}):**\n"
         "• 💬 **Romance Chat**: Bebas sensor (SFW & NSFW), hangat, manja, dan otomatis ikut bahasamu.\n"
         "• 🧠 **Buku Ingatan Abadi**: Aku selalu mengingat fakta, kesukaan, dan hal penting tentang kamu (`/memory`)!\n"
+        "• 📖 **Cerita & Episode Harian**: Alur kisah hidup waifu hari ini (`/story`)!\n"
         "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'pap foto dong'* atau `/pap` untuk membuka menu pose interaktif!\n"
         "• 🎵 **Remote Musik PC**: Putar lagu YouTube di PC langsung dari Telegram (`/play`, `/pause`, `/next`)!\n"
         "• 👗 **Pilihan Baju**: Pilih pakaian waifumu lewat `/outfit` (Kimono, Maid, Piyama, dll).\n"
@@ -2068,10 +2071,18 @@ def build_system_diagnostics_report(user_id: int) -> str:
     hw = asset_manager.detect_hardware_profile() if asset_manager else None
     hw_str = f"`{hw['gpu_name']}` _({hw['vram_gb']} GB VRAM • {hw['tier_label']})_" if hw else "`Auto-Detect`"
 
+    # Resolve Daily Story Arc
+    today_ep = story_engine.get_today_story(persona_mgr.active_key)
+    if today_ep:
+        story_str = f"`{today_ep.get('arc_title', 'Kisah Harian')}` _(Hari {today_ep.get('day_index', 1)}/{today_ep.get('total_days', 5)}: {today_ep.get('day_theme', '')})_"
+    else:
+        story_str = "`Belum Ada Cerita`"
+
     report = (
         f"📊 **Waifu on Telegram v{get_version()} - System Diagnostics**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👑 **Persona Waifu** : **{p_name}** _({p_arch})_\n"
+        f"📖 **Cerita Hari Ini**: {story_str}\n"
         f"👗 **Pakaian Aktif** : `{cur_outfit}`\n"
         f"🌐 **Bahasa Chat**   : `{lang_label}`\n"
         f"💖 **Status Hubungan**: **{rel_status}** (`{score}%` • `{affinity_score} pts`)\n\n"
@@ -2207,6 +2218,40 @@ def show_affection_status(chat_id: int, user_id: int, reply_to_id: Optional[int]
         f"_{persona.get('name')} cherishes every message and moment spent with you, darling! Keep chatting and asking for photos to grow your bond closer._ 🥰"
     )
     send_menu_message(chat_id, reply, reply_to_id=reply_to_id)
+
+
+@bot.message_handler(commands=['story', 'cerita', 'arc', 'episode'])
+def handle_story_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    persona = persona_mgr.get_active_persona()
+    card = story_engine.format_story_summary_card(persona_mgr.active_key, persona.get("name", "Waifu"))
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🔄 Segarkan Arc", callback_data="refresh_story_arc"),
+        types.InlineKeyboardButton("📸 Minta PAP Kegiatan", callback_data="action_photo:selfie")
+    )
+    safe_reply_to(message, card, reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "refresh_story_arc")
+def callback_refresh_story(call):
+    if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        return
+    persona = persona_mgr.get_active_persona()
+    story_engine.replenish_storylines_if_llm_active(persona_mgr.active_key, llm_client, force=True)
+    bot.answer_callback_query(call.id, "✨ Memperbarui alur cerita...", show_alert=False)
+    card = story_engine.format_story_summary_card(persona_mgr.active_key, persona.get("name", "Waifu"))
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🔄 Segarkan Arc", callback_data="refresh_story_arc"),
+        types.InlineKeyboardButton("📸 Minta PAP Kegiatan", callback_data="action_photo:selfie")
+    )
+    try:
+        bot.edit_message_text(card, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    except Exception:
+        pass
 
 
 @bot.message_handler(commands=['persona'])
@@ -3044,6 +3089,10 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
 
             history = persona_mgr.get_chat_history(user_id)
             detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
+            if not detected_scene:
+                story_photo = story_engine.get_story_photo_suggestion(persona_mgr.active_key)
+                if story_photo and story_photo.get("danbooru_tags"):
+                    detected_scene = story_photo["danbooru_tags"]
             visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
                 user_text, user_id=user_id, scene_override=detected_scene, history=history
             )
@@ -4599,7 +4648,12 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                         "Kamu bukan langsung bertindak sebagai pacar jika belum diminta; bersikaplah sebagai teman ngobrol mahasiswi yang ramah, hangat, dan asyik. Biarkan dinamika hubungan berkembang secara alami sesuai kenyamanan user."
                     )
 
+                # Inject daily story episode
+                story_ctx = story_engine.get_story_prompt_context(persona_mgr.active_key)
+
                 system_inst = persona.get("system_instruction", "")
+                if story_ctx:
+                    system_inst += story_ctx
                 system_inst += (
                     f"\n\n[KEGIATAN MAHASISWI HARI INI]\n"
                     f"Waktu sekarang: Jam {cur_hour:02d}:00. Kegiatanmu saat ini: {routine['activity_desc']}. "
@@ -4721,8 +4775,10 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                                 persona_key=persona_mgr.active_key,
                                 llm_client=llm_client,
                                 idle_engine=idle_engine,
-                                lang=BOT_LANGUAGE
+                                lang=BOT_LANGUAGE,
+                                story_engine=story_engine
                             )
+                            story_engine.replenish_storylines_if_llm_active(persona_mgr.active_key, llm_client)
                         except Exception as e_rep:
                             logger.debug(f"Buffer replenishment error: {e_rep}")
                     threading.Thread(target=_replenish_buffer, daemon=True).start()

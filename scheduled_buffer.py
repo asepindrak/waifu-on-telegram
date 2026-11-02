@@ -129,7 +129,8 @@ class ScheduledMessageBuffer:
         persona_key: str,
         llm_client: Any,
         idle_engine: Any = None,
-        lang: str = "id"
+        lang: str = "id",
+        story_engine: Any = None
     ):
         """
         Opportunistically replenishes the buffer ONLY IF KoboldCPP LLM is currently awake & active.
@@ -150,11 +151,21 @@ class ScheduledMessageBuffer:
         p_name = persona.get("name", "Waifu")
         sys_instruction = persona.get("system_instruction", "")
 
+        # Retrieve today's story episode for realistic context injection
+        story_hint = ""
+        if story_engine and hasattr(story_engine, "get_today_story"):
+            try:
+                ep = story_engine.get_today_story(persona_key)
+                if ep:
+                    story_hint = f" Today's activity: {ep.get('day_theme', '')} ({ep.get('key_activity', '')}). Naturally reference this if appropriate."
+            except Exception:
+                pass
+
         targets = [
-            ("morning", "It is 7:00 AM morning. Write 1-2 sweet, cheerful, affectionate sentences wishing your partner a wonderful productive day. Keep it natural like a loving girlfriend texting. Never be dramatic."),
-            ("lunch", "It is 12:30 PM lunch break. Write 1-2 sweet, cheerful, caring sentences reminding your partner to take a break and eat a delicious lunch. Keep it natural and casual."),
-            ("night", "It is 10:00 PM bedtime. Write 1-2 sweet, gentle, caring sentences reminding your partner to rest, sleep tight, and have sweet dreams. Keep it warm and loving."),
-            ("proactive", f"You are {p_name} chatting with your real-life boyfriend. You haven't texted in a few hours. Send 1 natural, casual check-in text asking how his day or work is going or sharing a quick cute update. Under 2 short sentences.")
+            ("morning", f"It is 7:00 AM morning. Write 1-2 cheerful, warm, and natural sentences wishing them a wonderful day. Use 'aku' and 'kamu'. Avoid unprompted pet names like 'sayang'.{story_hint}"),
+            ("lunch", f"It is 12:30 PM lunch break. Write 1-2 friendly, caring sentences reminding them to take a break and eat lunch. Use 'aku' and 'kamu'. Avoid unprompted pet names.{story_hint}"),
+            ("night", f"It is 10:00 PM bedtime. Write 1-2 warm, gentle sentences reminding them to rest well. Use 'aku' and 'kamu'. Avoid unprompted pet names.{story_hint}"),
+            ("proactive", f"You are {p_name} chatting via message. Send 1 natural, casual check-in text asking how their day is going or sharing a quick update about your day. Under 2 short sentences. Use 'aku' and 'kamu'.{story_hint}")
         ]
 
         for msg_type, prompt_desc in targets:
