@@ -330,6 +330,20 @@ def cmd_status():
                 pass
         print(f"  📂 Photo Vault: {v_count} foto tersimpan di arsip galeri lokal " + c(GREEN, "(Arsip Lokal Aktif ✓)"))
 
+        # Scheduled message buffer info
+        buf_file = os.path.join(PROJECT_ROOT, "data", "scheduled_message_buffer.json")
+        buf_count = 0
+        if os.path.exists(buf_file):
+            try:
+                with open(buf_file, "r", encoding="utf-8") as bf:
+                    b_data = json.load(bf)
+                    for u_val in b_data.values():
+                        for m_list in u_val.values():
+                            buf_count += len(m_list)
+            except Exception:
+                pass
+        print(f"  🎮 Scheduled Message Buffer: {buf_count} pesan tersimpan " + c(GREEN, "(Gaming Protection Aktif ✓)"))
+
 def cmd_setup():
     setup_py = os.path.join(PROJECT_ROOT, "setup.py")
     subprocess.run([sys.executable, setup_py])

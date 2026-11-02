@@ -281,4 +281,19 @@ if (Test-Path $shortcut) {
 } else {
     Write-Host "  [DISABLED] Windows Startup Autorun: INACTIVE" -ForegroundColor DarkGray
 }
+
+# 8. Check Scheduled Message Buffer & Gaming Protection
+$bufFile = Join-Path $PSScriptRoot "data\scheduled_message_buffer.json"
+$bufCount = 0
+if (Test-Path $bufFile) {
+    try {
+        $rawBuf = Get-Content $bufFile -Raw -Encoding UTF8 | ConvertFrom-Json
+        foreach ($prop in $rawBuf.PSObject.Properties) {
+            foreach ($subProp in $prop.Value.PSObject.Properties) {
+                $bufCount += @($subProp.Value).Count
+            }
+        }
+    } catch {}
+}
+Write-Host "  [GAMING]  Scheduled Messages Buffer: $bufCount pesan tersimpan (Gaming Protection Aktif)" -ForegroundColor Cyan
 Write-Host ""

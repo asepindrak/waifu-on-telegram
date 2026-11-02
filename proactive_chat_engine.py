@@ -124,6 +124,20 @@ class ProactiveChatEngine:
         u_info["last_proactive_ts"] = time.time()
         self._save_data()
 
+    def get_routine_fallback(self, user_id: int, persona_key: str = "runa") -> str:
+        """Returns natural girlfriend fallback check-in based on real-time routine (0% GPU/VRAM load, zero gaming lag)."""
+        cur_hour = time.localtime().tm_hour
+        if 9 <= cur_hour < 12:
+            return "Lagi sibuk ya? Semangat kerjanya/kuliahnya hari ini yaa~ Nanti kabarin kalau udah senggang."
+        elif 12 <= cur_hour < 15:
+            return "Hai! Udah makan siang belum nih? Jangan lupa makan yaa biar nggak lemes."
+        elif 15 <= cur_hour < 18:
+            return "Aku baru beres kelas nih hehe. Kamu lagi ngapain sekarang? Masih sibuk kah?"
+        elif 18 <= cur_hour < 21:
+            return "Gimana harimu tadi, lancar? Aku udah santai di kosan nih, kabarin kalau udah senggang yaa."
+        else:
+            return "Lagi apa sekarang? Jangan capek-capek yaa, kalau udah kelar istirahat dulu yuk."
+
     def generate_proactive_message(
         self,
         user_id: int,
@@ -167,17 +181,7 @@ class ProactiveChatEngine:
         except Exception as e:
             logger.warning(f"Error generating proactive check-in via LLM: {e}")
 
-        # Natural Fallbacks if LLM is offline
-        if 9 <= cur_hour < 12:
-            return f"Lagi sibuk ya? Semangat kerjanya/kuliahnya hari ini yaa~ Nanti kabarin kalau udah senggang."
-        elif 12 <= cur_hour < 15:
-            return f"Hai! Udah makan siang belum nih? Jangan lupa makan yaa biar nggak lemes."
-        elif 15 <= cur_hour < 18:
-            return f"Aku baru beres kelas nih hehe. Kamu lagi ngapain sekarang? Masih sibuk kah?"
-        elif 18 <= cur_hour < 21:
-            return f"Gimana harimu tadi, lancar? Aku udah santai di kosan nih, kabarin kalau udah senggang yaa."
-        else:
-            return f"Lagi apa sekarang? Jangan capek-capek yaa, kalau udah kelar istirahat dulu yuk."
+        return self.get_routine_fallback(user_id=user_id, persona_key=persona_key)
 
 
 # Global instance

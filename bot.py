@@ -32,8 +32,9 @@ from memory_engine import MemoryEngine
 from reminder_engine import ReminderEngine
 from anniversary_engine import AnniversaryEngine
 import asset_manager
-from health_engine import HealthEngine
+from health_engine import HealthEngine, is_port_listening
 from idle_engine import IdleEngine
+from scheduled_buffer import scheduled_buffer
 from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
@@ -2089,6 +2090,7 @@ def build_system_diagnostics_report(user_id: int) -> str:
         f"• PC Autorun   : `{autorun_str}`\n"
         f"• Health Check : `{health_engine.get_status_summary()}`\n"
         f"• Mode Hemat   : `{idle_engine.get_status_summary()}`\n"
+        f"• Buffer Jadwal : `{scheduled_buffer.get_status_summary(user_id)}`\n"
         f"• Buku Ingatan : `{facts_count} fakta tersimpan`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 _Ketik `/setup` untuk membuka panel kontrol dan pengaturan lengkap._"
@@ -4571,6 +4573,20 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                             pass
                     threading.Thread(target=_auto_diary, daemon=True).start()
 
+                    def _replenish_buffer():
+                        try:
+                            scheduled_buffer.replenish_buffer_if_llm_active(
+                                user_id=message.from_user.id,
+                                persona=persona,
+                                persona_key=persona_mgr.active_key,
+                                llm_client=llm_client,
+                                idle_engine=idle_engine,
+                                lang=BOT_LANGUAGE
+                            )
+                        except Exception as e_rep:
+                            logger.debug(f"Buffer replenishment error: {e_rep}")
+                    threading.Thread(target=_replenish_buffer, daemon=True).start()
+
                 user_mode = USER_VOICE_MODES.get(message.from_user.id, "always" if VOICE_ENABLED else "off")
                 should_voice = False
                 if user_mode == "always" and VOICE_ENABLED:
@@ -4648,17 +4664,26 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
                 fallback = "Selamat istirahat yaa, tidur nyenyak."
                 tag = "🌙 *Selamat Istirahat!*"
 
-        messages = [
-            {"role": "system", "content": persona.get("system_instruction", "")},
-            {"role": "user", "content": prompt}
-        ]
-        try:
-            idle_engine.ensure_llm_active()
-            text, _ = llm_client.chat(messages, max_tokens=150)
-        except Exception:
-            text = None
-        if not text:
+        # Check pre-generated scheduled message buffer first (Zero GPU/VRAM load, zero gaming lag)
+        buffered = scheduled_buffer.get_message(user_id, time_of_day)
+        if buffered:
+            text = buffered
+        elif idle_engine and (getattr(idle_engine, "is_llm_sleeping", False) or not is_port_listening(5001)):
+            # Gaming Protection: LLM is sleeping -> NEVER wake KoboldCPP!
+            logger.info(f"⚡ Smart Idle: LLM is sleeping. Dispatched fallback {time_of_day} greeting without waking GPU.")
             text = fallback
+        else:
+            # LLM is already running in background (not sleeping) -> query without waking
+            messages = [
+                {"role": "system", "content": persona.get("system_instruction", "")},
+                {"role": "user", "content": prompt}
+            ]
+            try:
+                text, _ = llm_client.chat(messages, max_tokens=150)
+            except Exception:
+                text = None
+            if not text:
+                text = fallback
 
         bot.send_message(user_id, f"{tag}\n\n{text}", parse_mode="Markdown")
 
@@ -4757,13 +4782,19 @@ def schedule_daily_greetings():
                 if proactive_engine.should_send_checkin(uid):
                     try:
                         persona = persona_mgr.get_active_persona()
-                        p_msg = proactive_engine.generate_proactive_message(
-                            user_id=uid,
-                            persona=persona,
-                            persona_key=persona_mgr.active_key,
-                            llm_client=llm_client,
-                            lang=BOT_LANGUAGE
-                        )
+                        p_msg = scheduled_buffer.get_message(uid, "proactive")
+                        if not p_msg:
+                            # Strict Gaming Protection: if LLM is sleeping, NEVER wake it!
+                            if idle_engine and (getattr(idle_engine, "is_llm_sleeping", False) or not is_port_listening(5001)):
+                                p_msg = proactive_engine.get_routine_fallback(uid, persona_key=persona_mgr.active_key)
+                            else:
+                                p_msg = proactive_engine.generate_proactive_message(
+                                    user_id=uid,
+                                    persona=persona,
+                                    persona_key=persona_mgr.active_key,
+                                    llm_client=llm_client,
+                                    lang=BOT_LANGUAGE
+                                )
                         if p_msg:
                             persona_mgr.add_message(uid, "assistant", p_msg)
                             bot.send_message(uid, p_msg)

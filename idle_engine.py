@@ -242,10 +242,12 @@ class IdleEngine:
 
             return False
 
-    def ensure_llm_active(self, bot=None, chat_id: Optional[int] = None) -> bool:
+    def ensure_llm_active(self, bot=None, chat_id: Optional[int] = None, is_user_chat: bool = True) -> bool:
         """
         Ensures LLM is active before answering messages.
         If sleeping, displays a friendly waking indicator and wakes KoboldCPP.
+        If is_user_chat is False (e.g. background automation or scheduler),
+        it will NEVER wake the LLM from sleep to avoid interrupting gaming / work.
         """
         if not self.enabled:
             return True
@@ -254,6 +256,10 @@ class IdleEngine:
             self.is_llm_sleeping = False
             self.record_activity()
             return True
+
+        if not is_user_chat:
+            logger.info("⚡ Smart Idle: Blocked background automation from waking LLM (Gaming Protection Active).")
+            return False
 
         # Send temporary waking status to user
         waking_msg = None
