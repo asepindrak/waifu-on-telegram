@@ -8,7 +8,7 @@ import urllib.parse
 import logging
 import requests
 from resource_lock import acquire_gpu_heavy_lock
-from typing import Optional, Dict, Any, Tuple, Callable
+from typing import Optional, Dict, Any, Tuple, Callable, List
 
 try:
     import photo_vault
@@ -49,6 +49,22 @@ def format_comfy_validation_error(res: requests.Response) -> str:
     except Exception:
         pass
     return f"ComfyUI menolak prompt (HTTP {res.status_code}): {res.text[:250]}"
+
+def extract_combo_choices(raw_field: Any) -> List[str]:
+    """Safely extracts list of string choices from ComfyUI node input definitions."""
+    if not raw_field:
+        return []
+    if isinstance(raw_field, list):
+        if len(raw_field) > 0 and isinstance(raw_field[0], list):
+            return [str(x) for x in raw_field[0] if isinstance(x, (str, int, float)) and len(str(x)) > 0]
+        if len(raw_field) > 1 and isinstance(raw_field[1], dict) and "choices" in raw_field[1]:
+            return [str(x) for x in raw_field[1]["choices"] if isinstance(x, (str, int, float)) and len(str(x)) > 0]
+        if len(raw_field) > 1 and isinstance(raw_field[1], list):
+            return [str(x) for x in raw_field[1] if isinstance(x, (str, int, float)) and len(str(x)) > 0]
+        strings = [str(x) for x in raw_field if isinstance(x, str) and x.upper() not in ("COMBO", "STRING", "FLOAT", "INT", "BOOLEAN")]
+        if strings:
+            return strings
+    return []
 
 class MediaEngine:
     """Generates images and videos via local ComfyUI with cloud fallback."""
@@ -168,9 +184,9 @@ class MediaEngine:
             pass
         return []
 
-    def _get_animatediff_loader_info(self) -> Optional[Tuple[str, str, str]]:
+    def _get_animatediff_loader_info(self) -> Optional[Dict[str, Any]]:
         """Inspects ComfyUI for available AnimateDiff motion module loader nodes and model files.
-        Returns (node_class, model_input_key, chosen_model_filename) or None.
+        Returns dictionary with loader configuration or None.
         """
         try:
             r = requests.get(f"{self.comfyui_url}/object_info", timeout=4)
@@ -178,27 +194,79 @@ class MediaEngine:
                 return None
             data = r.json()
 
-            loader_candidates = [
-                ("ADE_AnimateDiffLoaderWithContext", "model_name"),
-                ("AnimateDiffLoader", "model_name"),
-                ("ADE_AnimateDiffLoaderGen1", "model_name")
-            ]
+            # Priority 1: Modern Gen2 Pipeline (ADE_LoadAnimateDiffModel + ADE_ApplyAnimateDiffModel / Simple)
+            if "ADE_LoadAnimateDiffModel" in data and ("ADE_ApplyAnimateDiffModelSimple" in data or "ADE_ApplyAnimateDiffModel" in data):
+                apply_class = "ADE_ApplyAnimateDiffModelSimple" if "ADE_ApplyAnimateDiffModelSimple" in data else "ADE_ApplyAnimateDiffModel"
+                load_def = data["ADE_LoadAnimateDiffModel"]
+                raw_models = load_def.get("input", {}).get("required", {}).get("model_name", [])
+                choices = extract_combo_choices(raw_models)
+                chosen_m = "mm_sd_v15_v2.ckpt"
+                if choices:
+                    for m in choices:
+                        if "v15_v2" in m.lower():
+                            chosen_m = m
+                            break
+                        elif "v15" in m.lower() or "mm" in m.lower():
+                            chosen_m = m
+                    if chosen_m not in choices:
+                        chosen_m = choices[0]
+                return {
+                    "mode": "gen2",
+                    "load_class": "ADE_LoadAnimateDiffModel",
+                    "apply_class": apply_class,
+                    "model_name": chosen_m
+                }
 
-            for class_name, key_name in loader_candidates:
+            # Priority 2: All-in-One Gen1 Loaders (ADE_AnimateDiffLoaderWithContext, AnimateDiffLoader, ADE_AnimateDiffLoaderGen1)
+            loader_candidates = [
+                "ADE_AnimateDiffLoaderWithContext",
+                "AnimateDiffLoader",
+                "ADE_AnimateDiffLoaderGen1"
+            ]
+            for class_name in loader_candidates:
                 if class_name in data:
                     node_def = data[class_name]
-                    available_models = node_def.get("input", {}).get("required", {}).get(key_name, [[]])[0]
+                    req_inputs = node_def.get("input", {}).get("required", {})
+                    raw_models = req_inputs.get("model_name", [])
+                    choices = extract_combo_choices(raw_models)
                     chosen_m = "mm_sd_v15_v2.ckpt"
-                    if available_models:
-                        for m in available_models:
+                    if choices:
+                        for m in choices:
                             if "v15_v2" in m.lower():
                                 chosen_m = m
                                 break
                             elif "v15" in m.lower() or "mm" in m.lower():
                                 chosen_m = m
-                        if chosen_m not in available_models and available_models:
-                            chosen_m = available_models[0]
-                    return (class_name, key_name, chosen_m)
+                        if chosen_m not in choices:
+                            chosen_m = choices[0]
+
+                    # Resolve beta_schedule if present
+                    chosen_beta = None
+                    if "beta_schedule" in req_inputs:
+                        raw_beta = req_inputs.get("beta_schedule", [])
+                        beta_choices = extract_combo_choices(raw_beta)
+                        chosen_beta = "autoselect"
+                        if beta_choices:
+                            if "autoselect" in beta_choices:
+                                chosen_beta = "autoselect"
+                            elif "sqrt_linear (AnimateDiff)" in beta_choices:
+                                chosen_beta = "sqrt_linear (AnimateDiff)"
+                            elif "sqrt_linear" in beta_choices:
+                                chosen_beta = "sqrt_linear"
+                            else:
+                                chosen_beta = beta_choices[0]
+
+                    needs_context = "context_options" in req_inputs
+                    has_uniform_context = "ADE_AnimateDiffUniformContextOptions" in data
+
+                    return {
+                        "mode": "gen1",
+                        "loader_class": class_name,
+                        "model_name": chosen_m,
+                        "beta_schedule": chosen_beta,
+                        "needs_context": needs_context,
+                        "has_uniform_context": has_uniform_context
+                    }
         except Exception as e:
             logger.debug(f"Error checking AnimateDiff loader in ComfyUI: {e}")
         return None
@@ -962,8 +1030,6 @@ class MediaEngine:
             )
             return None
 
-        loader_class, model_key, chosen_motion_model = ad_info
-
         ckpts = self.get_available_checkpoints()
         chosen_ckpt = None
         for c in ckpts:
@@ -980,61 +1046,94 @@ class MediaEngine:
         seed = random.randint(1000000, 99999999)
         neg = negative_prompt or "worst quality, low quality, bad anatomy, deformed eyes, extra limbs, static"
 
-        # Wire AnimateDiff Motion Module between Checkpoint and KSampler
+        # 2. Wire AnimateDiff Motion Module between Checkpoint and KSampler
         workflow = {
             "1": {
                 "class_type": "CheckpointLoaderSimple",
                 "inputs": {"ckpt_name": chosen_ckpt}
-            },
-            "2": {
-                "class_type": loader_class,
+            }
+        }
+
+        if ad_info.get("mode") == "gen2":
+            workflow["2"] = {
+                "class_type": ad_info["load_class"],
+                "inputs": {
+                    "model_name": ad_info["model_name"]
+                }
+            }
+            workflow["2b"] = {
+                "class_type": ad_info["apply_class"],
                 "inputs": {
                     "model": ["1", 0],
-                    model_key: chosen_motion_model
+                    "motion_model": ["2", 0]
                 }
-            },
-            "3": {
-                "class_type": "EmptyLatentImage",
-                "inputs": {"width": 512, "height": 768, "batch_size": 16}
-            },
-            "4": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"text": visual_prompt, "clip": ["1", 1]}
-            },
-            "5": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"text": neg, "clip": ["1", 1]}
-            },
-            "6": {
-                "class_type": "KSampler",
-                "inputs": {
-                    "seed": seed,
-                    "steps": 20,
-                    "cfg": 7.0,
-                    "sampler_name": "euler_ancestral",
-                    "scheduler": "karras",
-                    "denoise": 1.0,
-                    "model": ["2", 0],  # Connected to AnimateDiff Motion Model!
-                    "positive": ["4", 0],
-                    "negative": ["5", 0],
-                    "latent_image": ["3", 0]
+            }
+            sampler_model_target = ["2b", 0]
+        else:
+            inputs_dict = {
+                "model": ["1", 0],
+                "model_name": ad_info["model_name"]
+            }
+            if ad_info.get("beta_schedule"):
+                inputs_dict["beta_schedule"] = ad_info["beta_schedule"]
+            if ad_info.get("needs_context") and ad_info.get("has_uniform_context"):
+                workflow["2_ctx"] = {
+                    "class_type": "ADE_AnimateDiffUniformContextOptions",
+                    "inputs": {
+                        "context_length": 16,
+                        "context_stride": 1,
+                        "context_overlap": 4
+                    }
                 }
-            },
-            "7": {
-                "class_type": "VAEDecode",
-                "inputs": {"samples": ["6", 0], "vae": ["1", 2]}
-            },
-            "8": {
-                "class_type": "CreateVideo",
-                "inputs": {"images": ["7", 0], "fps": 8.0}
-            },
-            "9": {
-                "class_type": "SaveVideo",
-                "inputs": {
-                    "video": ["8", 0],
-                    "filename_prefix": "WaifuAnimateDiff",
-                    "format": "auto"
-                }
+                inputs_dict["context_options"] = ["2_ctx", 0]
+
+            workflow["2"] = {
+                "class_type": ad_info["loader_class"],
+                "inputs": inputs_dict
+            }
+            sampler_model_target = ["2", 0]
+
+        workflow["3"] = {
+            "class_type": "EmptyLatentImage",
+            "inputs": {"width": 512, "height": 768, "batch_size": 16}
+        }
+        workflow["4"] = {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": visual_prompt, "clip": ["1", 1]}
+        }
+        workflow["5"] = {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": neg, "clip": ["1", 1]}
+        }
+        workflow["6"] = {
+            "class_type": "KSampler",
+            "inputs": {
+                "seed": seed,
+                "steps": 20,
+                "cfg": 7.0,
+                "sampler_name": "euler_ancestral",
+                "scheduler": "karras",
+                "denoise": 1.0,
+                "model": sampler_model_target,
+                "positive": ["4", 0],
+                "negative": ["5", 0],
+                "latent_image": ["3", 0]
+            }
+        }
+        workflow["7"] = {
+            "class_type": "VAEDecode",
+            "inputs": {"samples": ["6", 0], "vae": ["1", 2]}
+        }
+        workflow["8"] = {
+            "class_type": "CreateVideo",
+            "inputs": {"images": ["7", 0], "fps": 8.0}
+        }
+        workflow["9"] = {
+            "class_type": "SaveVideo",
+            "inputs": {
+                "video": ["8", 0],
+                "filename_prefix": "WaifuAnimateDiff",
+                "format": "auto"
             }
         }
 

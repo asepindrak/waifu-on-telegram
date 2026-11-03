@@ -74,6 +74,16 @@ class TestWan21AssetsAndValidation(unittest.TestCase):
             self.assertIn("umt5_xxl_fp8_e4m3fn_scaled.safetensors", engine.last_error)
             self.assertIn("models/clip", engine.last_error)
 
+    def test_extract_combo_choices_never_returns_single_char(self):
+        """Test extract_combo_choices parses various ComfyUI combo formats without returning 'C'."""
+        from media_engine import extract_combo_choices
+        # Format 1: [["mm_sd_v15_v2.ckpt"]]
+        self.assertEqual(extract_combo_choices([["mm_sd_v15_v2.ckpt"]]), ["mm_sd_v15_v2.ckpt"])
+        # Format 2: ["COMBO", {"choices": ["mm_sd_v15_v2.ckpt"]}]
+        self.assertEqual(extract_combo_choices(["COMBO", {"choices": ["mm_sd_v15_v2.ckpt"]}]), ["mm_sd_v15_v2.ckpt"])
+        # Format 3: ["COMBO", ["mm_sd_v15_v2.ckpt"]]
+        self.assertEqual(extract_combo_choices(["COMBO", ["mm_sd_v15_v2.ckpt"]]), ["mm_sd_v15_v2.ckpt"])
+
     def test_animatediff_missing_loader_validation(self):
         """Test generate_video_animatediff fails gracefully when AnimateDiff loader node is absent."""
         engine = MediaEngine(comfyui_url="http://127.0.0.1:8188")
@@ -82,10 +92,18 @@ class TestWan21AssetsAndValidation(unittest.TestCase):
             self.assertIsNone(res)
             self.assertIn("Ekstensi AnimateDiff", engine.last_error)
 
-    def test_animatediff_workflow_wires_motion_module(self):
-        """Test generate_video_animatediff wires the motion module node to KSampler."""
+    def test_animatediff_workflow_wires_motion_module_gen1(self):
+        """Test generate_video_animatediff wires the motion module node to KSampler for Gen1."""
         engine = MediaEngine(comfyui_url="http://127.0.0.1:8188")
-        with patch.object(engine, "_get_animatediff_loader_info", return_value=("ADE_AnimateDiffLoaderWithContext", "model_name", "mm_sd_v15_v2.ckpt")), \
+        gen1_info = {
+            "mode": "gen1",
+            "loader_class": "ADE_AnimateDiffLoaderWithContext",
+            "model_name": "mm_sd_v15_v2.ckpt",
+            "beta_schedule": "autoselect",
+            "needs_context": True,
+            "has_uniform_context": True
+        }
+        with patch.object(engine, "_get_animatediff_loader_info", return_value=gen1_info), \
              patch.object(engine, "get_available_checkpoints", return_value=["meinamix_v12Final.safetensors"]), \
              patch.object(engine, "_execute_video_workflow") as mock_exec:
             mock_exec.return_value = b"video_mp4_bytes"
@@ -95,9 +113,32 @@ class TestWan21AssetsAndValidation(unittest.TestCase):
             # Verify motion loader is node "2"
             self.assertEqual(workflow_passed["2"]["class_type"], "ADE_AnimateDiffLoaderWithContext")
             self.assertEqual(workflow_passed["2"]["inputs"]["model_name"], "mm_sd_v15_v2.ckpt")
-            # Verify KSampler (node "6") connects to node "2" (the motion module), not directly to Checkpoint
+            self.assertEqual(workflow_passed["2"]["inputs"]["beta_schedule"], "autoselect")
+            self.assertEqual(workflow_passed["2"]["inputs"]["context_options"], ["2_ctx", 0])
+            # Verify KSampler (node "6") connects to node "2"
             self.assertEqual(workflow_passed["6"]["inputs"]["model"], ["2", 0])
             self.assertEqual(workflow_passed["8"]["inputs"]["fps"], 8.0)
+
+    def test_animatediff_workflow_wires_motion_module_gen2(self):
+        """Test generate_video_animatediff wires the motion module node to KSampler for Gen2."""
+        engine = MediaEngine(comfyui_url="http://127.0.0.1:8188")
+        gen2_info = {
+            "mode": "gen2",
+            "load_class": "ADE_LoadAnimateDiffModel",
+            "apply_class": "ADE_ApplyAnimateDiffModelSimple",
+            "model_name": "mm_sd_v15_v2.ckpt"
+        }
+        with patch.object(engine, "_get_animatediff_loader_info", return_value=gen2_info), \
+             patch.object(engine, "get_available_checkpoints", return_value=["meinamix_v12Final.safetensors"]), \
+             patch.object(engine, "_execute_video_workflow") as mock_exec:
+            mock_exec.return_value = b"video_mp4_bytes"
+            res = engine.generate_video_animatediff("a girl smiling")
+            self.assertEqual(res, b"video_mp4_bytes")
+            workflow_passed = mock_exec.call_args[0][0]
+            self.assertEqual(workflow_passed["2"]["class_type"], "ADE_LoadAnimateDiffModel")
+            self.assertEqual(workflow_passed["2b"]["class_type"], "ADE_ApplyAnimateDiffModelSimple")
+            # Verify KSampler connects to "2b"
+            self.assertEqual(workflow_passed["6"]["inputs"]["model"], ["2b", 0])
 
 if __name__ == "__main__":
     unittest.main()
