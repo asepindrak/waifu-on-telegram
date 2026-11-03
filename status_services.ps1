@@ -261,6 +261,10 @@ try {
     }
 }
 
+if ($env:SFW_IMAGE_ENGINE -eq "agy") {
+    Write-Host "  [ONLINE]  Image Generator Mode: Google Antigravity (AGY Image Generator Subagent)" -ForegroundColor Green
+}
+
 # Photo Vault stats
 $vaultPath = Join-Path $PSScriptRoot "data\photo_vault\catalog.json"
 $vaultCount = 0

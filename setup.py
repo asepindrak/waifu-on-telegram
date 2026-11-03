@@ -466,6 +466,16 @@ def config_image_model(env_vars):
         ""
     ))
 
+    # 5b. Google Antigravity Image Generator (AGY)
+    agy_ready = (shutil.which("agy") or shutil.which("agy.cmd"))
+    agy_tag = c(GREEN, "[TERPASANG]") if agy_ready else c(DIM, "[Bisa via AGY CLI / Bridge]")
+    options.append((
+        f"🌉 Google Antigravity Image Generator (AGY Image Generator Subagent) {agy_tag}\n"
+        f"     ↳ Bebas VRAM, ditenagai langsung oleh subagent image-generator AGY",
+        "agy",
+        "agy"
+    ))
+
     # 6. Cloud Engine
     rec_cloud_badge = " " + c(BOLD + GREEN, "⭐ [REKOMENDASI HARDWARE]") if rec_img_model == "cloud" else ""
     options.append((
@@ -503,7 +513,11 @@ def config_image_model(env_vars):
 
     chosen_label, chosen_mode, chosen_val = options[chosen_idx]
 
-    if chosen_mode == "disabled":
+    if chosen_mode == "agy":
+        env_vars["SFW_IMAGE_ENGINE"] = "agy"
+        env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
+        print(c(GREEN, "  ✓ Image Engine dipilih: Google Antigravity (AGY Image Generator)."))
+    elif chosen_mode == "disabled":
         env_vars["COMFYUI_URL"] = ""
         env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
         env_vars["COMFYUI_CHECKPOINT"] = ""

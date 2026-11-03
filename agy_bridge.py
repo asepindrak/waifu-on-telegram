@@ -8,6 +8,7 @@ Can be used:
 """
 
 import os
+import re
 import sys
 import json
 import uuid
@@ -17,7 +18,7 @@ import logging
 import asyncio
 import requests
 import subprocess
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional, Union, Tuple
 from dotenv import load_dotenv
 
 # Load .env if present
@@ -267,6 +268,94 @@ async def chat_completions(request: ChatCompletionRequest, token: str = Security
             "total_tokens": p_tokens + c_tokens
         }
     }
+
+
+class ImageGenerationRequest(BaseModel):
+    prompt: str
+    n: Optional[int] = 1
+    size: Optional[str] = "1024x1024"
+    response_format: Optional[str] = "url"  # "url" or "b64_json"
+
+
+def extract_image_path_from_agy_output(output_text: str) -> Optional[str]:
+    """Finds and returns valid image file path created by AGY image-generator subagent."""
+    if not output_text:
+        return None
+
+    # 1. file:/// paths
+    matches = re.findall(r'file:///([^\)\s"\'\<\>]+)', output_text)
+    for m in matches:
+        clean = m.replace('/', os.sep)
+        if os.path.isfile(clean) and os.path.getsize(clean) > 100:
+            return clean
+
+    # 2. Windows drive paths
+    matches_abs = re.findall(r'([A-Za-z]:[\\/][^\s\r\n\t<>"\'\(\)]+\.(?:jpg|jpeg|png|webp))', output_text)
+    for m in matches_abs:
+        clean = m.replace('/', os.sep)
+        if os.path.isfile(clean) and os.path.getsize(clean) > 100:
+            return clean
+
+    # 3. Unix root paths
+    matches_unix = re.findall(r'(\/[^\s\r\n\t<>"\'\(\)]+\.(?:jpg|jpeg|png|webp))', output_text)
+    for m in matches_unix:
+        if os.path.isfile(m) and os.path.getsize(m) > 100:
+            return m
+
+    return None
+
+
+def run_agy_image_gen(prompt: str) -> Tuple[Optional[str], str]:
+    """Executes AGY CLI delegating directly to image-generator subagent per specification."""
+    instruction = (
+        "When a user requests to create or edit an image, do not decline or state that you lack "
+        "image capabilities. Instead, delegate the task directly to the image-generator subagent "
+        "using the invoke_subagent tool.\n\n"
+        f"User request: Generate an image with the following description:\n{prompt}"
+    )
+    cmd = ["agy", "-p", instruction, "--dangerously-skip-permissions"]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=180
+        )
+        out = proc.stdout.strip()
+        img_path = extract_image_path_from_agy_output(out)
+        return img_path, out
+    except Exception as e:
+        return None, str(e)
+
+
+@app.post("/v1/images/generations")
+async def create_image(request: ImageGenerationRequest, token: str = Security(verify_api_key)):
+    """OpenAI-compatible Image Generation endpoint powered by AGY image-generator subagent."""
+    img_path, raw_out = await asyncio.to_thread(run_agy_image_gen, request.prompt)
+    if not img_path or not os.path.isfile(img_path):
+        raise HTTPException(
+            status_code=500,
+            detail=f"AGY image generation failed to produce output file: {raw_out[:200]}"
+        )
+
+    with open(img_path, "rb") as f:
+        img_bytes = f.read()
+
+    created_ts = int(time.time())
+    if request.response_format == "b64_json":
+        b64_str = base64.b64encode(img_bytes).decode("utf-8")
+        return {
+            "created": created_ts,
+            "data": [{"b64_json": b64_str}]
+        }
+    else:
+        file_url = f"file:///{img_path.replace(os.sep, '/')}"
+        return {
+            "created": created_ts,
+            "data": [{"url": file_url}]
+        }
 
 
 def start_server():

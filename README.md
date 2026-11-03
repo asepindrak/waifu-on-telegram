@@ -273,7 +273,7 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.7.1)
+                        💖 WAIFU ON TELEGRAM BOT (v1.7.2)
 ```
 
 > 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.
@@ -282,12 +282,12 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
 
 ## 🌉 Google Antigravity CLI (AGY) OpenAI-Compatible Bridge Server
 
-Project ini dilengkapi dengan **AGY OpenAI Bridge Server** (`agy_bridge.py` di port `8001`), sebuah jembatan lokal standar OpenAI API (`/v1/chat/completions`, `/v1/models`, dan `/health`) yang ditenagai oleh Google Antigravity CLI (`agy`).
+Project ini dilengkapi dengan **AGY OpenAI Bridge Server** (`agy_bridge.py` di port `8001`), sebuah jembatan lokal standar OpenAI API (`/v1/chat/completions`, `/v1/images/generations`, `/v1/models`, dan `/health`) yang ditenagai oleh Google Antigravity CLI (`agy`).
 
 ### 🌟 Fitur Utama AGY Bridge:
 1. **Dapat Digunakan Langsung oleh Waifu on Telegram**:
-   - Dapat diatur sebagai provider LLM SFW (`SFW_LLM_PROVIDER=agy` di `.env` atau melalui `waifu setup`).
-   - Sangat cepat, cerdas, responsif, dan 0 VRAM overhead (memanfaatkan engine `flash` atau `pro`).
+   - **Otak Chat SFW**: Dapat diatur sebagai provider LLM SFW (`SFW_LLM_PROVIDER=agy` di `.env` atau melalui `waifu setup`). Sangat cepat, cerdas, responsif, dan 0 VRAM overhead.
+   - **Generator Gambar & Selfie (AGY Image Generator)**: Dapat dipilih sebagai generator foto/selfie (`SFW_IMAGE_ENGINE=agy` di `.env` atau melalui `waifu setup`). Ketika diminta generate gambar, AGY secara otomatis mendelegasikan tugas ke subagent `image-generator` bawaan Antigravity tanpa membebani GPU/VRAM lokal sama sekali!
 2. **Dapat Digunakan Bersama oleh Aplikasi Eksternal**:
    - Menghubungkan berbagai IDE & tools pengembang pihak ketiga ke ekosistem Google Antigravity tanpa konfigurasi rumit:
      - **Cursor / VS Code (Cline, Roo Code, Continue, Chat)**

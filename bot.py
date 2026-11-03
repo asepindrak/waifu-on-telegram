@@ -2047,6 +2047,10 @@ def build_system_diagnostics_report(user_id: int) -> str:
         ckpt_path = os.path.join(cdir, "models", "checkpoints", cur_ckpt)
         ckpt_installed = os.path.isfile(ckpt_path)
     ckpt_badge = "_(Terpasang ✓)_" if ckpt_installed else ("_(Aktif di ComfyUI ✓)_" if media_stat.get("online") else "_(Perlu Download)_")
+    sfw_img_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower()
+    if sfw_img_engine == "agy":
+        cur_ckpt = "Google Antigravity (AGY Subagent)"
+        ckpt_badge = "_(Cloud Subagent Aktif ✓)_" 
 
     # Resolve Photo Vault Archive stats
     import photo_vault

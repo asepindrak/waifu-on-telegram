@@ -1,14 +1,17 @@
 """
-tests/test_agy_bridge.py - Unit tests for Google Antigravity CLI (agy) Bridge
+tests/test_agy_bridge.py - Unit tests for Google Antigravity CLI (agy) Bridge & Image Generator
 """
 
 import os
+import tempfile
+import base64
 import unittest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 import agy_bridge
 from routing_engine import PROVIDER_PRESETS, get_hybrid_llm_client
+from media_engine import MediaEngine
 
 
 class TestAGYBridge(unittest.TestCase):
@@ -40,7 +43,6 @@ class TestAGYBridge(unittest.TestCase):
 
     def test_process_message_content_string_and_multimodal(self):
         """Test text extraction and data URI processing in message payloads."""
-        import tempfile
         with tempfile.TemporaryDirectory() as tmp_dir:
             # 1. Plain text
             txt = agy_bridge.process_message_content("Halo waifu!", tmp_dir)
@@ -93,6 +95,83 @@ class TestAGYBridge(unittest.TestCase):
         self.assertIn("text/event-stream", res.headers.get("content-type", ""))
         self.assertIn("chat.completion.chunk", res.text)
         self.assertIn("[DONE]", res.text)
+
+    def test_extract_image_path_from_agy_output(self):
+        """Test extracting image path from AGY image-generator subagent output."""
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            f.write(b"FAKE_IMAGE_DATA_12345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")
+            tmp_path = f.name
+
+        try:
+            sample_output = f"""
+I have launched the image generator subagent to create the cute anime cat image for you.
+Here is your cute anime cat image!
+
+![Cute Anime Cat](file:///{tmp_path.replace(os.sep, '/')})
+
+- **File Path**: [{os.path.basename(tmp_path)}](file:///{tmp_path.replace(os.sep, '/')})
+"""
+            extracted = agy_bridge.extract_image_path_from_agy_output(sample_output)
+            self.assertIsNotNone(extracted)
+            self.assertEqual(os.path.abspath(extracted).lower(), os.path.abspath(tmp_path).lower())
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    @patch("agy_bridge.run_agy_image_gen")
+    def test_image_generations_endpoint(self, mock_gen):
+        """Test /v1/images/generations endpoint for both b64_json and url formats."""
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            f.write(b"PNG_FAKE_IMAGE_BYTES_LONGER_THAN_100_CHARACTERS_FOR_VALIDATION_PURPOSES_123456789012345678901234567890")
+            tmp_path = f.name
+
+        try:
+            mock_gen.return_value = (tmp_path, "Subagent finished.")
+
+            # 1. Test b64_json
+            req_b64 = {
+                "prompt": "cute anime girl smiling",
+                "response_format": "b64_json"
+            }
+            res = self.client.post("/v1/images/generations", json=req_b64)
+            self.assertEqual(res.status_code, 200)
+            data = res.json()
+            self.assertIn("data", data)
+            b64_val = data["data"][0]["b64_json"]
+            self.assertTrue(len(b64_val) > 10)
+            self.assertEqual(base64.b64decode(b64_val), b"PNG_FAKE_IMAGE_BYTES_LONGER_THAN_100_CHARACTERS_FOR_VALIDATION_PURPOSES_123456789012345678901234567890")
+
+            # 2. Test url format
+            req_url = {
+                "prompt": "cute anime girl smiling",
+                "response_format": "url"
+            }
+            res_url = self.client.post("/v1/images/generations", json=req_url)
+            self.assertEqual(res_url.status_code, 200)
+            data_url = res_url.json()
+            self.assertIn("file:///", data_url["data"][0]["url"])
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    @patch("requests.post")
+    def test_media_engine_generate_image_agy(self, mock_post):
+        """Test MediaEngine.generate_image_agy via AGY bridge."""
+        fake_bytes = b"REAL_IMAGE_BYTES_FROM_AGY_GENERATOR_1234567890"
+        b64_str = base64.b64encode(fake_bytes).decode("utf-8")
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "created": 1700000000,
+            "data": [{"b64_json": b64_str}]
+        }
+        mock_post.return_value = mock_resp
+
+        engine = MediaEngine()
+        result_bytes = engine.generate_image_agy("cute anime girl in school uniform")
+        self.assertIsNotNone(result_bytes)
+        self.assertEqual(result_bytes, fake_bytes)
 
     def test_routing_engine_agy_preset(self):
         """Test that routing_engine recognizes agy preset."""

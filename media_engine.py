@@ -444,6 +444,24 @@ class MediaEngine:
                 cloud_img = self.generate_image_cloud(effective_prompt, aspect_ratio=aspect_ratio)
                 if cloud_img:
                     return cloud_img, "Cloud Engine (SFW Pollinations)"
+            elif not is_nude and sfw_engine == "agy":
+                agy_img = self.generate_image_agy(effective_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
+                if agy_img:
+                    if photo_vault:
+                        try:
+                            photo_vault.save_photo_to_vault(
+                                agy_img,
+                                persona=persona,
+                                scene=scene or user_query,
+                                outfit_label=outfit_label,
+                                is_nude=is_nude,
+                                visual_prompt=effective_prompt,
+                                user_query=user_query,
+                                aspect_ratio=aspect_ratio or "3:4"
+                            )
+                        except Exception:
+                            pass
+                    return agy_img, "Google Antigravity (AGY Image Generator)" 
 
             local_img = self.generate_image_comfyui(
                 effective_prompt,
@@ -472,6 +490,26 @@ class MediaEngine:
                 active_ckpt = self.get_active_checkpoint()
                 clean_name = os.path.splitext(active_ckpt)[0]
                 return local_img, f"Local ComfyUI ({clean_name})"
+            elif not is_nude and os.environ.get("MEDIA_FALLBACK_AGY", "true").lower() in ("true", "1", "yes"):
+                import shutil
+                if shutil.which("agy") or shutil.which("agy.cmd"):
+                    agy_img = self.generate_image_agy(effective_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
+                    if agy_img:
+                        if photo_vault:
+                            try:
+                                photo_vault.save_photo_to_vault(
+                                    agy_img,
+                                    persona=persona,
+                                    scene=scene or user_query,
+                                    outfit_label=outfit_label,
+                                    is_nude=is_nude,
+                                    visual_prompt=effective_prompt,
+                                    user_query=user_query,
+                                    aspect_ratio=aspect_ratio or "3:4"
+                                )
+                            except Exception:
+                                pass
+                        return agy_img, "Google Antigravity (AGY Fallback)" 
         else:
             self.last_error = "ComfyUI URL belum dikonfigurasi (pastikan ComfyUI lokal aktif di port 8188)."
 
@@ -495,6 +533,83 @@ class MediaEngine:
 
         # Cloud fallback is intentionally disabled per user request (bad quality)
         return None, "Failed"
+
+    def generate_image_agy(
+        self,
+        prompt: str,
+        aspect_ratio: Optional[str] = None,
+        progress_callback: Optional[Callable[[str], None]] = None
+    ) -> Optional[bytes]:
+        """
+        Generates an image using Google Antigravity CLI (AGY) image-generator subagent.
+        First attempts to query local AGY Bridge at http://127.0.0.1:8001/v1/images/generations.
+        If Bridge is unreachable, invokes `agy` CLI directly.
+        """
+        if progress_callback:
+            progress_callback("Menghubungkan ke Google Antigravity (AGY Image Generator)... 🎨")
+
+        agy_port = int(os.environ.get("AGY_BRIDGE_PORT", "8001"))
+        bridge_url = f"http://127.0.0.1:{agy_port}/v1/images/generations"
+
+        # 1. Try via AGY OpenAI Bridge
+        try:
+            req_body = {
+                "prompt": prompt,
+                "n": 1,
+                "size": "1024x1024",
+                "response_format": "b64_json"
+            }
+            if progress_callback:
+                progress_callback("AGY image-generator sedang merender gambar... ✨")
+            res = requests.post(bridge_url, json=req_body, timeout=120)
+            if res.status_code == 200:
+                data = res.json()
+                b64_data = data.get("data", [{}])[0].get("b64_json")
+                if b64_data:
+                    import base64
+                    return base64.b64decode(b64_data)
+        except Exception as e_bridge:
+            logger.debug(f"AGY Bridge image generation call failed: {e_bridge}. Trying direct CLI...")
+
+        # 2. Fallback to direct agy CLI invocation
+        import shutil, subprocess, re
+        agy_bin = shutil.which("agy") or shutil.which("agy.cmd")
+        if not agy_bin:
+            self.last_error = "Google Antigravity CLI ('agy') tidak ditemukan di PATH sistem."
+            return None
+
+        instruction = (
+            "When a user requests to create or edit an image, do not decline or state that you lack "
+            "image capabilities. Instead, delegate the task directly to the image-generator subagent "
+            "using the invoke_subagent tool.\n\n"
+            f"User request: Generate an image with the following description:\n{prompt}"
+        )
+        try:
+            if progress_callback:
+                progress_callback("Menjalankan subagent image-generator via agy CLI... ✨")
+            proc = subprocess.run(
+                [agy_bin, "-p", instruction, "--dangerously-skip-permissions"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=180
+            )
+            out = proc.stdout
+            try:
+                from agy_bridge import extract_image_path_from_agy_output
+                cand_path = extract_image_path_from_agy_output(out)
+            except Exception:
+                cand_path = None
+            if cand_path and os.path.isfile(cand_path) and os.path.getsize(cand_path) > 100:
+                with open(cand_path, "rb") as f:
+                    return f.read()
+
+            self.last_error = f"AGY CLI selesai namun tidak menemukan file gambar output: {out[:120]}"
+            return None
+        except Exception as e_cli:
+            self.last_error = f"AGY CLI image generation exception: {e_cli}"
+            return None
 
     def generate_video(
         self,
