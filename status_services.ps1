@@ -268,18 +268,45 @@ try {
     $comfyOnline = $true
 } catch {
     $comfyDirCandidates = @(
-        (Join-Path $PSScriptRoot "ComfyUI"),
+        $env:COMFYUI_DIR,
+        $env:COMFYUI_PATH,
+        (Join-Path $PSScriptRoot "tools\ComfyUI\ComfyUI_windows_portable\ComfyUI"),
+        (Join-Path $PSScriptRoot "tools\ComfyUI_windows_portable\ComfyUI"),
+        (Join-Path $PSScriptRoot "tools\ComfyUI\ComfyUI"),
         (Join-Path $PSScriptRoot "tools\ComfyUI"),
+        (Join-Path $PSScriptRoot "ComfyUI"),
         (Join-Path $PSScriptRoot "..\ComfyUI"),
-        (Join-Path $PSScriptRoot "..\ComfyUI_windows_portable\ComfyUI")
+        (Join-Path $PSScriptRoot "..\ComfyUI_windows_portable\ComfyUI"),
+        (Join-Path $env:LOCALAPPDATA "Comfy-Desktop\ComfyUI-Installs\ComfyUI\ComfyUI"),
+        (Join-Path $env:USERPROFILE "ComfyUI"),
+        (Join-Path $env:USERPROFILE "Desktop\ComfyUI"),
+        (Join-Path $env:USERPROFILE "Downloads\ComfyUI")
     )
+    foreach ($drv in @("C:", "D:", "E:", "F:", "G:")) {
+        $comfyDirCandidates += "$drv\ComfyUI"
+        $comfyDirCandidates += "$drv\comfyui"
+        $comfyDirCandidates += "$drv\ComfyUI_windows_portable\ComfyUI"
+        $comfyDirCandidates += "$drv\AI\ComfyUI"
+        $comfyDirCandidates += "$drv\StableDiffusion\ComfyUI"
+    }
+
+    $toolsComfyDir = Join-Path $PSScriptRoot "tools\ComfyUI"
+    if (Test-Path $toolsComfyDir) {
+        $foundM = Get-ChildItem -Path $toolsComfyDir -Filter "main.py" -File -Recurse -Depth 4 -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($foundM) {
+            $comfyDirCandidates += $foundM.DirectoryName
+        }
+    }
+
     $hasComfyDir = $false
     $targetCkpt = $env:COMFYUI_CHECKPOINT
+    if (-not $targetCkpt) { $targetCkpt = $env:NSFW_COMFYUI_CHECKPOINT }
+    if (-not $targetCkpt) { $targetCkpt = $env:SFW_COMFYUI_CHECKPOINT }
     if (-not $targetCkpt) { $targetCkpt = "AnythingXL_xl.safetensors" }
     $ckptInstalled = $false
 
     foreach ($cd in $comfyDirCandidates) {
-        if (Test-Path (Join-Path $cd "main.py")) {
+        if ($cd -and (Test-Path (Join-Path $cd "main.py"))) {
             $hasComfyDir = $true
             $cFile = Join-Path $cd "models\checkpoints\$targetCkpt"
             if (Test-Path $cFile) {
