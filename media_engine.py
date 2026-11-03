@@ -17,6 +17,39 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+def format_comfy_validation_error(res: requests.Response) -> str:
+    """Parses ComfyUI validation or execution errors into a clear, readable message."""
+    try:
+        data = res.json()
+        node_errors = data.get("node_errors", {})
+        err_messages = []
+        for node_id, node_info in node_errors.items():
+            class_type = node_info.get("class_type", f"Node {node_id}")
+            errors = node_info.get("errors", [])
+            for err in errors:
+                detail = err.get("details") or err.get("message") or err.get("type")
+                if detail:
+                    if "not in []" in str(detail) or "not in" in str(detail):
+                        err_messages.append(f"{class_type} (#{node_id}): Model/File belum terpasang ({detail})")
+                    else:
+                        err_messages.append(f"{class_type} (#{node_id}): {detail}")
+        if err_messages:
+            return f"ComfyUI validation error: {'; '.join(err_messages)}"
+
+        err_obj = data.get("error", {})
+        if isinstance(err_obj, dict):
+            msg = err_obj.get("message") or err_obj.get("type")
+            details = err_obj.get("details")
+            if details:
+                return f"ComfyUI error: {msg} ({details})"
+            if msg:
+                return f"ComfyUI error: {msg}"
+        elif isinstance(err_obj, str):
+            return f"ComfyUI error: {err_obj}"
+    except Exception:
+        pass
+    return f"ComfyUI menolak prompt (HTTP {res.status_code}): {res.text[:250]}"
+
 class MediaEngine:
     """Generates images and videos via local ComfyUI with cloud fallback."""
 
@@ -109,6 +142,28 @@ class MediaEngine:
             if r.status_code == 200:
                 data = r.json()
                 return data["VAELoader"]["input"]["required"]["vae_name"][0]
+        except Exception:
+            pass
+        return []
+
+    def get_available_clips(self) -> list:
+        """Queries ComfyUI for available CLIP text encoder models."""
+        try:
+            r = requests.get(f"{self.comfyui_url}/object_info/CLIPLoader", timeout=4)
+            if r.status_code == 200:
+                data = r.json()
+                return data["CLIPLoader"]["input"]["required"]["clip_name"][0]
+        except Exception:
+            pass
+        return []
+
+    def get_available_unets(self) -> list:
+        """Queries ComfyUI for available diffusion models (UNET)."""
+        try:
+            r = requests.get(f"{self.comfyui_url}/object_info/UNETLoader", timeout=4)
+            if r.status_code == 200:
+                data = r.json()
+                return data["UNETLoader"]["input"]["required"]["unet_name"][0]
         except Exception:
             pass
         return []
@@ -348,7 +403,7 @@ class MediaEngine:
             )
             if res.status_code != 200:
                 logger.warning(f"ComfyUI rejected prompt: {res.text}")
-                self.last_error = f"ComfyUI menolak prompt (HTTP {res.status_code}): {res.text[:120]}"
+                self.last_error = format_comfy_validation_error(res)
                 return None
 
             prompt_id = res.json().get("prompt_id")
@@ -724,6 +779,35 @@ class MediaEngine:
         base_image_bytes: Optional[bytes] = None
     ) -> Optional[bytes]:
         """Executes Wan 2.1 1.3B AI Video pipeline on ComfyUI."""
+        # Check required models in ComfyUI before dispatching
+        available_clips = self.get_available_clips()
+        clip_name = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        if available_clips:
+            if clip_name not in available_clips:
+                matched_c = [c for c in available_clips if "umt5" in c.lower()]
+                if matched_c:
+                    clip_name = matched_c[0]
+                else:
+                    self.last_error = f"Model Text Encoder Wan 2.1 ('{clip_name}') belum terpasang di ComfyUI (models/clip). Silakan unduh via /video atau gunakan AnimateDiff."
+                    return None
+        elif self.comfyui_url:
+            self.last_error = f"Model Text Encoder Wan 2.1 ('{clip_name}') belum terpasang di ComfyUI (models/clip). Silakan unduh via /video atau gunakan AnimateDiff."
+            return None
+
+        available_unets = self.get_available_unets()
+        unet_name = "wan2.1_t2v_1.3B_bf16.safetensors"
+        if available_unets:
+            if unet_name not in available_unets:
+                matched_u = [u for u in available_unets if "wan" in u.lower() and "1.3b" in u.lower()]
+                if matched_u:
+                    unet_name = matched_u[0]
+                else:
+                    self.last_error = f"Model Diffusion Wan 2.1 ('{unet_name}') belum terpasang di ComfyUI (models/diffusion_models)."
+                    return None
+        elif self.comfyui_url:
+            self.last_error = f"Model Diffusion Wan 2.1 ('{unet_name}') belum terpasang di ComfyUI (models/diffusion_models)."
+            return None
+
         neg = negative_prompt or "bad anatomy, deformed, distorted, blurry, worst quality"
         seed = random.randint(1000000, 99999999)
 
@@ -732,14 +816,14 @@ class MediaEngine:
             "1": {
                 "class_type": "UNETLoader",
                 "inputs": {
-                    "unet_name": "wan2.1_t2v_1.3B_bf16.safetensors",
+                    "unet_name": unet_name,
                     "weight_dtype": "default"
                 }
             },
             "2": {
                 "class_type": "CLIPLoader",
                 "inputs": {
-                    "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+                    "clip_name": clip_name,
                     "type": "wan"
                 }
             },
@@ -911,7 +995,7 @@ class MediaEngine:
             )
             if res.status_code != 200:
                 logger.warning(f"ComfyUI video prompt rejected: {res.text}")
-                self.last_error = f"ComfyUI menolak prompt video: {res.text[:120]}"
+                self.last_error = format_comfy_validation_error(res)
                 return None
 
             prompt_id = res.json().get("prompt_id")

@@ -2442,7 +2442,7 @@ def build_system_diagnostics_report(user_id: int) -> str:
     is_v_ready, missing_v = asset_manager.ensure_video_engine_assets(VIDEO_ENGINE) if asset_manager else (True, [])
     v_ready_badge = "_(Siap ✓)_" if is_v_ready else f"_(Perlu Download: {', '.join(missing_v)})_"
     if VIDEO_ENGINE == "wan21":
-        v_model_str = "`wan2.1_t2v_1.3B_bf16.safetensors` + `wan_2.1_vae.safetensors`"
+        v_model_str = "`wan2.1_t2v_1.3B_bf16` + `umt5_xxl_fp8` + `wan_2.1_vae`"
     else:
         v_model_str = "`mm_sd_v15_v2.ckpt` + `ComfyUI-AnimateDiff-Evolved`"
 
@@ -3016,9 +3016,11 @@ def prompt_missing_asset_download(chat_id: int, user_id: int, missing_keys: List
         f"Apakah kamu ingin aku mengunduhnya secara otomatis sekarang?"
     )
     markup = types.InlineKeyboardMarkup(row_width=1)
+    alt_engine = "animatediff" if any("wan" in k for k in missing_keys) else "wan21"
+    alt_label = "🌸 Alihkan ke AnimateDiff (SD 1.5 Anime)" if alt_engine == "animatediff" else "🌟 Alihkan ke Wan 2.1"
     markup.add(
         types.InlineKeyboardButton(f"📥 Unduh Otomatis (~{size_mb} MB)", callback_data=f"dl_asset:{first_key}"),
-        types.InlineKeyboardButton("🌟 Alihkan ke Wan 2.1 (Engine Siap)", callback_data="cfg_set_vengine:wan21"),
+        types.InlineKeyboardButton(alt_label, callback_data=f"cfg_set_vengine:{alt_engine}"),
         types.InlineKeyboardButton("❌ Batal", callback_data="cancel_dl_prompt")
     )
     target_mid = message_to_edit or (status_msg.message_id if status_msg else None)

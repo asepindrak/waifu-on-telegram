@@ -136,6 +136,10 @@ ASSET_REGISTRY = {
         "name": "Wan 2.1 1.3B Video Diffusion Model",
         "type": "model",
         "subfolder": os.path.join("models", "diffusion_models"),
+        "search_paths": [
+            os.path.join("models", "diffusion_models"),
+            os.path.join("models", "checkpoints")
+        ],
         "filename": "wan2.1_t2v_1.3B_bf16.safetensors",
         "patterns": ["*wan2.1*1.3B*.safetensors", "*wan2.1_t2v_1.3B*.safetensors", "*wan*1.3B*.safetensors", "*Wan2_1*1_3B*.safetensors"],
         "size_mb": 2700,
@@ -148,6 +152,28 @@ ASSET_REGISTRY = {
             "https://hf-mirror.com/Kijai/WanVideo_comfy/resolve/main/Wan2_1-T2V-1_3B_bf16.safetensors"
         ],
         "description": "Model video generasi baru Wan 2.1 1.3B (ringan & hemat VRAM).",
+        "required_for": "Video Engine Wan 2.1"
+    },
+    "wan21_clip": {
+        "name": "Wan 2.1 Text Encoder (UMT5 XXL FP8)",
+        "type": "model",
+        "subfolder": os.path.join("models", "clip"),
+        "search_paths": [
+            os.path.join("models", "clip"),
+            os.path.join("models", "text_encoders")
+        ],
+        "filename": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "patterns": ["*umt5_xxl*.safetensors", "*umt5*.safetensors"],
+        "size_mb": 4900,
+        "url": "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "fallback_url": "https://hf-mirror.com/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "mirrors": [
+            "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+            "https://hf-mirror.com/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+            "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+            "https://hf-mirror.com/Kijai/WanVideo_comfy/resolve/main/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        ],
+        "description": "Text encoder UMT5 XXL FP8 khusus untuk pipeline Wan 2.1 video.",
         "required_for": "Video Engine Wan 2.1"
     },
     "wan21_vae": {
@@ -1273,7 +1299,7 @@ def ensure_video_engine_assets(engine_name: str) -> Tuple[bool, List[str]]:
             if not info or not info.get("installed"):
                 missing.append(k)
     elif engine == "wan21":
-        for k in ("wan21_1.3b", "wan21_vae"):
+        for k in ("wan21_1.3b", "wan21_clip", "wan21_vae"):
             info = get_asset_info(k)
             if not info or not info.get("installed"):
                 missing.append(k)
