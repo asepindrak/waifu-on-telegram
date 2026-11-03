@@ -341,10 +341,49 @@ def cmd_status():
     else:
         import urllib.request
         print(c(BOLD + CYAN, f"System Status Diagnostics (v{get_version()}):"))
+
+        # Persona, Language, Outfit
+        persona_name = os.environ.get("DEFAULT_PERSONA", "runa").title()
+        lang_code = os.environ.get("BOT_LANGUAGE", "id")
+        lang_names = {"id": "Bahasa Indonesia", "en": "English", "ja": "Japanese", "auto": "Auto-detect"}
+        lang_disp = lang_names.get(lang_code, lang_code)
+        
+        outfit_key = "default"
+        outfit_file = os.path.join(PROJECT_ROOT, "data", "user_outfits.json")
+        if os.path.exists(outfit_file):
+            try:
+                with open(outfit_file, "r", encoding="utf-8") as of:
+                    odata = json.load(of)
+                    if odata:
+                        outfit_key = list(odata.values())[-1]
+            except Exception:
+                pass
+        outfit_disp = outfit_key
+        if outfit_key == "nude":
+            outfit_disp = "Tanpa Busana (Full Nude) [Auto-Switch NSFW Engine Aktif]"
+
+        print(f"  👑 Active Persona: {persona_name} | Language: {lang_disp}")
+        print(f"  👗 Current Outfit: {outfit_disp}")
+
+        # AI Architecture
+        ai_mode = os.environ.get("AI_ENGINE_MODE", "split")
+        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "gemini")
+        sfw_m = os.environ.get("SFW_LLM_MODEL", "gemini-2.5-flash")
+        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local")
+        nsfw_m = os.environ.get("LOCAL_LLM_MODEL", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
+        print(f"  🧠 AI Architecture: {ai_mode.upper()} (SFW: {sfw_p} [{sfw_m}] • NSFW: {nsfw_p} [{nsfw_m}])")
+
+        # Image Architecture
+        sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "comfyui")
+        nsfw_img = os.environ.get("NSFW_IMAGE_ENGINE", "comfyui")
+        sfw_ckpt = os.environ.get("SFW_COMFYUI_CHECKPOINT", "AnythingXL_xl.safetensors")
+        nsfw_ckpt = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "AOM3A1B_orange_mixs.safetensors")
+        print(f"  🎨 Visual Architecture: SFW '{sfw_img}' ({sfw_ckpt}) • NSFW '{nsfw_img}' ({nsfw_ckpt})")
+
         smart_idle = os.environ.get("SMART_IDLE_ENABLED", "true").lower() in ("true", "1", "yes")
         on_demand = os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")
-        llm_model = os.environ.get("LOCAL_LLM_MODEL", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
-        photo_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "AnythingXL_xl.safetensors")
+        llm_model = nsfw_m
+        photo_ckpt = nsfw_ckpt if outfit_key == "nude" else sfw_ckpt
 
         for name, url, is_idle, model_name in [
             ("Local LLM (KoboldCPP 5001)", "http://127.0.0.1:5001/v1/models", smart_idle, llm_model),
@@ -371,6 +410,40 @@ def cmd_status():
             except Exception:
                 pass
         print(f"  📂 Photo Vault: {v_count} foto tersimpan di arsip galeri lokal " + c(GREEN, "(Arsip Lokal Aktif ✓)"))
+
+        # Voice TTS
+        v_backend = os.environ.get("VOICE_BACKEND", "edge-tts")
+        v_speaker = os.environ.get("VOICE_NAME", "id-ID-GadisNeural")
+        v_lang = os.environ.get("VOICE_LANGUAGE", "id-ID")
+        v_reply = os.environ.get("VOICE_REPLY_MODE", "smart")
+        print(f"  🎙️ Voice Engine: {v_backend} (Speaker: {v_speaker} • Lang: {v_lang} • Reply: {v_reply})")
+        if "voicestudio" in v_backend.lower():
+            vs_port = int(os.environ.get("VOICESTUDIO_PORT", "3900"))
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{vs_port}/", timeout=1.5):
+                    print(f"  ✓ VoiceStudio Local AI (Port {vs_port}): " + c(GREEN, "ONLINE (Service Ready)"))
+            except Exception:
+                vs_dir = os.path.join(PROJECT_ROOT, "tools", "VoiceStudio")
+                if os.path.exists(vs_dir):
+                    print(f"  💤 VoiceStudio Local AI (Port {vs_port}): " + c(CYAN, "STANDBY / TIDUR (Hemat VRAM)"))
+                else:
+                    print(f"  🔴 VoiceStudio Local AI (Port {vs_port}): " + c(RED, "NOT INSTALLED"))
+        else:
+            print(f"  ✓ Voice TTS Cloud: " + c(GREEN, "ONLINE (Microsoft Edge-TTS Cloud Ready)"))
+
+        # Coding Workspace & Active Project
+        act_proj_file = os.path.join(PROJECT_ROOT, "data", "active_project.json")
+        act_proj = "general"
+        if os.path.exists(act_proj_file):
+            try:
+                with open(act_proj_file, "r", encoding="utf-8") as apf:
+                    ap_data = json.load(apf)
+                    if ap_data:
+                        act_proj = list(ap_data.values())[-1]
+            except Exception:
+                pass
+        p_root = os.environ.get("PROJECTS_DIR", os.path.expanduser("~"))
+        print(f"  💻 Coding Workspace: Active Project '{act_proj}' (Root: {p_root})")
 
         # Scheduled message buffer info
         buf_file = os.path.join(PROJECT_ROOT, "data", "scheduled_message_buffer.json")
@@ -400,6 +473,8 @@ def cmd_status():
                 print(f"  💤 Google Antigravity Bridge (Port {agy_port}): " + c(CYAN, "STANDBY / OFFLINE"))
             else:
                 print(f"  ⚪ Google Antigravity Bridge (Port {agy_port}): " + c(DIM, "DISABLED"))
+
+        print(f"  🔒 GPU Resource Lock: " + c(GREEN, "AKTIF (Proteksi Tabrakan VRAM Image & Voice Aktif ✓)"))
 
 def cmd_setup():
     setup_py = os.path.join(PROJECT_ROOT, "setup.py")

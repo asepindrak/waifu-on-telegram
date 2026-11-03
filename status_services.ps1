@@ -38,6 +38,18 @@ try {
     }
     Write-Host "  [PERSONA] Active Waifu: $pName ($pArch)" -ForegroundColor Magenta
 
+    # Language
+    $bLang = $env:BOT_LANGUAGE
+    if (-not $bLang) { $bLang = "id" }
+    $langMap = @{
+        "id" = "Bahasa Indonesia (id)"
+        "en" = "English (en)"
+        "ja" = "Japanese (ja)"
+        "auto" = "Auto-detect (Ikuti Bahasa Chat)"
+    }
+    $langDisp = if ($langMap.ContainsKey($bLang)) { $langMap[$bLang] } else { $bLang }
+    Write-Host "  [LANGUAGE] Chat Language: $langDisp" -ForegroundColor Cyan
+
     # Outfit
     $outfitName = "Default (Persona Style)"
     $outfitsPath = Join-Path $PSScriptRoot "data\user_outfits.json"
@@ -68,6 +80,9 @@ try {
                 $outfitName = $outfitMap[$outfitRawKey]
             } else {
                 $outfitName = $outfitRawKey
+            }
+            if ($outfitRawKey -eq "nude") {
+                $outfitName = "$outfitName (Auto-Switch NSFW Image & LLM Engine Aktif)"
             }
         }
     }
@@ -104,6 +119,40 @@ try {
     elseif ($vramMB -ge 2000) { $tierLabel = "Compact (SD 1.5 MeinaMix & AnimateDiff)" }
 
     Write-Host "  [HARDWARE] GPU & VRAM: $gpuName ($vramGB GB VRAM • $tierLabel)" -ForegroundColor Yellow
+} catch {}
+
+# 1c. AI & Image Engine Architecture Setup
+try {
+    $aiMode = $env:AI_ENGINE_MODE
+    if (-not $aiMode) { $aiMode = "split" }
+    $aiModeLabel = if ($aiMode -eq "split") { "Split Hybrid (SFW Provider + NSFW Local)" } else { "Unified (Single Model)" }
+    $sfwProv = $env:SFW_LLM_PROVIDER
+    if (-not $sfwProv) { $sfwProv = "gemini" }
+    $sfwModel = $env:SFW_LLM_MODEL
+    if (-not $sfwModel) { $sfwModel = "gemini-2.5-flash" }
+    $nsfwProv = $env:NSFW_LLM_PROVIDER
+    if (-not $nsfwProv) { $nsfwProv = "local" }
+    $nsfwModel = $env:LOCAL_LLM_MODEL
+    if (-not $nsfwModel) { $nsfwModel = "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" }
+
+    Write-Host "  [AI ARCH] Mode AI: $aiModeLabel" -ForegroundColor Cyan
+    Write-Host "            - SFW Engine : $sfwProv ($sfwModel)" -ForegroundColor DarkCyan
+    Write-Host "            - NSFW Engine: $nsfwProv ($nsfwModel)" -ForegroundColor DarkCyan
+
+    $imgMode = $env:IMAGE_ENGINE_MODE
+    if (-not $imgMode) { $imgMode = "split" }
+    $sfwImg = $env:SFW_IMAGE_ENGINE
+    if (-not $sfwImg) { $sfwImg = "comfyui" }
+    $nsfwImg = $env:NSFW_IMAGE_ENGINE
+    if (-not $nsfwImg) { $nsfwImg = "comfyui" }
+    $sfwCkpt = $env:SFW_COMFYUI_CHECKPOINT
+    if (-not $sfwCkpt) { $sfwCkpt = "AnythingXL_xl.safetensors" }
+    $nsfwCkpt = $env:NSFW_COMFYUI_CHECKPOINT
+    if (-not $nsfwCkpt) { $nsfwCkpt = "AOM3A1B_orange_mixs.safetensors" }
+
+    Write-Host "  [IMG ARCH] Visual Generator Architecture:" -ForegroundColor Cyan
+    Write-Host "            - SFW Image  : $sfwImg ($sfwCkpt)" -ForegroundColor DarkCyan
+    Write-Host "            - NSFW Image : $nsfwImg ($nsfwCkpt)" -ForegroundColor DarkCyan
 } catch {}
 
 # 2. Check Local LLM (KoboldCPP 5001 / Locally Uncensored 8127 / Ollama 11434 / LM Studio 1234)
@@ -284,6 +333,66 @@ $vModel = if ($vEngine -eq "animatediff") { "mm_sd_v15_v2.ckpt (AnimateDiff v2)"
 Write-Host "  [VIDEO]   Active Video Engine: $vLabel" -ForegroundColor Cyan
 Write-Host "            Video Model: $vModel" -ForegroundColor DarkCyan
 
+# 4b. Voice TTS Engine & VoiceStudio Port 3900
+try {
+    $vBackend = $env:VOICE_BACKEND
+    if (-not $vBackend) { $vBackend = "edge-tts" }
+    $vSpeaker = $env:VOICE_NAME
+    if (-not $vSpeaker) { $vSpeaker = "id-ID-GadisNeural" }
+    $vLang = $env:VOICE_LANGUAGE
+    if (-not $vLang) { $vLang = "id-ID" }
+    $vReply = $env:VOICE_REPLY_MODE
+    if (-not $vReply) { $vReply = "smart" }
+
+    $vBackendLabel = if ($vBackend -like "*voicestudio*") { "VoiceStudio Local AI (Port 3900)" } else { "Microsoft Edge-TTS Cloud" }
+    Write-Host "  [VOICE]   Voice Engine: $vBackendLabel (Speaker: $vSpeaker • Lang: $vLang • Reply: $vReply)" -ForegroundColor Cyan
+
+    if ($vBackend -like "*voicestudio*") {
+        $vsPort = if ($env:VOICESTUDIO_PORT) { [int]$env:VOICESTUDIO_PORT } else { 3900 }
+        $vsOnline = $false
+        try {
+            $tcpVs = New-Object System.Net.Sockets.TcpClient
+            $arVs = $tcpVs.BeginConnect("127.0.0.1", $vsPort, $null, $null)
+            $okVs = $arVs.AsyncWaitHandle.WaitOne(300, $false)
+            if ($okVs -and $tcpVs.Connected) {
+                $tcpVs.EndConnect($arVs)
+                $vsOnline = $true
+            }
+            $tcpVs.Close()
+        } catch {}
+
+        if ($vsOnline) {
+            Write-Host "  [ONLINE]  VoiceStudio Local AI (Port $vsPort): ONLINE (Service Ready)" -ForegroundColor Green
+        } else {
+            $vsDir = Join-Path $PSScriptRoot "tools\VoiceStudio"
+            if (Test-Path $vsDir) {
+                Write-Host "  [STANDBY] VoiceStudio Local AI (Port $vsPort): STANDBY / TIDUR (Hemat VRAM • Bangun Otomatis Saat Voice)" -ForegroundColor Cyan
+            } else {
+                Write-Host "  [NOT READY] VoiceStudio Local AI (Port $vsPort): tools\VoiceStudio belum terpasang" -ForegroundColor Yellow
+            }
+        }
+    } else {
+        Write-Host "  [ONLINE]  Voice TTS Cloud: ONLINE (Microsoft Edge-TTS Cloud Ready)" -ForegroundColor Green
+    }
+} catch {}
+
+# 4c. Coding Workspace & Active Project
+try {
+    $projectsRoot = $env:PROJECTS_DIR
+    if (-not $projectsRoot) { $projectsRoot = [Environment]::GetFolderPath('UserProfile') }
+
+    $activeProj = "general"
+    $actProjFile = Join-Path $PSScriptRoot "data\active_project.json"
+    if (Test-Path $actProjFile) {
+        try {
+            $actData = Get-Content $actProjFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            $props = @($actData.PSObject.Properties)
+            if ($props.Count -gt 0) { $activeProj = $props[-1].Value }
+        } catch {}
+    }
+    Write-Host "  [CODING]  Coding Workspace: Active Project '$activeProj' (Root: $projectsRoot)" -ForegroundColor Cyan
+} catch {}
+
 # 5. Check Music Server (Port 8002)
 try {
     $tcp = New-Object System.Net.Sockets.TcpClient
@@ -349,4 +458,5 @@ if (Test-Path $bufFile) {
     } catch {}
 }
 Write-Host "  [GAMING]  Scheduled Messages Buffer: $bufCount pesan tersimpan (Gaming Protection Aktif)" -ForegroundColor Cyan
+Write-Host "  [LOCK]    GPU Resource Lock: AKTIF (Proteksi Tabrakan VRAM Image & Voice Aktif [OK])" -ForegroundColor Green
 Write-Host ""

@@ -71,6 +71,7 @@ Thumbs.db
 
 # User Memory & Private Data
 data/*.json
+data/photo_vault/
 !data/.gitkeep
 
 # Local AI Models & Tools Runtime

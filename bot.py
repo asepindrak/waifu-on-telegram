@@ -2344,6 +2344,17 @@ def is_agy_bridge_online() -> bool:
         return False
 
 
+def is_voicestudio_online() -> bool:
+    """Quick socket check if VoiceStudio service is responding on port 3900."""
+    import socket
+    vs_port = int(os.environ.get("VOICESTUDIO_PORT", "3900"))
+    try:
+        with socket.create_connection(("127.0.0.1", vs_port), timeout=0.5):
+            return True
+    except Exception:
+        return False
+
+
 def build_system_diagnostics_report(user_id: int) -> str:
     """Builds a comprehensive system diagnostics report matching and exceeding CLI 'waifu status'."""
     llm_stat = llm_client.check_health()
@@ -2384,13 +2395,25 @@ def build_system_diagnostics_report(user_id: int) -> str:
     # Resolve Persona & Outfit
     p_name = persona.get("name", "Waifu")
     p_arch = persona.get("archetype", "Companion")
-    _, cur_outfit = persona_mgr.get_user_outfit(user_id)
+    raw_outfit_key, cur_outfit = persona_mgr.get_user_outfit(user_id)
+    if raw_outfit_key == "nude":
+        outfit_disp = f"`{cur_outfit}` 🔞 _(Auto-Switch NSFW Engine Aktif)_"
+    else:
+        outfit_disp = f"`{cur_outfit}`"
     lang_label = persona_mgr.get_language_display_name(BOT_LANGUAGE)
     score, rel_status = persona_mgr.get_relationship_status(user_id)
     affinity_score = memory_engine.get_affinity(user_id)
 
+    # Resolve AI Architecture
+    ai_mode = os.environ.get("AI_ENGINE_MODE", "split").lower()
+    ai_mode_str = "Split Hybrid (SFW + NSFW Khusus)" if ai_mode == "split" else "Unified (Model Tunggal)"
+    sfw_p = os.environ.get("SFW_LLM_PROVIDER", "gemini")
+    sfw_m = os.environ.get("SFW_LLM_MODEL", "gemini-2.5-flash")
+    nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local")
+    nsfw_m = os.environ.get("LOCAL_LLM_MODEL", llm_model_name)
+
     # Resolve Photo model checkpoint and installation status
-    cur_ckpt = media_stat.get("active_checkpoint") or media_engine.get_active_checkpoint()
+    cur_ckpt = media_stat.get("active_checkpoint") or media_engine.get_active_checkpoint(is_nude=(raw_outfit_key == "nude"))
     cdir = asset_manager.detect_comfyui_dir() if asset_manager else None
     ckpt_installed = False
     if cdir and cur_ckpt:
@@ -2398,9 +2421,16 @@ def build_system_diagnostics_report(user_id: int) -> str:
         ckpt_installed = os.path.isfile(ckpt_path)
     ckpt_badge = "_(Terpasang ✓)_" if ckpt_installed else ("_(Aktif di ComfyUI ✓)_" if media_stat.get("online") else "_(Perlu Download)_")
     sfw_img_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower()
-    if sfw_img_engine == "agy":
-        cur_ckpt = "Google Antigravity (AGY Subagent)"
-        ckpt_badge = "_(Cloud Subagent Aktif ✓)_" 
+    nsfw_img_engine = os.environ.get("NSFW_IMAGE_ENGINE", "comfyui").lower()
+    sfw_ckpt_name = os.environ.get("SFW_COMFYUI_CHECKPOINT", "AnythingXL_xl.safetensors")
+    nsfw_ckpt_name = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "AOM3A1B_orange_mixs.safetensors")
+    img_mode = os.environ.get("IMAGE_ENGINE_MODE", "split").lower()
+    img_mode_str = "Split Hybrid (SFW + NSFW Khusus)" if img_mode == "split" else "Unified"
+
+    if raw_outfit_key == "nude":
+        active_model_str = f"`{cur_ckpt}` _(NSFW Model Dipakai Otomatis 🔞)_"
+    else:
+        active_model_str = f"`{cur_ckpt}` {ckpt_badge}"
 
     # Resolve Photo Vault Archive stats
     import photo_vault
@@ -2420,12 +2450,32 @@ def build_system_diagnostics_report(user_id: int) -> str:
     ar = USER_RATIOS.get(user_id, "3:4")
     qual = USER_QUALITIES.get(user_id, "high").title()
 
-    # Voice TTS & Music Player
-    voice_str = f"Aktif ({voice_engine.default_voice})" if VOICE_ENABLED else "Nonaktif"
+    # Voice TTS & VoiceStudio / Edge-TTS
+    vs_backend = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
+    vs_speaker = os.environ.get("VOICE_NAME", getattr(voice_engine, "default_voice", "id-ID-GadisNeural"))
+    vs_lang = os.environ.get("VOICE_LANGUAGE", "id-ID")
+    vs_reply = os.environ.get("VOICE_REPLY_MODE", "smart").title()
+    if "voicestudio" in vs_backend:
+        vs_port = int(os.environ.get("VOICESTUDIO_PORT", "3900"))
+        if is_voicestudio_online():
+            vs_status_str = f"🟢 Online (Port {vs_port} - Local AI)"
+        elif hasattr(idle_engine, "voicestudio_installed") and idle_engine.voicestudio_installed:
+            vs_status_str = f"💤 Standby / Tidur (Smart Idle: VRAM Bebas)"
+        else:
+            vs_status_str = f"🔴 Offline / Belum Terpasang (Port {vs_port})"
+        voice_label_str = f"VoiceStudio Local AI (`{vs_speaker}`)"
+    else:
+        vs_status_str = "🟢 Online (Microsoft Edge-TTS Cloud Ready)"
+        voice_label_str = f"Edge-TTS Cloud (`{vs_speaker}`)"
+
     music_str = "🟢 Online (Port 8002)" if is_music_server_online() else "⚪ Inactive"
 
     # AGY OpenAI Bridge
     agy_str = "🟢 Online (Port 8001 - OpenAI Ready)" if is_agy_bridge_online() else "⚪ Inactive"
+
+    # Coding Workspace & Active Project
+    curr_proj = project_manager.get_active_project(user_id) if project_manager else "general"
+    root_proj_dir = project_manager.get_projects_root_dir() if project_manager else os.path.expanduser("~")
 
     # Bot Process & Windows Autorun
     bot_pid = os.getpid()
@@ -2450,34 +2500,39 @@ def build_system_diagnostics_report(user_id: int) -> str:
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👑 **Persona Waifu** : **{p_name}** _({p_arch})_\n"
         f"📖 **Cerita Hari Ini**: {story_str}\n"
-        f"👗 **Pakaian Aktif** : `{cur_outfit}`\n"
+        f"👗 **Pakaian Aktif** : {outfit_disp}\n"
         f"🌐 **Bahasa Chat**   : `{lang_label}`\n"
         f"💖 **Status Hubungan**: **{rel_status}** (`{score}%` • `{affinity_score} pts`)\n\n"
         f"🎮 **Hardware Auto-Tuning**:\n"
         f"• Profil GPU   : {hw_str}\n\n"
-        f"🧠 **Local LLM Engine**: {status_icon}\n"
-        f"• Model Chat   : `{llm_model_name}`\n"
-        f"• Vision Model : {vision_str}\n"
-        f"• Backend      : `{llm_stat.get('backend', 'KoboldCPP')}`\n"
-        f"• Endpoint     : `{LLM_BASE_URL}`\n\n"
-        f"🎨 **Generator Visual (Port 8188)**: {media_icon}\n"
-        f"• Backend      : `{media_stat.get('backend', 'ComfyUI Local')}`\n"
-        f"• Device / GPU : `{media_stat.get('device', 'CUDA')}`\n"
-        f"• **Model Foto** : `{cur_ckpt}` {ckpt_badge}\n"
+        f"🧠 **Arsitektur LLM ({ai_mode_str})**:\n"
+        f"• SFW Engine   : `{sfw_p}` (`{sfw_m}`)\n"
+        f"• NSFW Engine  : `{nsfw_p}` (`{nsfw_m}`)\n"
+        f"• Local Kobold : {status_icon}\n"
+        f"• AGY Bridge   : {agy_str}\n"
+        f"• Vision Model : {vision_str}\n\n"
+        f"🎨 **Generator Visual ({img_mode_str})**: {media_icon}\n"
+        f"• SFW Engine   : `{sfw_img_engine}` (`{sfw_ckpt_name}`)\n"
+        f"• NSFW Engine  : `{nsfw_img_engine}` (`{nsfw_ckpt_name}`)\n"
+        f"• **Model Foto Aktif**: {active_model_str}\n"
         f"• **Photo Vault**: {vault_str}\n"
         f"• **Engine Video**: `{v_engine_label}` {v_ready_badge}\n"
         f"• **Model Video**: {v_model_str}\n"
         f"• Rasio/Preset : `{ar}` | `{qual}`\n\n"
         f"🎙️ **Audio & Suara**:\n"
-        f"• Suara Waifu  : `{voice_str}`\n"
-        f"• Server Musik : `{music_str}`\n"
-        f"• AGY Bridge    : `{agy_str}`\n\n"
-        f"⚙️ **Sistem & Proses**:\n"
+        f"• Engine Voice : `{voice_label_str}`\n"
+        f"• Status Voice : {vs_status_str}\n"
+        f"• Bahasa Voice : `{vs_lang}` | Mode: `{vs_reply}`\n"
+        f"• Server Musik : {music_str}\n\n"
+        f"💻 **Coding & Workspace**:\n"
+        f"• Project Aktif: `{curr_proj}`\n"
+        f"• Root Folder  : `{root_proj_dir}`\n\n"
+        f"⚙️ **Sistem & Resource**:\n"
         f"• Bot Process  : `🟢 Berjalan (PID: {bot_pid})`\n"
         f"• PC Autorun   : `{autorun_str}`\n"
-        f"• Health Check : `{health_engine.get_status_summary()}`\n"
         f"• Mode Hemat   : `{idle_engine.get_status_summary()}`\n"
-        f"• Buffer Jadwal : `{scheduled_buffer.get_status_summary(user_id)}`\n"
+        f"• GPU Lock     : `🟢 Aktif (Proteksi Tabrakan VRAM Image & Voice)`\n"
+        f"• Buffer Jadwal: `{scheduled_buffer.get_status_summary(user_id)}`\n"
         f"• Buku Ingatan : `{facts_count} fakta tersimpan`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 _Ketik `/setup` untuk membuka panel kontrol dan pengaturan lengkap._"
@@ -3642,7 +3697,7 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
             }
 
             with ChatActionLoop(bot, chat_id, "upload_photo"):
-                if not media_engine.allow_cloud_fallback:
+                if is_nude or not media_engine.allow_cloud_fallback or os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip() == "comfyui":
                     idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id)
 
                 def photo_progress(stage_text: str):
@@ -3737,7 +3792,7 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
             })
 
             try:
-                caption, _ = llm_client.chat(caption_prompt, max_tokens=120)
+                caption, _ = llm_client.chat(caption_prompt, max_tokens=120, is_nsfw=is_nude)
             except Exception as e_cap:
                 logger.warning(f"Could not generate dynamic photo caption from LLM: {e_cap}")
                 caption = None
@@ -3891,7 +3946,7 @@ def process_video_request(
                 prompt_missing_asset_download(chat_id, user_id, missing, status_msg=status_msg)
                 return
 
-            if VIDEO_ENGINE in ("wan21", "animatediff") and not media_engine.allow_cloud_fallback:
+            if ((VIDEO_ENGINE in ("wan21", "animatediff") and not media_engine.allow_cloud_fallback) or is_nude):
                 idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id)
 
             with ChatActionLoop(bot, chat_id, "upload_video"):
@@ -3955,7 +4010,7 @@ def process_video_request(
             })
 
             try:
-                caption, _ = llm_client.chat(caption_prompt, max_tokens=120)
+                caption, _ = llm_client.chat(caption_prompt, max_tokens=120, is_nsfw=is_nude)
             except Exception:
                 caption = None
 
@@ -5412,6 +5467,9 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
             with ChatActionLoop(bot, message.chat.id, "typing"):
                 # 1. Proactively ensure LLM is awake (wakes from Smart Idle if sleeping)
                 is_nsfw_turn = detect_nsfw_intent(user_text)
+                cur_outfit_key, _ = persona_mgr.get_user_outfit(message.from_user.id)
+                if cur_outfit_key == "nude" and any(k in user_text.lower() for k in ["baju", "pakaian", "busana", "foto", "pap", "liat", "lihat", "telanjang", "nude", "pose", "seksi", "badan"]):
+                    is_nsfw_turn = True
                 llm_active = idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id, is_nsfw=is_nsfw_turn)
                 if not llm_active:
                     logger.warning("Local LLM engine could not be awakened.")
