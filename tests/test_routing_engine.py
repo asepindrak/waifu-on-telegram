@@ -113,5 +113,42 @@ class TestRoutingEngine(unittest.TestCase):
             self.assertEqual(nsfw_ckpt, "AOM3A1B_orangemixs.safetensors")
 
 
+    def test_history_sanitization_for_sfw(self):
+        """Past NSFW turns in history are stripped before sending to SFW provider (AGY / OpenAI)."""
+        mock_sfw = MagicMock(spec=LocallyUncensoredClient)
+        mock_sfw.chat.return_value = ("Jawaban kodingan bersih", "")
+        mock_sfw.base_url = "http://127.0.0.1:8001/v1"
+        mock_sfw.model = "gemini-3.8-flash-medium"
+
+        mock_nsfw = MagicMock(spec=LocallyUncensoredClient)
+        mock_nsfw.base_url = "http://127.0.0.1:5001/v1"
+        mock_nsfw.model = "default"
+
+        hybrid = HybridLLMClient(mode="split", sfw_client=mock_sfw, nsfw_client=mock_nsfw)
+
+        # History with past explicit NSFW conversation
+        history = [
+            {"role": "system", "content": "You are Runa, friendly waifu companion."},
+            {"role": "user", "content": "Aku mau liat kamu telanjang tanpa busana dong"},
+            {"role": "assistant", "content": "Ihh nakal banget sih, malu tau..."},
+            {"role": "user", "content": "Bantu buatkan script python untuk parsing json"}  # Current SFW turn
+        ]
+
+        reply, _ = hybrid.chat(history)
+        self.assertEqual(reply, "Jawaban kodingan bersih")
+        mock_sfw.chat.assert_called_once()
+
+        # Verify that mock_sfw was called with SANITIZED messages
+        called_messages = mock_sfw.chat.call_args[0][0]
+        # Should only contain system and the current clean SFW turn
+        self.assertEqual(len(called_messages), 2)
+        self.assertEqual(called_messages[0]["role"], "system")
+        self.assertEqual(called_messages[1]["content"], "Bantu buatkan script python untuk parsing json")
+        # Ensure no NSFW words reached SFW provider
+        for msg in called_messages:
+            self.assertNotIn("telanjang", msg["content"])
+            self.assertNotIn("tanpa busana", msg["content"])
+
+
 if __name__ == "__main__":
     unittest.main()

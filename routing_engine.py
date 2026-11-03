@@ -174,6 +174,69 @@ def detect_nsfw_intent(text: str, messages: Optional[List[Dict[str, Any]]] = Non
     return False
 
 
+def sanitize_messages_for_sfw(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Sanitizes conversation history before sending to SFW providers (AGY CLI, OpenAI, Groq).
+    Filters out explicit NSFW/erotic exchanges (both user and assistant turns) from past history,
+    preventing cloud safety filter bans, account warnings, or AGY CLI moderation triggers.
+    """
+    clean_messages = []
+    total = len(messages)
+    skip_next_assistant = False
+
+    for idx, m in enumerate(messages):
+        role = m.get("role", "")
+        content = m.get("content", "")
+
+        # 1. System instruction
+        if role == "system":
+            if isinstance(content, str):
+                safe_sys = re.sub(r'\[(?:NSFW|ERP|ADULT|MODE INTIM)[^\]]*\]', '', content, flags=re.IGNORECASE)
+                clean_messages.append({"role": role, "content": safe_sys.strip()})
+            else:
+                clean_messages.append(m)
+            continue
+
+        # 2. Latest active user message (the router already determined is_nsfw=False for SFW)
+        if idx == total - 1 and role == "user":
+            clean_messages.append(m)
+            continue
+
+        # 3. Check historical message content
+        content_str = ""
+        if isinstance(content, str):
+            content_str = content
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    content_str += part.get("text", "") + " "
+
+        is_nsfw_msg = bool(_NSFW_REGEX.search(content_str))
+
+        if role == "user":
+            if is_nsfw_msg:
+                # Omit this NSFW user turn and skip the paired assistant response
+                skip_next_assistant = True
+                continue
+            else:
+                skip_next_assistant = False
+                clean_messages.append(m)
+        elif role == "assistant":
+            if skip_next_assistant or is_nsfw_msg:
+                skip_next_assistant = False
+                continue
+            else:
+                clean_messages.append(m)
+        else:
+            clean_messages.append(m)
+
+    # Ensure system prompt and at least the latest user message exist
+    if not any(m.get("role") == "user" for m in clean_messages) and messages:
+        clean_messages.append(messages[-1])
+
+    return clean_messages
+
+
 class HybridLLMClient:
     """
     Intelligent Dual-Engine LLM Client.
@@ -295,9 +358,15 @@ class HybridLLMClient:
         client_model = getattr(target_client, 'model', 'default')
         logger.info(f"Routing chat turn -> [{target_label}] Engine ({client_url}, Model: {client_model})")
 
+        # If routing to SFW provider in split mode,
+        # sanitize history so past NSFW turns never reach AGY CLI or Cloud APIs!
+        payload_messages = messages
+        if target_client != self.nsfw_client and self.is_split_mode():
+            payload_messages = sanitize_messages_for_sfw(messages)
+
         try:
             return target_client.chat(
-                messages,
+                payload_messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 image_bytes=image_bytes
