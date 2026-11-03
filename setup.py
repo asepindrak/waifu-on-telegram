@@ -15,6 +15,9 @@ import sys
 import glob
 import json
 import shutil
+import logging
+
+logger = logging.getLogger(__name__)
 import platform
 import subprocess
 import argparse
@@ -556,6 +559,7 @@ def config_voice(env_vars):
                     voicestudio_engine.start_service()
         except Exception as e:
             logger.warning(f"VoiceStudio setup notice: {e}")
+            print(c(YELLOW, f"  ⚠️ VoiceStudio setup notice: {e}"))
     else:
         env_vars["VOICE_BACKEND"] = "edge-tts"
         print(c(GREEN, "  ✓ Voice Engine: Edge-TTS Cloud"))

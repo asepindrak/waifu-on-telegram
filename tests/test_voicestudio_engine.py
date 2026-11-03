@@ -84,6 +84,18 @@ class TestVoiceStudioEngine(unittest.TestCase):
         self.assertTrue(ok)
         self.assertTrue(mock_popen.called)
 
+    @patch("shutil.which", return_value="git.exe")
+    @patch("subprocess.run")
+    def test_install_method(self, mock_run, mock_which):
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_run.return_value = mock_proc
+
+        with patch.object(self.engine, "is_installed", return_value=True):
+            ok, msg = self.engine.install()
+            self.assertTrue(ok)
+            self.assertIn("berhasil", msg.lower())
+
 
 class TestPersonaVoiceSpecs(unittest.TestCase):
     def test_all_personas_have_voice_specs(self):

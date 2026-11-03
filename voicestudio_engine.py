@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import socket
+import shutil
 import logging
 import platform
 import subprocess
