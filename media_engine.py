@@ -168,6 +168,41 @@ class MediaEngine:
             pass
         return []
 
+    def _get_animatediff_loader_info(self) -> Optional[Tuple[str, str, str]]:
+        """Inspects ComfyUI for available AnimateDiff motion module loader nodes and model files.
+        Returns (node_class, model_input_key, chosen_model_filename) or None.
+        """
+        try:
+            r = requests.get(f"{self.comfyui_url}/object_info", timeout=4)
+            if r.status_code != 200:
+                return None
+            data = r.json()
+
+            loader_candidates = [
+                ("ADE_AnimateDiffLoaderWithContext", "model_name"),
+                ("AnimateDiffLoader", "model_name"),
+                ("ADE_AnimateDiffLoaderGen1", "model_name")
+            ]
+
+            for class_name, key_name in loader_candidates:
+                if class_name in data:
+                    node_def = data[class_name]
+                    available_models = node_def.get("input", {}).get("required", {}).get(key_name, [[]])[0]
+                    chosen_m = "mm_sd_v15_v2.ckpt"
+                    if available_models:
+                        for m in available_models:
+                            if "v15_v2" in m.lower():
+                                chosen_m = m
+                                break
+                            elif "v15" in m.lower() or "mm" in m.lower():
+                                chosen_m = m
+                        if chosen_m not in available_models and available_models:
+                            chosen_m = available_models[0]
+                    return (class_name, key_name, chosen_m)
+        except Exception as e:
+            logger.debug(f"Error checking AnimateDiff loader in ComfyUI: {e}")
+        return None
+
     @staticmethod
     def get_dimensions(aspect_ratio: str = "3:4", is_sdxl: bool = False) -> Tuple[int, int]:
         """Calculates optimal (width, height) tailored for SD 1.5 or SDXL based on aspect ratio."""
@@ -916,7 +951,19 @@ class MediaEngine:
         negative_prompt: Optional[str] = None,
         base_image_bytes: Optional[bytes] = None
     ) -> Optional[bytes]:
-        """Executes AnimateDiff SD 1.5 Anime video pipeline on ComfyUI."""
+        """Executes AnimateDiff SD 1.5 Anime video pipeline on ComfyUI with temporal motion cohesion."""
+        # 1. Verify AnimateDiff loader node and motion models exist in ComfyUI
+        ad_info = self._get_animatediff_loader_info()
+        if not ad_info:
+            self.last_error = (
+                "Ekstensi AnimateDiff (ComfyUI-AnimateDiff-Evolved) atau motion module (mm_sd_v15_v2.ckpt) "
+                "belum terpasang di ComfyUI. Tanpa modul animasi temporal, frame video hanya akan menghasilkan foto acak yang berkedip. "
+                "Silakan unduh AnimateDiff melalui bot (/video) atau gunakan Wan 2.1 (1.3B AI Video)."
+            )
+            return None
+
+        loader_class, model_key, chosen_motion_model = ad_info
+
         ckpts = self.get_available_checkpoints()
         chosen_ckpt = None
         for c in ckpts:
@@ -931,59 +978,92 @@ class MediaEngine:
             return None
 
         seed = random.randint(1000000, 99999999)
-        neg = negative_prompt or "worst quality, low quality, bad anatomy, deformed eyes"
+        neg = negative_prompt or "worst quality, low quality, bad anatomy, deformed eyes, extra limbs, static"
 
+        # Wire AnimateDiff Motion Module between Checkpoint and KSampler
         workflow = {
             "1": {
                 "class_type": "CheckpointLoaderSimple",
                 "inputs": {"ckpt_name": chosen_ckpt}
             },
             "2": {
+                "class_type": loader_class,
+                "inputs": {
+                    "model": ["1", 0],
+                    model_key: chosen_motion_model
+                }
+            },
+            "3": {
                 "class_type": "EmptyLatentImage",
                 "inputs": {"width": 512, "height": 768, "batch_size": 16}
             },
-            "3": {
+            "4": {
                 "class_type": "CLIPTextEncode",
                 "inputs": {"text": visual_prompt, "clip": ["1", 1]}
             },
-            "4": {
+            "5": {
                 "class_type": "CLIPTextEncode",
                 "inputs": {"text": neg, "clip": ["1", 1]}
             },
-            "5": {
+            "6": {
                 "class_type": "KSampler",
                 "inputs": {
                     "seed": seed,
                     "steps": 20,
                     "cfg": 7.0,
-                    "sampler_name": "dpmpp_2m",
+                    "sampler_name": "euler_ancestral",
                     "scheduler": "karras",
                     "denoise": 1.0,
-                    "model": ["1", 0],
-                    "positive": ["3", 0],
-                    "negative": ["4", 0],
-                    "latent_image": ["2", 0]
+                    "model": ["2", 0],  # Connected to AnimateDiff Motion Model!
+                    "positive": ["4", 0],
+                    "negative": ["5", 0],
+                    "latent_image": ["3", 0]
                 }
             },
-            "6": {
-                "class_type": "VAEDecode",
-                "inputs": {"samples": ["5", 0], "vae": ["1", 2]}
-            },
             "7": {
-                "class_type": "CreateVideo",
-                "inputs": {"images": ["6", 0], "fps": 12.0}
+                "class_type": "VAEDecode",
+                "inputs": {"samples": ["6", 0], "vae": ["1", 2]}
             },
             "8": {
+                "class_type": "CreateVideo",
+                "inputs": {"images": ["7", 0], "fps": 8.0}
+            },
+            "9": {
                 "class_type": "SaveVideo",
                 "inputs": {
-                    "video": ["7", 0],
+                    "video": ["8", 0],
                     "filename_prefix": "WaifuAnimateDiff",
                     "format": "auto"
                 }
             }
         }
 
-        return self._execute_video_workflow(workflow, output_node_id="8")
+        # If base image is provided (e.g. from photo message), encode and repeat for image-to-video animation
+        if base_image_bytes:
+            uploaded_name = self._upload_image_to_comfy(base_image_bytes, f"anim_in_{seed}.png")
+            if uploaded_name:
+                workflow["10"] = {
+                    "class_type": "LoadImage",
+                    "inputs": {"image": uploaded_name}
+                }
+                workflow["11"] = {
+                    "class_type": "VAEEncode",
+                    "inputs": {
+                        "pixels": ["10", 0],
+                        "vae": ["1", 2]
+                    }
+                }
+                workflow["12"] = {
+                    "class_type": "RepeatLatentBatch",
+                    "inputs": {
+                        "samples": ["11", 0],
+                        "amount": 16
+                    }
+                }
+                workflow["6"]["inputs"]["latent_image"] = ["12", 0]
+                workflow["6"]["inputs"]["denoise"] = 0.65
+
+        return self._execute_video_workflow(workflow, output_node_id="9")
 
     def _execute_video_workflow(self, workflow: dict, output_node_id: str = "9") -> Optional[bytes]:
         """Submits video workflow to ComfyUI and polls for the resulting MP4 video binary."""

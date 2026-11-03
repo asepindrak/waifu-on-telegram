@@ -74,5 +74,30 @@ class TestWan21AssetsAndValidation(unittest.TestCase):
             self.assertIn("umt5_xxl_fp8_e4m3fn_scaled.safetensors", engine.last_error)
             self.assertIn("models/clip", engine.last_error)
 
+    def test_animatediff_missing_loader_validation(self):
+        """Test generate_video_animatediff fails gracefully when AnimateDiff loader node is absent."""
+        engine = MediaEngine(comfyui_url="http://127.0.0.1:8188")
+        with patch.object(engine, "_get_animatediff_loader_info", return_value=None):
+            res = engine.generate_video_animatediff("a girl smiling")
+            self.assertIsNone(res)
+            self.assertIn("Ekstensi AnimateDiff", engine.last_error)
+
+    def test_animatediff_workflow_wires_motion_module(self):
+        """Test generate_video_animatediff wires the motion module node to KSampler."""
+        engine = MediaEngine(comfyui_url="http://127.0.0.1:8188")
+        with patch.object(engine, "_get_animatediff_loader_info", return_value=("ADE_AnimateDiffLoaderWithContext", "model_name", "mm_sd_v15_v2.ckpt")), \
+             patch.object(engine, "get_available_checkpoints", return_value=["meinamix_v12Final.safetensors"]), \
+             patch.object(engine, "_execute_video_workflow") as mock_exec:
+            mock_exec.return_value = b"video_mp4_bytes"
+            res = engine.generate_video_animatediff("a girl smiling")
+            self.assertEqual(res, b"video_mp4_bytes")
+            workflow_passed = mock_exec.call_args[0][0]
+            # Verify motion loader is node "2"
+            self.assertEqual(workflow_passed["2"]["class_type"], "ADE_AnimateDiffLoaderWithContext")
+            self.assertEqual(workflow_passed["2"]["inputs"]["model_name"], "mm_sd_v15_v2.ckpt")
+            # Verify KSampler (node "6") connects to node "2" (the motion module), not directly to Checkpoint
+            self.assertEqual(workflow_passed["6"]["inputs"]["model"], ["2", 0])
+            self.assertEqual(workflow_passed["8"]["inputs"]["fps"], 8.0)
+
 if __name__ == "__main__":
     unittest.main()
