@@ -268,6 +268,18 @@ def apply_llm_choice(choice: str) -> str:
 def apply_ckpt_choice(choice: str) -> str:
     global COMFYUI_URL, MEDIA_FALLBACK
     detected_ckpts = scan_image_models()
+    if choice == "agy":
+        os.environ["SFW_IMAGE_ENGINE"] = "agy"
+        os.environ["COMFYUI_URL"] = "http://127.0.0.1:8188"
+        os.environ["MEDIA_FALLBACK_CLOUD"] = "false"
+        update_env_variable("SFW_IMAGE_ENGINE", "agy")
+        update_env_variable("MEDIA_FALLBACK_AGY", "true")
+        update_env_variable("MEDIA_FALLBACK_CLOUD", "false")
+        return "Google Antigravity (AGY Image Generator)"
+    else:
+        os.environ["SFW_IMAGE_ENGINE"] = "cloud" if choice == "cloud" else ("disabled" if choice == "disabled" else "comfyui")
+        update_env_variable("SFW_IMAGE_ENGINE", os.environ["SFW_IMAGE_ENGINE"])
+
     if choice == "auto":
         os.environ["COMFYUI_CHECKPOINT"] = ""
         os.environ["COMFYUI_URL"] = "http://127.0.0.1:8188"
@@ -1774,8 +1786,10 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
     is_aom = any(k in cur_ckpt.lower() for k in ["aom", "orange"])
     is_anything = ("anything" in cur_ckpt.lower() or "xl" in cur_ckpt.lower())
     is_auto = (not cur_ckpt and bool(cur_url))
+    is_agy = (os.environ.get("SFW_IMAGE_ENGINE", "").lower() == "agy")
 
-    markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - Cepat & Hemat VRAM) {'✓' if is_meina else ''}", callback_data="cfg_set_ckpt:meinamix"))
+    markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity (AGY Subagent) {'✓' if is_agy else ''}", callback_data="cfg_set_ckpt:agy"))
+    markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - Cepat & Hemat VRAM) {'✓' if is_meina and not is_agy else ''}", callback_data="cfg_set_ckpt:meinamix"))
     markup.add(types.InlineKeyboardButton(f"🍊 AbyssOrangeMix3 (AOM3A1B SD 1.5 - Civitai #9942) {'✓' if is_aom else ''}", callback_data="cfg_set_ckpt:aom3"))
     markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - Ultra Jernih) {'✓' if is_anything else ''}", callback_data="cfg_set_ckpt:anything_xl"))
     markup.add(types.InlineKeyboardButton(f"🎯 Auto-detect ComfyUI {'✓' if is_auto else ''}", callback_data="cfg_set_ckpt:auto"))
@@ -1797,7 +1811,9 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
     markup.add(types.InlineKeyboardButton(f"❌ Nonaktifkan Foto {'✓' if is_disabled else ''}", callback_data="cfg_set_ckpt:disabled"))
     markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
 
-    if not cur_ckpt:
+    if is_agy:
+        active_display = "Google Antigravity (AGY Subagent)"
+    elif not cur_ckpt:
         active_display = "Auto (ComfyUI Active)" if cur_url else ("Cloud Engine" if cur_cloud else "Dinonaktifkan")
     elif "anything" in cur_ckpt.lower():
         active_display = "Anything XL (SDXL 1024px)"

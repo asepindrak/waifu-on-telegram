@@ -518,21 +518,25 @@ def config_image_model(env_vars):
         env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
         print(c(GREEN, "  ✓ Image Engine dipilih: Google Antigravity (AGY Image Generator)."))
     elif chosen_mode == "disabled":
+        env_vars["SFW_IMAGE_ENGINE"] = "disabled"
         env_vars["COMFYUI_URL"] = ""
         env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
         env_vars["COMFYUI_CHECKPOINT"] = ""
         print(c(YELLOW, "  ✓ Fitur foto dinonaktifkan."))
     elif chosen_mode == "cloud":
+        env_vars["SFW_IMAGE_ENGINE"] = "cloud"
         env_vars["COMFYUI_URL"] = ""
         env_vars["MEDIA_FALLBACK_CLOUD"] = "true"
         env_vars["COMFYUI_CHECKPOINT"] = ""
         print(c(GREEN, "  ✓ Model Foto dipilih: Cloud Fallback Engine (Pollinations AI)"))
     elif chosen_mode == "auto":
+        env_vars["SFW_IMAGE_ENGINE"] = "comfyui"
         env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
         env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
         env_vars["COMFYUI_CHECKPOINT"] = ""
         print(c(GREEN, "  ✓ Model Foto dipilih: Auto-detect ComfyUI"))
-    elif chosen_mode in ("meinamix", "aom3", "anything_xl"):
+    elif chosen_mode in ("meinamix", "aom3", "anything_xl", "local_custom"):
+        env_vars["SFW_IMAGE_ENGINE"] = "comfyui"
         env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
         env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
         env_vars["COMFYUI_CHECKPOINT"] = chosen_val

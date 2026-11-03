@@ -58,5 +58,16 @@ class TestBotMenusAndResilience(unittest.TestCase):
             bot.handle_text_messages(msg)
             mock_persona.assert_called_once_with(6402709138, 6402709138, reply_to_id=556)
 
+    def test_apply_ckpt_choice_agy(self):
+        with patch.object(bot, 'update_env_variable'):
+            label = bot.apply_ckpt_choice("agy")
+            self.assertIn("Google Antigravity", label)
+            self.assertEqual(os.environ.get("SFW_IMAGE_ENGINE"), "agy")
+
+            # Switching back to meinamix
+            label_meina = bot.apply_ckpt_choice("meinamix")
+            self.assertIn("MeinaMix", label_meina)
+            self.assertEqual(os.environ.get("SFW_IMAGE_ENGINE"), "comfyui")
+
 if __name__ == '__main__':
     unittest.main()
