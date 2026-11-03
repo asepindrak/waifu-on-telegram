@@ -249,6 +249,24 @@ def start_auxiliary_services():
                 except Exception:
                     pass
 
+    # 4. Google Antigravity CLI Bridge (Port 8001)
+    agy_enabled = os.environ.get("AGY_BRIDGE_ENABLED", "true").lower() in ("true", "1", "yes")
+    agy_port = int(os.environ.get("AGY_BRIDGE_PORT", "8001"))
+    if agy_enabled and not is_port_listening(agy_port):
+        agy_script = os.path.join(PROJECT_ROOT, "agy_bridge.py")
+        if os.path.exists(agy_script) and (shutil.which("agy") or shutil.which("agy.cmd")):
+            try:
+                subprocess.Popen(
+                    [sys.executable, agy_script],
+                    cwd=PROJECT_ROOT,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    **popen_kwargs
+                )
+                print(c(GREEN, f"  ✓ Google Antigravity CLI Bridge active on port {agy_port} (OpenAI Compatible)"))
+            except Exception:
+                pass
+
 def cmd_stop():
     print_banner()
     print(c(YELLOW, "🛑 Terminating Waifu on Telegram services..."))
@@ -266,6 +284,8 @@ def cmd_stop():
         subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq ComfyUI*"], capture_output=True)
         ps_comfy = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*main.py*" -and $_.CommandLine -like "*8188*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
         subprocess.run(["powershell", "-NoProfile", "-Command", ps_comfy], capture_output=True)
+        ps_bridge = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*agy_bridge.py*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
+        subprocess.run(["powershell", "-NoProfile", "-Command", ps_bridge], capture_output=True)
     else:
         stop_sh = os.path.join(PROJECT_ROOT, "stop_services.sh")
         if os.path.exists(stop_sh):
@@ -281,6 +301,7 @@ def cmd_stop():
             subprocess.run(["pkill", "-f", "node.*music_player_server.js"], capture_output=True)
             subprocess.run(["pkill", "-f", "koboldcpp"], capture_output=True)
             subprocess.run(["pkill", "-f", "main.py.*8188"], capture_output=True)
+            subprocess.run(["pkill", "-f", "python.*agy_bridge.py"], capture_output=True)
 
     if os.path.exists(PID_FILE):
         try:
@@ -347,6 +368,21 @@ def cmd_status():
             except Exception:
                 pass
         print(f"  🎮 Scheduled Message Buffer: {buf_count} pesan tersimpan " + c(GREEN, "(Gaming Protection Aktif ✓)"))
+
+        # AGY OpenAI Bridge diagnostics
+        agy_port = int(os.environ.get("AGY_BRIDGE_PORT", "8001"))
+        try:
+            try:
+                r = urllib.request.urlopen(f"http://127.0.0.1:{agy_port}/health", timeout=1.5)
+            except Exception:
+                r = urllib.request.urlopen(f"http://127.0.0.1:{agy_port}/", timeout=1.5)
+            with r:
+                print(f"  ✓ Google Antigravity Bridge (Port {agy_port}): " + c(GREEN, "ONLINE (OpenAI API Ready)"))
+        except Exception:
+            if os.environ.get("AGY_BRIDGE_ENABLED", "true").lower() in ("true", "1", "yes"):
+                print(f"  💤 Google Antigravity Bridge (Port {agy_port}): " + c(CYAN, "STANDBY / OFFLINE"))
+            else:
+                print(f"  ⚪ Google Antigravity Bridge (Port {agy_port}): " + c(DIM, "DISABLED"))
 
 def cmd_setup():
     setup_py = os.path.join(PROJECT_ROOT, "setup.py")
@@ -770,6 +806,64 @@ def cmd_update():
         print(c(DIM, "\nStart your bot anytime with: waifu start --daemon\n"))
 
 
+def cmd_bridge(action: str = "status"):
+    """Manages Google Antigravity CLI OpenAI-Compatible Bridge Server."""
+    action = (action or "status").lower()
+    agy_port = int(os.environ.get("AGY_BRIDGE_PORT", "8001"))
+    agy_script = os.path.join(PROJECT_ROOT, "agy_bridge.py")
+
+    if action == "start":
+        print(c(CYAN, f"\n🚀 Launching Google Antigravity CLI Bridge on port {agy_port}..."))
+        if is_port_listening(agy_port):
+            print(c(YELLOW, f"⚠️ Port {agy_port} is already in use (Bridge is already active)."))
+            return
+
+        popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if platform.system() == "Windows" else {"start_new_session": True}
+        subprocess.Popen([sys.executable, agy_script], cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
+        time.sleep(1.5)
+        if is_port_listening(agy_port):
+            print(c(GREEN, f"✓ AGY Bridge is online at http://127.0.0.1:{agy_port}/v1"))
+            print(c(DIM, "  OpenAI API Compatible: /v1/chat/completions | /v1/models"))
+        else:
+            print(c(YELLOW, f"⏳ AGY Bridge is initializing... Check status with 'waifu bridge status'."))
+    elif action == "stop":
+        print(c(YELLOW, f"\n🛑 Stopping Google Antigravity CLI Bridge (port {agy_port})..."))
+        if platform.system() == "Windows":
+            ps_cmd = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*agy_bridge.py*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
+            subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True)
+        else:
+            subprocess.run(["pkill", "-f", "python.*agy_bridge.py"], capture_output=True)
+        print(c(GREEN, "✓ AGY Bridge has been stopped."))
+    elif action == "restart":
+        cmd_bridge("stop")
+        time.sleep(1.5)
+        cmd_bridge("start")
+    else:  # status
+        import urllib.request
+        print_banner()
+        print(c(BOLD + CYAN, "🌉 GOOGLE ANTIGRAVITY CLI (AGY) OPENAI-COMPATIBLE BRIDGE:"))
+        print(c(DIM, "─" * 70))
+        try:
+            try:
+                r = urllib.request.urlopen(f"http://127.0.0.1:{agy_port}/health", timeout=2)
+            except Exception:
+                r = urllib.request.urlopen(f"http://127.0.0.1:{agy_port}/", timeout=2)
+            with r:
+                data = json.loads(r.read().decode("utf-8"))
+                print(f"  • Status      : " + c(GREEN, "ONLINE (OpenAI API Ready ✓)"))
+                print(f"  • Endpoint    : http://127.0.0.1:{agy_port}/v1")
+                print(f"  • Engine      : {data.get('engine', 'Google Antigravity CLI')}")
+                print(f"  • AGY Version : {data.get('agy_version', 'N/A')}")
+                print(f"  • Model Def   : {data.get('default_model', 'flash')} (flash, pro, inherit)")
+                print(c(DIM, "\n  Gunakan di aplikasi eksternal (Cursor, VSCode, LibreChat, dll):"))
+                print(c(DIM, f"    Base URL : http://127.0.0.1:{agy_port}/v1"))
+                print(c(DIM, f"    API Key  : sk-agy-waifu (atau bebas)"))
+                print(c(DIM, f"    Model    : flash / pro / inherit"))
+        except Exception:
+            print(f"  • Status      : " + c(RED, f"OFFLINE (Port {agy_port} tidak merespon)"))
+            print(c(DIM, "  Nyalakan dengan: waifu bridge start"))
+        print(c(DIM, "─" * 70) + "\n")
+
 def cmd_chat():
     """Starts the interactive CLI chat session with shared Telegram history."""
     try:
@@ -804,6 +898,7 @@ def print_cli_help(unknown_cmd: str = None):
     print(f"    {c(GREEN, 'waifu restart')}               Restart bot & daemon secara bersih")
     print(f"    {c(GREEN, 'waifu status')}                Diagnostik kesehatan LLM, ComfyUI, Music & RAM/VRAM")
     print(f"    {c(GREEN, 'waifu logs')}                  Pantau log aktivitas bot secara real-time")
+    print(f"    {c(GREEN, 'waifu bridge')} [start|stop|status]  Kelola Google Antigravity CLI OpenAI-compatible Bridge")
 
     print(c(BOLD + MAGENTA, "\n  ⚙️ Konfigurasi & Model AI:"))
     print(f"    {c(GREEN, 'waifu autotune')}              Deteksi GPU/VRAM & optimalkan model foto/video otomatis")
@@ -853,6 +948,9 @@ def main():
         cmd_stop()
     elif cmd == "restart":
         cmd_restart(daemon=True)
+    elif cmd == "bridge":
+        action = args.arg or "status"
+        cmd_bridge(action)
     elif cmd == "status":
         cmd_status()
     elif cmd in ("setup", "config"):

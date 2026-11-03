@@ -296,6 +296,23 @@ try {
     Write-Host "  [INACTIVE] YouTube Music Player (Port 8002): Inactive" -ForegroundColor DarkGray
 }
 
+# 5b. Check AGY OpenAI Bridge Server (Port 8001)
+$agyPort = if ($env:AGY_BRIDGE_PORT) { [int]$env:AGY_BRIDGE_PORT } else { 8001 }
+try {
+    $tcpAgy = New-Object System.Net.Sockets.TcpClient
+    $arAgy = $tcpAgy.BeginConnect("127.0.0.1", $agyPort, $null, $null)
+    $okAgy = $arAgy.AsyncWaitHandle.WaitOne(500, $false)
+    if ($okAgy -and $tcpAgy.Connected) {
+        $tcpAgy.EndConnect($arAgy)
+        Write-Host "  [ONLINE]  AGY OpenAI Bridge (Port $agyPort): ONLINE (OpenAI API Ready)" -ForegroundColor Green
+    } else {
+        Write-Host "  [STANDBY] AGY OpenAI Bridge (Port $agyPort): Standby / Inactive" -ForegroundColor DarkGray
+    }
+    $tcpAgy.Close()
+} catch {
+    Write-Host "  [STANDBY] AGY OpenAI Bridge (Port $agyPort): Standby / Inactive" -ForegroundColor DarkGray
+}
+
 # 6. Check Bot Process
 $botProc = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*bot.py*" }
 if ($botProc) {

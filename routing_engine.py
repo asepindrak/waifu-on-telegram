@@ -95,6 +95,14 @@ PROVIDER_PRESETS = {
         "default_model": "default",
         "is_local": False,
         "description": "Endpoint API eksternal buatan sendiri."
+    },
+    "agy": {
+        "name": "Google Antigravity CLI Bridge (AGY Port 8001)",
+        "base_url": "http://127.0.0.1:8001/v1",
+        "api_key": "sk-agy-waifu",
+        "default_model": "flash",
+        "is_local": True,
+        "description": "Bridge server OpenAI-compatible bertenaga Google Antigravity CLI (agy)."
     }
 }
 

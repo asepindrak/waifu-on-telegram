@@ -54,7 +54,15 @@ if command -v node &>/dev/null && [ -f "$SCRIPT_DIR/music_player_server.js" ]; t
     nohup node "$SCRIPT_DIR/music_player_server.js" >/dev/null 2>&1 &
 fi
 
-# 4. Start Python Telegram Bot
+# 4. Start Google Antigravity CLI Bridge if present & port 8001 not active
+if command -v agy &>/dev/null && [ -f "$SCRIPT_DIR/agy_bridge.py" ]; then
+    if ! nc -z 127.0.0.1 8001 2>/dev/null && ! (echo >/dev/tcp/127.0.0.1/8001) 2>/dev/null; then
+        echo "Starting Google Antigravity CLI Bridge on port 8001..."
+        nohup $PY "$SCRIPT_DIR/agy_bridge.py" >/dev/null 2>&1 &
+    fi
+fi
+
+# 5. Start Python Telegram Bot
 nohup $PY "$SCRIPT_DIR/bot.py" >> "$LOG_FILE" 2>&1 &
 BOT_PID=$!
 echo "$BOT_PID" > "$PID_FILE"

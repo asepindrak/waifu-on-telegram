@@ -18,5 +18,6 @@ pkill -f "python.*bot.py" 2>/dev/null || true
 pkill -f "node.*music_player_server.js" 2>/dev/null || true
 pkill -f "koboldcpp" 2>/dev/null || true
 pkill -f "main.py.*8188" 2>/dev/null || true
+pkill -f "python.*agy_bridge.py" 2>/dev/null || true
 
 echo "All Waifu on Telegram services stopped."

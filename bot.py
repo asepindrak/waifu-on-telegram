@@ -1984,6 +1984,15 @@ def is_music_server_online() -> bool:
     except Exception:
         return False
 
+def is_agy_bridge_online() -> bool:
+    """Quick socket check if AGY OpenAI bridge is responding on port 8001."""
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", 8001), timeout=0.5):
+            return True
+    except Exception:
+        return False
+
 
 def build_system_diagnostics_report(user_id: int) -> str:
     """Builds a comprehensive system diagnostics report matching and exceeding CLI 'waifu status'."""
@@ -2061,6 +2070,9 @@ def build_system_diagnostics_report(user_id: int) -> str:
     voice_str = f"Aktif ({voice_engine.default_voice})" if VOICE_ENABLED else "Nonaktif"
     music_str = "🟢 Online (Port 8002)" if is_music_server_online() else "⚪ Inactive"
 
+    # AGY OpenAI Bridge
+    agy_str = "🟢 Online (Port 8001 - OpenAI Ready)" if is_agy_bridge_online() else "⚪ Inactive"
+
     # Bot Process & Windows Autorun
     bot_pid = os.getpid()
     autorun_str = "🟢 Aktif (Auto-boot PC)" if is_autorun_enabled() else "⚪ Nonaktif"
@@ -2104,7 +2116,8 @@ def build_system_diagnostics_report(user_id: int) -> str:
         f"• Rasio/Preset : `{ar}` | `{qual}`\n\n"
         f"🎙️ **Audio & Suara**:\n"
         f"• Suara Waifu  : `{voice_str}`\n"
-        f"• Server Musik : `{music_str}`\n\n"
+        f"• Server Musik : `{music_str}`\n"
+        f"• AGY Bridge    : `{agy_str}`\n\n"
         f"⚙️ **Sistem & Proses**:\n"
         f"• Bot Process  : `🟢 Berjalan (PID: {bot_pid})`\n"
         f"• PC Autorun   : `{autorun_str}`\n"

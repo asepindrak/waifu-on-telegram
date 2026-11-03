@@ -12,6 +12,8 @@ taskkill /F /FI "WINDOWTITLE eq ComfyUI*" >nul 2>&1
 powershell -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*main.py*' -and $_.CommandLine -like '*8188*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
 
 powershell -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*bot.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq AGY OpenAI Bridge*" >nul 2>&1
+powershell -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*agy_bridge.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
 
 echo Services stopped.
 timeout /t 2 >nul

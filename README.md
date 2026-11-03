@@ -273,10 +273,46 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.7.0)
+                        💖 WAIFU ON TELEGRAM BOT (v1.7.1)
 ```
 
 > 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.
+
+---
+
+## 🌉 Google Antigravity CLI (AGY) OpenAI-Compatible Bridge Server
+
+Project ini dilengkapi dengan **AGY OpenAI Bridge Server** (`agy_bridge.py` di port `8001`), sebuah jembatan lokal standar OpenAI API (`/v1/chat/completions`, `/v1/models`, dan `/health`) yang ditenagai oleh Google Antigravity CLI (`agy`).
+
+### 🌟 Fitur Utama AGY Bridge:
+1. **Dapat Digunakan Langsung oleh Waifu on Telegram**:
+   - Dapat diatur sebagai provider LLM SFW (`SFW_LLM_PROVIDER=agy` di `.env` atau melalui `waifu setup`).
+   - Sangat cepat, cerdas, responsif, dan 0 VRAM overhead (memanfaatkan engine `flash` atau `pro`).
+2. **Dapat Digunakan Bersama oleh Aplikasi Eksternal**:
+   - Menghubungkan berbagai IDE & tools pengembang pihak ketiga ke ekosistem Google Antigravity tanpa konfigurasi rumit:
+     - **Cursor / VS Code (Cline, Roo Code, Continue, Chat)**
+     - **LibreChat / NextChat / OpenWebUI**
+     - **Script Python, cURL, maupun agen automasi mandiri**
+   - Mendukung prompt teks streaming/non-streaming serta multimodal vision (gambar lokal maupun web URL).
+3. **Parameter Integrasi Client Eksternal**:
+   - **Base URL**: `http://127.0.0.1:8001/v1`
+   - **API Key**: `sk-agy-waifu` *(atau string bebas jika tanpa strict auth)*
+   - **Model IDs**: `flash`, `pro`, `inherit`, `gpt-4o`, `gpt-4o-mini`
+
+### 🛠️ Perintah CLI Manajemen Bridge (`waifu bridge`):
+```bash
+# Cek status diagnostik & endpoint AGY Bridge
+waifu bridge status
+
+# Jalankan server AGY Bridge di latar belakang (port 8001)
+waifu bridge start
+
+# Hentikan server AGY Bridge
+waifu bridge stop
+
+# Restart server AGY Bridge
+waifu bridge restart
+```
 
 ---
 
@@ -324,6 +360,11 @@ waifu restart
 
 # Stop all bot services (Bot, Music Server, & KoboldCPP)
 waifu stop
+
+# Manage Google Antigravity CLI OpenAI Bridge (Port 8001)
+waifu bridge status
+waifu bridge start
+waifu bridge stop
 ```
 
 ---

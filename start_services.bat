@@ -97,6 +97,27 @@ if defined NODE_CMD (
     )
 )
 
-:: 4. Start Telegram Bot
-echo [4/4] Starting Telegram Bot...
+:: 4. Start Google Antigravity CLI Bridge if enabled & port 8001 not active
+set "AGY_BRIDGE_ENABLED=1"
+if exist "%~dp0.env" (
+    findstr /i /c:"AGY_BRIDGE_ENABLED=false" "%~dp0.env" >nul 2>&1 && set "AGY_BRIDGE_ENABLED=0"
+    findstr /i /c:"AGY_BRIDGE_ENABLED=0" "%~dp0.env" >nul 2>&1 && set "AGY_BRIDGE_ENABLED=0"
+    findstr /i /c:"AGY_BRIDGE_ENABLED=no" "%~dp0.env" >nul 2>&1 && set "AGY_BRIDGE_ENABLED=0"
+)
+
+if "%AGY_BRIDGE_ENABLED%"=="1" (
+    powershell -NoProfile -Command "$tcp = New-Object System.Net.Sockets.TcpClient; try { $tcp.Connect('127.0.0.1', 8001); $tcp.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
+    if errorlevel 1 (
+        where agy >nul 2>nul
+        if %ERRORLEVEL% EQU 0 (
+            echo [4/5] Starting Google Antigravity CLI Bridge on port 8001...
+            start "AGY OpenAI Bridge" /b python agy_bridge.py > nul 2>&1
+        )
+    ) else (
+        echo [4/5] Google Antigravity CLI Bridge is already active on port 8001.
+    )
+)
+
+:: 5. Start Telegram Bot
+echo [5/5] Starting Telegram Bot...
 python bot.py
