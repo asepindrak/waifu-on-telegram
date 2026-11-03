@@ -105,7 +105,7 @@ def get_running_pid():
     cur_pid = os.getpid()
     if platform.system() == "Windows":
         try:
-            ps_check = f'Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -like "*bot.py*" -and $_.ProcessId -ne {cur_pid} }} | Select-Object -ExpandProperty ProcessId -First 1'
+            ps_check = f'Get-CimInstance Win32_Process | Where-Object {{ ($_.Name -like "python*.exe") -and ($_.CommandLine -like "*bot.py*") -and ($_.ProcessId -ne {cur_pid}) }} | Select-Object -ExpandProperty ProcessId -First 1'
             res = subprocess.run(["powershell", "-NoProfile", "-Command", ps_check], capture_output=True, text=True, timeout=5)
             out = res.stdout.strip()
             if out and out.isdigit():
@@ -141,23 +141,21 @@ def cmd_start(daemon: bool = False):
     # Auto start background auxiliary servers (KoboldCPP, ComfyUI, Music)
     start_auxiliary_services()
 
+    # Record current Python interpreter for startup scripts & background services
+    try:
+        with open(os.path.join(PROJECT_ROOT, ".python_path"), "w", encoding="utf-8") as pf:
+            pf.write(sys.executable)
+    except Exception:
+        pass
+
     bot_script = os.path.join(PROJECT_ROOT, "bot.py")
 
     if daemon:
+        popen_kwargs = {}
         if platform.system() == "Windows":
-            vbs_script = os.path.join(PROJECT_ROOT, "start_services_silent.vbs")
-            if os.path.exists(vbs_script):
-                subprocess.Popen(["wscript.exe", vbs_script], cwd=PROJECT_ROOT)
-                print(c(GREEN, "✓ Waifu is running silently in the background (Daemon Mode)!"))
-                print(c(DIM, "  Use 'waifu status' to inspect or 'waifu stop' to terminate."))
-                return
+            popen_kwargs["creationflags"] = 0x08000000 | 0x00000200  # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
         else:
-            sh_script = os.path.join(PROJECT_ROOT, "start_services.sh")
-            if os.path.exists(sh_script):
-                subprocess.run(["bash", sh_script])
-                print(c(GREEN, "✓ Waifu is running in background (Daemon Mode via start_services.sh)!"))
-                print(c(DIM, "  Use 'waifu status' to inspect or 'waifu stop' to terminate."))
-                return
+            popen_kwargs["start_new_session"] = True
 
         with open(LOG_FILE, "a", encoding="utf-8") as log_out:
             p = subprocess.Popen(
@@ -165,12 +163,13 @@ def cmd_start(daemon: bool = False):
                 cwd=PROJECT_ROOT,
                 stdout=log_out,
                 stderr=log_out,
-                start_new_session=True
+                **popen_kwargs
             )
             with open(PID_FILE, "w") as f:
                 f.write(str(p.pid))
-            print(c(GREEN, f"✓ Waifu is running in background (PID {p.pid})!"))
+            print(c(GREEN, f"✓ Waifu is running silently in the background (PID {p.pid})!"))
             print(c(DIM, f"  Log file: {LOG_FILE}"))
+            print(c(DIM, "  Use 'waifu status' to inspect or 'waifu stop' to terminate."))
     else:
         print(c(GREEN, "✓ Waifu running in foreground terminal. Press Ctrl+C to stop."))
         try:
@@ -305,7 +304,7 @@ def cmd_stop():
     print(c(YELLOW, "🛑 Terminating Waifu on Telegram services..."))
 
     if platform.system() == "Windows":
-        ps_cmd = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*bot.py*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
+        ps_cmd = 'Get-CimInstance Win32_Process | Where-Object { ($_.Name -like "python*.exe") -and ($_.CommandLine -like "*bot.py*") } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
         subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True)
         subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq Waifu Music Server*"], capture_output=True)
         subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq KoboldCPP*"], capture_output=True)

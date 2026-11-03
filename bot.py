@@ -5960,7 +5960,7 @@ def main():
         if sys.platform == "win32":
             ps_kill_old = (
                 f"Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | "
-                f"Where-Object {{ $_.ProcessId -ne {cur_pid} -and ($_.CommandLine -like '*bot.py*') }} | "
+                f"Where-Object {{ ($_.Name -like 'python*.exe') -and ($_.ProcessId -ne {cur_pid}) -and ($_.CommandLine -like '*bot.py*') }} | "
                 f"ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
             )
             subprocess.run(["powershell", "-NoProfile", "-Command", ps_kill_old], capture_output=True, creationflags=0x08000000)

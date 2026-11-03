@@ -454,7 +454,7 @@ try {
 }
 
 # 6. Check Bot Process
-$botProc = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*bot.py*" }
+$botProc = Get-CimInstance Win32_Process | Where-Object { ($_.Name -like "python*.exe") -and ($_.CommandLine -like "*bot.py*") }
 if ($botProc) {
     $pids = ($botProc | ForEach-Object { $_.ProcessId }) -join ", "
     Write-Host "  [RUNNING] Telegram Bot Process: ACTIVE (PID: $pids)" -ForegroundColor Green

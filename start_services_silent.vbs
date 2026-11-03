@@ -6,7 +6,20 @@ WshShell.CurrentDirectory = ScriptDir
 
 Dim pyCmd
 pyCmd = "python"
-If FSO.FileExists("C:\Python315\python.exe") Then
+If FSO.FileExists(ScriptDir & "\.python_path") Then
+    Dim pStream
+    On Error Resume Next
+    Set pStream = FSO.OpenTextFile(ScriptDir & "\.python_path", 1)
+    If Not pStream.AtEndOfStream Then
+        Dim customPy
+        customPy = Trim(pStream.ReadLine)
+        If FSO.FileExists(customPy) Then
+            pyCmd = customPy
+        End If
+    End If
+    pStream.Close
+    On Error GoTo 0
+ElseIf FSO.FileExists("C:\Python315\python.exe") Then
     pyCmd = "C:\Python315\python.exe"
 End If
 
@@ -98,4 +111,4 @@ If FSO.FileExists(ScriptDir & "\music_player_server.js") Then
 End If
 
 ' 4. Start Python Bot
-WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && """ & pyCmd & """ bot.py", 0, False
+WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && """ & pyCmd & """ bot.py >> bot.log 2>&1", 0, False
