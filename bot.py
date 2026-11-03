@@ -4735,7 +4735,6 @@ def callback_music_command(call):
         show_music_dashboard(chat_id, user_id, message_to_edit=mid)
 
 
-@bot.message_handler(func=lambda msg: True)
 @bot.message_handler(commands=['projects', 'project', 'workspace'])
 def handle_projects_command(message):
     if not is_authorized(message.from_user.id):
@@ -4971,6 +4970,7 @@ def process_computer_request(message, user_text: str):
         bot.reply_to(message, f"🌸 **{p_name}**:\n{reply_msg}", parse_mode="Markdown")
 
 
+@bot.message_handler(func=lambda msg: True)
 def handle_text_messages(message):
     if not is_authorized(message.from_user.id):
         return
