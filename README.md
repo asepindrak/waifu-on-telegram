@@ -130,8 +130,13 @@ Waifu on Telegram mendukung sintesis suara melalui dua pilihan backend canggih:
   - **Auto-Installer & Lifecycle:** Otomatis di-clone dan di-setup ketika dipilih melalui `waifu setup`, serta dapat dikontrol via CLI: `waifu voicestudio start|stop|restart|status`.
 
 * **🌐 Pilihan 2: Microsoft Edge-TTS Cloud (Ringan & 0 VRAM):**
-  - Menggunakan neural voice cloud berkecepatan tinggi: `id-ID-GadisNeural`, `ja-JP-NanamiNeural`, `en-US-AnaNeural`, dan `en-US-JennyNeural`.
-  - **Polyglot Multi-Tier Translation Guardrail:** Menerjemahkan teks secara otomatis jika bahasa teks berbeda dengan suara target (Google GTX -> Client5 -> MyMemory -> Local LLM).
+  - Menggunakan neural voice cloud berkecepatan tinggi dengan pilihan bahasa lengkap:
+    - 🇮🇩 **Gadis** (`id-ID-GadisNeural`) = Bahasa Indonesia alami
+    - 🇯🇵 **Nanami** (`ja-JP-NanamiNeural`) = Bahasa Jepang (*kawaii anime voice*)
+    - 🇬🇧 **Ana / Jenny** (`en-US-AnaNeural` / `en-US-JennyNeural`) = Bahasa Inggris (*sweet & cheerful*)
+    - 🌐 **Auto-Sync** (`auto`) = Otomatis mengikuti bahasa chat waifu (`/language`)
+  - **Polyglot Multi-Tier Translation Guardrail:** Menerjemahkan teks suara secara otomatis jika bahasa teks berbeda dengan suara target (Google GTX -> Client5 -> MyMemory -> Local LLM), misalnya chat bahasa Indonesia diterjemahkan otomatis ke bahasa Jepang anime saat Nanami dipilih!
+  - **Pengaturan Mudah:** Dapat diubah secara instan di Telegram lewat menu `/voice` atau di terminal via `waifu setup` opsi `[5]`.
 * **🛡️ Resilient Auto-Fallback:** Jika VoiceStudio offline atau GPU sedang sibuk me-render gambar, engine otomatis mengalihkan sintesis suara ke Edge-TTS agar waifu tetap mengirim voice note tanpa gangguan!
 
 #### 5. 💤 Smart Idle Engine (Manajemen VRAM & Daya Otomatis)
@@ -283,7 +288,7 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.9.2)
+                        💖 WAIFU ON TELEGRAM BOT (v1.9.3)
 ```
 
 > 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.
