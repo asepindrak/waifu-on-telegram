@@ -1829,33 +1829,75 @@ def handle_help(message):
 # --- Submenus for Setup ---
 
 def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
+    cur_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip()
+    is_split = (cur_mode in ("split", "hybrid"))
+    sfw_p = os.environ.get("SFW_LLM_PROVIDER", "local").lower().strip()
+    sfw_m = os.environ.get("SFW_LLM_MODEL", os.environ.get("LLM_MODEL", "default"))
+    nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local").lower().strip()
+    nsfw_m = os.environ.get("NSFW_LLM_MODEL", "default")
     cur_llm = os.environ.get("LLM_MODEL", "default")
     cur_base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
     detected = scan_local_llm_models()
 
     markup = types.InlineKeyboardMarkup(row_width=1)
-    is_kobold = ("5001" in cur_base)
-    markup.add(types.InlineKeyboardButton(f"🤖 KoboldCPP (Port 5001 - Auto-start) {'✓' if is_kobold else ''}", callback_data="cfg_set_llm:kobold"))
 
-    for idx, (source, mname, mpath) in enumerate(detected):
-        is_cur = (cur_llm.lower() in mname.lower())
-        short_name = mname.replace(".gguf", "")
-        if len(short_name) > 34:
-            short_name = short_name[:31] + "..."
-        markup.add(types.InlineKeyboardButton(f"🧠 {short_name} ({source}) {'✓' if is_cur else ''}", callback_data=f"cfg_set_llm:{idx}"))
+    # 1. Mode Selector Toggle
+    mode_toggle_label = "🔀 Mode: Split Hybrid (Aktif) ➔ Ganti Unified" if is_split else "🤖 Mode: Unified (Aktif) ➔ Ganti Split Hybrid"
+    markup.add(types.InlineKeyboardButton(mode_toggle_label, callback_data="cfg_toggle_split_mode"))
 
-    is_ollama = ("11434" in cur_base)
-    markup.add(types.InlineKeyboardButton(f"🦙 Ollama Server (Port 11434) {'✓' if is_ollama else ''}", callback_data="cfg_set_llm:ollama"))
-    is_lu = ("8127" in cur_base)
-    markup.add(types.InlineKeyboardButton(f"⚙️ Locally Uncensored (Port 8127) {'✓' if is_lu else ''}", callback_data="cfg_set_llm:locally_uncensored"))
+    if is_split:
+        # SFW Providers section
+        markup.add(types.InlineKeyboardButton("─── 🌸 PROVIDER CHAT SFW ───", callback_data="noop"))
+        markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity Bridge (AGY) {'✓' if sfw_p == 'agy' else ''}", callback_data="cfg_set_sfw_p:agy"))
+        markup.add(types.InlineKeyboardButton(f"⚡ Groq Cloud (Llama 3.3 70B - Kilat) {'✓' if sfw_p == 'groq' else ''}", callback_data="cfg_set_sfw_p:groq"))
+        markup.add(types.InlineKeyboardButton(f"🤖 OpenAI Cloud (GPT-4o-mini) {'✓' if sfw_p == 'openai' else ''}", callback_data="cfg_set_sfw_p:openai"))
+        markup.add(types.InlineKeyboardButton(f"🧠 DeepSeek Cloud (deepseek-chat) {'✓' if sfw_p == 'deepseek' else ''}", callback_data="cfg_set_sfw_p:deepseek"))
+        markup.add(types.InlineKeyboardButton(f"🏠 Local KoboldCPP (Lokal PC) {'✓' if sfw_p == 'local' else ''}", callback_data="cfg_set_sfw_p:local"))
+
+        # NSFW Providers section
+        markup.add(types.InlineKeyboardButton("─── 🔞 PROVIDER CHAT NSFW ───", callback_data="noop"))
+        markup.add(types.InlineKeyboardButton(f"🔞 Local KoboldCPP Uncensored {'✓' if nsfw_p == 'local' else ''}", callback_data="cfg_set_nsfw_p:local"))
+        markup.add(types.InlineKeyboardButton(f"☁️ OpenRouter Uncensored {'✓' if nsfw_p == 'openrouter_uncensored' else ''}", callback_data="cfg_set_nsfw_p:openrouter_uncensored"))
+    else:
+        is_kobold = ("5001" in cur_base)
+        markup.add(types.InlineKeyboardButton(f"🤖 KoboldCPP (Port 5001 - Auto-start) {'✓' if is_kobold else ''}", callback_data="cfg_set_llm:kobold"))
+
+        for idx, (source, mname, mpath) in enumerate(detected):
+            is_cur = (cur_llm.lower() in mname.lower())
+            short_name = mname.replace(".gguf", "")
+            if len(short_name) > 34:
+                short_name = short_name[:31] + "..."
+            markup.add(types.InlineKeyboardButton(f"🧠 {short_name} ({source}) {'✓' if is_cur else ''}", callback_data=f"cfg_set_llm:{idx}"))
+
+        is_ollama = ("11434" in cur_base)
+        markup.add(types.InlineKeyboardButton(f"🦙 Ollama Server (Port 11434) {'✓' if is_ollama else ''}", callback_data="cfg_set_llm:ollama"))
+        is_lu = ("8127" in cur_base)
+        markup.add(types.InlineKeyboardButton(f"⚙️ Locally Uncensored (Port 8127) {'✓' if is_lu else ''}", callback_data="cfg_set_llm:locally_uncensored"))
+
     markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
 
-    text = (
-        f"🧠 **Pengaturan Model LLM / Chat Romansa**\n\n"
-        f"• Model Aktif: `{cur_llm}`\n"
-        f"• Endpoint API: `{cur_base}`\n\n"
-        f"Pilih model obrolan lokal yang ingin kamu aktifkan:"
-    )
+    if is_split:
+        text = (
+            f"🧠 **Pengaturan Arsitektur Chat: Split Hybrid**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• Status Arsitektur: `🔀 Split Hybrid (Terpisah Otomatis)`\n"
+            f"• **Otak SFW**  : `{sfw_p.upper()}` (`{sfw_m}`)\n"
+            f"• **Otak NSFW** : `{nsfw_p.upper()}` (`{nsfw_m}`)\n\n"
+            f"💡 _Setiap pesan chat otomatis dianalisis:_\n"
+            f"  - Obrolan santai, kuliah, dan coding dialihkan ke **SFW Provider**.\n"
+            f"  - Momen mesra, roleplay intim & 18+ dialihkan ke **NSFW Uncensored**.\n"
+            f"  - Akun cloud aman dari risiko blokir/sensor!"
+        )
+    else:
+        text = (
+            f"🧠 **Pengaturan Arsitektur Chat: Unified Mode**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• Status Arsitektur: `🤖 Unified (1 Provider untuk Semua)`\n"
+            f"• Model Aktif : `{cur_llm}`\n"
+            f"• Endpoint API: `{cur_base}`\n\n"
+            f"Pilih model obrolan lokal atau klik tombol di atas untuk beralih ke Mode Split Hybrid:"
+        )
+
     if message_to_edit:
         try:
             bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
@@ -2626,6 +2668,80 @@ def callback_set_llm(call):
     label = apply_llm_choice(key)
     bot.answer_callback_query(call.id, f"LLM: {label}")
     show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'cfg_toggle_split_mode')
+def callback_toggle_split_mode(call):
+    if not is_authorized(call.from_user.id):
+        return
+    cur = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip()
+    new_mode = "split" if cur != "split" else "unified"
+    os.environ["AI_ENGINE_MODE"] = new_mode
+    update_env_variable("AI_ENGINE_MODE", new_mode)
+    get_hybrid_llm_client(force_reload=True)
+    bot.answer_callback_query(call.id, f"Arsitektur AI: {new_mode.upper()} Mode!")
+    show_llm_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_sfw_p:'))
+def callback_set_sfw_provider(call):
+    if not is_authorized(call.from_user.id):
+        return
+    prov = call.data.split(":", 1)[1]
+    presets = {
+        "agy": ("http://127.0.0.1:8001/v1", "sk-agy-waifu", "flash"),
+        "openai": ("https://api.openai.com/v1", os.environ.get("OPENAI_API_KEY", ""), "gpt-4o-mini"),
+        "groq": ("https://api.groq.com/openai/v1", os.environ.get("GROQ_API_KEY", ""), "llama-3.3-70b-versatile"),
+        "deepseek": ("https://api.deepseek.com/v1", os.environ.get("DEEPSEEK_API_KEY", ""), "deepseek-chat"),
+        "local": ("http://127.0.0.1:5001/v1", "kobold", "default")
+    }
+    base, key, model = presets.get(prov, ("http://127.0.0.1:5001/v1", "kobold", "default"))
+    os.environ["SFW_LLM_PROVIDER"] = prov
+    os.environ["SFW_LLM_BASE_URL"] = base
+    if key:
+        os.environ["SFW_LLM_API_KEY"] = key
+    os.environ["SFW_LLM_MODEL"] = model
+    update_env_variable("SFW_LLM_PROVIDER", prov)
+    update_env_variable("SFW_LLM_BASE_URL", base)
+    if key:
+        update_env_variable("SFW_LLM_API_KEY", key)
+    update_env_variable("SFW_LLM_MODEL", model)
+    get_hybrid_llm_client(force_reload=True)
+    bot.answer_callback_query(call.id, f"SFW Provider: {prov.upper()}")
+    show_llm_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_nsfw_p:'))
+def callback_set_nsfw_provider(call):
+    if not is_authorized(call.from_user.id):
+        return
+    prov = call.data.split(":", 1)[1]
+    if prov == "openrouter_uncensored":
+        base = "https://openrouter.ai/api/v1"
+        key = os.environ.get("OPENROUTER_API_KEY", "")
+        model = "nousresearch/hermes-3-llama-3.1-405b"
+    else:
+        base = "http://127.0.0.1:5001/v1"
+        key = "kobold"
+        model = "default"
+    os.environ["NSFW_LLM_PROVIDER"] = prov
+    os.environ["NSFW_LLM_BASE_URL"] = base
+    if key:
+        os.environ["NSFW_LLM_API_KEY"] = key
+    os.environ["NSFW_LLM_MODEL"] = model
+    update_env_variable("NSFW_LLM_PROVIDER", prov)
+    update_env_variable("NSFW_LLM_BASE_URL", base)
+    if key:
+        update_env_variable("NSFW_LLM_API_KEY", key)
+    update_env_variable("NSFW_LLM_MODEL", model)
+    get_hybrid_llm_client(force_reload=True)
+    bot.answer_callback_query(call.id, f"NSFW Provider: {prov.upper()}")
+    show_llm_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'noop')
+def callback_noop(call):
+    bot.answer_callback_query(call.id)
 
 
 def prompt_missing_asset_download(chat_id: int, user_id: int, missing_keys: List[str], status_msg=None, message_to_edit: Optional[int] = None):
