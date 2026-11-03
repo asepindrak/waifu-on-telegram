@@ -247,13 +247,14 @@ Waifu on Telegram mendukung **pemisahan arsitektur antara obrolan/foto SFW dan N
 * **NSFW Engine (Roleplay Dewasa, Momen Mesra, 18+, Tanpa Busana):**
   - **Local KoboldCPP Uncensored** (*Huihui-Qwythos-9B-Abliterated*) atau **OpenRouter Uncensored**.
   - 100% bebas sensor, tidak ada moralizing/preachiness.
-* **🛡️ Account Protection & Auto-Failover:**
+* **🛡️ SFW Chat History Sanitization & Account Protection:**
   - Bot secara otomatis mendeteksi apakah obrolan bertema SFW atau NSFW (`routing_engine.py`).
-  - **Pesan NSFW dijamin tidak pernah dikirim ke OpenAI/Groq**, mencegah akun cloud terkena peringatan/banned dari filter konten ketat.
+  - **History Sanitization Otomatis**: Riwayat obrolan masa lalu yang mengandung percakapan NSFW/dewasa secara otomatis disaring dan disanitasi sebelum dikirim ke AGY CLI atau Cloud API (OpenAI/Groq/DeepSeek), sehingga akun Anda 100% aman dari sensor kebijakan dan bahaya banned!
   - Jika provider SFW menolak pesan karena filter kebijakan, bot **otomatis mengalihkan request secara transparan** ke engine lokal uncensored!
-* **🎨 SFW vs NSFW Image Separation:**
-  - Foto SFW dapat menggunakan checkpoint ComfyUI SDXL (**Anything XL**), MeinaMix, atau Cloud Fallback.
-  - Foto NSFW (selfie intim/lingerie/nude) otomatis dialihkan ke ComfyUI lokal dengan model uncensored (**AOM3** / **MeinaMix**).
+* **🎨 SFW vs NSFW Image Engine Separation (`IMAGE_ENGINE_MODE=split`):**
+  - **SFW Image Engine:** Bebas memilih **Google Antigravity Image Generator (`agy` subagent)** (0 VRAM!), **Anything XL (SDXL 1024px)**, **MeinaMix v12**, atau **Cloud Pollinations**.
+  - **NSFW Image Engine:** Menggunakan model spesialis uncensored di ComfyUI lokal seperti **AbyssOrangeMix3 (AOM3A1B)** atau **MeinaMix v12**.
+  - Dapat diatur melalui `waifu setup` (Step 3) atau toggle 1-klik di menu Telegram `/setup` -> Pengaturan Foto.
 
 ---
 
@@ -273,7 +274,7 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.7.3)
+                        💖 WAIFU ON TELEGRAM BOT (v1.8.0)
 ```
 
 > 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.
