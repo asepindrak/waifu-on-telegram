@@ -50,10 +50,13 @@ class MediaEngine:
             "active_checkpoint": self.get_active_checkpoint()
         }
 
-    def get_active_checkpoint(self) -> str:
-        """Determines the active image checkpoint model currently selected/available."""
+    def get_active_checkpoint(self, is_nude: bool = False) -> str:
+        """Determines the active image checkpoint model currently selected/available for SFW or NSFW."""
         ckpts = self.get_available_checkpoints()
-        env_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "").strip()
+        if is_nude:
+            env_ckpt = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "").strip() or os.environ.get("COMFYUI_CHECKPOINT", "").strip()
+        else:
+            env_ckpt = os.environ.get("SFW_COMFYUI_CHECKPOINT", "").strip() or os.environ.get("COMFYUI_CHECKPOINT", "").strip()
         if env_ckpt and ckpts:
             matched = [c for c in ckpts if env_ckpt.lower() in c.lower()]
             if matched:
@@ -163,6 +166,7 @@ class MediaEngine:
         height: Optional[int] = None,
         steps: Optional[int] = None,
         cfg: Optional[float] = None,
+        is_nude: bool = False,
         progress_callback: Optional[Callable[[str], None]] = None
     ) -> Optional[bytes]:
         """Runs standard Text-to-Image workflow on local ComfyUI with optimal anime settings."""
@@ -171,12 +175,10 @@ class MediaEngine:
             logger.warning("No ComfyUI checkpoints found for T2I.")
             return None
 
-        # Smart Checkpoint Selection:
-        # 1. Environment variable if user configured specific model
-        env_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "").strip()
-        chosen_ckpt = None
-        if env_ckpt:
-            matched = [c for c in ckpts if env_ckpt.lower() in c.lower()]
+        # Smart Checkpoint Selection for SFW vs NSFW:
+        chosen_ckpt = self.get_active_checkpoint(is_nude=is_nude)
+        if chosen_ckpt and ckpts:
+            matched = [c for c in ckpts if chosen_ckpt.lower() in c.lower()]
             if matched:
                 chosen_ckpt = matched[0]
 
@@ -436,11 +438,19 @@ class MediaEngine:
 
         # 1. Try local ComfyUI
         if self.comfyui_url:
+            # Check SFW Image Engine routing:
+            sfw_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
+            if not is_nude and sfw_engine == "cloud":
+                cloud_img = self.generate_image_cloud(effective_prompt, aspect_ratio=aspect_ratio)
+                if cloud_img:
+                    return cloud_img, "Cloud Engine (SFW Pollinations)"
+
             local_img = self.generate_image_comfyui(
                 effective_prompt,
                 negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
                 aspect_ratio=aspect_ratio,
                 quality=quality,
+                is_nude=is_nude,
                 progress_callback=progress_callback
             )
             if local_img:

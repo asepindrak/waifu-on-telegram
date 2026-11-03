@@ -239,14 +239,25 @@ class IdleEngine:
 
             return False
 
-    def ensure_llm_active(self, bot=None, chat_id: Optional[int] = None, is_user_chat: bool = True) -> bool:
+    def ensure_llm_active(self, bot=None, chat_id: Optional[int] = None, is_user_chat: bool = True, is_nsfw: bool = False) -> bool:
         """
         Ensures LLM is active before answering messages.
         If sleeping, displays a friendly waking indicator and wakes KoboldCPP.
         If is_user_chat is False (e.g. background automation or scheduler),
         it will NEVER wake the LLM from sleep to avoid interrupting gaming / work.
+        If AI_ENGINE_MODE is split and SFW provider is Cloud, does NOT wake local KoboldCPP unless is_nsfw is True!
         """
         if not self.enabled:
+            return True
+
+        # Check if SFW provider is remote cloud
+        split_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip() in ("split", "hybrid")
+        sfw_provider = os.environ.get("SFW_LLM_PROVIDER", "local").lower().strip()
+        sfw_is_cloud = split_mode and sfw_provider not in ("local", "kobold", "ollama", "lm-studio", "locally-uncensored")
+
+        if sfw_is_cloud and not is_nsfw:
+            # Cloud SFW engine handles the request, KoboldCPP stays comfortably asleep
+            self.record_activity()
             return True
 
         if self.is_llm_ready():

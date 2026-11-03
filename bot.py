@@ -24,6 +24,7 @@ import telebot
 from telebot import types
 
 from lu_llm_client import LocallyUncensoredClient
+from routing_engine import get_hybrid_llm_client, detect_nsfw_intent
 from persona_manager import PersonaManager, build_custom_persona
 from media_engine import MediaEngine
 from voice_engine import VoiceEngine
@@ -92,7 +93,7 @@ VOICE_ENABLED = os.environ.get("VOICE_REPLY_ENABLED", "true").lower() in ("true"
 VOICE_NAME = os.environ.get("VOICE_NAME", "en-US-AnaNeural")
 DEFAULT_PERSONA = os.environ.get("DEFAULT_PERSONA", "runa")
 
-llm_client = LocallyUncensoredClient(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
+llm_client = get_hybrid_llm_client()
 persona_mgr = PersonaManager(active_key=DEFAULT_PERSONA)
 media_engine = MediaEngine(comfyui_url=COMFYUI_URL, allow_cloud_fallback=MEDIA_FALLBACK)
 memory_engine = MemoryEngine()
@@ -4595,7 +4596,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
             with ChatActionLoop(bot, message.chat.id, "typing"):
                 # 1. Proactively ensure LLM is awake (wakes from Smart Idle if sleeping)
-                llm_active = idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
+                is_nsfw_turn = detect_nsfw_intent(user_text)
+                llm_active = idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id, is_nsfw=is_nsfw_turn)
                 if not llm_active:
                     logger.warning("Local LLM engine could not be awakened.")
                     return
@@ -4678,8 +4680,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 messages.append({"role": "user", "content": user_text})
 
                 try:
-                    idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
-                    reply_text, _ = llm_client.chat(messages, max_tokens=150)
+                    idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id, is_nsfw=is_nsfw_turn)
+                    reply_text, _ = llm_client.chat(messages, max_tokens=150, is_nsfw=is_nsfw_turn)
                 except Exception as e:
                     logger.error(f"Chat error / LLM timeout: {e}")
                     health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=str(e))

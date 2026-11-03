@@ -31,6 +31,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from lu_llm_client import LocallyUncensoredClient
+from routing_engine import get_hybrid_llm_client, detect_nsfw_intent
 from persona_manager import PersonaManager
 from memory_engine import MemoryEngine
 from story_engine import StoryEngine
@@ -189,7 +190,7 @@ class WaifuCLISession:
         self.default_persona = os.environ.get("DEFAULT_PERSONA", "runa")
         self.bot_language = os.environ.get("BOT_LANGUAGE", "id")
 
-        self.llm_client = LocallyUncensoredClient(base_url=self.llm_base_url, api_key=self.llm_api_key)
+        self.llm_client = get_hybrid_llm_client()
         self.persona_mgr = PersonaManager(active_key=self.default_persona)
         self.memory_engine = MemoryEngine()
         self.story_engine = StoryEngine()
@@ -412,15 +413,19 @@ class WaifuCLISession:
         messages.extend(history)
         messages.append({"role": "user", "content": user_text})
 
-        with CLILoader(f"{p_name} sedang memikirkan balasan...", emoji="💭") as loader:
+        is_nsfw_turn = detect_nsfw_intent(user_text, messages)
+        load_emoji = "💋" if is_nsfw_turn else "💭"
+        load_msg = f"{p_name} sedang merespon (Mode Intim)..." if is_nsfw_turn else f"{p_name} sedang memikirkan balasan..."
+
+        with CLILoader(load_msg, emoji=load_emoji) as loader:
             # Ensure LLM awake
             if getattr(self.idle_engine, "is_llm_sleeping", False):
                 loader.set_status("Membangunkan KoboldCPP ke memori...", emoji="⚡")
-            self.idle_engine.ensure_llm_active()
+            self.idle_engine.ensure_llm_active(is_nsfw=is_nsfw_turn)
 
-            loader.set_status(f"{p_name} sedang mengetik...", emoji="🌸")
+            loader.set_status(f"{p_name} sedang mengetik...", emoji="💋" if is_nsfw_turn else "🌸")
             try:
-                raw_reply, _ = self.llm_client.chat(messages, max_tokens=150)
+                raw_reply, _ = self.llm_client.chat(messages, max_tokens=150, is_nsfw=is_nsfw_turn)
             except Exception as e:
                 loader.stop()
                 print(f"⚠️ {c(RED, f'Koneksi ke LLM lokal gagal: {e}')}\n")

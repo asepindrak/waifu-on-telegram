@@ -255,44 +255,119 @@ def config_telegram_credentials(env_vars):
 def config_llm_model(env_vars):
     print(c(BOLD + CYAN, "\n[Step 2/7: Chat & Romance LLM Model Selection]"))
     print("-" * 60)
-    cur_base = env_vars.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
-    cur_model = env_vars.get("LLM_MODEL", "default")
-    print(f"Active Settings: `{cur_model}` at `{cur_base}`\n")
+    cur_mode = env_vars.get("AI_ENGINE_MODE", "unified")
+    mode_str = "Split SFW/NSFW (Hybrid)" if cur_mode == "split" else "Unified (1 Provider)"
+    print(f"Mode Saat Ini: {c(BOLD + GREEN, mode_str)}")
+    print("Pilih Arsitektur Otak AI:")
+    print("  1) 🌟 Mode Unified (Default: 1 Provider/Model untuk SFW & NSFW)")
+    print("  2) 🔀 Mode Split Hybrid (Pisahkan SFW: OpenAI/Groq/DeepSeek & NSFW: KoboldCPP/Uncensored)")
 
-    detected_llms = scan_local_llm_models()
-    options = []
-    options.append(("KoboldCPP (Auto-starts & Auto-loads GGUF model on boot)", "http://127.0.0.1:5001/v1", "kobold", "default"))
+    mode_in = input("\nPilih Mode [1-2, default: 1]: ").strip()
+    if mode_in == "2":
+        env_vars["AI_ENGINE_MODE"] = "split"
+        print(c(BOLD + MAGENTA, "\n--- [A] Konfigurasi Otak Chat SFW (Obrolan Normal / Kuliah / Santai) ---"))
+        sfw_providers = [
+            ("OpenAI Official (GPT-4o-mini / GPT-4o)", "openai", "https://api.openai.com/v1", "gpt-4o-mini"),
+            ("Groq Cloud (Llama 3.3 70B - Super Cepat & Free Tier)", "groq", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+            ("DeepSeek API (deepseek-chat - Murah & Cerdas)", "deepseek", "https://api.deepseek.com/v1", "deepseek-chat"),
+            ("OpenRouter (Multi-model Cloud SFW)", "openrouter", "https://openrouter.ai/api/v1", "meta-llama/llama-3.3-70b-instruct"),
+            ("Local KoboldCPP (Lokal di PC)", "local", "http://127.0.0.1:5001/v1", "default"),
+            ("Local Ollama (Port 11434)", "ollama", "http://127.0.0.1:11434/v1", "default"),
+            ("Custom OpenAI-Compatible API", "custom", "", "")
+        ]
+        for idx, (p_label, _, _, _) in enumerate(sfw_providers, 1):
+            print(f"  {idx}) {p_label}")
+        sfw_c = input(f"Pilih Provider SFW [1-{len(sfw_providers)}, default: 1]: ").strip()
+        sfw_idx = int(sfw_c) - 1 if sfw_c.isdigit() and 1 <= int(sfw_c) <= len(sfw_providers) else 0
+        p_name, p_key_type, p_url, p_def_model = sfw_providers[sfw_idx]
 
-    for source, mname, mpath in detected_llms:
-        if source == "KoboldCPP":
-            options.append((f"{mname} ({source} - Project Model)", "http://127.0.0.1:5001/v1", "kobold", mname))
-        elif source == "Locally Uncensored":
-            options.append((f"{mname} ({source})", "http://127.0.0.1:8127/v1", "auto", mname))
-        elif source == "Ollama":
-            options.append((f"{mname} (Ollama)", "http://127.0.0.1:11434/v1", "ollama", mname))
+        env_vars["SFW_LLM_PROVIDER"] = p_key_type
+        if p_key_type == "custom":
+            env_vars["SFW_LLM_BASE_URL"] = input("  Masukkan Base URL (contoh: https://api.openai.com/v1): ").strip()
+            env_vars["SFW_LLM_API_KEY"] = input("  Masukkan API Key: ").strip() or "none"
+            env_vars["SFW_LLM_MODEL"] = input("  Masukkan Nama Model: ").strip() or "default"
+        elif p_key_type in ("openai", "groq", "deepseek", "openrouter"):
+            env_vars["SFW_LLM_BASE_URL"] = p_url
+            env_vars["SFW_LLM_API_KEY"] = input(f"  Masukkan API Key untuk {p_name}: ").strip()
+            cust_m = input(f"  Model [{p_def_model}]: ").strip()
+            env_vars["SFW_LLM_MODEL"] = cust_m or p_def_model
+        else:
+            env_vars["SFW_LLM_BASE_URL"] = p_url
+            env_vars["SFW_LLM_API_KEY"] = "kobold" if p_key_type == "local" else "ollama"
+            env_vars["SFW_LLM_MODEL"] = "default"
 
-    options.append(("Locally Uncensored (Auto-detect Active Model & Dynamic Key)", "http://127.0.0.1:8127/v1", "auto", "default"))
-    options.append(("Custom OpenAI-compatible URL", "custom", "", ""))
+        print(c(BOLD + MAGENTA, "\n--- [B] Konfigurasi Otak Chat NSFW (Momen Mesra, Roleplay Intim & 18+) ---"))
+        nsfw_providers = [
+            ("Local KoboldCPP Uncensored (Rekomendasi - 100% Bebas Sensor)", "local", "http://127.0.0.1:5001/v1", "default"),
+            ("OpenRouter Uncensored (nousresearch/hermes-3-llama-3.1-405b)", "openrouter_uncensored", "https://openrouter.ai/api/v1", "nousresearch/hermes-3-llama-3.1-405b"),
+            ("Custom Uncensored API (URL + Key + Model)", "custom", "", "")
+        ]
+        for idx, (p_label, _, _, _) in enumerate(nsfw_providers, 1):
+            print(f"  {idx}) {p_label}")
+        nsfw_c = input(f"Pilih Provider NSFW [1-{len(nsfw_providers)}, default: 1]: ").strip()
+        nsfw_idx = int(nsfw_c) - 1 if nsfw_c.isdigit() and 1 <= int(nsfw_c) <= len(nsfw_providers) else 0
+        np_name, np_type, np_url, np_def_model = nsfw_providers[nsfw_idx]
 
-    for idx, opt in enumerate(options, 1):
-        print(f"  {idx}) {opt[0]}")
+        env_vars["NSFW_LLM_PROVIDER"] = np_type
+        if np_type == "custom":
+            env_vars["NSFW_LLM_BASE_URL"] = input("  Masukkan Base URL NSFW: ").strip()
+            env_vars["NSFW_LLM_API_KEY"] = input("  Masukkan API Key: ").strip() or "none"
+            env_vars["NSFW_LLM_MODEL"] = input("  Masukkan Nama Model: ").strip() or "default"
+        elif np_type == "openrouter_uncensored":
+            env_vars["NSFW_LLM_BASE_URL"] = np_url
+            env_vars["NSFW_LLM_API_KEY"] = input("  Masukkan OpenRouter API Key: ").strip()
+            cust_nm = input(f"  Model [{np_def_model}]: ").strip()
+            env_vars["NSFW_LLM_MODEL"] = cust_nm or np_def_model
+        else:
+            env_vars["NSFW_LLM_BASE_URL"] = np_url
+            env_vars["NSFW_LLM_API_KEY"] = "kobold"
+            env_vars["NSFW_LLM_MODEL"] = "default"
 
-    choice_llm = input(f"\nSelect Chat Model [1-{len(options)}, default: 1]: ").strip()
-    chosen_idx = int(choice_llm) - 1 if choice_llm.isdigit() and 1 <= int(choice_llm) <= len(options) else 0
+        env_vars["LLM_BASE_URL"] = env_vars["SFW_LLM_BASE_URL"]
+        env_vars["LLM_API_KEY"] = env_vars["SFW_LLM_API_KEY"]
+        env_vars["LLM_MODEL"] = env_vars["SFW_LLM_MODEL"]
+        print(c(GREEN, f"\n✓ Mode Split SFW ({env_vars['SFW_LLM_PROVIDER']}) & NSFW ({env_vars['NSFW_LLM_PROVIDER']}) berhasil disimpan!"))
 
-    if options[chosen_idx][1] == "custom":
-        custom_url = input("Enter API Base URL (e.g. http://127.0.0.1:1234/v1): ").strip()
-        custom_key = input("Enter API Key (optional, press Enter if none): ").strip()
-        custom_model = input("Enter model name: ").strip() or "default"
-        env_vars["LLM_BASE_URL"] = custom_url
-        env_vars["LLM_API_KEY"] = custom_key or "none"
-        env_vars["LLM_MODEL"] = custom_model
     else:
-        label, base_url, api_key, model_name = options[chosen_idx]
-        env_vars["LLM_BASE_URL"] = base_url
-        env_vars["LLM_API_KEY"] = api_key
-        env_vars["LLM_MODEL"] = model_name
-        print(c(GREEN, f"  ✓ Selected: {label}"))
+        env_vars["AI_ENGINE_MODE"] = "unified"
+        cur_base = env_vars.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
+        cur_model = env_vars.get("LLM_MODEL", "default")
+        print(f"Pengaturan Aktif: `{cur_model}` di `{cur_base}`\n")
+
+        detected_llms = scan_local_llm_models()
+        options = []
+        options.append(("KoboldCPP (Auto-starts & Auto-loads GGUF model on boot)", "http://127.0.0.1:5001/v1", "kobold", "default"))
+
+        for source, mname, mpath in detected_llms:
+            if source == "KoboldCPP":
+                options.append((f"{mname} ({source} - Project Model)", "http://127.0.0.1:5001/v1", "kobold", mname))
+            elif source == "Locally Uncensored":
+                options.append((f"{mname} ({source})", "http://127.0.0.1:8127/v1", "auto", mname))
+            elif source == "Ollama":
+                options.append((f"{mname} (Ollama)", "http://127.0.0.1:11434/v1", "ollama", mname))
+
+        options.append(("Locally Uncensored (Auto-detect Active Model & Dynamic Key)", "http://127.0.0.1:8127/v1", "auto", "default"))
+        options.append(("Custom OpenAI-compatible URL", "custom", "", ""))
+
+        for idx, opt in enumerate(options, 1):
+            print(f"  {idx}) {opt[0]}")
+
+        choice_llm = input(f"\nSelect Chat Model [1-{len(options)}, default: 1]: ").strip()
+        chosen_idx = int(choice_llm) - 1 if choice_llm.isdigit() and 1 <= int(choice_llm) <= len(options) else 0
+
+        if options[chosen_idx][1] == "custom":
+            custom_url = input("Enter API Base URL (e.g. http://127.0.0.1:1234/v1): ").strip()
+            custom_key = input("Enter API Key (optional, press Enter if none): ").strip()
+            custom_model = input("Enter model name: ").strip() or "default"
+            env_vars["LLM_BASE_URL"] = custom_url
+            env_vars["LLM_API_KEY"] = custom_key or "none"
+            env_vars["LLM_MODEL"] = custom_model
+        else:
+            label, base_url, api_key, model_name = options[chosen_idx]
+            env_vars["LLM_BASE_URL"] = base_url
+            env_vars["LLM_API_KEY"] = api_key
+            env_vars["LLM_MODEL"] = model_name
+            print(c(GREEN, f"  ✓ Selected: {label}"))
 
 def config_image_model(env_vars):
     print(c(BOLD + CYAN, "\n[Step 3/7: Photo / Selfie Generator Model (ComfyUI)]"))
