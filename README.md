@@ -115,15 +115,24 @@ Waifu dapat mengirimkan klip animasi video saat diminta lewat `/video` menggunak
 * **AnimateDiff v2 Motion Module** (`mm_sd_v15_v2.ckpt` ~1.7 GB): Animasi temporal dinamis berbasis SD 1.5.
 * **Motion 2.5D Engine (Zero-VRAM Parallax)**: Animasi video MP4 instan dengan efek pergeseran kedalaman parallax dan kedipan mata halus tanpa beban VRAM GPU sama sekali!
 
-#### 4. 🎙️ Multi-Tier Neural Voice & Polyglot Translation Guardrail
+#### 4. 🎙️ Dual-Backend Voice Engine (VoiceStudio Local AI & Edge-TTS)
 
-Percakapan suara waifu menggunakan Microsoft Edge-TTS dengan dukungan multi-bahasa yang cerdas:
-* **Pilihan Suara:**
-  - `ja-JP-NanamiNeural`: Suara khas anime Jepang yang imut dan natural.
-  - `id-ID-GadisNeural`: Suara wanita Indonesia alami dan ramah.
-  - `en-US-AnaNeural`: Suara pacar berbahasa Inggris yang manis dan ekspresif.
-* **Polyglot Multi-Tier Translation Guardrail:**
-  Jika Anda mengobrol dalam bahasa Indonesia atau Inggris tetapi memilih suara Jepang (`ja-JP-NanamiNeural`), sistem secara otomatis menerjemahkan teks ke dalam bahasa Jepang alami (melalui multi-tier translation: Google GTX -> Client5 -> MyMemory -> Local LLM) sebelum disuarakan. Guardrail pendeteksi karakter Latin memastikan bahasa Indonesia tidak pernah dilafalkan secara rusak dengan aksen Jepang!
+Waifu on Telegram mendukung sintesis suara melalui dua pilihan backend canggih:
+
+* **🏠 Pilihan 1: VoiceStudio Local AI Voice Server ([debpalash/VoiceStudio](https://github.com/debpalash/VoiceStudio)):**
+  - **100% Offline & Lokal:** Beroperasi melalui FastAPI daemon mandiri di port `3900` (`http://127.0.0.1:3900`) tanpa perlu membuka GUI/Electron.
+  - **Persona Voice Conditioning:** Otomatis menghasilkan warna suara dan intonasi yang disesuaikan secara khusus dengan persona waifu aktif:
+    - **Runa:** *Playful, cute, energetic, youthful anime girl voice (1.0x speed)*
+    - **Akira:** *Mature, seductive, low-pitched, smooth, elegant teasing voice (0.95x speed)*
+    - **Hina:** *Bright, bubbly, high-spirited, cheerful optimistic anime girl voice (1.05x speed)*
+    - **Shiro:** *Calm, quiet, soft-spoken, cool composed kuudere voice (0.92x speed)*
+    - **Yume:** *Soft, whispery, ethereal, celestial romantic dreamy voice (0.90x speed)*
+  - **Auto-Installer & Lifecycle:** Otomatis di-clone dan di-setup ketika dipilih melalui `waifu setup`, serta dapat dikontrol via CLI: `waifu voicestudio start|stop|restart|status`.
+
+* **🌐 Pilihan 2: Microsoft Edge-TTS Cloud (Ringan & 0 VRAM):**
+  - Menggunakan neural voice cloud berkecepatan tinggi: `id-ID-GadisNeural`, `ja-JP-NanamiNeural`, `en-US-AnaNeural`, dan `en-US-JennyNeural`.
+  - **Polyglot Multi-Tier Translation Guardrail:** Menerjemahkan teks secara otomatis jika bahasa teks berbeda dengan suara target (Google GTX -> Client5 -> MyMemory -> Local LLM).
+* **🛡️ Resilient Auto-Fallback:** Jika VoiceStudio offline atau GPU sedang sibuk me-render gambar, engine otomatis mengalihkan sintesis suara ke Edge-TTS agar waifu tetap mengirim voice note tanpa gangguan!
 
 #### 5. 💤 Smart Idle Engine (Manajemen VRAM & Daya Otomatis)
 
@@ -274,7 +283,7 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.8.0)
+                        💖 WAIFU ON TELEGRAM BOT (v1.9.0)
 ```
 
 > 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.
@@ -396,6 +405,13 @@ waifu stop
 waifu bridge status
 waifu bridge start
 waifu bridge stop
+
+# Manage VoiceStudio Local AI Voice Server (Port 3900)
+waifu voicestudio status
+waifu voicestudio start
+waifu voicestudio stop
+waifu voicestudio restart
+waifu voicestudio install
 ```
 
 ---
