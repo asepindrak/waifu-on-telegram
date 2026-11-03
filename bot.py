@@ -235,6 +235,84 @@ def update_env_variable(key: str, value: str):
         logger.warning(f"Could not persist {key} to .env: {e}")
 
 
+def reload_env_configurations():
+    """Hot-reloads modified variables from .env into global state and engines."""
+    global VOICE_NAME, BOT_LANGUAGE, VOICE_ENABLED
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if not os.path.exists(env_path):
+        return
+
+    new_vars = {}
+    try:
+        from dotenv import dotenv_values
+        new_vars = dotenv_values(env_path)
+    except Exception:
+        pass
+
+    if not new_vars:
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        new_vars[k.strip()] = v.strip().strip("'\"")
+        except Exception:
+            return
+
+    # 1. Voice Name & Speaker
+    if "VOICE_NAME" in new_vars:
+        new_v = (new_vars["VOICE_NAME"] or "").strip()
+        if new_v and new_v != VOICE_NAME:
+            logger.info(f"🔄 [Hot-Reload] VOICE_NAME updated: '{VOICE_NAME}' -> '{new_v}'")
+            VOICE_NAME = new_v
+            if voice_engine:
+                voice_engine.default_voice = new_v
+
+    # 2. Voice Backend
+    if "VOICE_BACKEND" in new_vars:
+        new_vb = (new_vars["VOICE_BACKEND"] or "").strip().lower()
+        if voice_engine and getattr(voice_engine, "voice_backend", "") != new_vb:
+            logger.info(f"🔄 [Hot-Reload] VOICE_BACKEND updated -> '{new_vb}'")
+            voice_engine.voice_backend = new_vb
+
+    # 3. Bot Language
+    if "BOT_LANGUAGE" in new_vars:
+        new_lang = (new_vars["BOT_LANGUAGE"] or "").strip()
+        if new_lang and new_lang != BOT_LANGUAGE:
+            logger.info(f"🔄 [Hot-Reload] BOT_LANGUAGE updated: '{BOT_LANGUAGE}' -> '{new_lang}'")
+            BOT_LANGUAGE = new_lang
+            os.environ["BOT_LANGUAGE"] = new_lang
+
+    # 4. Engine & Model Settings
+    for k in ("AI_ENGINE_MODE", "SFW_LLM_PROVIDER", "SFW_IMAGE_ENGINE", "COMFYUI_CHECKPOINT", "DEFAULT_PERSONA", "VIDEO_ENGINE"):
+        if k in new_vars and new_vars[k]:
+            os.environ[k] = new_vars[k].strip()
+
+
+def start_env_hot_reload_watcher():
+    """Watches .env file for changes and hot-reloads configuration in memory without disconnecting."""
+    def _watch():
+        env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+        if not os.path.exists(env_path):
+            return
+        last_mtime = os.path.getmtime(env_path)
+        while True:
+            time.sleep(2.0)
+            try:
+                if not os.path.exists(env_path):
+                    continue
+                curr_mtime = os.path.getmtime(env_path)
+                if curr_mtime > last_mtime:
+                    last_mtime = curr_mtime
+                    reload_env_configurations()
+            except Exception as e:
+                logger.debug(f"Env watcher check error: {e}")
+
+    threading.Thread(target=_watch, daemon=True).start()
+    logger.info("✓ Configuration Hot-Reload watcher active (.env watcher)")
+
+
 def apply_llm_choice(choice: str) -> str:
     global LLM_BASE_URL
     detected_llms = scan_local_llm_models()
@@ -5907,6 +5985,9 @@ def main():
             logger.info("🚀 Startup: Starting AGY OpenAI Bridge on port 8001...")
             idle_engine.wake_agy_bridge()
             logger.info("✓ AGY OpenAI Bridge online at http://127.0.0.1:8001/v1")
+
+    # Start configuration hot-reload watcher (.env watcher)
+    start_env_hot_reload_watcher()
 
     # Start Smart Idle & Dynamic Power Saver monitor
     if idle_engine.enabled:

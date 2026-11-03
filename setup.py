@@ -12,6 +12,7 @@ Repository: https://github.com/asepindrak/waifu-on-telegram
 
 import os
 import sys
+import time
 import glob
 import json
 import shutil
@@ -82,6 +83,95 @@ def write_env(env_vars):
     with open(ENV_FILE, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
     print(c(GREEN, f"\n✓ Configuration successfully saved to: {ENV_FILE}"))
+
+def is_bot_running():
+    """Checks if bot.py is currently running, returning its PID if found."""
+    pid_file = os.path.join(SCRIPT_DIR, "data", "waifu.pid")
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file, "r") as f:
+                pid = int(f.read().strip())
+            if sys.platform == "win32":
+                res = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True)
+                if str(pid) in res.stdout:
+                    return pid
+            else:
+                os.kill(pid, 0)
+                return pid
+        except Exception:
+            pass
+
+    # Process search fallback (Windows / Unix)
+    try:
+        cur_pid = os.getpid()
+        if sys.platform == "win32":
+            ps_check = f'Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -like "*bot.py*" -and $_.ProcessId -ne {cur_pid} }} | Select-Object -ExpandProperty ProcessId'
+            out = subprocess.run(["powershell", "-NoProfile", "-Command", ps_check], capture_output=True, text=True).stdout.strip()
+            if out:
+                lines = [int(l.strip()) for l in out.splitlines() if l.strip().isdigit()]
+                if lines:
+                    return lines[0]
+        else:
+            out = subprocess.run(["pgrep", "-f", "python.*bot.py"], capture_output=True, text=True).stdout.strip()
+            if out:
+                lines = [int(l.strip()) for l in out.splitlines() if l.strip().isdigit() and int(l.strip()) != cur_pid]
+                if lines:
+                    return lines[0]
+    except Exception:
+        pass
+    return None
+
+def restart_bot_if_running() -> bool:
+    """Restarts bot.py if it is currently running so new configuration takes effect immediately."""
+    running_pid = is_bot_running()
+    if not running_pid:
+        return False
+
+    print(c(CYAN, f"\n🔄 Terdeteksi Waifu Bot sedang aktif di latar belakang (PID: {running_pid})."))
+    print(c(YELLOW, "⚡ Me-restart bot secara otomatis agar konfigurasi baru langsung aktif..."))
+
+    # 1. Terminate old process
+    try:
+        cur_pid = os.getpid()
+        if sys.platform == "win32":
+            ps_kill = f'Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -like "*bot.py*" -and $_.ProcessId -ne {cur_pid} }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}'
+            subprocess.run(["powershell", "-NoProfile", "-Command", ps_kill], capture_output=True)
+        else:
+            subprocess.run(["pkill", "-f", "python.*bot.py"], capture_output=True)
+    except Exception as e:
+        logger.debug(f"Kill error: {e}")
+
+    time.sleep(1.5)
+
+    # 2. Spawn new bot.py in detached background
+    bot_script = os.path.join(SCRIPT_DIR, "bot.py")
+    popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, bot_script],
+            cwd=SCRIPT_DIR,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            **popen_kwargs
+        )
+        pid_file = os.path.join(SCRIPT_DIR, "data", "waifu.pid")
+        try:
+            os.makedirs(os.path.dirname(pid_file), exist_ok=True)
+            with open(pid_file, "w") as f:
+                f.write(str(proc.pid))
+        except Exception:
+            pass
+        print(c(GREEN, f"✓ Bot berhasil di-restart otomatis di background (PID: {proc.pid})! ✨\n"))
+        return True
+    except Exception as e:
+        print(c(RED, f"❌ Gagal me-restart bot otomatis: {e}"))
+        return False
+
+def save_config(env_vars: dict, auto_restart: bool = True):
+    """Saves configuration to .env and automatically restarts bot if running."""
+    write_env(env_vars)
+    if auto_restart:
+        restart_bot_if_running()
 
 def scan_local_llm_models():
     """Scans KoboldCPP, Locally Uncensored, and local model directories across Windows, Linux, and macOS."""
@@ -828,30 +918,30 @@ def run_menu():
         opt = input("Select option [0-11]: ").strip()
         if opt == "1":
             config_telegram_credentials(env_vars)
-            write_env(env_vars)
+            save_config(env_vars)
         elif opt == "2":
             config_llm_model(env_vars)
-            write_env(env_vars)
+            save_config(env_vars)
         elif opt == "3":
             config_image_model(env_vars)
-            write_env(env_vars)
+            save_config(env_vars)
         elif opt == "4":
             config_persona(env_vars)
-            write_env(env_vars)
+            save_config(env_vars)
         elif opt == "5":
             config_voice(env_vars)
-            write_env(env_vars)
+            save_config(env_vars)
         elif opt == "6":
             config_language(env_vars)
-            write_env(env_vars)
+            save_config(env_vars)
         elif opt == "7":
             config_video_engine(env_vars)
-            write_env(env_vars)
+            save_config(env_vars)
         elif opt == "8":
             manage_models_menu()
         elif opt == "9":
             config_workspace_projects(env_vars)
-            write_env(env_vars)
+            save_config(env_vars)
         elif opt == "10":
             auto_in = input("Enable bot automatically on PC boot (Autorun)? [Y/n, default: Y]: ").strip().lower()
             setup_autostart(enable=(auto_in != "n"))
@@ -893,7 +983,7 @@ def run_full_wizard():
     autostart_input = input(c(BOLD + YELLOW, "Launch bot automatically on system startup? [Y/n, default: Y]: ")).strip().lower()
     enable_auto = autostart_input != "n"
 
-    write_env(env_vars)
+    save_config(env_vars)
     setup_autostart(enable=enable_auto)
 
     print(c(BOLD + GREEN, "\n" + "=" * 70))
@@ -919,7 +1009,7 @@ if __name__ == "__main__":
             env_vars["TELEGRAM_ALLOWED_USER_ID"] = args.user
         if args.backend:
             env_vars["LLM_BASE_URL"] = args.backend
-        write_env(env_vars)
+        save_config(env_vars)
         if args.language:
             env_vars["BOT_LANGUAGE"] = args.language
         if args.video_engine:

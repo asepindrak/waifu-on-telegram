@@ -34,6 +34,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Process & Runtime Cache
+*.pid
+data/*.pid
 bot.pid
 bot.log
 server.pid
