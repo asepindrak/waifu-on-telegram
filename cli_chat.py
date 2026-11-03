@@ -39,6 +39,9 @@ from media_engine import MediaEngine
 from idle_engine import IdleEngine
 from health_engine import HealthEngine
 import student_schedule
+from project_manager import get_project_manager
+from computer_use_engine import get_computer_use_engine
+from coding_engine import get_coding_engine
 
 logger = logging.getLogger("WaifuCLI")
 
@@ -205,6 +208,9 @@ class WaifuCLISession:
             comfyui_on_demand=os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")
         )
         self.health_engine.idle_engine = self.idle_engine
+        self.project_manager = get_project_manager()
+        self.coding_engine = get_coding_engine()
+        self.computer_use_engine = get_computer_use_engine()
 
     def print_welcome_banner(self):
         persona = self.persona_mgr.get_active_persona()
@@ -223,6 +229,11 @@ class WaifuCLISession:
         print(f"  • {c(BOLD + CYAN, 'Cerita Hari Ini')}: {story_title} (Hari ini: {story_theme})")
         print(f"  • {c(BOLD + CYAN, 'Riwayat Chat')}   : {history_len} pesan tersinkronisasi dengan Telegram (User ID: {self.user_id})")
         print(f"  • {c(BOLD + CYAN, 'Media Auto-Open')}: Gambar & video akan otomatis terbuka di layar PC Anda!")
+        active_proj = self.project_manager.get_active_project(self.user_id)
+        proj_path = self.project_manager.get_active_project_path(self.user_id)
+        cu_avail = self.computer_use_engine.is_available()
+        print(f"  • {c(BOLD + CYAN, 'Workspace Aktif')}: {c(BOLD + GREEN, active_proj)} ({c(DIM, proj_path)})")
+        print(f"  • {c(BOLD + CYAN, 'Computer Use')}   : {c(GREEN, '🟢 Ready (agent-desktop)') if cu_avail else c(YELLOW, '⚠️ Not Ready')}")
         print(c(DIM, "─" * 74))
         print(f"  {c(YELLOW, '💡 Ketik pesan lalu tekan Enter untuk mengobrol.')}")
         print(f"  {c(YELLOW, '💡 Perintah cepat:')} /pap {c(DIM, '(minta foto)')}, /video {c(DIM, '(minta video)')}, /story {c(DIM, '(cek cerita)')}, /clear, /exit")
@@ -351,6 +362,35 @@ class WaifuCLISession:
 
         self.persona_mgr.add_message(self.user_id, "user", user_text)
         self.persona_mgr.add_message(self.user_id, "assistant", f"{caption} [VIDEO: {f_name}]")
+
+    def handle_coding_request(self, user_text: str):
+        """Executes coding task inside active project directory with waifu persona."""
+        persona = self.persona_mgr.get_active_persona()
+        p_name = persona.get("name", "Waifu")
+        active_proj = self.project_manager.get_active_project(self.user_id)
+
+        with CLILoader(f"{p_name} sedang mengerjakan coding di '{active_proj}'...", emoji="💻"):
+            reply_msg = self.coding_engine.execute_task(user_text, self.user_id)
+
+        print(f"\n🌸 {c(BOLD + MAGENTA, p_name)}:\n{reply_msg}\n")
+        self.persona_mgr.add_message(self.user_id, "user", user_text)
+        self.persona_mgr.add_message(self.user_id, "assistant", reply_msg)
+
+    def handle_computer_request(self, user_text: str):
+        """Executes desktop / computer use task via agent-desktop."""
+        persona = self.persona_mgr.get_active_persona()
+        p_name = persona.get("name", "Waifu")
+
+        with CLILoader(f"{p_name} sedang memeriksa layar & kontrol desktop...", emoji="🖥️"):
+            reply_msg, screenshot_path = self.coding_engine.execute_computer_task(user_text, self.user_id)
+
+        print(f"\n🌸 {c(BOLD + MAGENTA, p_name)}:\n{reply_msg}\n")
+        if screenshot_path and os.path.exists(screenshot_path):
+            print(f"📸 {c(GREEN, f'Membuka tangkapan layar desktop ({os.path.basename(screenshot_path)})...')}")
+            open_media_file(screenshot_path)
+
+        self.persona_mgr.add_message(self.user_id, "user", user_text)
+        self.persona_mgr.add_message(self.user_id, "assistant", reply_msg)
 
     def process_message(self, user_text: str):
         """Processes one conversational turn with full story, memory, and routine injection."""
@@ -487,6 +527,10 @@ class WaifuCLISession:
                 print("  • /pap atau minta foto ➔ Foto digenerate dan otomatis terbuka di layar!")
                 print("  • /video atau minta video ➔ Video digenerate dan otomatis terbuka!")
                 print("  • /story ➔ Melihat cerita & episode hidup waifu hari ini.")
+                print("  • /projects ➔ Melihat & memilih project workspace coding.")
+                print("  • /spawn <nama> ➔ Membuat folder project baru & langsung beralih.")
+                print("  • /desktop ➔ Cek status Computer Use (agent-desktop).")
+                print("  • /screen ➔ Screenshot layar desktop & tampilkan ke layar.")
                 print("  • /persona [nama] ➔ Ganti karakter (runa, akira, hina, shiro, yume).")
                 print("  • /clear ➔ Menghapus riwayat percakapan sesi ini.")
                 print("  • /exit atau /quit ➔ Keluar dari sesi chat CLI.\n")
@@ -516,6 +560,72 @@ class WaifuCLISession:
                     print(f"ℹ️ Persona aktif saat ini: {c(BOLD + GREEN, curr.get('name'))}. Ketik '/persona <nama>' untuk mengganti.\n")
                 continue
 
+            if low in ("/projects", "/project", "/workspace"):
+                curr = self.project_manager.get_active_project(self.user_id)
+                curr_p = self.project_manager.get_active_project_path(self.user_id)
+                root_d = self.project_manager.get_projects_root_dir()
+                projs = self.project_manager.list_projects()
+
+                print(f"\n{c(BOLD + CYAN, '💻 DAFTAR PROJECT WORKSPACE:')}")
+                print(f"  • Root Directory : {c(DIM, root_d)}")
+                print(f"  • Project Aktif  : {c(BOLD + GREEN, curr)} ({c(DIM, curr_p)})\n")
+                for p_name, p_info in projs.items():
+                    mark = c(BOLD + GREEN, "➔ [AKTIF]") if p_name == curr else "  [     ]"
+                    p_disp = p_info if isinstance(p_info, str) else p_info.get('path', '')
+                    print(f"  {mark} {c(BOLD, p_name)} : {c(DIM, p_disp)}")
+                print(f"\n  {c(YELLOW, '💡 Ketik /project <nama> untuk beralih atau /spawn <nama> untuk buat baru.')}\n")
+                continue
+
+            if low.startswith("/project ") or low.startswith("/use "):
+                target_p = user_input.split(None, 1)[1].strip()
+                ok, res_path = self.project_manager.set_active_project(self.user_id, target_p)
+                if ok:
+                    new_path = self.project_manager.get_active_project_path(self.user_id)
+                    print(f"✨ {c(GREEN, f'Berhasil beralih ke project: {target_p}')} ({c(DIM, new_path)})\n")
+                else:
+                    print(f"⚠️ Project '{target_p}' tidak ditemukan. Ketik /projects untuk melihat daftar.\n")
+                continue
+
+            if low.startswith("/spawn "):
+                new_p = user_input.split(None, 1)[1].strip()
+                ok, clean_p, path_or_err = self.project_manager.spawn_project(new_p, switch_user_id=self.user_id)
+                if ok:
+                    print(f"🎉 {c(GREEN, f'Project baru {clean_p} berhasil dibuat!')} Folder: {c(DIM, path_or_err)}\n")
+                else:
+                    print(f"⚠️ Gagal membuat project: {path_or_err}\n")
+                continue
+
+            if low.startswith("/setprojectsdir "):
+                new_dir = user_input.split(None, 1)[1].strip()
+                ok, path_or_err = self.project_manager.set_projects_root_dir(new_dir)
+                if ok:
+                    print(f"✅ {c(GREEN, 'Root directory projects berhasil diubah:')} {c(DIM, path_or_err)}\n")
+                else:
+                    print(f"❌ {path_or_err}\n")
+                continue
+
+            if low in ("/desktop", "/computer"):
+                st = self.computer_use_engine.get_status()
+                avail = self.computer_use_engine.is_available()
+                plat = st.get("data", {}).get("platform", sys.platform)
+                perm = st.get("data", {}).get("permissions", {}).get("accessibility", {}).get("state", "unknown")
+                print(f"\n{c(BOLD + CYAN, '🖥️ STATUS COMPUTER USE (agent-desktop):')}")
+                print(f"  • Status Adapter : {c(GREEN, '🟢 Ready') if avail else c(RED, '🔴 Not Available')}")
+                print(f"  • Platform       : {plat}")
+                print(f"  • Accessibility  : {perm}")
+                print(f"  • Tooling        : Native Accessibility Tree & Screenshot\n")
+                continue
+
+            if low in ("/screen", "/screenshot"):
+                with CLILoader("Mengambil tangkapan layar desktop...", emoji="📸"):
+                    sc_path = self.computer_use_engine.capture_screenshot()
+                if sc_path and os.path.exists(sc_path):
+                    print(f"✅ Screenshot berhasil diambil: {c(DIM, sc_path)}")
+                    open_media_file(sc_path)
+                else:
+                    print(f"⚠️ Gagal mengambil tangkapan layar.\n")
+                continue
+
             if low in ("/clear", "/reset"):
                 self.persona_mgr.clear_history(self.user_id)
                 print(f"🧹 {c(GREEN, 'Riwayat obrolan sesi ini berhasil dibersihkan!')}\n")
@@ -525,7 +635,11 @@ class WaifuCLISession:
             is_pap_request = bool(re.search(r"\b(pap|foto|selfie|kirim foto|minta foto|liat foto)\b", low))
             is_video_request = bool(re.search(r"\b(video|animasi|klip|bergerak)\b", low))
 
-            if low.startswith("/pap") or low.startswith("/foto") or (is_pap_request and not is_video_request):
+            if self.coding_engine.is_computer_use_intent(user_input):
+                self.handle_computer_request(user_input)
+            elif self.coding_engine.is_coding_intent(user_input):
+                self.handle_coding_request(user_input)
+            elif low.startswith("/pap") or low.startswith("/foto") or (is_pap_request and not is_video_request):
                 self.handle_photo_request(user_input)
             elif low.startswith("/video") or is_video_request:
                 self.handle_video_request(user_input)

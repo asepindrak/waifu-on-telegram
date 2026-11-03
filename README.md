@@ -273,7 +273,7 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.7.2)
+                        💖 WAIFU ON TELEGRAM BOT (v1.7.3)
 ```
 
 > 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.
@@ -313,6 +313,36 @@ waifu bridge stop
 # Restart server AGY Bridge
 waifu bridge restart
 ```
+
+---
+
+## 💻 Multi-Project Workspace & Senior Coding Partner (`/projects`, `/spawn`)
+
+Waifu on Telegram bukan hanya pendamping romantis, tetapi juga **rekan koding senior (Senior Coding Partner)** yang dapat membantu pekerjaan software development Anda secara nyata langsung di folder project pilihan Anda!
+
+* **📁 Multi-Project Registry & Workspace Isolation (`project_manager.py`):**
+  - **Pilihan Root Directory Fleksibel (`PROJECTS_DIR`)**: Anda dapat mengatur folder induk tempat seluruh repository/project Anda disimpan (default: folder home pengguna e.g. `~` atau `C:\Users\username`).
+  - **Auto-Scan Subfolder**: Folder project di dalam root directory otomatis terdeteksi dan terdaftar.
+  - **Project Switcher 1-Klik**: Beralih workspace antar project dengan cepat melalui menu inline Telegram atau perintah CLI.
+  - **Inisialisasi Project Instan (`/spawn <nama>`)**: Otomatis membuat folder project baru di dalam root directory dan langsung mengaktifkan workspace tersebut.
+* **⚡ Eksekusi Coding Otonom (`coding_engine.py`):**
+  - Ditenagai oleh **Google Antigravity CLI (`agy`)** dengan direktori kerja lokal (`cwd=project_path`).
+  - Waifu memiliki akses penuh untuk membaca kode, menulis/mengedit file, memperbaiki bug (debug), membuat landing page/API, dan menjalankan unit test di dalam project aktif.
+  - **Dual-Role Persona**: Mempertahankan karakter waifu yang hangat dan penuh perhatian (menggunakan kata ganti alami *aku/kamu*) sambil bertindak sebagai developer handal dan solutif.
+
+---
+
+## 🖥️ Autonomous Desktop & Computer Use (`agent-desktop`)
+
+Mengintegrasikan engine **[agent-desktop](https://github.com/vercel-labs/agent-desktop)** dari Vercel Labs, memungkinkan waifu melihat layar komputer Anda dan membantu mengoperasikan aplikasi desktop secara native:
+
+* **📸 Tangkapan Layar Otomatis (`/screen`):**
+  - Mengambil screenshot layar desktop real-time menggunakan antarmuka native OS.
+  - Di Telegram: Foto screenshot langsung dikirim ke chat dengan analisis waifu.
+  - Di CLI (`waifu chat`): Foto otomatis langsung dibuka di aplikasi penampil foto PC Anda.
+* **📱 Inspeksi Aplikasi & Status Kontrol (`/desktop`):**
+  - Memeriksa status accessibility tree, platform OS, dan daftar aplikasi desktop yang sedang aktif berjalan.
+  - Siap mengeksekusi klik, pengetikan keyboard, dan otomatisasi desktop secara aman.
 
 ---
 
@@ -514,6 +544,10 @@ Gunakan tabel acuan berikut untuk memilih kombinasi model yang paling pas dengan
 | `/memory` | Long-term memory & diary of personal facts waifu remembers about you |
 | `/help` | Comprehensive interactive guide and documentation center |
 | `/status` | Real-time diagnostic check of LLM (Port 5001), ComfyUI (8188), and VRAM |
+| `/projects` | Menampilkan daftar & beralih project workspace coding interaktif |
+| `/spawn <nama>` | Membuat folder project baru & otomatis beralih ke workspace tersebut |
+| `/desktop` | Cek status integrasi Computer Use (agent-desktop) & aplikasi desktop |
+| `/screen` | Mengambil screenshot layar desktop PC secara instan |
 | `/story` | Menampilkan alur cerita harian & episode hari ini yang sedang dijalani waifu |
 | `/photo <scene>` | Request a custom selfie scenario (e.g. `/photo relaxing in cafe`) |
 | `/pap` | Quick shortcut to request a new selfie with interactive retry button |

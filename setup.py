@@ -734,6 +734,29 @@ def manage_models_menu():
             else:
                 print(c(RED, f"❌ Gagal mengunduh {info.get('name')}."))
 
+def config_workspace_projects(env_vars):
+    print(c(BOLD + CYAN, "\n--- Configure Coding Workspace & Projects Directory ---"))
+    default_dir = os.path.expanduser("~")
+    current_dir = env_vars.get("PROJECTS_DIR") or default_dir
+    print(f"Current Projects Root Directory: {current_dir}")
+    print("This is the directory where your coding projects are scanned, created, and managed by your waifu.")
+    val = input(f"Enter new Projects Root Directory [Press Enter to keep '{current_dir}']: ").strip()
+    if val:
+        exp = os.path.expanduser(os.path.expandvars(val))
+        if os.path.exists(exp):
+            env_vars["PROJECTS_DIR"] = os.path.abspath(exp)
+            print(c(GREEN, f"✓ Projects directory set to: {env_vars['PROJECTS_DIR']}"))
+        else:
+            create_choice = input(f"Directory '{exp}' does not exist. Create it? [Y/n]: ").strip().lower()
+            if create_choice != "n":
+                os.makedirs(exp, exist_ok=True)
+                env_vars["PROJECTS_DIR"] = os.path.abspath(exp)
+                print(c(GREEN, f"✓ Created and set projects directory: {env_vars['PROJECTS_DIR']}"))
+            else:
+                print(c(YELLOW, "Cancelled."))
+    else:
+        env_vars["PROJECTS_DIR"] = current_dir
+
 def run_menu():
     env_vars = read_env()
     has_token = bool(env_vars.get("TELEGRAM_BOT_TOKEN"))
@@ -763,6 +786,7 @@ def run_menu():
             cur_ckpt_disp = "MeinaMix v12 (SD 1.5)"
         print(c(CYAN, f"  • Photo Model : {cur_ckpt_disp} ({env_vars.get('COMFYUI_URL', 'Disabled')})"))
         print(c(CYAN, f"  • Persona     : {env_vars.get('DEFAULT_PERSONA', 'runa').title()} | Voice: {env_vars.get('VOICE_NAME', '')}"))
+        print(c(CYAN, f"  • Workspace   : {env_vars.get('PROJECTS_DIR', os.path.expanduser('~'))}"))
         print(c(CYAN, f"  • Language    : {env_vars.get('BOT_LANGUAGE', 'id')}"))
         print("-" * 70)
         print("  [1] 🤖 Change Telegram Bot Token / Allowed User ID")
@@ -772,12 +796,13 @@ def run_menu():
         print("  [5] 🌐 Change Waifu Language (ID, EN, JA, Custom)")
         print("  [6] 🎬 Choose Video Engine (Wan 2.1 / AnimateDiff / Motion 2.5D)")
         print("  [7] 📦 AI Assets & Models Manager (Download / Verify Models)")
-        print("  [8] 🚀 Configure Autorun at System Startup (On / Off)")
-        print("  [9] 🔄 Re-run Complete Setup Wizard")
+        print("  [8] 💻 Configure Coding Workspace & Projects Directory (/projects)")
+        print("  [9] 🚀 Configure Autorun at System Startup (On / Off)")
+        print("  [10] 🔄 Re-run Complete Setup Wizard")
         print("  [0] ❌ Exit / Done")
         print("-" * 70)
 
-        opt = input("Select option [0-9]: ").strip()
+        opt = input("Select option [0-10]: ").strip()
         if opt == "1":
             config_telegram_credentials(env_vars)
             write_env(env_vars)
@@ -799,9 +824,12 @@ def run_menu():
         elif opt == "7":
             manage_models_menu()
         elif opt == "8":
+            config_workspace_projects(env_vars)
+            write_env(env_vars)
+        elif opt == "9":
             auto_in = input("Enable bot automatically on PC boot (Autorun)? [Y/n, default: Y]: ").strip().lower()
             setup_autostart(enable=(auto_in != "n"))
-        elif opt == "9":
+        elif opt == "10":
             run_full_wizard()
             break
         elif opt == "0":
@@ -824,6 +852,8 @@ def run_full_wizard():
 
     config_persona_voice(env_vars)
     config_language(env_vars)
+
+    config_workspace_projects(env_vars)
 
     print(c(BOLD + CYAN, "\n[Step 6/7: PC Music Remote Player (YouTube Music)]"))
     print("-" * 60)

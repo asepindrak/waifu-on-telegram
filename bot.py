@@ -33,6 +33,14 @@ from memory_engine import MemoryEngine
 from reminder_engine import ReminderEngine
 from anniversary_engine import AnniversaryEngine
 from story_engine import StoryEngine
+from project_manager import get_project_manager
+from computer_use_engine import get_computer_use_engine
+from coding_engine import get_coding_engine
+
+project_manager = get_project_manager()
+computer_use_engine = get_computer_use_engine()
+coding_engine = get_coding_engine()
+AWAITING_PROJECTS_DIR: dict = {}
 import asset_manager
 from health_engine import HealthEngine, is_port_listening
 from idle_engine import IdleEngine
@@ -677,6 +685,8 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("🌐 Bahasa / Language", callback_data="cfg_submenu:language"),
         types.InlineKeyboardButton("🎨 Model Foto & ComfyUI", callback_data="cfg_submenu:photo"),
         types.InlineKeyboardButton("🎬 Video Engine (/video)", callback_data="cfg_submenu:video_engine"),
+        types.InlineKeyboardButton("💻 Workspace (/projects)", callback_data="cfg_submenu:projects"),
+        types.InlineKeyboardButton("🖥️ Computer Use (/desktop)", callback_data="cfg_submenu:desktop"),
         types.InlineKeyboardButton("🎭 Ganti Persona", callback_data="open_persona_menu"),
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
         types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
@@ -1717,6 +1727,86 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
     return text, markup
 
 
+def show_projects_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders interactive projects & workspace directory selection menu."""
+    curr_proj = project_manager.get_active_project(user_id)
+    curr_path = project_manager.get_active_project_path(user_id)
+    root_dir = project_manager.get_projects_root_dir()
+    projs = project_manager.list_projects()
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    buttons = []
+    for p_name in projs.keys():
+        is_cur = (p_name == curr_proj)
+        label = f"✅ {p_name}" if is_cur else f"📁 {p_name}"
+        buttons.append(types.InlineKeyboardButton(label, callback_data=f"select_proj:{p_name}"))
+    markup.add(*buttons)
+    markup.add(
+        types.InlineKeyboardButton("➕ Buat Project Baru (/spawn)", callback_data="proj_action:spawn"),
+        types.InlineKeyboardButton("📂 Ganti Root Folder", callback_data="proj_action:set_root")
+    )
+    markup.add(
+        types.InlineKeyboardButton("🖥️ Status Desktop (/desktop)", callback_data="proj_action:desktop"),
+        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+    )
+
+    text = (
+        f"💻 **Manajemen Workspace & Project Coding**\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👑 **Project Aktif** : **{curr_proj}**\n"
+        f"📂 **Lokasi Folder** : `{curr_path}`\n"
+        f"🏠 **Root Directory**: `{root_dir}`\n\n"
+        f"Pilih project di atas untuk beralih workspace dengan 1 klik, "
+        f"atau ketik `/spawn <nama>` untuk membuat project baru!\n\n"
+        f"💡 _Semua tugas coding, file, dan terminal dari waifu akan dijalankan di dalam folder project aktif._"
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
+
+
+def show_desktop_status_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders status and options for Computer Use via Vercel agent-desktop."""
+    cu = get_computer_use_engine()
+    status = cu.get_status()
+    is_avail = cu.is_available()
+    plat = status.get("data", {}).get("platform", sys.platform)
+    perm = status.get("data", {}).get("permissions", {}).get("accessibility", {}).get("state", "unknown")
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("📸 Screenshot Layar", callback_data="desktop_act:screenshot"),
+        types.InlineKeyboardButton("📱 Cek Aplikasi", callback_data="desktop_act:apps")
+    )
+    markup.add(
+        types.InlineKeyboardButton("💻 Menu Projects", callback_data="cfg_submenu:projects"),
+        types.InlineKeyboardButton("🔙 Menu Setup", callback_data="cfg_submenu:dashboard")
+    )
+
+    text = (
+        f"🖥️ **Computer Use & Desktop Control (agent-desktop)**\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"• Status Adapter : {'🟢 Active & Ready' if is_avail else '🔴 Not Found'}\n"
+        f"• Platform       : `{plat}`\n"
+        f"• Accessibility  : `{perm}`\n"
+        f"• Engine         : `agent-desktop (Native Accessibility Tree)`\n\n"
+        f"Waifu bisa melihat layar desktop, membuka aplikasi, mengklik elemen UI, "
+        f"dan membantu pekerjaanmu secara real-time!\n\n"
+        f"💡 _Ketik `/screen` untuk screenshot instan atau chat langsung (misal: 'tolong screenshot layar pc')._"
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
+
+
 def show_help_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, section: str = "main", reply_to_id: Optional[int] = None):
     """Renders or updates help guide."""
     text, markup = render_help_section(section)
@@ -2468,6 +2558,10 @@ def callback_cfg_submenus(call):
         show_language_menu(chat_id, user_id, message_to_edit=mid)
     elif sub == "video_engine":
         show_video_engine_menu(chat_id, user_id, message_to_edit=mid)
+    elif sub == "projects":
+        show_projects_menu(chat_id, user_id, message_to_edit=mid)
+    elif sub == "desktop":
+        show_desktop_status_menu(chat_id, user_id, message_to_edit=mid)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_toggle:'))
@@ -4313,6 +4407,241 @@ def callback_music_command(call):
 
 
 @bot.message_handler(func=lambda msg: True)
+@bot.message_handler(commands=['projects', 'project', 'workspace'])
+def handle_projects_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    show_projects_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
+@bot.message_handler(commands=['spawn'])
+def handle_spawn_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    args = (message.text or "").split(maxsplit=1)
+    if len(args) < 2 or not args[1].strip():
+        bot.reply_to(message, "ℹ️ Format: `/spawn <nama_project>`\nContoh: `/spawn landing-page` atau `/spawn discord-bot`", parse_mode="Markdown")
+        return
+    p_name = args[1].strip()
+    ok, clean_name, path_or_err = project_manager.spawn_project(p_name)
+    if ok:
+        project_manager.set_active_project(message.from_user.id, clean_name)
+        bot.reply_to(
+            message,
+            f"🚀 **Project '{clean_name}' Berhasil Diinisialisasi!**\n\n"
+            f"📂 Path: `{path_or_err}`\n\n"
+            f"Workspace aktif telah otomatis berpindah ke project ini. Semua tugas coding dan file akan dikerjakan di folder ini!",
+            parse_mode="Markdown"
+        )
+    else:
+        bot.reply_to(message, f"❌ Gagal membuat project: {path_or_err}", parse_mode="Markdown")
+
+
+@bot.message_handler(commands=['general'])
+def handle_general_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    project_manager.set_active_project(message.from_user.id, "general")
+    bot.reply_to(message, "✅ Berpindah ke mode workspace **General Chat**.", parse_mode="Markdown")
+
+
+@bot.message_handler(commands=['setprojectsdir'])
+def handle_set_projects_dir_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    args = (message.text or "").split(maxsplit=1)
+    if len(args) < 2 or not args[1].strip():
+        cur_root = project_manager.get_projects_root_dir()
+        bot.reply_to(message, f"ℹ️ Format: `/setprojectsdir <path_folder>`\nFolder saat ini: `{cur_root}`", parse_mode="Markdown")
+        return
+    ok, res = project_manager.set_projects_root_dir(args[1].strip())
+    if ok:
+        update_env_variable("PROJECTS_DIR", res)
+        bot.reply_to(message, f"✅ Root projects directory diubah ke: `{res}`", parse_mode="Markdown")
+    else:
+        bot.reply_to(message, f"❌ {res}", parse_mode="Markdown")
+
+
+@bot.message_handler(commands=['desktop', 'computer'])
+def handle_desktop_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    show_desktop_status_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
+@bot.message_handler(commands=['screen', 'screenshot'])
+def handle_screen_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    cu = get_computer_use_engine()
+    bot.send_chat_action(message.chat.id, "upload_photo")
+    ok, path = cu.take_screenshot()
+    if ok and os.path.exists(path):
+        with open(path, "rb") as f:
+            bot.send_photo(message.chat.id, f, caption="📸 **Tangkapan Layar Desktop PC** 🖥️\n_Dihasilkan via agent-desktop_", reply_to_message_id=message.message_id, parse_mode="Markdown")
+    else:
+        bot.reply_to(message, f"⚠️ Gagal mengambil tangkapan layar: {path}")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("select_proj:"))
+def callback_select_proj(call):
+    if not is_authorized(call.from_user.id):
+        return
+    p_name = call.data.split(":", 1)[1]
+    ok, path_or_err = project_manager.set_active_project(call.from_user.id, p_name)
+    if ok:
+        bot.answer_callback_query(call.id, f"Workspace: {p_name}")
+        show_projects_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+    else:
+        bot.answer_callback_query(call.id, f"Error: {path_or_err}")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("proj_action:"))
+def callback_proj_actions(call):
+    if not is_authorized(call.from_user.id):
+        return
+    act = call.data.split(":", 1)[1]
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    if act == "spawn":
+        bot.answer_callback_query(call.id)
+        msg_text = (
+            "➕ **Buat Folder Project Baru (/spawn)**\n\n"
+            "Format: `/spawn <nama_project>`\n"
+            "Contoh: `/spawn web-landing-page` atau `/spawn telegram-bot`\n\n"
+            "Folder akan dibuat di root directory dan waifu langsung beralih workspace ke sana!"
+        )
+        bot.send_message(chat_id, msg_text, parse_mode="Markdown")
+    elif act == "set_root":
+        AWAITING_PROJECTS_DIR[user_id] = True
+        bot.answer_callback_query(call.id)
+        cur_root = project_manager.get_projects_root_dir()
+        msg_text = (
+            "📂 **Ganti Root Folder List Projects (/setprojectsdir)**\n\n"
+            f"• Folder Saat Ini: `{cur_root}`\n\n"
+            "Silakan ketik dan kirimkan path folder lengkap yang ingin dijadikan tempat penyimpanan projects kamu:\n"
+            "_(Contoh: `C:\\Users\\sangp\\projects` atau `D:\\Coding`)_\n\n"
+            "💡 _Waifu akan otomatis mendeteksi semua subfolder di dalamnya sebagai project yang siap dipilih!_"
+        )
+        bot.send_message(chat_id, msg_text, parse_mode="Markdown")
+    elif act == "desktop":
+        show_desktop_status_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("desktop_act:"))
+def callback_desktop_actions(call):
+    if not is_authorized(call.from_user.id):
+        return
+    act = call.data.split(":", 1)[1]
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    cu = get_computer_use_engine()
+    if act == "screenshot":
+        bot.answer_callback_query(call.id, "📸 Mengambil screenshot...")
+        ok, path = cu.take_screenshot()
+        if ok and os.path.exists(path):
+            with open(path, "rb") as f:
+                bot.send_photo(chat_id, f, caption="📸 **Tangkapan Layar Desktop PC** 🖥️\n_Dihasilkan via agent-desktop_", parse_mode="Markdown")
+        else:
+            bot.send_message(chat_id, f"⚠️ Gagal mengambil tangkapan layar: {path}")
+    elif act == "apps":
+        bot.answer_callback_query(call.id)
+        apps = cu.list_running_apps()
+        if apps:
+            app_list_str = "\n".join([f"• `{a}`" for a in apps[:15]])
+            msg = f"📱 **Aplikasi Desktop Terdeteksi:**\n\n{app_list_str}"
+        else:
+            msg = "📱 Tidak ada aplikasi GUI terdeteksi yang aktif saat ini."
+        bot.send_message(chat_id, msg, parse_mode="Markdown")
+
+
+def process_coding_request(message, user_text: str, is_voice: bool = False):
+    """Executes coding / engineering tasks within the active project workspace."""
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    p_info = persona_mgr.get_active_persona()
+    p_name = p_info.get("name", "Waifu")
+    active_proj = project_manager.get_active_project(user_id)
+    active_path = project_manager.get_active_project_path(user_id)
+
+    status_msg = bot.reply_to(
+        message,
+        f"👩‍💻 **{p_name}**: Siap! Aku buka project `{active_proj}` dan kerjakan kodenya sekarang yaa~ 💻✨\n"
+        f"📂 _Workspace_: `{active_path}`"
+    )
+
+    stop_typing = False
+    def _typing_loop():
+        while not stop_typing:
+            try:
+                bot.send_chat_action(chat_id, "typing")
+            except Exception:
+                pass
+            time.sleep(4)
+    threading.Thread(target=_typing_loop, daemon=True).start()
+
+    try:
+        response_text, voice_text = coding_engine.execute_coding_task(
+            user_id=user_id,
+            prompt=user_text,
+            persona=p_info,
+            voice_enabled=is_voice,
+            timeout=1800
+        )
+    finally:
+        stop_typing = True
+
+    try:
+        bot.delete_message(chat_id, status_msg.message_id)
+    except Exception:
+        pass
+
+    send_long_chat_message(chat_id, response_text, reply_to_id=message.message_id)
+
+    v_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")
+    should_send_vn = (v_mode == "always") or (v_mode == "match_vn" and is_voice)
+    if should_send_vn and voice_engine:
+        spoken = voice_text or f"Kodenya sudah aku selesaikan di project {active_proj} yaa! Coba kamu cek hasilnya yaa~"
+        clean_spoken = re.sub(r'[*_`#~]', '', spoken).strip()
+        vn_bytes = voice_engine.generate_voice_bytes(clean_spoken)
+        if vn_bytes:
+            try:
+                import io
+                bio = io.BytesIO(vn_bytes)
+                bio.name = "waifu_reply.ogg"
+                bot.send_voice(chat_id, bio, caption=f"🌸 {p_name}")
+            except Exception as e_vn:
+                logger.warning(f"Voice send failed: {e_vn}")
+
+
+def process_computer_request(message, user_text: str):
+    """Executes computer use / desktop automation tasks."""
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    p_info = persona_mgr.get_active_persona()
+    p_name = p_info.get("name", "Waifu")
+
+    bot.send_chat_action(chat_id, "upload_photo")
+    status_msg = bot.reply_to(message, f"🖥️ **{p_name}**: Sedang memeriksa layar dan menjalankan perintah desktop... 🖱️✨")
+
+    try:
+        reply_msg, screenshot_path = coding_engine.execute_computer_task(user_text, user_id)
+    except Exception as e:
+        reply_msg = f"⚠️ Kendala computer use: {e}"
+        screenshot_path = None
+
+    try:
+        bot.delete_message(chat_id, status_msg.message_id)
+    except Exception:
+        pass
+
+    if screenshot_path and os.path.exists(screenshot_path):
+        with open(screenshot_path, "rb") as f:
+            bot.send_photo(chat_id, f, caption=f"🌸 **{p_name}**:\n{reply_msg}", reply_to_message_id=message.message_id, parse_mode="Markdown")
+    else:
+        bot.reply_to(message, f"🌸 **{p_name}**:\n{reply_msg}", parse_mode="Markdown")
+
+
 def handle_text_messages(message):
     if not is_authorized(message.from_user.id):
         return
@@ -4329,6 +4658,24 @@ def handle_text_messages(message):
                 parse_mode="Markdown"
             )
             return
+    if message.from_user.id in AWAITING_PROJECTS_DIR and AWAITING_PROJECTS_DIR[message.from_user.id]:
+        AWAITING_PROJECTS_DIR[message.from_user.id] = False
+        dir_input = message.text.strip()
+        if dir_input:
+            ok, res_path = project_manager.set_projects_root_dir(dir_input)
+            if ok:
+                update_env_variable("PROJECTS_DIR", res_path)
+                bot.reply_to(
+                    message,
+                    f"✅ **Root Directory Projects Berhasil Diubah!**\n\n"
+                    f"📂 Folder Baru: `{res_path}`\n\n"
+                    f"Semua project di dalam folder ini otomatis terdaftar. Ketik `/projects` untuk melihat list project!",
+                    parse_mode="Markdown"
+                )
+            else:
+                bot.reply_to(message, f"❌ {res_path}", parse_mode="Markdown")
+            return
+
     if message.from_user.id in USER_PERSONA_WIZARD:
         if handle_persona_wizard_input(message):
             return
@@ -4339,7 +4686,25 @@ def handle_text_messages(message):
     if "@" in first_token:
         first_token = first_token.split("@")[0]
 
-    if first_token in ('/outfit', '/wardrobe', '/baju', '/pakaian'):
+    if first_token in ('/projects', '/project', '/workspace'):
+        handle_projects_command(message)
+        return
+    elif first_token in ('/spawn',):
+        handle_spawn_command(message)
+        return
+    elif first_token in ('/general',):
+        handle_general_command(message)
+        return
+    elif first_token in ('/setprojectsdir',):
+        handle_set_projects_dir_command(message)
+        return
+    elif first_token in ('/desktop', '/computer'):
+        handle_desktop_command(message)
+        return
+    elif first_token in ('/screen', '/screenshot'):
+        handle_screen_command(message)
+        return
+    elif first_token in ('/outfit', '/wardrobe', '/baju', '/pakaian'):
         handle_outfit_command(message)
         return
     elif first_token in ('/persona', '/karakter'):
@@ -4491,6 +4856,16 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
     """Main conversation processor running asynchronously with continuous typing status."""
     def _execute():
         try:
+            # Check Computer Use Intent (screenshot / desktop control)
+            if coding_engine.is_computer_use_intent(user_text):
+                process_computer_request(message, user_text)
+                return
+
+            # Check Coding Intent (programming / workspace tasks)
+            if coding_engine.is_coding_intent(user_text):
+                process_coding_request(message, user_text, is_voice=is_voice)
+                return
+
             is_media, media_type = persona_mgr.detect_media_request(user_text)
             if is_media and media_type == "video":
                 process_video_request(message, user_text)
@@ -5092,6 +5467,10 @@ def setup_bot_commands():
         types.BotCommand("greetings", "⏰ Toggle sapaan harian (Pagi, Siang, Malam)"),
         types.BotCommand("chatting", "💬 Toggle inisiatif chat duluan dari waifu"),
         types.BotCommand("status", "📊 Cek status server LLM & ComfyUI"),
+        types.BotCommand("projects", "💻 Kelola & beralih project workspace coding"),
+        types.BotCommand("spawn", "🚀 Inisialisasi folder project baru (/spawn <nama>)"),
+        types.BotCommand("desktop", "🖥️ Computer Use & status kontrol desktop PC"),
+        types.BotCommand("screen", "📸 Ambil screenshot layar desktop PC"),
         types.BotCommand("reset", "🔄 Hapus memori obrolan (topik baru)")
     ]
     try:
