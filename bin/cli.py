@@ -100,6 +100,28 @@ def get_running_pid():
                 return pid
         except Exception:
             pass
+
+    # Direct process detection fallback for bot.py
+    cur_pid = os.getpid()
+    if platform.system() == "Windows":
+        try:
+            ps_check = f'Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -like "*bot.py*" -and $_.ProcessId -ne {cur_pid} }} | Select-Object -ExpandProperty ProcessId -First 1'
+            res = subprocess.run(["powershell", "-NoProfile", "-Command", ps_check], capture_output=True, text=True, timeout=5)
+            out = res.stdout.strip()
+            if out and out.isdigit():
+                return int(out)
+        except Exception:
+            pass
+    else:
+        try:
+            out = subprocess.run(["pgrep", "-f", "python.*bot.py"], capture_output=True, text=True).stdout.strip()
+            if out:
+                for line in out.splitlines():
+                    if line.strip().isdigit() and int(line.strip()) != cur_pid:
+                        return int(line.strip())
+        except Exception:
+            pass
+
     return None
 
 def cmd_start(daemon: bool = False):
@@ -891,11 +913,15 @@ def cmd_update():
     else:
         print(c(BOLD + GREEN, f"\n🎉 Waifu on Telegram is fully up to date (v{new_v})!"))
 
-    if is_running:
-        print(c(CYAN, "\n🔄 Restarting bot daemon to apply all changes cleanly..."))
+    active_pid = get_running_pid()
+    if is_running or active_pid:
+        target_pid = active_pid or "aktif"
+        print(c(CYAN, f"\n🔄 Terdeteksi bot sedang aktif di latar belakang (PID: {target_pid})."))
+        print(c(CYAN, "⚡ Me-restart bot secara otomatis agar seluruh pembaruan langsung aktif..."))
         cmd_restart(daemon=True)
+        print(c(GREEN, "✓ Bot berhasil di-restart otomatis di background! ✨\n"))
     else:
-        print(c(DIM, "\nStart your bot anytime with: waifu start --daemon\n"))
+        print(c(DIM, "\n💡 Bot belum berjalan. Jalankan bot kapan saja dengan: waifu start --daemon\n"))
 
 
 def cmd_voicestudio(action: str = "status"):

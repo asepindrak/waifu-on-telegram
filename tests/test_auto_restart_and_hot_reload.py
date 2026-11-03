@@ -60,6 +60,19 @@ class TestAutoRestartAndHotReload(unittest.TestCase):
                 except Exception:
                     pass
 
+    def test_cli_update_triggers_auto_restart_when_bot_running(self):
+        """Verifies waifu update automatically restarts running bot."""
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
+        import cli
+        with patch("cli.get_running_pid", return_value=12345), \
+             patch("cli.cmd_restart") as mock_restart, \
+             patch("cli.asset_manager", None), \
+             patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            cli.cmd_update()
+            mock_restart.assert_called_once_with(daemon=True)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5986,6 +5986,14 @@ def main():
     except Exception as e_bot_guard:
         logger.debug(f"Bot singleton guard check: {e_bot_guard}")
 
+    # Record active PID to bot.pid
+    try:
+        pid_file = os.path.join(PROJECT_ROOT, "bot.pid")
+        with open(pid_file, "w", encoding="utf-8") as pf:
+            pf.write(str(cur_pid))
+    except Exception:
+        pass
+
     # 2. Ensure no zombie duplicate KoboldCpp processes exist from previous crashes or uncoordinated launches
     try:
         from health_engine import get_koboldcpp_process_count, kill_all_koboldcpp
