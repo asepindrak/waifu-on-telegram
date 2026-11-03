@@ -358,6 +358,32 @@ class HybridLLMClient:
         client_model = getattr(target_client, 'model', 'default')
         logger.info(f"Routing chat turn -> [{target_label}] Engine ({client_url}, Model: {client_model})")
 
+        # Auto-wake / auto-run AGY Bridge if targeted on port 8001
+        if "8001" in str(client_url):
+            from idle_engine import is_port_listening
+            if not is_port_listening(8001):
+                try:
+                    import sys, subprocess
+                    proj_root = os.path.dirname(os.path.abspath(__file__))
+                    agy_script = os.path.join(proj_root, "agy_bridge.py")
+                    if os.path.exists(agy_script):
+                        logger.info("AGY Bridge is offline. Auto-starting AGY OpenAI Bridge on port 8001...")
+                        popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
+                        subprocess.Popen([sys.executable, agy_script], cwd=proj_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
+                        for _ in range(10):
+                            time.sleep(0.5)
+                            if is_port_listening(8001):
+                                break
+                except Exception as e_start:
+                    logger.debug(f"Failed to auto-start AGY bridge: {e_start}")
+
+            try:
+                import bot
+                if hasattr(bot, "idle_engine") and bot.idle_engine:
+                    bot.idle_engine.record_activity(is_agy=True)
+            except Exception:
+                pass
+
         # If routing to SFW provider in split mode,
         # sanitize history so past NSFW turns never reach AGY CLI or Cloud APIs!
         payload_messages = messages

@@ -5539,7 +5539,9 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                             else:
                                 clean_for_vn = clean_for_vn[:180].rsplit(' ', 1)[0]
 
-                        vn_path = voice_engine.generate_voice_note(clean_for_vn)
+                        from resource_lock import acquire_gpu_heavy_lock
+                        with acquire_gpu_heavy_lock("Telegram Chat Voice Note"):
+                            vn_path = voice_engine.generate_voice_note(clean_for_vn)
                         if vn_path:
                             try:
                                 with open(vn_path, "rb") as vn_file:
@@ -5884,6 +5886,27 @@ def main():
 
     # Start periodic service health monitor
     health_engine.start_monitor(bot=bot, get_recipients_func=get_notification_recipient_ids)
+
+    # Ensure VoiceStudio Local AI is ready at startup if configured
+    v_backend = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
+    if v_backend in ("voicestudio", "local"):
+        try:
+            from voicestudio_engine import voicestudio_engine
+            if voicestudio_engine.is_installed() and not voicestudio_engine.is_service_running():
+                logger.info("🚀 Startup: Starting VoiceStudio Local AI Voice Server on port 3900...")
+                voicestudio_engine.start_service()
+                logger.info(f"✓ VoiceStudio online at {voicestudio_engine.server_url}")
+        except Exception as e_vs:
+            logger.warning(f"VoiceStudio startup check: {e_vs}")
+
+    # Ensure AGY OpenAI Bridge is ready at startup if configured
+    sfw_provider = os.environ.get("SFW_LLM_PROVIDER", "local").lower().strip()
+    sfw_image = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
+    if sfw_provider == "agy" or sfw_image == "agy":
+        if not is_agy_bridge_online():
+            logger.info("🚀 Startup: Starting AGY OpenAI Bridge on port 8001...")
+            idle_engine.wake_agy_bridge()
+            logger.info("✓ AGY OpenAI Bridge online at http://127.0.0.1:8001/v1")
 
     # Start Smart Idle & Dynamic Power Saver monitor
     if idle_engine.enabled:

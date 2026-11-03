@@ -267,6 +267,17 @@ def start_auxiliary_services():
             except Exception:
                 pass
 
+    # 5. VoiceStudio Local AI Voice Server (Port 3900)
+    v_backend = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
+    if v_backend in ("voicestudio", "local") and not is_port_listening(3900):
+        try:
+            from voicestudio_engine import voicestudio_engine
+            if voicestudio_engine.is_installed():
+                voicestudio_engine.start_service()
+                print(c(GREEN, f"  ✓ VoiceStudio Local AI active on port {voicestudio_engine.port}"))
+        except Exception:
+            pass
+
 def cmd_stop():
     print_banner()
     print(c(YELLOW, "🛑 Terminating Waifu on Telegram services..."))
@@ -302,6 +313,12 @@ def cmd_stop():
             subprocess.run(["pkill", "-f", "koboldcpp"], capture_output=True)
             subprocess.run(["pkill", "-f", "main.py.*8188"], capture_output=True)
             subprocess.run(["pkill", "-f", "python.*agy_bridge.py"], capture_output=True)
+
+    try:
+        from voicestudio_engine import voicestudio_engine
+        voicestudio_engine.stop_service()
+    except Exception:
+        pass
 
     if os.path.exists(PID_FILE):
         try:

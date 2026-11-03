@@ -401,6 +401,39 @@ class HealthEngine:
 
         return False
 
+    def heal_voicestudio(self) -> bool:
+        """Attempts to start or resurrect VoiceStudio Local AI Voice Server (Port 3900)."""
+        if is_port_listening(3900):
+            return True
+        try:
+            from voicestudio_engine import voicestudio_engine
+            if voicestudio_engine.is_installed():
+                logger.info("Self-healing: Spawning VoiceStudio Local AI on port 3900...")
+                return voicestudio_engine.start_service()
+        except Exception as e:
+            logger.error(f"Self-healing failed to spawn VoiceStudio: {e}")
+        return False
+
+    def heal_agy(self) -> bool:
+        """Attempts to start or resurrect Google Antigravity (AGY) OpenAI Bridge (Port 8001)."""
+        if is_port_listening(8001):
+            return True
+        agy_script = os.path.join(self.project_root, "agy_bridge.py")
+        if not os.path.exists(agy_script):
+            return False
+        try:
+            popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
+            logger.info("Self-healing: Spawning AGY OpenAI Bridge on port 8001...")
+            subprocess.Popen([sys.executable, agy_script], cwd=self.project_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
+            for _ in range(10):
+                time.sleep(0.5)
+                if is_port_listening(8001):
+                    logger.info("Self-healing: AGY Bridge restored successfully.")
+                    return True
+        except Exception as e:
+            logger.error(f"Self-healing failed to spawn AGY Bridge: {e}")
+        return False
+
     def attempt_heal_service(self, service: str, bot, recipients: List[int]) -> bool:
         """
         Executes self-healing for a specific service with proactive Telegram status updates.
@@ -408,7 +441,9 @@ class HealthEngine:
         service_names = {
             "llm": "🧠 Server LLM / Kecerdasan",
             "comfyui": "🎨 Server Visual ComfyUI",
-            "music": "🎵 Server Pemutar Musik PC"
+            "music": "🎵 Server Pemutar Musik PC",
+            "voicestudio": "🎙️ VoiceStudio Local AI (Port 3900)",
+            "agy": "🌉 AGY OpenAI Bridge (Port 8001)"
         }
         disp_name = service_names.get(service, service.upper())
 
@@ -456,6 +491,10 @@ class HealthEngine:
                 success = self.heal_comfyui()
             elif service == "music":
                 success = self.heal_music()
+            elif service == "voicestudio":
+                success = self.heal_voicestudio()
+            elif service == "agy":
+                success = self.heal_agy()
         finally:
             with self.lock:
                 self.healing_in_progress[service] = False
@@ -512,6 +551,22 @@ class HealthEngine:
         music_feat = os.environ.get("MUSIC_FEATURE_ENABLED", "true").lower() in ("true", "1", "yes")
         if music_feat and os.path.exists(music_js) and not is_port_listening(8002):
             results["music"] = self.attempt_heal_service("music", bot, recipients)
+
+        # 4. VoiceStudio Local AI (if configured)
+        v_backend = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
+        if v_backend in ("voicestudio", "local") and not is_port_listening(3900):
+            try:
+                from voicestudio_engine import voicestudio_engine
+                if voicestudio_engine.is_installed():
+                    results["voicestudio"] = self.attempt_heal_service("voicestudio", bot, recipients)
+            except Exception:
+                pass
+
+        # 5. AGY OpenAI Bridge (if configured)
+        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
+        sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "").lower().strip()
+        if (sfw_p == "agy" or sfw_img == "agy") and not is_port_listening(8001):
+            results["agy"] = self.attempt_heal_service("agy", bot, recipients)
 
         return results
 

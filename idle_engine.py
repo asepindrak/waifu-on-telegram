@@ -68,24 +68,34 @@ class IdleEngine:
             self.comfyui_on_demand = os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")
 
         self.comfyui_timeout_minutes = 5  # ComfyUI unloads 5 mins after last photo request
+        self.voicestudio_timeout_minutes = 5  # VoiceStudio unloads 5 mins after last voice synthesis
+        self.agy_timeout_minutes = 10  # AGY bridge unloads after 10 mins idle
         self.last_llm_activity = time.time()
         self.last_comfyui_activity = time.time()
+        self.last_voicestudio_activity = time.time()
+        self.last_agy_activity = time.time()
 
         self.is_llm_sleeping = not is_port_listening(5001)
         self.is_comfyui_sleeping = not is_port_listening(8188)
+        self.is_voicestudio_sleeping = not is_port_listening(3900)
+        self.is_agy_sleeping = not is_port_listening(8001)
 
         self.wake_lock = threading.Lock()
         self.state_lock = threading.Lock()
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
-    def record_activity(self, is_media: bool = False):
+    def record_activity(self, is_media: bool = False, is_voice: bool = False, is_agy: bool = False):
         """Records user interaction timestamp to reset idle countdown."""
         now = time.time()
         with self.state_lock:
             self.last_llm_activity = now
             if is_media:
                 self.last_comfyui_activity = now
+            if is_voice:
+                self.last_voicestudio_activity = now
+            if is_agy:
+                self.last_agy_activity = now
 
     def is_llm_ready(self) -> bool:
         """Checks if KoboldCPP / LLM service is online and listening on port 5001."""
@@ -102,6 +112,121 @@ class IdleEngine:
     def is_comfyui_ready(self) -> bool:
         """Checks if ComfyUI service is online and listening on port 8188."""
         return is_port_listening(8188)
+
+    def is_voicestudio_ready(self) -> bool:
+        """Checks if VoiceStudio service is online and listening on port 3900."""
+        return is_port_listening(3900)
+
+    def is_agy_bridge_ready(self) -> bool:
+        """Checks if AGY OpenAI Bridge is online and listening on port 8001."""
+        return is_port_listening(8001)
+
+    def sleep_voicestudio(self) -> bool:
+        """Puts VoiceStudio to sleep, freeing model RAM & VRAM."""
+        with self.wake_lock:
+            if not is_port_listening(3900):
+                self.is_voicestudio_sleeping = True
+                return True
+            logger.info("💤 Smart Idle: Terminating VoiceStudio backend to free RAM & VRAM...")
+            try:
+                from voicestudio_engine import voicestudio_engine
+                voicestudio_engine.stop_service()
+                time.sleep(1)
+                self.is_voicestudio_sleeping = True
+                logger.info("✓ Smart Idle: VoiceStudio put to sleep. RAM & VRAM freed!")
+                return True
+            except Exception as e:
+                logger.error(f"Error putting VoiceStudio to sleep: {e}")
+                return False
+
+    def wake_voicestudio(self, timeout_seconds: int = 15) -> bool:
+        """Wakes VoiceStudio backend service on-demand (Port 3900)."""
+        with self.wake_lock:
+            if self.is_voicestudio_ready():
+                self.is_voicestudio_sleeping = False
+                self.record_activity(is_voice=True)
+                return True
+            logger.info("⚡ Smart Idle: Waking VoiceStudio Local AI on-demand (Port 3900)...")
+            try:
+                from voicestudio_engine import voicestudio_engine
+                if voicestudio_engine.is_installed():
+                    voicestudio_engine.start_service()
+                    for _ in range(timeout_seconds):
+                        time.sleep(1)
+                        if self.is_voicestudio_ready():
+                            self.is_voicestudio_sleeping = False
+                            self.record_activity(is_voice=True)
+                            logger.info("✓ Smart Idle: VoiceStudio successfully awakened!")
+                            return True
+            except Exception as e:
+                logger.error(f"Failed to wake VoiceStudio: {e}")
+            return False
+
+    def ensure_voicestudio_active(self) -> bool:
+        """Ensures VoiceStudio is online before synthesis."""
+        if not self.enabled:
+            return True
+        if self.is_voicestudio_ready():
+            self.is_voicestudio_sleeping = False
+            self.record_activity(is_voice=True)
+            return True
+        return self.wake_voicestudio()
+
+    def sleep_agy_bridge(self) -> bool:
+        """Puts AGY Bridge to sleep, terminating python agy_bridge.py to free RAM."""
+        with self.wake_lock:
+            if not is_port_listening(8001):
+                self.is_agy_sleeping = True
+                return True
+            logger.info("💤 Smart Idle: Terminating AGY OpenAI Bridge to free RAM...")
+            try:
+                if sys.platform == "win32":
+                    ps_cmd = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*agy_bridge.py*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
+                    subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True, timeout=8)
+                else:
+                    subprocess.run(["pkill", "-f", "python.*agy_bridge.py"], capture_output=True, timeout=5)
+                time.sleep(1)
+                self.is_agy_sleeping = True
+                logger.info("✓ Smart Idle: AGY OpenAI Bridge put to sleep.")
+                return True
+            except Exception as e:
+                logger.error(f"Error putting AGY Bridge to sleep: {e}")
+                return False
+
+    def wake_agy_bridge(self, timeout_seconds: int = 15) -> bool:
+        """Wakes AGY OpenAI Bridge server on-demand (Port 8001)."""
+        with self.wake_lock:
+            if self.is_agy_bridge_ready():
+                self.is_agy_sleeping = False
+                self.record_activity(is_agy=True)
+                return True
+            logger.info("⚡ Smart Idle: Waking AGY OpenAI Bridge on-demand (Port 8001)...")
+            agy_script = os.path.join(self.project_root, "agy_bridge.py")
+            if not os.path.exists(agy_script):
+                return False
+            try:
+                popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
+                subprocess.Popen([sys.executable, agy_script], cwd=self.project_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
+                for _ in range(timeout_seconds):
+                    time.sleep(1)
+                    if self.is_agy_bridge_ready():
+                        self.is_agy_sleeping = False
+                        self.record_activity(is_agy=True)
+                        logger.info("✓ Smart Idle: AGY OpenAI Bridge successfully awakened!")
+                        return True
+            except Exception as e:
+                logger.error(f"Failed to wake AGY Bridge: {e}")
+            return False
+
+    def ensure_agy_bridge_active(self) -> bool:
+        """Ensures AGY OpenAI Bridge is online before routing chat or image request."""
+        if not self.enabled:
+            return True
+        if self.is_agy_bridge_ready():
+            self.is_agy_sleeping = False
+            self.record_activity(is_agy=True)
+            return True
+        return self.wake_agy_bridge()
 
     def sleep_llm(self) -> bool:
         """Puts KoboldCPP LLM to sleep, freeing all GPU VRAM and model RAM."""
@@ -475,6 +600,31 @@ class IdleEngine:
                             )
                             self.sleep_comfyui()
 
+                # 3. Check VoiceStudio idle (auto-sleep to free RAM/VRAM)
+                v_backend = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
+                if (v_backend in ("voicestudio", "local") or is_port_listening(3900)):
+                    vs_idle_sec = self.voicestudio_timeout_minutes * 60
+                    if (now - self.last_voicestudio_activity) >= vs_idle_sec:
+                        if is_port_listening(3900) and not self.is_voicestudio_sleeping:
+                            logger.info(
+                                f"💤 Smart Idle: No voice synthesis activity for {self.voicestudio_timeout_minutes}m. "
+                                f"Putting VoiceStudio to sleep to free RAM & VRAM..."
+                            )
+                            self.sleep_voicestudio()
+
+                # 4. Check AGY Bridge idle
+                sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
+                sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "").lower().strip()
+                if (sfw_p == "agy" or sfw_img == "agy" or is_port_listening(8001)):
+                    agy_idle_sec = self.agy_timeout_minutes * 60
+                    if (now - self.last_agy_activity) >= agy_idle_sec:
+                        if is_port_listening(8001) and not self.is_agy_sleeping:
+                            logger.info(
+                                f"💤 Smart Idle: No AGY Bridge activity for {self.agy_timeout_minutes}m. "
+                                f"Putting AGY Bridge to sleep to free RAM..."
+                            )
+                            self.sleep_agy_bridge()
+
             except Exception as e:
                 logger.error(f"Error in Smart Idle watchdog loop: {e}")
 
@@ -496,4 +646,6 @@ class IdleEngine:
             return "⚪ Nonaktif"
         llm_state = "💤 Tidur (VRAM Bebas)" if self.is_llm_sleeping else ("🟢 Online" if is_port_listening(5001) else "💤 Standby")
         comfy_state = "💤 Standby On-Demand" if self.comfyui_on_demand else ("🟢 Online" if is_port_listening(8188) else "🔴 Offline")
-        return f"🟢 Aktif (Idle Timeout: {self.idle_timeout_minutes}m • LLM: {llm_state} • Foto: {comfy_state})"
+        vs_state = "🟢 Online" if is_port_listening(3900) else "💤 Standby"
+        agy_state = "🟢 Online" if is_port_listening(8001) else "💤 Standby"
+        return f"🟢 Aktif (Idle: {self.idle_timeout_minutes}m • LLM: {llm_state} • Foto: {comfy_state} • Voice: {vs_state} • AGY: {agy_state})"

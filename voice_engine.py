@@ -259,15 +259,34 @@ class VoiceEngine:
                     v_model = active_persona.get("voicestudio_model", "omnivoice")
                     v_speed = float(active_persona.get("voicestudio_speed", 1.0))
 
+                    # Auto-wake / auto-run VoiceStudio if installed but offline
+                    if not voicestudio_engine.is_service_running() and voicestudio_engine.is_installed():
+                        logger.info("VoiceStudio is offline. Auto-starting VoiceStudio Local AI on port 3900...")
+                        voicestudio_engine.start_service()
+                        for _ in range(10):
+                            if voicestudio_engine.is_service_running():
+                                break
+                            time.sleep(0.5)
+
                     if voicestudio_engine.is_service_running():
-                        vs_audio = voicestudio_engine.synthesize(
-                            text=clean_speech,
-                            voice_character=v_char,
-                            voice_name=v_name,
-                            model=v_model,
-                            speed=v_speed,
-                            output_path=output_path
-                        )
+                        from resource_lock import acquire_gpu_heavy_lock
+                        with acquire_gpu_heavy_lock("VoiceStudio TTS Synthesis"):
+                            vs_audio = voicestudio_engine.synthesize(
+                                text=clean_speech,
+                                voice_character=v_char,
+                                voice_name=v_name,
+                                model=v_model,
+                                speed=v_speed,
+                                output_path=output_path
+                            )
+                        # Record VoiceStudio activity for Smart Idle countdown
+                        try:
+                            import bot
+                            if hasattr(bot, "idle_engine") and bot.idle_engine:
+                                bot.idle_engine.record_activity(is_voice=True)
+                        except Exception:
+                            pass
+
                         if vs_audio and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
                             logger.info(f"Generated voice note via VoiceStudio backend for persona '{active_persona.get('name', 'Waifu')}'")
                             return True

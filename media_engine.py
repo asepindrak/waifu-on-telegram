@@ -7,6 +7,7 @@ import io
 import urllib.parse
 import logging
 import requests
+from resource_lock import acquire_gpu_heavy_lock
 from typing import Optional, Dict, Any, Tuple, Callable
 
 try:
@@ -170,6 +171,33 @@ class MediaEngine:
         progress_callback: Optional[Callable[[str], None]] = None
     ) -> Optional[bytes]:
         """Runs standard Text-to-Image workflow on local ComfyUI with optimal anime settings."""
+        with acquire_gpu_heavy_lock("ComfyUI Image Generation"):
+            return self._execute_generate_image_comfyui(
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                aspect_ratio=aspect_ratio,
+                quality=quality,
+                width=width,
+                height=height,
+                steps=steps,
+                cfg=cfg,
+                is_nude=is_nude,
+                progress_callback=progress_callback
+            )
+
+    def _execute_generate_image_comfyui(
+        self,
+        prompt: str,
+        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
+        aspect_ratio: Optional[str] = None,
+        quality: Optional[str] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        steps: Optional[int] = None,
+        cfg: Optional[float] = None,
+        is_nude: bool = False,
+        progress_callback: Optional[Callable[[str], None]] = None
+    ) -> Optional[bytes]:
         ckpts = self.get_available_checkpoints()
         if not ckpts:
             logger.warning("No ComfyUI checkpoints found for T2I.")
@@ -550,6 +578,31 @@ class MediaEngine:
 
         agy_port = int(os.environ.get("AGY_BRIDGE_PORT", "8001"))
         bridge_url = f"http://127.0.0.1:{agy_port}/v1/images/generations"
+
+        # Auto-wake / auto-run AGY Bridge if enabled and offline
+        from idle_engine import is_port_listening
+        if not is_port_listening(agy_port):
+            try:
+                import sys, subprocess
+                proj_root = os.path.dirname(os.path.abspath(__file__))
+                agy_script = os.path.join(proj_root, "agy_bridge.py")
+                if os.path.exists(agy_script):
+                    logger.info("AGY Bridge is offline. Auto-starting AGY OpenAI Bridge on port 8001...")
+                    popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
+                    subprocess.Popen([sys.executable, agy_script], cwd=proj_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
+                    for _ in range(10):
+                        time.sleep(0.5)
+                        if is_port_listening(agy_port):
+                            break
+            except Exception as e_start:
+                logger.debug(f"Failed to auto-start AGY bridge: {e_start}")
+
+        try:
+            import bot
+            if hasattr(bot, "idle_engine") and bot.idle_engine:
+                bot.idle_engine.record_activity(is_agy=True)
+        except Exception:
+            pass
 
         # 1. Try via AGY OpenAI Bridge
         try:
