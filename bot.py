@@ -2689,7 +2689,7 @@ def callback_set_sfw_provider(call):
         return
     prov = call.data.split(":", 1)[1]
     presets = {
-        "agy": ("http://127.0.0.1:8001/v1", "sk-agy-waifu", "flash"),
+        "agy": ("http://127.0.0.1:8001/v1", "sk-agy-secret-key-12345", "gemini-3.8-flash-medium"),
         "openai": ("https://api.openai.com/v1", os.environ.get("OPENAI_API_KEY", ""), "gpt-4o-mini"),
         "groq": ("https://api.groq.com/openai/v1", os.environ.get("GROQ_API_KEY", ""), "llama-3.3-70b-versatile"),
         "deepseek": ("https://api.deepseek.com/v1", os.environ.get("DEEPSEEK_API_KEY", ""), "deepseek-chat"),

@@ -857,7 +857,7 @@ def cmd_bridge(action: str = "status"):
                 print(f"  • Model Def   : {data.get('default_model', 'flash')} (flash, pro, inherit)")
                 print(c(DIM, "\n  Gunakan di aplikasi eksternal (Cursor, VSCode, LibreChat, dll):"))
                 print(c(DIM, f"    Base URL : http://127.0.0.1:{agy_port}/v1"))
-                print(c(DIM, f"    API Key  : sk-agy-waifu (atau bebas)"))
+                print(c(DIM, f"    API Key  : sk-agy-secret-key-12345 (atau bebas)"))
                 print(c(DIM, f"    Model    : flash / pro / inherit"))
         except Exception:
             print(f"  • Status      : " + c(RED, f"OFFLINE (Port {agy_port} tidak merespon)"))

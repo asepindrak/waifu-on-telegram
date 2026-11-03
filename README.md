@@ -296,8 +296,8 @@ Project ini dilengkapi dengan **AGY OpenAI Bridge Server** (`agy_bridge.py` di p
    - Mendukung prompt teks streaming/non-streaming serta multimodal vision (gambar lokal maupun web URL).
 3. **Parameter Integrasi Client Eksternal**:
    - **Base URL**: `http://127.0.0.1:8001/v1`
-   - **API Key**: `sk-agy-waifu` *(atau string bebas jika tanpa strict auth)*
-   - **Model IDs**: `flash`, `pro`, `inherit`, `gpt-4o`, `gpt-4o-mini`
+   - **API Key**: `sk-agy-secret-key-12345` *(atau string bebas jika tanpa strict auth)*
+   - **Model IDs**: `gemini-3.8-flash-medium`, `flash`, `pro`, `inherit`, `gpt-4o`, `gpt-4o-mini`
 
 ### 🛠️ Perintah CLI Manajemen Bridge (`waifu bridge`):
 ```bash

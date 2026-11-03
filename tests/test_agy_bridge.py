@@ -70,7 +70,7 @@ class TestAGYBridge(unittest.TestCase):
             ],
             "stream": False
         }
-        res = self.client.post("/v1/chat/completions", json=req_body, headers={"Authorization": "Bearer sk-agy-waifu"})
+        res = self.client.post("/v1/chat/completions", json=req_body, headers={"Authorization": "Bearer sk-agy-secret-key-12345"})
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertEqual(data["object"], "chat.completion")
@@ -178,7 +178,7 @@ Here is your cute anime cat image!
         self.assertIn("agy", PROVIDER_PRESETS)
         preset = PROVIDER_PRESETS["agy"]
         self.assertEqual(preset["base_url"], "http://127.0.0.1:8001/v1")
-        self.assertEqual(preset["default_model"], "flash")
+        self.assertEqual(preset["default_model"], "gemini-3.8-flash-medium")
 
         # Test creating client with agy preset via environment patch
         env_patch = {

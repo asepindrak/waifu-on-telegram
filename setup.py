@@ -268,7 +268,7 @@ def config_llm_model(env_vars):
         print(c(BOLD + MAGENTA, "\n--- [A] Konfigurasi Otak Chat SFW (Obrolan Normal / Kuliah / Santai) ---"))
         sfw_providers = [
             ("OpenAI Official (GPT-4o-mini / GPT-4o)", "openai", "https://api.openai.com/v1", "gpt-4o-mini"),
-            ("Google Antigravity CLI Bridge (AGY Port 8001 - Flash/Pro)", "agy", "http://127.0.0.1:8001/v1", "flash"),
+            ("Google Antigravity CLI Bridge (AGY Port 8001 - gemini-3.8-flash-medium)", "agy", "http://127.0.0.1:8001/v1", "gemini-3.8-flash-medium"),
             ("Groq Cloud (Llama 3.3 70B - Super Cepat & Free Tier)", "groq", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
             ("DeepSeek API (deepseek-chat - Murah & Cerdas)", "deepseek", "https://api.deepseek.com/v1", "deepseek-chat"),
             ("OpenRouter (Multi-model Cloud SFW)", "openrouter", "https://openrouter.ai/api/v1", "meta-llama/llama-3.3-70b-instruct"),
@@ -288,20 +288,18 @@ def config_llm_model(env_vars):
             env_vars["SFW_LLM_API_KEY"] = input("  Masukkan API Key: ").strip() or "none"
             env_vars["SFW_LLM_MODEL"] = input("  Masukkan Nama Model: ").strip() or "default"
         elif p_key_type in ("openai", "groq", "deepseek", "openrouter", "agy"):
+            env_vars["SFW_LLM_BASE_URL"] = p_url
             if p_key_type == "agy":
-                env_vars["SFW_LLM_BASE_URL"] = p_url
-                env_vars["SFW_LLM_API_KEY"] = "sk-agy-waifu"
+                def_key = "sk-agy-secret-key-12345"
+                key_in = input(f"  Masukkan Secret API Key [{def_key}]: ").strip()
+                env_vars["SFW_LLM_API_KEY"] = key_in or def_key
                 cust_m = input(f"  Model [{p_def_model}]: ").strip()
                 env_vars["SFW_LLM_MODEL"] = cust_m or p_def_model
+                print(c(GREEN, f"  ✓ AGY Bridge dikonfigurasi: Model '{env_vars['SFW_LLM_MODEL']}', Key '{env_vars['SFW_LLM_API_KEY']}'"))
             else:
-                env_vars["SFW_LLM_BASE_URL"] = p_url
                 env_vars["SFW_LLM_API_KEY"] = input(f"  Masukkan API Key untuk {p_name}: ").strip()
                 cust_m = input(f"  Model [{p_def_model}]: ").strip()
                 env_vars["SFW_LLM_MODEL"] = cust_m or p_def_model
-            env_vars["SFW_LLM_BASE_URL"] = p_url
-            env_vars["SFW_LLM_API_KEY"] = input(f"  Masukkan API Key untuk {p_name}: ").strip()
-            cust_m = input(f"  Model [{p_def_model}]: ").strip()
-            env_vars["SFW_LLM_MODEL"] = cust_m or p_def_model
         else:
             env_vars["SFW_LLM_BASE_URL"] = p_url
             env_vars["SFW_LLM_API_KEY"] = "kobold" if p_key_type == "local" else "ollama"
@@ -348,7 +346,7 @@ def config_llm_model(env_vars):
         detected_llms = scan_local_llm_models()
         options = []
         options.append(("KoboldCPP (Auto-starts & Auto-loads GGUF model on boot)", "http://127.0.0.1:5001/v1", "kobold", "default"))
-        options.append(("Google Antigravity CLI Bridge (AGY Port 8001)", "http://127.0.0.1:8001/v1", "agy", "flash"))
+        options.append(("Google Antigravity CLI Bridge (AGY Port 8001 - gemini-3.8-flash-medium)", "http://127.0.0.1:8001/v1", "sk-agy-secret-key-12345", "gemini-3.8-flash-medium"))
 
         for source, mname, mpath in detected_llms:
             if source == "KoboldCPP":

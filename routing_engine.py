@@ -99,8 +99,8 @@ PROVIDER_PRESETS = {
     "agy": {
         "name": "Google Antigravity CLI Bridge (AGY Port 8001)",
         "base_url": "http://127.0.0.1:8001/v1",
-        "api_key": "sk-agy-waifu",
-        "default_model": "flash",
+        "api_key": "sk-agy-secret-key-12345",
+        "default_model": "gemini-3.8-flash-medium",
         "is_local": True,
         "description": "Bridge server OpenAI-compatible bertenaga Google Antigravity CLI (agy)."
     }

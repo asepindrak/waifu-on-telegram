@@ -36,7 +36,7 @@ from pydantic import BaseModel
 app = FastAPI(title="Google Antigravity CLI OpenAI-Compatible Bridge", version="1.0.0")
 
 # Security & API Key
-DEFAULT_API_KEY = os.environ.get("AGY_BRIDGE_API_KEY", "sk-agy-waifu")
+DEFAULT_API_KEY = os.environ.get("AGY_BRIDGE_API_KEY", "sk-agy-secret-key-12345")
 security = HTTPBearer(auto_error=False)
 
 def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)):
@@ -49,7 +49,7 @@ def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = Securit
         return "allowed"
 
     token = credentials.credentials.strip()
-    if token != expected_key and token != "sk-agy-waifu":
+    if token != expected_key and token != "sk-agy-secret-key-12345" and token != "sk-agy-waifu":
         # Allow any sk- key if strict auth is not enforced
         strict = os.environ.get("AGY_BRIDGE_STRICT_AUTH", "false").lower() in ("true", "1", "yes")
         if strict:
@@ -64,7 +64,7 @@ class ChatMessage(BaseModel):
 
 
 class ChatCompletionRequest(BaseModel):
-    model: Optional[str] = "flash"
+    model: Optional[str] = "gemini-3.8-flash-medium"
     messages: List[ChatMessage]
     temperature: Optional[float] = 0.7
     top_p: Optional[float] = 1.0
@@ -93,7 +93,7 @@ def health_check():
         "agy_installed": agy_ready,
         "agy_version": agy_ver,
         "port": int(os.environ.get("AGY_BRIDGE_PORT", 8001)),
-        "default_model": os.environ.get("AGY_DEFAULT_MODEL", "flash")
+        "default_model": os.environ.get("AGY_DEFAULT_MODEL", "gemini-3.8-flash-medium")
     }
 
 
@@ -101,6 +101,7 @@ def health_check():
 def list_models():
     """Lists available models supported by Antigravity CLI."""
     models_list = [
+        {"id": "gemini-3.8-flash-medium", "object": "model", "created": 1700000000, "owned_by": "google-antigravity"},
         {"id": "flash", "object": "model", "created": 1700000000, "owned_by": "google-antigravity"},
         {"id": "pro", "object": "model", "created": 1700000000, "owned_by": "google-antigravity"},
         {"id": "inherit", "object": "model", "created": 1700000000, "owned_by": "google-antigravity"},
@@ -209,7 +210,7 @@ async def chat_completions(request: ChatCompletionRequest, token: str = Security
         content_str = process_message_content(msg.content, temp_dir)
         full_prompt += f"{role_label}: {content_str}\n"
 
-    default_model = os.environ.get("AGY_DEFAULT_MODEL", "flash")
+    default_model = os.environ.get("AGY_DEFAULT_MODEL", "gemini-3.8-flash-medium")
     effort = os.environ.get("AGY_EFFORT", "")
     target_model = request.model if request.model else default_model
 
