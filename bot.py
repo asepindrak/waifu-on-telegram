@@ -635,23 +635,37 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
 
     _, cur_outfit_name = persona_mgr.get_user_outfit(user_id)
 
-    cur_llm = os.environ.get("LLM_MODEL", "default")
-    if cur_llm == "default" or not cur_llm:
-        cur_llm = "Auto-detect (Locally Uncensored)"
-    elif len(cur_llm) > 28:
-        cur_llm = cur_llm[:25] + "..."
+    cur_llm_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip()
+    if cur_llm_mode in ("split", "hybrid"):
+        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "local").upper()
+        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local").upper()
+        cur_llm = f"Split ({sfw_p}/{nsfw_p})"
+    else:
+        cur_llm = os.environ.get("LLM_MODEL", "default")
+        if cur_llm == "default" or not cur_llm:
+            cur_llm = "Auto-detect (Locally Uncensored)"
+        elif len(cur_llm) > 28:
+            cur_llm = cur_llm[:25] + "..."
 
-    cur_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "")
-    if not cur_ckpt:
-        cur_ckpt = "Auto (ComfyUI Active)"
-    elif "anything" in cur_ckpt.lower():
-        cur_ckpt = "Anything XL (SDXL 1024px)"
-    elif any(k in cur_ckpt.lower() for k in ["aom", "orange"]):
-        cur_ckpt = "AbyssOrangeMix3 (AOM3A1B)"
-    elif "meina" in cur_ckpt.lower():
-        cur_ckpt = "MeinaMix v12 (SD 1.5)"
-    elif len(cur_ckpt) > 28:
-        cur_ckpt = cur_ckpt[:25] + "..."
+    cur_img_mode = os.environ.get("IMAGE_ENGINE_MODE", "unified").lower().strip()
+    if cur_img_mode in ("split", "hybrid"):
+        sfw_e = os.environ.get("SFW_IMAGE_ENGINE", "agy").lower()
+        sfw_lbl = "AGY" if sfw_e == "agy" else ("Cloud" if sfw_e == "cloud" else "ComfyUI")
+        nsfw_c = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "aom3").lower()
+        nsfw_lbl = "AOM3" if any(k in nsfw_c for k in ["aom", "orange"]) else ("MeinaMix" if "meina" in nsfw_c else "ComfyUI")
+        cur_ckpt = f"Split ({sfw_lbl}/{nsfw_lbl})"
+    else:
+        cur_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "")
+        if not cur_ckpt:
+            cur_ckpt = "Auto (ComfyUI Active)"
+        elif "anything" in cur_ckpt.lower():
+            cur_ckpt = "Anything XL (SDXL 1024px)"
+        elif any(k in cur_ckpt.lower() for k in ["aom", "orange"]):
+            cur_ckpt = "AbyssOrangeMix3 (AOM3A1B)"
+        elif "meina" in cur_ckpt.lower():
+            cur_ckpt = "MeinaMix v12 (SD 1.5)"
+        elif len(cur_ckpt) > 28:
+            cur_ckpt = cur_ckpt[:25] + "..."
 
     text = (
         f"⚙️ **WAIFU ON TELEGRAM - SETUP & SYSTEM CONTROL** `(v{get_version()})`\n"
@@ -1908,60 +1922,128 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
 
 
 def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
+    cur_mode = os.environ.get("IMAGE_ENGINE_MODE", "unified").lower().strip()
+    is_split = (cur_mode in ("split", "hybrid"))
     cur_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "")
     cur_url = os.environ.get("COMFYUI_URL", "")
     cur_cloud = os.environ.get("MEDIA_FALLBACK_CLOUD", "false").lower() in ("true", "1")
+    sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "agy").lower().strip()
+    sfw_ckpt = os.environ.get("SFW_COMFYUI_CHECKPOINT", "").strip()
+    nsfw_ckpt = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "").strip()
     detected = scan_image_models()
 
     markup = types.InlineKeyboardMarkup(row_width=1)
-    is_meina = ("meina" in cur_ckpt.lower())
-    is_aom = any(k in cur_ckpt.lower() for k in ["aom", "orange"])
-    is_anything = ("anything" in cur_ckpt.lower() or "xl" in cur_ckpt.lower())
-    is_auto = (not cur_ckpt and bool(cur_url))
-    is_agy = (os.environ.get("SFW_IMAGE_ENGINE", "").lower() == "agy")
 
-    markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity (AGY Subagent) {'✓' if is_agy else ''}", callback_data="cfg_set_ckpt:agy"))
-    markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - Cepat & Hemat VRAM) {'✓' if is_meina and not is_agy else ''}", callback_data="cfg_set_ckpt:meinamix"))
-    markup.add(types.InlineKeyboardButton(f"🍊 AbyssOrangeMix3 (AOM3A1B SD 1.5 - Civitai #9942) {'✓' if is_aom else ''}", callback_data="cfg_set_ckpt:aom3"))
-    markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - Ultra Jernih) {'✓' if is_anything else ''}", callback_data="cfg_set_ckpt:anything_xl"))
-    markup.add(types.InlineKeyboardButton(f"🎯 Auto-detect ComfyUI {'✓' if is_auto else ''}", callback_data="cfg_set_ckpt:auto"))
+    # 1. Mode Selector Toggle
+    mode_toggle_label = "🔀 Mode: Split Hybrid (Aktif) ➔ Ganti Unified" if is_split else "🤖 Mode: Unified (Aktif) ➔ Ganti Split Hybrid"
+    markup.add(types.InlineKeyboardButton(mode_toggle_label, callback_data="cfg_toggle_split_img"))
 
-    for idx, (source, cname) in enumerate(detected):
-        lower_c = cname.lower()
-        if "meinamix" in lower_c or "anything" in lower_c or "aom" in lower_c or "orangemix" in lower_c:
-            continue
-        is_cur = (cur_ckpt.lower() in cname.lower() if cur_ckpt else False)
-        short_c = cname.replace(".safetensors", "").replace(".ckpt", "")
-        if len(short_c) > 34:
-            short_c = short_c[:31] + "..."
-        markup.add(types.InlineKeyboardButton(f"🎨 {short_c} {'✓' if is_cur else ''}", callback_data=f"cfg_set_ckpt:{idx}"))
+    if is_split:
+        # SFW Section
+        markup.add(types.InlineKeyboardButton("─── 🌸 ENGINE FOTO SFW (Santai/Normal) ───", callback_data="noop"))
+        is_sfw_agy = (sfw_img == "agy")
+        is_sfw_anything = (sfw_img == "comfyui" and ("anything" in sfw_ckpt.lower() or "xl" in sfw_ckpt.lower()))
+        is_sfw_meina = (sfw_img == "comfyui" and "meina" in sfw_ckpt.lower())
+        is_sfw_cloud = (sfw_img == "cloud")
 
-    is_cloud_only = (not cur_url and cur_cloud)
-    markup.add(types.InlineKeyboardButton(f"☁️ Cloud Engine (Pollinations GPU) {'✓' if is_cloud_only else ''}", callback_data="cfg_set_ckpt:cloud"))
+        markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity (AGY Generator) {'✓' if is_sfw_agy else ''}", callback_data="cfg_set_sfw_img:agy"))
+        markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - ComfyUI) {'✓' if is_sfw_anything else ''}", callback_data="cfg_set_sfw_img:anything_xl"))
+        markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - ComfyUI) {'✓' if is_sfw_meina else ''}", callback_data="cfg_set_sfw_img:meinamix"))
+        markup.add(types.InlineKeyboardButton(f"☁️ Cloud Engine (Pollinations GPU) {'✓' if is_sfw_cloud else ''}", callback_data="cfg_set_sfw_img:cloud"))
 
-    is_disabled = (not cur_url and not cur_cloud)
-    markup.add(types.InlineKeyboardButton(f"❌ Nonaktifkan Foto {'✓' if is_disabled else ''}", callback_data="cfg_set_ckpt:disabled"))
+        # NSFW Section
+        markup.add(types.InlineKeyboardButton("─── 🔞 ENGINE FOTO NSFW (18+ / Intim) ───", callback_data="noop"))
+        is_nsfw_aom = any(k in nsfw_ckpt.lower() for k in ["aom", "orange"]) or not nsfw_ckpt
+        is_nsfw_meina = ("meina" in nsfw_ckpt.lower())
+        is_nsfw_anything = ("anything" in nsfw_ckpt.lower() or "xl" in nsfw_ckpt.lower())
+
+        markup.add(types.InlineKeyboardButton(f"🍊 AbyssOrangeMix3 (AOM3A1B SD 1.5 - Uncensored) {'✓' if is_nsfw_aom else ''}", callback_data="cfg_set_nsfw_img:aom3"))
+        markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - ComfyUI) {'✓' if is_nsfw_meina and not is_nsfw_aom else ''}", callback_data="cfg_set_nsfw_img:meinamix"))
+        markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - ComfyUI) {'✓' if is_nsfw_anything else ''}", callback_data="cfg_set_nsfw_img:anything_xl"))
+    else:
+        is_meina = ("meina" in cur_ckpt.lower())
+        is_aom = any(k in cur_ckpt.lower() for k in ["aom", "orange"])
+        is_anything = ("anything" in cur_ckpt.lower() or "xl" in cur_ckpt.lower())
+        is_auto = (not cur_ckpt and bool(cur_url))
+        is_agy = (os.environ.get("SFW_IMAGE_ENGINE", "").lower() == "agy")
+
+        markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity (AGY Subagent) {'✓' if is_agy else ''}", callback_data="cfg_set_ckpt:agy"))
+        markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - Cepat & Hemat VRAM) {'✓' if is_meina and not is_agy else ''}", callback_data="cfg_set_ckpt:meinamix"))
+        markup.add(types.InlineKeyboardButton(f"🍊 AbyssOrangeMix3 (AOM3A1B SD 1.5 - Civitai #9942) {'✓' if is_aom else ''}", callback_data="cfg_set_ckpt:aom3"))
+        markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - Ultra Jernih) {'✓' if is_anything else ''}", callback_data="cfg_set_ckpt:anything_xl"))
+        markup.add(types.InlineKeyboardButton(f"🎯 Auto-detect ComfyUI {'✓' if is_auto else ''}", callback_data="cfg_set_ckpt:auto"))
+
+        for idx, (source, cname) in enumerate(detected):
+            lower_c = cname.lower()
+            if "meinamix" in lower_c or "anything" in lower_c or "aom" in lower_c or "orangemix" in lower_c:
+                continue
+            is_cur = (cur_ckpt.lower() in cname.lower() if cur_ckpt else False)
+            short_c = cname.replace(".safetensors", "").replace(".ckpt", "")
+            if len(short_c) > 34:
+                short_c = short_c[:31] + "..."
+            markup.add(types.InlineKeyboardButton(f"🎨 {short_c} {'✓' if is_cur else ''}", callback_data=f"cfg_set_ckpt:{idx}"))
+
+        is_cloud_only = (not cur_url and cur_cloud)
+        markup.add(types.InlineKeyboardButton(f"☁️ Cloud Engine (Pollinations GPU) {'✓' if is_cloud_only else ''}", callback_data="cfg_set_ckpt:cloud"))
+
+        is_disabled = (not cur_url and not cur_cloud)
+        markup.add(types.InlineKeyboardButton(f"❌ Nonaktifkan Foto {'✓' if is_disabled else ''}", callback_data="cfg_set_ckpt:disabled"))
+
     markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
 
-    if is_agy:
-        active_display = "Google Antigravity (AGY Subagent)"
-    elif not cur_ckpt:
-        active_display = "Auto (ComfyUI Active)" if cur_url else ("Cloud Engine" if cur_cloud else "Dinonaktifkan")
-    elif "anything" in cur_ckpt.lower():
-        active_display = "Anything XL (SDXL 1024px)"
-    elif any(k in cur_ckpt.lower() for k in ["aom", "orange"]):
-        active_display = "AbyssOrangeMix3 (AOM3A1B)"
-    elif "meina" in cur_ckpt.lower():
-        active_display = "MeinaMix v12 (SD 1.5)"
-    else:
-        active_display = cur_ckpt
+    if is_split:
+        if sfw_img == "agy":
+            sfw_display = "Google Antigravity (AGY Image Generator)"
+        elif sfw_img == "cloud":
+            sfw_display = "Cloud Engine (Pollinations)"
+        elif "anything" in sfw_ckpt.lower():
+            sfw_display = "Anything XL (SDXL ComfyUI)"
+        elif "meina" in sfw_ckpt.lower():
+            sfw_display = "MeinaMix v12 (SD 1.5 ComfyUI)"
+        else:
+            sfw_display = sfw_ckpt or "Local ComfyUI"
 
-    text = (
-        f"🎨 **Pengaturan Model Foto & ComfyUI**\n\n"
-        f"• Model Aktif: `{active_display}`\n"
-        f"• ComfyUI URL: `{cur_url or 'Offline / Cloud'}`\n\n"
-        f"Pilih model gambar anime lokal atau cloud engine:"
-    )
+        if "aom" in nsfw_ckpt.lower() or "orange" in nsfw_ckpt.lower() or not nsfw_ckpt:
+            nsfw_display = "AbyssOrangeMix3 (AOM3A1B SD 1.5 Uncensored)"
+        elif "anything" in nsfw_ckpt.lower():
+            nsfw_display = "Anything XL (SDXL)"
+        elif "meina" in nsfw_ckpt.lower():
+            nsfw_display = "MeinaMix v12"
+        else:
+            nsfw_display = nsfw_ckpt
+
+        text = (
+            f"🎨 **Pengaturan Model Foto: Split Hybrid**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• Status Arsitektur: `🔀 Split Hybrid (Terpisah Otomatis)`\n"
+            f"• **Engine Foto SFW**  : `{sfw_display}`\n"
+            f"• **Engine Foto NSFW** : `{nsfw_display}`\n\n"
+            f"💡 _Setiap permintaan foto otomatis disalurkan:_\n"
+            f"  - Foto santai/jalan-jalan dialihkan ke **Engine SFW**.\n"
+            f"  - Foto intim/dewasa dialihkan ke **Engine NSFW Uncensored**."
+        )
+    else:
+        if is_agy:
+            active_display = "Google Antigravity (AGY Subagent)"
+        elif not cur_ckpt:
+            active_display = "Auto (ComfyUI Active)" if cur_url else ("Cloud Engine" if cur_cloud else "Dinonaktifkan")
+        elif "anything" in cur_ckpt.lower():
+            active_display = "Anything XL (SDXL 1024px)"
+        elif any(k in cur_ckpt.lower() for k in ["aom", "orange"]):
+            active_display = "AbyssOrangeMix3 (AOM3A1B)"
+        elif "meina" in cur_ckpt.lower():
+            active_display = "MeinaMix v12 (SD 1.5)"
+        else:
+            active_display = cur_ckpt
+
+        text = (
+            f"🎨 **Pengaturan Model Foto & ComfyUI**\n\n"
+            f"• Mode: `🤖 Unified Mode`\n"
+            f"• Model Aktif: `{active_display}`\n"
+            f"• ComfyUI URL: `{cur_url or 'Offline / Cloud'}`\n\n"
+            f"Pilih model gambar anime lokal atau cloud engine:"
+        )
+
     if message_to_edit:
         try:
             bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
@@ -2849,6 +2931,74 @@ def callback_cancel_dl(call):
     except Exception:
         pass
 
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'cfg_toggle_split_img')
+def callback_toggle_split_img(call):
+    if not is_authorized(call.from_user.id):
+        return
+    cur = os.environ.get("IMAGE_ENGINE_MODE", "unified").lower().strip()
+    new_mode = "split" if cur != "split" else "unified"
+    os.environ["IMAGE_ENGINE_MODE"] = new_mode
+    update_env_variable("IMAGE_ENGINE_MODE", new_mode)
+    bot.answer_callback_query(call.id, f"Mode Foto: {new_mode.upper()} Mode!")
+    show_photo_engine_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_sfw_img:'))
+def callback_set_sfw_img(call):
+    if not is_authorized(call.from_user.id):
+        return
+    key = call.data.split(":", 1)[1]
+    if key == "agy":
+        os.environ["SFW_IMAGE_ENGINE"] = "agy"
+        update_env_variable("SFW_IMAGE_ENGINE", "agy")
+        label = "Google Antigravity (AGY)"
+    elif key == "cloud":
+        os.environ["SFW_IMAGE_ENGINE"] = "cloud"
+        update_env_variable("SFW_IMAGE_ENGINE", "cloud")
+        label = "Cloud Pollinations"
+    elif key == "anything_xl":
+        os.environ["SFW_IMAGE_ENGINE"] = "comfyui"
+        os.environ["SFW_COMFYUI_CHECKPOINT"] = "AnythingXL_xl.safetensors"
+        update_env_variable("SFW_IMAGE_ENGINE", "comfyui")
+        update_env_variable("SFW_COMFYUI_CHECKPOINT", "AnythingXL_xl.safetensors")
+        label = "Anything XL (SDXL)"
+    elif key == "meinamix":
+        os.environ["SFW_IMAGE_ENGINE"] = "comfyui"
+        os.environ["SFW_COMFYUI_CHECKPOINT"] = "meinamix_v12Final.safetensors"
+        update_env_variable("SFW_IMAGE_ENGINE", "comfyui")
+        update_env_variable("SFW_COMFYUI_CHECKPOINT", "meinamix_v12Final.safetensors")
+        label = "MeinaMix v12"
+    else:
+        label = key
+    bot.answer_callback_query(call.id, f"SFW Foto: {label}")
+    show_photo_engine_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_nsfw_img:'))
+def callback_set_nsfw_img(call):
+    if not is_authorized(call.from_user.id):
+        return
+    key = call.data.split(":", 1)[1]
+    if key == "aom3":
+        ckpt = "AOM3A1B_orangemixs.safetensors"
+        label = "AbyssOrangeMix3 (AOM3A1B)"
+    elif key == "meinamix":
+        ckpt = "meinamix_v12Final.safetensors"
+        label = "MeinaMix v12"
+    elif key == "anything_xl":
+        ckpt = "AnythingXL_xl.safetensors"
+        label = "Anything XL"
+    else:
+        ckpt = key
+        label = key
+    os.environ["NSFW_IMAGE_ENGINE"] = "comfyui"
+    os.environ["NSFW_COMFYUI_CHECKPOINT"] = ckpt
+    update_env_variable("NSFW_IMAGE_ENGINE", "comfyui")
+    update_env_variable("NSFW_COMFYUI_CHECKPOINT", ckpt)
+    bot.answer_callback_query(call.id, f"NSFW Foto: {label}")
+    show_photo_engine_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_ckpt:'))
 def callback_set_ckpt(call):

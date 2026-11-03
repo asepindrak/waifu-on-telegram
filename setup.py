@@ -380,186 +380,127 @@ def config_llm_model(env_vars):
             print(c(GREEN, f"  ✓ Selected: {label}"))
 
 def config_image_model(env_vars):
-    print(c(BOLD + CYAN, "\n[Step 3/7: Photo / Selfie Generator Model (ComfyUI)]"))
+    print(c(BOLD + CYAN, "\n[Step 3/7: Photo / Selfie Generator Model (ComfyUI & AGY)]"))
     print("-" * 60)
-    print("Pilih model ilustrasi anime yang ingin digunakan untuk generasi foto / selfie waifu:\n")
 
-    meina_info = asset_manager.get_asset_info("meinamix") if asset_manager else None
-    meina_inst = meina_info.get("installed", False) if meina_info else False
-    meina_incomp = meina_info.get("incomplete", False) if meina_info else False
-    if meina_inst:
-        meina_tag = c(GREEN, "[TERPASANG]")
-    elif meina_incomp:
-        meina_tag = c(YELLOW, f"[TERPUTUS: {meina_info.get('current_size_mb')} MB / ~2.0 GB ({meina_info.get('percent_complete')}%) - BISA RESUME]")
-    else:
-        meina_tag = c(YELLOW, "[PERLU DOWNLOAD ~2.0 GB]")
+    cur_sfw_eng = env_vars.get("SFW_IMAGE_ENGINE", "comfyui").lower()
+    cur_sfw_ckpt = env_vars.get("SFW_COMFYUI_CHECKPOINT", env_vars.get("COMFYUI_CHECKPOINT", ""))
+    cur_nsfw_ckpt = env_vars.get("NSFW_COMFYUI_CHECKPOINT", env_vars.get("COMFYUI_CHECKPOINT", ""))
+    cur_mode = env_vars.get("IMAGE_ENGINE_MODE", "split" if (cur_sfw_eng == "agy" or (cur_sfw_ckpt and cur_nsfw_ckpt and cur_sfw_ckpt != cur_nsfw_ckpt)) else "unified")
 
-    aom_info = asset_manager.get_asset_info("aom3") if asset_manager else None
-    aom_inst = aom_info.get("installed", False) if aom_info else False
-    aom_incomp = aom_info.get("incomplete", False) if aom_info else False
-    if aom_inst:
-        aom_tag = c(GREEN, "[TERPASANG]")
-    elif aom_incomp:
-        aom_tag = c(YELLOW, f"[TERPUTUS: {aom_info.get('current_size_mb')} MB / ~2.0 GB ({aom_info.get('percent_complete')}%) - BISA RESUME]")
-    else:
-        aom_tag = c(YELLOW, "[PERLU DOWNLOAD ~2.0 GB]")
+    print(f"Mode Image Saat Ini: {c(BOLD + GREEN, 'Split SFW/NSFW (Hybrid)' if cur_mode == 'split' else 'Unified (1 Model)')}")
+    print("Pilih Arsitektur Generator Foto / Selfie:")
+    print("  1) 🤖 Mode Unified (1 Model / Engine untuk SFW & NSFW)")
+    print("  2) 🔀 Mode Split Hybrid (Pisahkan SFW: AGY / Anything XL & NSFW: AOM3 / MeinaMix Uncensored)")
 
-    anything_info = asset_manager.get_asset_info("anything_xl") if asset_manager else None
-    anything_inst = anything_info.get("installed", False) if anything_info else False
-    anything_incomp = anything_info.get("incomplete", False) if anything_info else False
-    if anything_inst:
-        anything_tag = c(GREEN, "[TERPASANG]")
-    elif anything_incomp:
-        anything_tag = c(YELLOW, f"[TERPUTUS: {anything_info.get('current_size_mb')} MB / ~6.6 GB ({anything_info.get('percent_complete')}%) - BISA RESUME]")
-    else:
-        anything_tag = c(YELLOW, "[PERLU DOWNLOAD ~6.6 GB]")
+    def_mode_choice = "2" if cur_mode == "split" else "1"
+    choice_mode = input(f"\nPilih Mode [1-2, default: {def_mode_choice}]: ").strip()
+    if not choice_mode:
+        choice_mode = def_mode_choice
+    is_split = (choice_mode == "2")
 
-    hw = asset_manager.detect_hardware_profile() if asset_manager else None
-    rec_img_model = hw.get("recommended_image_model", "meinamix") if hw else "meinamix"
-    if hw:
-        print(c(BOLD + CYAN, f"  🎮 Hardware Terdeteksi: {hw['gpu_name']} ({hw['vram_gb']} GB VRAM • {hw['tier_label']})"))
-        print(c(GREEN, f"  💡 Rekomendasi Hardware: {hw['recommendation_text']}\n"))
+    if is_split:
+        env_vars["IMAGE_ENGINE_MODE"] = "split"
+        print(c(BOLD + MAGENTA, "\n--- [A] Konfigurasi Image Engine SFW (Foto Keseharian, Outfit, Selfie Santai) ---"))
+        agy_ready = bool(shutil.which("agy") or shutil.which("agy.cmd"))
+        sfw_options = [
+            (f"🌉 Google Antigravity Image Generator (AGY Subagent) {'[TERPASANG - 0 VRAM]' if agy_ready else '[Bebas VRAM]'}", "agy", "agy", "agy"),
+            ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Jernih 1024px)", "comfyui", "AnythingXL_xl.safetensors", "anything_xl"),
+            ("✨ MeinaMix v12 (Anime SD 1.5 - Cepat & Hemat VRAM)", "comfyui", "meinamix_v12Final.safetensors", "meinamix"),
+            ("🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif)", "comfyui", "", "auto"),
+            ("☁️ Cloud Fallback Engine (Pollinations AI - Free Cloud GPU, 0 VRAM)", "cloud", "", "cloud")
+        ]
+        for idx, (label, mode, ckpt, key) in enumerate(sfw_options, 1):
+            print(f"  {idx}) {label}")
+        sfw_in = input(f"Pilih Engine SFW [1-{len(sfw_options)}, default: 1]: ").strip()
+        sfw_idx = int(sfw_in) - 1 if sfw_in.isdigit() and 1 <= int(sfw_in) <= len(sfw_options) else 0
+        _, s_mode, s_ckpt, s_key = sfw_options[sfw_idx]
 
-    options = []
-    # 1. MeinaMix v12
-    rec_meina_badge = " " + c(BOLD + GREEN, "⭐ [REKOMENDASI HARDWARE]") if rec_img_model == "meinamix" else ""
-    options.append((
-        f"✨ MeinaMix v12 (Anime SD 1.5) {meina_tag}{rec_meina_badge}\n"
-        f"     ↳ Cepat, estetik anime konsisten, hemat VRAM (Rekomendasi GPU 4GB - 8GB)",
-        "meinamix",
-        "meinamix_v12Final.safetensors"
-    ))
-    # 2. AbyssOrangeMix3 (AOM3A1B)
-    options.append((
-        f"🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Civitai #9942) {aom_tag}\n"
-        f"     ↳ Anime legendaris, gaya tajam & dinamis (Rekomendasi GPU 4GB - 8GB)",
-        "aom3",
-        "AOM3A1B_orangemixs.safetensors"
-    ))
-    # 3. Anything XL
-    rec_xl_badge = " " + c(BOLD + GREEN, "⭐ [REKOMENDASI HARDWARE]") if rec_img_model == "anything_xl" else ""
-    options.append((
-        f"🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Civitai #9409) {anything_tag}{rec_xl_badge}\n"
-        f"     ↳ Resolusi 1024px ultra jernih, detail anime kaya (Rekomendasi GPU 6GB - 8GB+ VRAM)",
-        "anything_xl",
-        "AnythingXL_xl.safetensors"
-    ))
+        env_vars["SFW_IMAGE_ENGINE"] = s_mode
+        env_vars["SFW_COMFYUI_CHECKPOINT"] = s_ckpt
+        if s_mode == "agy":
+            env_vars["MEDIA_FALLBACK_AGY"] = "true"
+            env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
+        elif s_mode == "cloud":
+            env_vars["MEDIA_FALLBACK_CLOUD"] = "true"
+        print(c(GREEN, f"  ✓ SFW Image Engine: {s_mode.upper()} ({s_ckpt or 'Default'})"))
 
-    # 4. Other detected local checkpoints
-    detected_img = scan_image_models()
-    for source, ckpt_name in detected_img:
-        lower_c = ckpt_name.lower()
-        if "meina" in lower_c or "anything" in lower_c or "aom" in lower_c or "orangemix" in lower_c:
-            continue
-        options.append((
-            f"🎨 {ckpt_name} (Local ComfyUI Checkpoint)",
-            "local_custom",
-            ckpt_name
-        ))
+        # Download check for SFW model if ComfyUI
+        if s_mode == "comfyui" and s_key in ("anything_xl", "meinamix") and asset_manager:
+            s_info = asset_manager.get_asset_info(s_key)
+            if s_info and not s_info.get("installed", False):
+                print(c(YELLOW, f"  ℹ Model '{s_info.get('name')}' belum terpasang di ComfyUI."))
+                if input(f"  Download sekarang (~{s_info.get('size_mb', 0)} MB)? [Y/n, default: Y]: ").strip().lower() != "n":
+                    asset_manager.download_asset(s_key)
 
-    # 5. Auto detect
-    options.append((
-        "🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif di ComfyUI)",
-        "auto",
-        ""
-    ))
+        print(c(BOLD + MAGENTA, "\n--- [B] Konfigurasi Image Engine NSFW (Selfie Privat, Lingerie, Bikini, Nude 18+) ---"))
+        nsfw_options = [
+            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Civitai #9942, Rekomendasi Uncensored)", "AOM3A1B_orangemixs.safetensors", "aom3"),
+            ("✨ MeinaMix v12 (Anime SD 1.5 - Uncensored Art)", "meinamix_v12Final.safetensors", "meinamix"),
+            ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0)", "AnythingXL_xl.safetensors", "anything_xl"),
+            ("🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif)", "", "auto")
+        ]
+        for idx, (label, ckpt, key) in enumerate(nsfw_options, 1):
+            print(f"  {idx}) {label}")
+        nsfw_in = input(f"Pilih Engine NSFW [1-{len(nsfw_options)}, default: 1]: ").strip()
+        nsfw_idx = int(nsfw_in) - 1 if nsfw_in.isdigit() and 1 <= int(nsfw_in) <= len(nsfw_options) else 0
+        _, n_ckpt, n_key = nsfw_options[nsfw_idx]
 
-    # 5b. Google Antigravity Image Generator (AGY)
-    agy_ready = (shutil.which("agy") or shutil.which("agy.cmd"))
-    agy_tag = c(GREEN, "[TERPASANG]") if agy_ready else c(DIM, "[Bisa via AGY CLI / Bridge]")
-    options.append((
-        f"🌉 Google Antigravity Image Generator (AGY Image Generator Subagent) {agy_tag}\n"
-        f"     ↳ Bebas VRAM, ditenagai langsung oleh subagent image-generator AGY",
-        "agy",
-        "agy"
-    ))
-
-    # 6. Cloud Engine
-    rec_cloud_badge = " " + c(BOLD + GREEN, "⭐ [REKOMENDASI HARDWARE]") if rec_img_model == "cloud" else ""
-    options.append((
-        f"☁️ Cloud Fallback Engine (Pollinations AI - Cepat, Free Cloud GPU, 0 VRAM){rec_cloud_badge}",
-        "cloud",
-        ""
-    ))
-
-    # 7. Disable
-    options.append((
-        "❌ Nonaktifkan fitur foto / selfie",
-        "disabled",
-        ""
-    ))
-
-    for idx, (label, mode, val) in enumerate(options, 1):
-        print(f"  {idx}) {label}")
-
-    cur_ckpt = env_vars.get("COMFYUI_CHECKPOINT", "")
-    default_idx = "1"
-    if cur_ckpt:
-        for idx, (_, mode, val) in enumerate(options, 1):
-            if val and val.lower() in cur_ckpt.lower():
-                default_idx = str(idx)
-                break
-    else:
-        # Auto-recommend default index based on GPU VRAM
-        for idx, (_, mode, _) in enumerate(options, 1):
-            if mode == rec_img_model:
-                default_idx = str(idx)
-                break
-
-    choice_img = input(f"\nPilih Model Foto [1-{len(options)}, default: {default_idx}]: ").strip()
-    chosen_idx = int(choice_img) - 1 if choice_img.isdigit() and 1 <= int(choice_img) <= len(options) else (int(default_idx) - 1)
-
-    chosen_label, chosen_mode, chosen_val = options[chosen_idx]
-
-    if chosen_mode == "agy":
-        env_vars["SFW_IMAGE_ENGINE"] = "agy"
+        env_vars["NSFW_IMAGE_ENGINE"] = "comfyui"
+        env_vars["NSFW_COMFYUI_CHECKPOINT"] = n_ckpt
+        env_vars["COMFYUI_CHECKPOINT"] = n_ckpt
         env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
-        print(c(GREEN, "  ✓ Image Engine dipilih: Google Antigravity (AGY Image Generator)."))
-    elif chosen_mode == "disabled":
-        env_vars["SFW_IMAGE_ENGINE"] = "disabled"
-        env_vars["COMFYUI_URL"] = ""
-        env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
-        env_vars["COMFYUI_CHECKPOINT"] = ""
-        print(c(YELLOW, "  ✓ Fitur foto dinonaktifkan."))
-    elif chosen_mode == "cloud":
-        env_vars["SFW_IMAGE_ENGINE"] = "cloud"
-        env_vars["COMFYUI_URL"] = ""
-        env_vars["MEDIA_FALLBACK_CLOUD"] = "true"
-        env_vars["COMFYUI_CHECKPOINT"] = ""
-        print(c(GREEN, "  ✓ Model Foto dipilih: Cloud Fallback Engine (Pollinations AI)"))
-    elif chosen_mode == "auto":
-        env_vars["SFW_IMAGE_ENGINE"] = "comfyui"
-        env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
-        env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
-        env_vars["COMFYUI_CHECKPOINT"] = ""
-        print(c(GREEN, "  ✓ Model Foto dipilih: Auto-detect ComfyUI"))
-    elif chosen_mode in ("meinamix", "aom3", "anything_xl", "local_custom"):
-        env_vars["SFW_IMAGE_ENGINE"] = "comfyui"
-        env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
-        env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
-        env_vars["COMFYUI_CHECKPOINT"] = chosen_val
-        print(c(GREEN, f"  ✓ Model Foto dipilih: {chosen_val}"))
+        print(c(GREEN, f"  ✓ NSFW Image Engine: COMFYUI ({n_ckpt or 'Auto'})"))
 
-        target_info = asset_manager.get_asset_info(chosen_mode) if asset_manager else None
-        if target_info and not target_info.get("installed", False):
-            if target_info.get("incomplete", False):
-                print(c(YELLOW, f"\n  ℹ Unduhan model '{target_info.get('name')}' belum selesai ({target_info.get('current_size_mb')} MB / ~{target_info.get('size_mb')} MB, {target_info.get('percent_complete')}%)."))
-                dl_ask = input(f"  Lanjutkan download (resume)? [Y/n, default: Y]: ").strip().lower()
-            else:
-                print(c(YELLOW, f"\n  ℹ Model '{target_info.get('name')}' belum terpasang di folder ComfyUI checkpoints."))
-                dl_ask = input(f"  Download sekarang (~{target_info.get('size_mb', 0)} MB via high-speed curl)? [Y/n, default: Y]: ").strip().lower()
-            if dl_ask != "n":
-                print(c(CYAN, f"  ⏳ Memproses unduhan {target_info.get('name')}..."))
-                ok = asset_manager.download_asset(chosen_mode)
-                if ok:
-                    print(c(GREEN, f"  ✓ Model '{target_info.get('name')}' berhasil diunduh dan siap digunakan!"))
-                else:
-                    print(c(RED, f"  ⚠️ Download belum selesai. Anda bisa melanjutkan nanti via 'waifu models download {chosen_mode}'."))
+        # Download check for NSFW model if ComfyUI
+        if n_key in ("aom3", "meinamix", "anything_xl") and asset_manager:
+            n_info = asset_manager.get_asset_info(n_key)
+            if n_info and not n_info.get("installed", False):
+                print(c(YELLOW, f"  ℹ Model '{n_info.get('name')}' belum terpasang di ComfyUI."))
+                if input(f"  Download sekarang (~{n_info.get('size_mb', 0)} MB)? [Y/n, default: Y]: ").strip().lower() != "n":
+                    asset_manager.download_asset(n_key)
+
+        print(c(GREEN, f"\n✓ Mode Split Image SFW ({s_mode}) & NSFW ({n_ckpt or 'auto'}) berhasil disimpan!\n"))
+
     else:
-        env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
-        env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
-        env_vars["COMFYUI_CHECKPOINT"] = chosen_val
-        print(c(GREEN, f"  ✓ Model Foto dipilih: {chosen_val}"))
+        env_vars["IMAGE_ENGINE_MODE"] = "unified"
+        options = [
+            ("✨ MeinaMix v12 (Anime SD 1.5 - Cepat & Hemat VRAM)", "meinamix", "meinamix_v12Final.safetensors"),
+            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Civitai #9942)", "aom3", "AOM3A1B_orangemixs.safetensors"),
+            ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Jernih 1024px)", "anything_xl", "AnythingXL_xl.safetensors"),
+            ("🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif)", "auto", ""),
+            ("🌉 Google Antigravity Image Generator (AGY Subagent)", "agy", "agy"),
+            ("☁️ Cloud Fallback Engine (Pollinations AI - 0 VRAM)", "cloud", ""),
+            ("❌ Nonaktifkan fitur foto / selfie", "disabled", "")
+        ]
+        for idx, (label, mode, val) in enumerate(options, 1):
+            print(f"  {idx}) {label}")
+        choice_img = input(f"\nPilih Model Foto [1-{len(options)}, default: 1]: ").strip()
+        chosen_idx = int(choice_img) - 1 if choice_img.isdigit() and 1 <= int(choice_img) <= len(options) else 0
+        _, chosen_mode, chosen_val = options[chosen_idx]
+
+        if chosen_mode == "agy":
+            env_vars["SFW_IMAGE_ENGINE"] = "agy"
+            env_vars["NSFW_IMAGE_ENGINE"] = "agy"
+            env_vars["MEDIA_FALLBACK_AGY"] = "true"
+        elif chosen_mode == "cloud":
+            env_vars["SFW_IMAGE_ENGINE"] = "cloud"
+            env_vars["NSFW_IMAGE_ENGINE"] = "cloud"
+            env_vars["MEDIA_FALLBACK_CLOUD"] = "true"
+        elif chosen_mode == "disabled":
+            env_vars["SFW_IMAGE_ENGINE"] = "disabled"
+            env_vars["NSFW_IMAGE_ENGINE"] = "disabled"
+            env_vars["COMFYUI_URL"] = ""
+        else:
+            env_vars["SFW_IMAGE_ENGINE"] = "comfyui"
+            env_vars["NSFW_IMAGE_ENGINE"] = "comfyui"
+            env_vars["SFW_COMFYUI_CHECKPOINT"] = chosen_val
+            env_vars["NSFW_COMFYUI_CHECKPOINT"] = chosen_val
+            env_vars["COMFYUI_CHECKPOINT"] = chosen_val
+            env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
+            env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
+        print(c(GREEN, f"  ✓ Model Foto Unified: {chosen_mode.upper()} {chosen_val}\n"))
+
 
 def config_persona_voice(env_vars):
     print(c(BOLD + CYAN, "\n[Step 5/7: AI Girlfriend Persona & Voice Selection]"))

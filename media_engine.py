@@ -436,33 +436,33 @@ class MediaEngine:
         self.last_error = None
         effective_prompt = prompt or visual_prompt
 
-        # 1. Try local ComfyUI
-        if self.comfyui_url:
-            # Check SFW Image Engine routing:
-            sfw_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
-            if not is_nude and sfw_engine == "cloud":
-                cloud_img = self.generate_image_cloud(effective_prompt, aspect_ratio=aspect_ratio)
-                if cloud_img:
-                    return cloud_img, "Cloud Engine (SFW Pollinations)"
-            elif not is_nude and sfw_engine == "agy":
-                agy_img = self.generate_image_agy(effective_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
-                if agy_img:
-                    if photo_vault:
-                        try:
-                            photo_vault.save_photo_to_vault(
-                                agy_img,
-                                persona=persona,
-                                scene=scene or user_query,
-                                outfit_label=outfit_label,
-                                is_nude=is_nude,
-                                visual_prompt=effective_prompt,
-                                user_query=user_query,
-                                aspect_ratio=aspect_ratio or "3:4"
-                            )
-                        except Exception:
-                            pass
-                    return agy_img, "Google Antigravity (AGY Image Generator)" 
+        # SFW External Engine Routing (Independent of local ComfyUI state)
+        sfw_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
+        if not is_nude and sfw_engine == "agy":
+            agy_img = self.generate_image_agy(effective_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
+            if agy_img:
+                if photo_vault:
+                    try:
+                        photo_vault.save_photo_to_vault(
+                            agy_img,
+                            persona=persona,
+                            scene=scene or user_query,
+                            outfit_label=outfit_label,
+                            is_nude=is_nude,
+                            visual_prompt=effective_prompt,
+                            user_query=user_query,
+                            aspect_ratio=aspect_ratio or "3:4"
+                        )
+                    except Exception:
+                        pass
+                return agy_img, "Google Antigravity (AGY Image Generator)"
+        elif not is_nude and sfw_engine == "cloud":
+            cloud_img = self.generate_image_cloud(effective_prompt, aspect_ratio=aspect_ratio)
+            if cloud_img:
+                return cloud_img, "Cloud Engine (SFW Pollinations)"
 
+        # Local ComfyUI (Used for NSFW and for SFW when engine is comfyui)
+        if self.comfyui_url:
             local_img = self.generate_image_comfyui(
                 effective_prompt,
                 negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
@@ -487,7 +487,7 @@ class MediaEngine:
                         )
                     except Exception as e_save:
                         logger.warning(f"Failed to auto-archive photo to vault: {e_save}")
-                active_ckpt = self.get_active_checkpoint()
+                active_ckpt = self.get_active_checkpoint(is_nude=is_nude)
                 clean_name = os.path.splitext(active_ckpt)[0]
                 return local_img, f"Local ComfyUI ({clean_name})"
             elif not is_nude and os.environ.get("MEDIA_FALLBACK_AGY", "true").lower() in ("true", "1", "yes"):

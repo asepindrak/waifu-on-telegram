@@ -94,9 +94,10 @@ class TestImageModelSelection(unittest.TestCase):
             self.assertEqual((w_sd, h_sd), (576, 768))
 
     def test_setup_config_image_model_choice(self):
-        """Verify that setup.py config_image_model properly prompts and configures AOM3 and Anything XL."""
+        """Verify that setup.py config_image_model properly prompts and configures AOM3 and Anything XL in Unified Mode."""
         env_vars = {}
-        with patch("builtins.input", side_effect=["2", "n"]):  # Choice 2 is AbyssOrangeMix3, do not download now
+        # Mode 1 (Unified), Choice 2 (AOM3), "n" (skip download)
+        with patch("builtins.input", side_effect=["1", "2", "n"]):
             with patch("setup.scan_image_models", return_value=[]):
                 setup.config_image_model(env_vars)
                 self.assertEqual(env_vars.get("COMFYUI_CHECKPOINT"), "AOM3A1B_orangemixs.safetensors")
@@ -104,12 +105,57 @@ class TestImageModelSelection(unittest.TestCase):
                 self.assertEqual(env_vars.get("MEDIA_FALLBACK_CLOUD"), "false")
 
         env_vars_xl = {}
-        with patch("builtins.input", side_effect=["3", "n"]):  # Choice 3 is Anything XL, do not download now
+        # Mode 1 (Unified), Choice 3 (Anything XL), "n" (skip download)
+        with patch("builtins.input", side_effect=["1", "3", "n"]):
             with patch("setup.scan_image_models", return_value=[]):
                 setup.config_image_model(env_vars_xl)
                 self.assertEqual(env_vars_xl.get("COMFYUI_CHECKPOINT"), "AnythingXL_xl.safetensors")
                 self.assertEqual(env_vars_xl.get("COMFYUI_URL"), "http://127.0.0.1:8188")
                 self.assertEqual(env_vars_xl.get("MEDIA_FALLBACK_CLOUD"), "false")
+
+    def test_setup_config_image_model_split_hybrid(self):
+        """Verify that setup.py config_image_model configures Split Hybrid Mode (SFW AGY + NSFW AOM3)."""
+        env_vars = {}
+        # Mode 2 (Split Hybrid), SFW 1 (AGY), NSFW 1 (AOM3), "n" (skip download)
+        with patch("builtins.input", side_effect=["2", "1", "1", "n"]):
+            with patch("setup.scan_image_models", return_value=[]):
+                setup.config_image_model(env_vars)
+                self.assertEqual(env_vars.get("IMAGE_ENGINE_MODE"), "split")
+                self.assertEqual(env_vars.get("SFW_IMAGE_ENGINE"), "agy")
+                self.assertEqual(env_vars.get("NSFW_IMAGE_ENGINE"), "comfyui")
+                self.assertEqual(env_vars.get("NSFW_COMFYUI_CHECKPOINT"), "AOM3A1B_orangemixs.safetensors")
+
+    def test_bot_photo_menu_split_callbacks(self):
+        """Verify that Telegram bot callbacks update split image settings correctly."""
+        import bot
+        from unittest.mock import MagicMock
+
+        # Mock call object
+        call = MagicMock()
+        call.from_user.id = 12345
+        call.message.chat.id = 12345
+        call.message.message_id = 999
+
+        with patch("bot.is_authorized", return_value=True), \
+             patch.object(bot.bot, "answer_callback_query"), \
+             patch("bot.update_env_variable"), \
+             patch("bot.show_photo_engine_menu"):
+
+            # 1. Toggle mode to split
+            os.environ["IMAGE_ENGINE_MODE"] = "unified"
+            bot.callback_toggle_split_img(call)
+            self.assertEqual(os.environ.get("IMAGE_ENGINE_MODE"), "split")
+
+            # 2. Set SFW image engine to AGY
+            call.data = "cfg_set_sfw_img:agy"
+            bot.callback_set_sfw_img(call)
+            self.assertEqual(os.environ.get("SFW_IMAGE_ENGINE"), "agy")
+
+            # 3. Set NSFW image engine to AOM3
+            call.data = "cfg_set_nsfw_img:aom3"
+            bot.callback_set_nsfw_img(call)
+            self.assertEqual(os.environ.get("NSFW_IMAGE_ENGINE"), "comfyui")
+            self.assertEqual(os.environ.get("NSFW_COMFYUI_CHECKPOINT"), "AOM3A1B_orangemixs.safetensors")
 
     def test_setup_manage_models_menu_render(self):
         """Verify that setup.py manage_models_menu renders without NameError (such as DIM)."""
