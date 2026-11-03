@@ -202,18 +202,26 @@ class VoiceEngine:
         """
         Determines the appropriate voice to use:
         If user explicitly set a default voice (e.g. ja-JP-NanamiNeural or id-ID-GadisNeural),
-        use that voice. If default voice is generic, detect based on text.
+        use that voice. If default voice is 'auto' or generic, detect based on text and BOT_LANGUAGE.
         """
-        if self.default_voice:
+        if self.default_voice and self.default_voice.lower() != "auto":
             return self.default_voice
 
-        # Check Japanese characters
-        if re.search(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', text):
+        # Check Japanese characters in text
+        if text and re.search(r"[぀-ゟ゠-ヿ一-鿿]", text):
             return "ja-JP-NanamiNeural"
 
-        # Check Indonesian keywords
-        words = set(re.findall(r'\b[a-z]+\b', text.lower()))
-        if len(words.intersection(INDONESIAN_WORDS)) >= 1:
+        # Check Indonesian keywords in text
+        if text:
+            words = set(re.findall(r"\b[a-z]+\b", text.lower()))
+            if len(words.intersection(INDONESIAN_WORDS)) >= 1:
+                return "id-ID-GadisNeural"
+
+        # Fallback to configured BOT_LANGUAGE if text is ambiguous or neutral
+        bot_lang = os.environ.get("BOT_LANGUAGE", "id").lower()
+        if bot_lang in ("ja", "japanese", "japan", "jp", "nihongo"):
+            return "ja-JP-NanamiNeural"
+        elif bot_lang in ("id", "indonesia", "indonesian"):
             return "id-ID-GadisNeural"
 
         return "en-US-AnaNeural"
@@ -270,7 +278,8 @@ class VoiceEngine:
 
             import edge_tts
 
-            voice = voice_override or self.default_voice or self.detect_language_voice(clean_speech)
+            active_default = self.default_voice if (self.default_voice and self.default_voice.lower() != "auto") else None
+            voice = voice_override or active_default or self.detect_language_voice(clean_speech)
             voice_lang = self.get_voice_language(voice)
             text_lang = self.detect_text_language(clean_speech)
 

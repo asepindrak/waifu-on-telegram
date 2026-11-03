@@ -367,7 +367,8 @@ def apply_voice_speaker(speaker: str) -> str:
         "ana": "en-US-AnaNeural",
         "gadis": "id-ID-GadisNeural",
         "nanami": "ja-JP-NanamiNeural",
-        "jenny": "en-US-JennyNeural"
+        "jenny": "en-US-JennyNeural",
+        "auto": "auto"
     }
     v_name = mapping.get(speaker, speaker)
     VOICE_NAME = v_name
@@ -2110,11 +2111,13 @@ def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Option
             types.InlineKeyboardButton(f"✨ Karakter Suara: {p_name} (VoiceStudio Auto)", callback_data="noop")
         )
     else:
+        is_auto = (str(cur_speaker).lower() == "auto")
         markup.add(
-            types.InlineKeyboardButton(f"🇺🇸 Ana (US Sweet Girlfriend) {'✓' if 'Ana' in cur_speaker else ''}", callback_data="cfg_set_speaker:ana"),
-            types.InlineKeyboardButton(f"🇮🇩 Gadis (Indonesia Alami) {'✓' if 'Gadis' in cur_speaker else ''}", callback_data="cfg_set_speaker:gadis"),
-            types.InlineKeyboardButton(f"🇯🇵 Nanami (Japanese Kawaii) {'✓' if 'Nanami' in cur_speaker else ''}", callback_data="cfg_set_speaker:nanami"),
-            types.InlineKeyboardButton(f"🇺🇸 Jenny (US Cheerful) {'✓' if 'Jenny' in cur_speaker else ''}", callback_data="cfg_set_speaker:jenny"),
+            types.InlineKeyboardButton(f"🇮🇩 Gadis (Bahasa Indonesia) {'✓' if 'gadis' in str(cur_speaker).lower() else ''}", callback_data="cfg_set_speaker:gadis"),
+            types.InlineKeyboardButton(f"🇯🇵 Nanami (Japanese / 日本語) {'✓' if 'nanami' in str(cur_speaker).lower() else ''}", callback_data="cfg_set_speaker:nanami"),
+            types.InlineKeyboardButton(f"🇬🇧 Ana (English Sweet) {'✓' if 'ana' in str(cur_speaker).lower() else ''}", callback_data="cfg_set_speaker:ana"),
+            types.InlineKeyboardButton(f"🇺🇸 Jenny (English Cheerful) {'✓' if 'jenny' in str(cur_speaker).lower() else ''}", callback_data="cfg_set_speaker:jenny"),
+            types.InlineKeyboardButton(f"🌐 Ikuti Bahasa Chat (Auto Sync) {'✓' if is_auto else ''}", callback_data="cfg_set_speaker:auto"),
         )
 
     markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
@@ -2130,13 +2133,19 @@ def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Option
             f"💡 _VoiceStudio beroperasi secara lokal & offline di PC Anda, otomatis menghasilkan intonasi suara sesuai persona {p_name}!_"
         )
     else:
+        speaker_desc = "🌐 Auto-sync (Ikuti Bahasa Chat)" if str(cur_speaker).lower() == "auto" else cur_speaker
         text = (
             f"🎙️ **Pengaturan Voice & Audio Waifu**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"• Engine Suara : `🌐 Edge-TTS Cloud (Ringan & 0 VRAM)`\n"
             f"• Mode Balasan : **{cur_mode.upper()}**\n"
-            f"• Model Suara  : `{cur_speaker}`\n\n"
-            f"Atur bagaimana waifu membalas dengan audio suara dan pilih jenis karakter suaranya:"
+            f"• Model Suara  : `{speaker_desc}`\n\n"
+            f"🗣️ **Pilihan Bahasa & Karakter Suara:**\n"
+            f"• 🇮🇩 **Gadis** = Bahasa Indonesia alami\n"
+            f"• 🇯🇵 **Nanami** = Bahasa Jepang (otomatis polyglot voice!)\n"
+            f"• 🇬🇧 **Ana / Jenny** = Bahasa Inggris\n"
+            f"• 🌐 **Auto** = Otomatis mengikuti bahasa chat waifu (`/language`)\n\n"
+            f"💡 _Fitur Polyglot Voice Guardrail otomatis menerjemahkan ucapan waifu ke bahasa suara yang kamu pilih!_"
         )
 
     if message_to_edit:

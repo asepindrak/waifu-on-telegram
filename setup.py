@@ -564,25 +564,40 @@ def config_voice(env_vars):
         env_vars["VOICE_BACKEND"] = "edge-tts"
         print(c(GREEN, "  ✓ Voice Engine: Edge-TTS Cloud"))
 
-    print("\nPilih Fallback / Default Voice (Edge-TTS):")
-    print("  1) en-US-AnaNeural (English sweet & natural girlfriend voice)")
-    print("  2) id-ID-GadisNeural (Indonesian natural female voice - Rekomendasi)")
-    print("  3) ja-JP-NanamiNeural (Japanese kawaii anime voice)")
-    print("  4) en-US-JennyNeural (English cheerful voice)")
+    print("\nPilih Bahasa & Model Suara Waifu (Voice TTS):")
+    print("  1) 🇮🇩 Bahasa Indonesia - id-ID-GadisNeural (Rekomendasi)")
+    print("  2) 🇯🇵 Japanese / 日本語 - ja-JP-NanamiNeural (Kawaii anime voice)")
+    print("  3) 🇬🇧 English - en-US-AnaNeural (English sweet & natural)")
+    print("  4) 🇺🇸 English - en-US-JennyNeural (English cheerful voice)")
+    print("  5) 🌐 Auto - Ikuti Bahasa Chat (Otomatis ikuti bahasa teks chat)")
     cur_v = env_vars.get("VOICE_NAME", "id-ID-GadisNeural")
-    def_v_idx = "2" if "gadis" in cur_v.lower() else ("3" if "nanami" in cur_v.lower() else ("4" if "jenny" in cur_v.lower() else "1"))
-    v_choice = input(f"Select voice [1-4, default: {def_v_idx}]: ").strip()
+    if "gadis" in cur_v.lower():
+        def_v_idx = "1"
+    elif "nanami" in cur_v.lower():
+        def_v_idx = "2"
+    elif "jenny" in cur_v.lower():
+        def_v_idx = "4"
+    elif cur_v.lower() == "auto":
+        def_v_idx = "5"
+    else:
+        def_v_idx = "3"
+
+    v_choice = input(f"Pilih bahasa & model suara [1-5, default: {def_v_idx}]: ").strip()
     if not v_choice:
         v_choice = def_v_idx
 
-    if v_choice == "2":
+    if v_choice == "1":
         env_vars["VOICE_NAME"] = "id-ID-GadisNeural"
-    elif v_choice == "3":
+    elif v_choice == "2":
         env_vars["VOICE_NAME"] = "ja-JP-NanamiNeural"
+    elif v_choice == "3":
+        env_vars["VOICE_NAME"] = "en-US-AnaNeural"
     elif v_choice == "4":
         env_vars["VOICE_NAME"] = "en-US-JennyNeural"
+    elif v_choice == "5":
+        env_vars["VOICE_NAME"] = "auto"
     else:
-        env_vars["VOICE_NAME"] = "en-US-AnaNeural"
+        env_vars["VOICE_NAME"] = "id-ID-GadisNeural"
     print(c(GREEN, f"  ✓ Voice speaker: {env_vars['VOICE_NAME']}\n"))
 
 def config_persona_voice(env_vars):
