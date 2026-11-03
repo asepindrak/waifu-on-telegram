@@ -502,36 +502,48 @@ def config_image_model(env_vars):
         print(c(GREEN, f"  ✓ Model Foto Unified: {chosen_mode.upper()} {chosen_val}\n"))
 
 
-def config_persona_voice(env_vars):
-    print(c(BOLD + CYAN, "\n[Step 5/7: AI Girlfriend Persona & Voice Selection]"))
+def config_persona(env_vars):
+    print(c(BOLD + CYAN, "\n[Step: AI Girlfriend Persona Selection]"))
     print("-" * 60)
-    print("1) Runa  - The Playful Girlfriend (Teasing, mischievous, kawaii gaming aesthetic)")
-    print("2) Akira - The Seductive Tease (Confident, witty, gothic elegance)")
-    print("3) Hina  - The Sunshine Girlfriend (Cheerful, energetic, bubbly, warm)")
-    print("4) Shiro - The Kuudere Girlfriend (Calm, intelligent, cool-blue moonlit)")
-    print("5) Yume  - The Dreamy Soulmate (Gentle, soft-spoken, celestial romantic)")
-    p_choice = input("Select character [1-5, default: 1]: ").strip()
+    print("Pilih kepribadian & karakter utama Waifu:")
+    print("  1) 🌸 Runa  - Mahasiswi Game Dev Ceria (Santai, perhatian, gamer aesthetic)")
+    print("  2) 🖤 Akira - The Seductive Tease (Percaya diri, cerdas, gothic elegance)")
+    print("  3) ☀️ Hina  - The Sunshine Girlfriend (Penuh energi, ceria, hangat, bubbly)")
+    print("  4) ❄️ Shiro - The Kuudere Girlfriend (Tenang, pintar, sejuk, moonlit gentle)")
+    print("  5) 🌙 Yume  - The Dreamy Soulmate (Lembut, puitis, celestial romantic)")
+    cur_p = env_vars.get("DEFAULT_PERSONA", "runa")
+    p_choice = input(f"Select character [1-5, default saat ini '{cur_p}']: ").strip()
     mapping = {"1": "runa", "2": "akira", "3": "hina", "4": "shiro", "5": "yume"}
-    env_vars["DEFAULT_PERSONA"] = mapping.get(p_choice, "runa")
+    if p_choice in mapping:
+        env_vars["DEFAULT_PERSONA"] = mapping[p_choice]
+    elif not p_choice:
+        env_vars["DEFAULT_PERSONA"] = cur_p
+    print(c(GREEN, f"  ✓ Persona aktif: {env_vars['DEFAULT_PERSONA'].title()}\n"))
 
+def config_voice(env_vars):
+    print(c(BOLD + CYAN, "\n[Step: Voice Note TTS & Voice Engine Configuration]"))
+    print("-" * 60)
     cur_v_backend = env_vars.get("VOICE_BACKEND", "edge-tts").lower().strip()
-    print("\nPilih Engine Suara (Voice Note TTS):")
+    cur_p = env_vars.get("DEFAULT_PERSONA", "runa").title()
+
+    print("Pilih Engine Suara (Voice Note TTS):")
     print("  1) 🌐 Edge-TTS Cloud (Ringan, Natural, 0 VRAM - Default)")
-    print("  2) 🏠 VoiceStudio Local AI (100% Offline, Port 3900, Voice Cloning Sesuai Persona)")
-    def_b_idx = "2" if cur_v_backend == "voicestudio" else "1"
-    b_choice = input(f"Pilih Engine Voice [1-2, default: {def_b_idx}]: ").strip()
+    print(f"  2) 🏠 VoiceStudio Local AI (100% Offline, Port 3900, Voice Conditioning Sesuai Persona {cur_p})")
+
+    def_b_idx = "2" if cur_v_backend in ("voicestudio", "local") else "1"
+    b_choice = input(f"\nPilih Engine Voice [1-2, default: {def_b_idx}]: ").strip()
     if not b_choice:
         b_choice = def_b_idx
 
     if b_choice == "2":
         env_vars["VOICE_BACKEND"] = "voicestudio"
         env_vars["VOICESTUDIO_PORT"] = "3900"
-        print(c(GREEN, "  ✓ Voice Engine: VoiceStudio Local AI (Port 3900)"))
+        print(c(GREEN, f"  ✓ Voice Engine: VoiceStudio Local AI (Port 3900, Voice: {cur_p})"))
         try:
             from voicestudio_engine import voicestudio_engine
             if not voicestudio_engine.is_installed():
                 print(c(YELLOW, "\n  ℹ VoiceStudio belum terpasang di tools/VoiceStudio."))
-                if input("  Unduh & setup backend VoiceStudio sekarang? [Y/n, default: Y]: ").strip().lower() != "n":
+                if input("  Unduh & setup backend VoiceStudio otomatis sekarang? [Y/n, default: Y]: ").strip().lower() != "n":
                     ok, msg = voicestudio_engine.install(progress_callback=lambda m: print(f"  {m}"))
                     if ok:
                         print(c(GREEN, f"  ✓ {msg}"))
@@ -548,12 +560,17 @@ def config_persona_voice(env_vars):
         env_vars["VOICE_BACKEND"] = "edge-tts"
         print(c(GREEN, "  ✓ Voice Engine: Edge-TTS Cloud"))
 
-    print("\nFallback / Default Voice (Edge-TTS):")
-    print("1) en-US-AnaNeural (English sweet & natural girlfriend voice - Recommended)")
-    print("2) id-ID-GadisNeural (Indonesian natural female voice)")
-    print("3) ja-JP-NanamiNeural (Japanese female voice)")
-    print("4) en-US-JennyNeural (English cheerful voice)")
-    v_choice = input("Select voice [1/2/3/4, default: 1]: ").strip()
+    print("\nPilih Fallback / Default Voice (Edge-TTS):")
+    print("  1) en-US-AnaNeural (English sweet & natural girlfriend voice)")
+    print("  2) id-ID-GadisNeural (Indonesian natural female voice - Rekomendasi)")
+    print("  3) ja-JP-NanamiNeural (Japanese kawaii anime voice)")
+    print("  4) en-US-JennyNeural (English cheerful voice)")
+    cur_v = env_vars.get("VOICE_NAME", "id-ID-GadisNeural")
+    def_v_idx = "2" if "gadis" in cur_v.lower() else ("3" if "nanami" in cur_v.lower() else ("4" if "jenny" in cur_v.lower() else "1"))
+    v_choice = input(f"Select voice [1-4, default: {def_v_idx}]: ").strip()
+    if not v_choice:
+        v_choice = def_v_idx
+
     if v_choice == "2":
         env_vars["VOICE_NAME"] = "id-ID-GadisNeural"
     elif v_choice == "3":
@@ -562,6 +579,12 @@ def config_persona_voice(env_vars):
         env_vars["VOICE_NAME"] = "en-US-JennyNeural"
     else:
         env_vars["VOICE_NAME"] = "en-US-AnaNeural"
+    print(c(GREEN, f"  ✓ Voice speaker: {env_vars['VOICE_NAME']}\n"))
+
+def config_persona_voice(env_vars):
+    """Backward compatibility wrapper for full persona & voice configuration."""
+    config_persona(env_vars)
+    config_voice(env_vars)
 
 def config_language(env_vars):
     print(c(BOLD + CYAN, "\n[Step: AI Girlfriend Language Selection]"))
@@ -758,24 +781,32 @@ def run_menu():
         elif "meina" in cur_ckpt_disp.lower():
             cur_ckpt_disp = "MeinaMix v12 (SD 1.5)"
         print(c(CYAN, f"  • Photo Model : {cur_ckpt_disp} ({env_vars.get('COMFYUI_URL', 'Disabled')})"))
-        print(c(CYAN, f"  • Persona     : {env_vars.get('DEFAULT_PERSONA', 'runa').title()} | Voice: {env_vars.get('VOICE_NAME', '')}"))
+        cur_v_backend = env_vars.get("VOICE_BACKEND", "edge-tts").lower().strip()
+        if cur_v_backend in ("voicestudio", "local"):
+            v_disp = f"VoiceStudio Local AI (Port 3900, Persona: {env_vars.get('DEFAULT_PERSONA', 'runa').title()})"
+        else:
+            v_disp = f"Edge-TTS ({env_vars.get('VOICE_NAME', 'id-ID-GadisNeural')})"
+
+        print(c(CYAN, f"  • Persona     : {env_vars.get('DEFAULT_PERSONA', 'runa').title()}"))
+        print(c(CYAN, f"  • Voice TTS   : {v_disp}"))
         print(c(CYAN, f"  • Workspace   : {env_vars.get('PROJECTS_DIR', os.path.expanduser('~'))}"))
         print(c(CYAN, f"  • Language    : {env_vars.get('BOT_LANGUAGE', 'id')}"))
         print("-" * 70)
         print("  [1] 🤖 Change Telegram Bot Token / Allowed User ID")
         print("  [2] 🧠 Change Chat / LLM Model (Scan new models)")
         print("  [3] 🎨 Change Photo & Video Model (ComfyUI / Cloud)")
-        print("  [4] 🎭 Change AI Girlfriend Persona & Voice")
-        print("  [5] 🌐 Change Waifu Language (ID, EN, JA, Custom)")
-        print("  [6] 🎬 Choose Video Engine (Wan 2.1 / AnimateDiff / Motion 2.5D)")
-        print("  [7] 📦 AI Assets & Models Manager (Download / Verify Models)")
-        print("  [8] 💻 Configure Coding Workspace & Projects Directory (/projects)")
-        print("  [9] 🚀 Configure Autorun at System Startup (On / Off)")
-        print("  [10] 🔄 Re-run Complete Setup Wizard")
+        print("  [4] 🎭 Change AI Girlfriend Persona (Runa, Akira, Hina, Shiro, Yume)")
+        print("  [5] 🔊 Configure Voice Note TTS (VoiceStudio Local AI / Edge-TTS)")
+        print("  [6] 🌐 Change Waifu Language (ID, EN, JA, Custom)")
+        print("  [7] 🎬 Choose Video Engine (Wan 2.1 / AnimateDiff / Motion 2.5D)")
+        print("  [8] 📦 AI Assets & Models Manager (Download / Verify Models)")
+        print("  [9] 💻 Configure Coding Workspace & Projects Directory (/projects)")
+        print("  [10] 🚀 Configure Autorun at System Startup (On / Off)")
+        print("  [11] 🔄 Re-run Complete Setup Wizard")
         print("  [0] ❌ Exit / Done")
         print("-" * 70)
 
-        opt = input("Select option [0-10]: ").strip()
+        opt = input("Select option [0-11]: ").strip()
         if opt == "1":
             config_telegram_credentials(env_vars)
             write_env(env_vars)
@@ -786,23 +817,26 @@ def run_menu():
             config_image_model(env_vars)
             write_env(env_vars)
         elif opt == "4":
-            config_persona_voice(env_vars)
+            config_persona(env_vars)
             write_env(env_vars)
         elif opt == "5":
-            config_language(env_vars)
+            config_voice(env_vars)
             write_env(env_vars)
         elif opt == "6":
-            config_video_engine(env_vars)
+            config_language(env_vars)
             write_env(env_vars)
         elif opt == "7":
-            manage_models_menu()
+            config_video_engine(env_vars)
+            write_env(env_vars)
         elif opt == "8":
+            manage_models_menu()
+        elif opt == "9":
             config_workspace_projects(env_vars)
             write_env(env_vars)
-        elif opt == "9":
+        elif opt == "10":
             auto_in = input("Enable bot automatically on PC boot (Autorun)? [Y/n, default: Y]: ").strip().lower()
             setup_autostart(enable=(auto_in != "n"))
-        elif opt == "10":
+        elif opt == "11":
             run_full_wizard()
             break
         elif opt == "0":
@@ -823,7 +857,8 @@ def run_full_wizard():
 
     config_video_engine(env_vars)
 
-    config_persona_voice(env_vars)
+    config_persona(env_vars)
+    config_voice(env_vars)
     config_language(env_vars)
 
     config_workspace_projects(env_vars)
