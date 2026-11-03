@@ -4,7 +4,7 @@ import asyncio
 import logging
 import tempfile
 import requests
-from typing import Optional, Any
+from typing import Optional, Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +29,15 @@ class VoiceEngine:
         voice_speed: str = "+0%",
         groq_key: Optional[str] = None,
         openai_key: Optional[str] = None,
-        llm_client: Optional[Any] = None
+        llm_client: Optional[Any] = None,
+        voice_backend: Optional[str] = None
     ):
         self.default_voice = voice_name
         self.voice_speed = voice_speed
         self.groq_key = groq_key
         self.openai_key = openai_key
         self.llm_client = llm_client
+        self.voice_backend = voice_backend or os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
 
     @staticmethod
     def clean_text_for_speech(text: str) -> str:
@@ -221,14 +223,52 @@ class VoiceEngine:
         text: str,
         output_path: str,
         voice_override: Optional[str] = None,
-        auto_translate: bool = True
+        auto_translate: bool = True,
+        persona: Optional[Dict[str, Any]] = None
     ) -> bool:
-        """Asynchronously synthesizes speech into an audio file using edge-tts with voice language alignment."""
+        """Asynchronously synthesizes speech into an audio file using VoiceStudio (local) or Edge-TTS (cloud)."""
         try:
-            import edge_tts
             clean_speech = self.clean_text_for_speech(text)
             if not clean_speech:
                 return False
+
+            # Check if local VoiceStudio backend is selected
+            cur_backend = os.environ.get("VOICE_BACKEND", getattr(self, "voice_backend", "edge-tts")).lower().strip()
+            if cur_backend in ("voicestudio", "local"):
+                try:
+                    from voicestudio_engine import voicestudio_engine
+                    active_persona = persona
+                    if not active_persona:
+                        try:
+                            import persona_manager
+                            cur_p = os.environ.get("DEFAULT_PERSONA", "runa")
+                            active_persona = persona_manager.DEFAULT_PERSONAS.get(cur_p, {})
+                        except Exception:
+                            active_persona = {}
+
+                    v_char = active_persona.get("voice_character")
+                    v_name = active_persona.get("voicestudio_voice", "runa")
+                    v_model = active_persona.get("voicestudio_model", "omnivoice")
+                    v_speed = float(active_persona.get("voicestudio_speed", 1.0))
+
+                    if voicestudio_engine.is_service_running():
+                        vs_audio = voicestudio_engine.synthesize(
+                            text=clean_speech,
+                            voice_character=v_char,
+                            voice_name=v_name,
+                            model=v_model,
+                            speed=v_speed,
+                            output_path=output_path
+                        )
+                        if vs_audio and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                            logger.info(f"Generated voice note via VoiceStudio backend for persona '{active_persona.get('name', 'Waifu')}'")
+                            return True
+                    else:
+                        logger.warning("VoiceStudio backend service is offline (port 3900). Falling back to Edge-TTS...")
+                except Exception as e_vs:
+                    logger.warning(f"VoiceStudio synthesis exception: {e_vs}. Falling back to Edge-TTS...")
+
+            import edge_tts
 
             voice = voice_override or self.default_voice or self.detect_language_voice(clean_speech)
             voice_lang = self.get_voice_language(voice)
@@ -255,7 +295,8 @@ class VoiceEngine:
         self,
         text: str,
         voice_override: Optional[str] = None,
-        auto_translate: bool = True
+        auto_translate: bool = True,
+        persona: Optional[Dict[str, Any]] = None
     ) -> Optional[str]:
         """Synchronous wrapper to generate a temporary voice note file (.ogg)."""
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".ogg")
@@ -266,7 +307,8 @@ class VoiceEngine:
                 text,
                 temp_file.name,
                 voice_override=voice_override,
-                auto_translate=auto_translate
+                auto_translate=auto_translate,
+                persona=persona
             ))
             if os.path.exists(temp_file.name) and os.path.getsize(temp_file.name) > 0:
                 return temp_file.name

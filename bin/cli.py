@@ -806,6 +806,67 @@ def cmd_update():
         print(c(DIM, "\nStart your bot anytime with: waifu start --daemon\n"))
 
 
+def cmd_voicestudio(action: str = "status"):
+    """Manages the local VoiceStudio background service (port 3900)."""
+    action = (action or "status").lower()
+    from voicestudio_engine import voicestudio_engine
+
+    if action == "status":
+        st = voicestudio_engine.get_status()
+        print(c(BOLD + CYAN, "\n🔊 VoiceStudio Local AI Voice Server Diagnostics:"))
+        print(f"  • Status Service : {c(BOLD + GREEN, 'ONLINE 🟢') if st['running'] else c(YELLOW, 'OFFLINE ⚪')}")
+        print(f"  • Port Backend   : {st['port']} ({st['url']})")
+        print(f"  • Terpasang      : {'Sudah ✅' if st['installed'] else 'Belum ❌'}")
+        print(f"  • Folder Root    : {st['install_dir']}")
+        print(f"  • Default Model  : {st['default_model']}")
+        if not st['running'] and st['installed']:
+            print(c(DIM, "\n💡 Jalankan 'waifu voicestudio start' untuk menyalakan backend VoiceStudio."))
+        elif not st['installed']:
+            print(c(DIM, "\n💡 Jalankan 'waifu voicestudio install' untuk mengunduh & memasang VoiceStudio."))
+    elif action == "start":
+        print(c(CYAN, f"\n🚀 Menjalankan VoiceStudio background service di port {voicestudio_engine.port}..."))
+        if voicestudio_engine.is_service_running():
+            print(c(YELLOW, f"⚠️ VoiceStudio sudah aktif di {voicestudio_engine.server_url}."))
+            return
+        if not voicestudio_engine.is_installed():
+            print(c(YELLOW, "VoiceStudio belum terpasang. Menjalankan auto-install..."))
+            ok, msg = voicestudio_engine.install(progress_callback=lambda m: print(f"  {m}"))
+            if not ok:
+                print(c(RED, f"❌ {msg}"))
+                return
+        ok = voicestudio_engine.start_service()
+        if ok:
+            print(c(GREEN, f"✓ VoiceStudio online di {voicestudio_engine.server_url}"))
+        else:
+            print(c(RED, "❌ Gagal menyalakan VoiceStudio. Cek log atau port 3900."))
+    elif action == "stop":
+        print(c(YELLOW, f"\n🛑 Menghentikan VoiceStudio background service..."))
+        ok = voicestudio_engine.stop_service()
+        if ok:
+            print(c(GREEN, "✓ VoiceStudio telah dinonaktifkan."))
+        else:
+            print(c(RED, "❌ Gagal menghentikan VoiceStudio."))
+    elif action == "restart":
+        print(c(CYAN, f"\n🔄 Merestart VoiceStudio background service..."))
+        voicestudio_engine.stop_service()
+        time.sleep(1.0)
+        ok = voicestudio_engine.start_service()
+        if ok:
+            print(c(GREEN, f"✓ VoiceStudio berhasil direstart di {voicestudio_engine.server_url}"))
+        else:
+            print(c(RED, "❌ Gagal merestart VoiceStudio."))
+    elif action in ("install", "setup"):
+        print(c(CYAN, "\n📦 Memulai instalasi & setup backend VoiceStudio..."))
+        ok, msg = voicestudio_engine.install(progress_callback=lambda m: print(f"  {m}"))
+        if ok:
+            print(c(GREEN, f"✓ {msg}"))
+            print(c(DIM, "Gunakan 'waifu voicestudio start' untuk menyalakan service."))
+        else:
+            print(c(RED, f"❌ {msg}"))
+    else:
+        print(c(YELLOW, f"Aksi '{action}' tidak dikenal. Gunakan: status | start | stop | restart | install"))
+
+
 def cmd_bridge(action: str = "status"):
     """Manages Google Antigravity CLI OpenAI-Compatible Bridge Server."""
     action = (action or "status").lower()
@@ -948,6 +1009,9 @@ def main():
         cmd_stop()
     elif cmd == "restart":
         cmd_restart(daemon=True)
+    elif cmd in ("voicestudio", "voice_service"):
+        action = args.arg or "status"
+        cmd_voicestudio(action)
     elif cmd == "bridge":
         action = args.arg or "status"
         cmd_bridge(action)

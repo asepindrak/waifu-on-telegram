@@ -167,6 +167,15 @@ ASSET_REGISTRY = {
         ],
         "description": "Autoencoder khusus video latents untuk Wan 2.1.",
         "required_for": "Video Engine Wan 2.1"
+    },
+    "voicestudio": {
+        "name": "VoiceStudio Local AI Voice Server",
+        "type": "tool_repo",
+        "subfolder": os.path.join("tools", "VoiceStudio"),
+        "git_url": "https://github.com/debpalash/VoiceStudio.git",
+        "size_mb": 450,
+        "description": "Server TTS lokal mandiri (FastAPI port 3900) dengan voice cloning & persona conditioning.",
+        "required_for": "Voice Engine VoiceStudio (Local AI Voice)"
     }
 }
 
@@ -843,6 +852,18 @@ def get_asset_info(asset_key: str) -> Optional[Dict[str, Any]]:
         spec["status"] = "installed" if spec["installed"] else ("incomplete" if spec.get("incomplete") else "missing")
         return spec
 
+    if spec.get("type") in ("tool_repo", "voicestudio") or asset_key == "voicestudio":
+        target_path = os.path.join(PROJECT_ROOT, spec.get("subfolder", os.path.join("tools", "VoiceStudio")))
+        spec["target_path"] = target_path
+        spec["target_dir"] = os.path.dirname(target_path)
+        backend_main = os.path.join(target_path, "backend", "main.py")
+        backend_dir = os.path.join(target_path, "backend")
+        spec["installed"] = os.path.exists(backend_main) or (os.path.isdir(backend_dir) and len(os.listdir(backend_dir)) > 0)
+        spec["incomplete"] = False
+        spec["current_size_mb"] = spec.get("size_mb", 450) if spec["installed"] else 0
+        spec["status"] = "installed" if spec["installed"] else "missing"
+        return spec
+
     comfy_dir = detect_comfyui_dir()
     
     if not comfy_dir:
@@ -1032,6 +1053,15 @@ def download_asset(asset_key: str, progress_callback=None) -> bool:
     if not info:
         logger.error(f"Asset '{asset_key}' not found.")
         return False
+
+    if info.get("type") in ("tool_repo", "voicestudio") or asset_key == "voicestudio":
+        from voicestudio_engine import voicestudio_engine
+        ok, msg = voicestudio_engine.install(progress_callback=progress_callback)
+        if ok:
+            print(f"  ✓ {msg}")
+        else:
+            print(f"  ❌ {msg}")
+        return ok
 
     if info.get("type") == "custom_node":
         return install_custom_node(asset_key)

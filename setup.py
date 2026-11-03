@@ -514,7 +514,41 @@ def config_persona_voice(env_vars):
     mapping = {"1": "runa", "2": "akira", "3": "hina", "4": "shiro", "5": "yume"}
     env_vars["DEFAULT_PERSONA"] = mapping.get(p_choice, "runa")
 
-    print("\nVoice Note Speech Voice (Edge-TTS):")
+    cur_v_backend = env_vars.get("VOICE_BACKEND", "edge-tts").lower().strip()
+    print("\nPilih Engine Suara (Voice Note TTS):")
+    print("  1) 🌐 Edge-TTS Cloud (Ringan, Natural, 0 VRAM - Default)")
+    print("  2) 🏠 VoiceStudio Local AI (100% Offline, Port 3900, Voice Cloning Sesuai Persona)")
+    def_b_idx = "2" if cur_v_backend == "voicestudio" else "1"
+    b_choice = input(f"Pilih Engine Voice [1-2, default: {def_b_idx}]: ").strip()
+    if not b_choice:
+        b_choice = def_b_idx
+
+    if b_choice == "2":
+        env_vars["VOICE_BACKEND"] = "voicestudio"
+        env_vars["VOICESTUDIO_PORT"] = "3900"
+        print(c(GREEN, "  ✓ Voice Engine: VoiceStudio Local AI (Port 3900)"))
+        try:
+            from voicestudio_engine import voicestudio_engine
+            if not voicestudio_engine.is_installed():
+                print(c(YELLOW, "\n  ℹ VoiceStudio belum terpasang di tools/VoiceStudio."))
+                if input("  Unduh & setup backend VoiceStudio sekarang? [Y/n, default: Y]: ").strip().lower() != "n":
+                    ok, msg = voicestudio_engine.install(progress_callback=lambda m: print(f"  {m}"))
+                    if ok:
+                        print(c(GREEN, f"  ✓ {msg}"))
+                        voicestudio_engine.start_service()
+                    else:
+                        print(c(RED, f"  ❌ {msg}"))
+            else:
+                if not voicestudio_engine.is_service_running():
+                    print("  Menjalankan background service VoiceStudio di port 3900...")
+                    voicestudio_engine.start_service()
+        except Exception as e:
+            logger.warning(f"VoiceStudio setup notice: {e}")
+    else:
+        env_vars["VOICE_BACKEND"] = "edge-tts"
+        print(c(GREEN, "  ✓ Voice Engine: Edge-TTS Cloud"))
+
+    print("\nFallback / Default Voice (Edge-TTS):")
     print("1) en-US-AnaNeural (English sweet & natural girlfriend voice - Recommended)")
     print("2) id-ID-GadisNeural (Indonesian natural female voice)")
     print("3) ja-JP-NanamiNeural (Japanese female voice)")

@@ -674,7 +674,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"🌐 **Bahasa**     : `{persona_mgr.get_language_display_name(BOT_LANGUAGE)}`\n"
         f"👗 **Pakaian**    : `{cur_outfit_name}`\n"
         f"🎙️ **Mode Suara** : `{v_labels.get(v_mode, v_mode)}`\n"
-        f"🗣️ **Voice TTS**  : `{voice_engine.default_voice}`\n"
+        f"🗣️ **Voice TTS**  : `{('VoiceStudio (' + persona.get('name', 'Local') + ')') if os.environ.get('VOICE_BACKEND', 'edge-tts').lower().strip() in ('voicestudio', 'local') else voice_engine.default_voice}`\n"
         f"🧠 **Model LLM**  : `{cur_llm}`\n"
         f"🎨 **Model Foto** : `{cur_ckpt}`\n"
         f"🎬 **Video Engine**: `{VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)}`\n"
@@ -2085,27 +2085,60 @@ def show_language_menu(chat_id: int, user_id: int, message_to_edit: Optional[int
 def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
     cur_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")
     cur_speaker = voice_engine.default_voice
+    cur_backend = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
+    is_vs = (cur_backend in ("voicestudio", "local"))
+
+    active_p = persona_mgr.get_active_persona()
+    p_name = active_p.get("name", "Waifu")
+    p_char = active_p.get("voice_character", "Natural anime girlfriend voice")
 
     markup = types.InlineKeyboardMarkup(row_width=1)
+
+    # 1. Voice Engine Toggle Button
+    engine_toggle_label = "🏠 Engine: VoiceStudio (Local AI Port 3900) ➔ Ubah ke Edge-TTS" if is_vs else "🌐 Engine: Edge-TTS Cloud (Aktif) ➔ Ubah ke VoiceStudio"
+    markup.add(types.InlineKeyboardButton(engine_toggle_label, callback_data="cfg_toggle_voice_engine"))
+
+    # 2. Voice Reply Mode
     markup.add(
         types.InlineKeyboardButton(f"🎙️ Selalu Balas Suara {'✓' if cur_mode == 'always' else ''}", callback_data="set_voice:always"),
         types.InlineKeyboardButton(f"🎧 Balas Suara Hanya Saat Kirim VN {'✓' if cur_mode == 'match_vn' else ''}", callback_data="set_voice:match_vn"),
         types.InlineKeyboardButton(f"🔇 Text Only (Mute) {'✓' if cur_mode == 'off' else ''}", callback_data="set_voice:off")
     )
-    markup.add(
-        types.InlineKeyboardButton(f"🇺🇸 Ana (US Sweet Girlfriend) {'✓' if 'Ana' in cur_speaker else ''}", callback_data="cfg_set_speaker:ana"),
-        types.InlineKeyboardButton(f"🇮🇩 Gadis (Indonesia Alami) {'✓' if 'Gadis' in cur_speaker else ''}", callback_data="cfg_set_speaker:gadis"),
-        types.InlineKeyboardButton(f"🇯🇵 Nanami (Japanese Kawaii) {'✓' if 'Nanami' in cur_speaker else ''}", callback_data="cfg_set_speaker:nanami"),
-        types.InlineKeyboardButton(f"🇺🇸 Jenny (US Cheerful) {'✓' if 'Jenny' in cur_speaker else ''}", callback_data="cfg_set_speaker:jenny"),
-        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
-    )
 
-    text = (
-        f"🎙️ **Pengaturan Voice & Audio Waifu**\n\n"
-        f"• Mode Balasan: **{cur_mode.upper()}**\n"
-        f"• Karakter Suara: `{cur_speaker}`\n\n"
-        f"Atur bagaimana waifu membalas dengan audio suara dan pilih jenis karakter suaranya:"
-    )
+    if is_vs:
+        markup.add(
+            types.InlineKeyboardButton(f"✨ Karakter Suara: {p_name} (VoiceStudio Auto)", callback_data="noop")
+        )
+    else:
+        markup.add(
+            types.InlineKeyboardButton(f"🇺🇸 Ana (US Sweet Girlfriend) {'✓' if 'Ana' in cur_speaker else ''}", callback_data="cfg_set_speaker:ana"),
+            types.InlineKeyboardButton(f"🇮🇩 Gadis (Indonesia Alami) {'✓' if 'Gadis' in cur_speaker else ''}", callback_data="cfg_set_speaker:gadis"),
+            types.InlineKeyboardButton(f"🇯🇵 Nanami (Japanese Kawaii) {'✓' if 'Nanami' in cur_speaker else ''}", callback_data="cfg_set_speaker:nanami"),
+            types.InlineKeyboardButton(f"🇺🇸 Jenny (US Cheerful) {'✓' if 'Jenny' in cur_speaker else ''}", callback_data="cfg_set_speaker:jenny"),
+        )
+
+    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+
+    if is_vs:
+        text = (
+            f"🎙️ **Pengaturan Voice & Audio Waifu**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• Engine Suara : `🏠 VoiceStudio Local AI (Port 3900)`\n"
+            f"• Mode Balasan : **{cur_mode.upper()}**\n"
+            f"• Persona Voice: **{p_name}**\n"
+            f"• Karakteristik: _{p_char}_\n\n"
+            f"💡 _VoiceStudio beroperasi secara lokal & offline di PC Anda, otomatis menghasilkan intonasi suara sesuai persona {p_name}!_"
+        )
+    else:
+        text = (
+            f"🎙️ **Pengaturan Voice & Audio Waifu**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• Engine Suara : `🌐 Edge-TTS Cloud (Ringan & 0 VRAM)`\n"
+            f"• Mode Balasan : **{cur_mode.upper()}**\n"
+            f"• Model Suara  : `{cur_speaker}`\n\n"
+            f"Atur bagaimana waifu membalas dengan audio suara dan pilih jenis karakter suaranya:"
+        )
+
     if message_to_edit:
         try:
             bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
@@ -3008,6 +3041,27 @@ def callback_set_ckpt(call):
     label = apply_ckpt_choice(key)
     bot.answer_callback_query(call.id, f"Model Foto: {label}")
     show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'cfg_toggle_voice_engine')
+def callback_toggle_voice_engine(call):
+    if not is_authorized(call.from_user.id):
+        return
+    cur = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
+    new_backend = "voicestudio" if cur != "voicestudio" else "edge-tts"
+    os.environ["VOICE_BACKEND"] = new_backend
+    update_env_variable("VOICE_BACKEND", new_backend)
+    voice_engine.voice_backend = new_backend
+
+    if new_backend == "voicestudio":
+        from voicestudio_engine import voicestudio_engine
+        if not voicestudio_engine.is_service_running() and voicestudio_engine.is_installed():
+            voicestudio_engine.start_service()
+        bot.answer_callback_query(call.id, "Voice Engine: VoiceStudio (Local AI) 🏠")
+    else:
+        bot.answer_callback_query(call.id, "Voice Engine: Edge-TTS Cloud 🌐")
+
+    show_voice_settings_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cfg_set_speaker:'))
