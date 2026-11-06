@@ -129,6 +129,8 @@ VIDEO_INTENT_KEYWORDS = [
     r"buat\s*video",
     r"animasi\s*kamu",
     r"bikin\s*animasi",
+    r"minta\s*animasi",
+    r"animasi\s*dong",
 ]
 
 OUTFIT_PRESETS = {
@@ -414,6 +416,40 @@ class PersonaManager:
                 return True, "photo"
 
         return False, "none"
+
+    def is_conversational_media_request(self, text: str) -> bool:
+        """
+        Checks if a user message asking for a photo/video also contains conversational content,
+        questions, or thoughts (e.g. 'aku belum ngantuk, minta pap donk kamu udah mau bobo?').
+        Returns True if conversational, False if it is a pure media command (e.g. 'pap dong', 'minta pap').
+        """
+        is_media, _ = self.detect_media_request(text)
+        if not is_media:
+            return False
+
+        has_question = ("?" in text)
+
+        cleaned = text.lower()
+        # Strip all photo & video triggers
+        for pat in PHOTO_INTENT_KEYWORDS + VIDEO_INTENT_KEYWORDS:
+            cleaned = re.sub(pat, " ", cleaned)
+
+        # Strip common standalone media nouns, verbs, pronouns, and fillers
+        media_tokens = [
+            r"\b(foto|gambar|selfie|pap|pic|picture|photo|video|animasi)\b",
+            r"\b(minta|kirim|liat|lihat|bagi|kasih|send|show|take|make|record|bikin|buat)\b",
+            r"\b(kamu|dirimu|mu|lu|lo|you|your|diri)\b",
+            r"\b(sayang|ayang|beb|babe|cinta|honey|dear)\b",
+            r"\b(dong|donk|ya|yaa|deh|sih|plis|please|pls|now|sekarang|cepet|coba|ayo|yuk|sekali)\b"
+        ]
+        for token_pat in media_tokens:
+            cleaned = re.sub(token_pat, " ", cleaned)
+
+        cleaned = re.sub(r"[^\w\s]", " ", cleaned).strip()
+        words = [w for w in cleaned.split() if len(w) > 1]
+
+        # If user asked a question, or has >= 2 words or >= 8 characters of conversation remaining
+        return has_question or len(words) >= 2 or len(cleaned) >= 8
 
     def list_outfits(self) -> List[Tuple[str, str]]:
         """Returns list of (key, name) for all outfit presets."""

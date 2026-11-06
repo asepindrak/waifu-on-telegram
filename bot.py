@@ -3728,7 +3728,13 @@ def sanitize_chat_caption(text: Optional[str], fallback: str) -> str:
         return fallback
     return clean[0].upper() + clean[1:]
 
-def process_photo_request(target, user_text: str, is_proof: bool = False):
+def process_photo_request(
+    target,
+    user_text: str,
+    is_proof: bool = False,
+    conversational_reply: Optional[str] = None,
+    is_followup: bool = False
+):
     """Generates and delivers consistent girlfriend photo with caption matching conversation context."""
     def _execute():
         chat_id = None
@@ -3757,17 +3763,19 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                 pass
 
             status_msg = None
-            status_text = f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕"
-            if is_callback and hasattr(reply_to_target, "message_id"):
-                # Instant UI feedback: transform the scenario menu directly into loading message
-                status_msg = safe_edit_message_text(status_text, chat_id=chat_id, message_id=reply_to_target.message_id)
-                if not status_msg:
-                    status_msg = reply_to_target
-            else:
-                status_msg = safe_reply_to(reply_to_target, status_text)
+            # If this is a followup photo after a conversational chat reply, don't spam a separate loading message
+            if not is_followup:
+                status_text = f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕"
+                if is_callback and hasattr(reply_to_target, "message_id"):
+                    # Instant UI feedback: transform the scenario menu directly into loading message
+                    status_msg = safe_edit_message_text(status_text, chat_id=chat_id, message_id=reply_to_target.message_id)
+                    if not status_msg:
+                        status_msg = reply_to_target
+                else:
+                    status_msg = safe_reply_to(reply_to_target, status_text)
 
-            if not status_msg:
-                status_msg = safe_send_message(chat_id, status_text)
+                if not status_msg:
+                    status_msg = safe_send_message(chat_id, status_text)
 
             history = persona_mgr.get_chat_history(user_id)
             detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
@@ -3857,8 +3865,9 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                 )
 
             cap_guide = (
-                f" You just took a sweet, cute photo to send on Telegram. "
-                f"Write 1 natural, warm, and playful chat caption accompanying the photo (e.g. 'Lagi santai rebahan nih, gimana fotonya? 💕' or 'Spesial buat kamu nih, suka ga? 🥰'). Avoid cheesy pet names unless requested. "
+                f" You just took a sweet, cute photo to send on Telegram to your boyfriend. "
+                f"Write 1 natural, warm, and playful chat caption accompanying the photo. "
+                f"STRICT: Directly respond to what boyfriend said, answer any questions he asked, and express your affection naturally. "
                 f"DILARANG KERAS bersikap defensif atau meyakinkan keberadaan ('biar percaya', 'biar yakin', 'beneran ada di sini', 'nih buktinya', 'diliatin aja'). "
                 f"STRICT: Chat 1-on-1 with boyfriend. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip yuk'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
             )
@@ -3878,10 +3887,25 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                 vault_guidance = " [ComfyUI is offline; you are happily sending a matching saved photo from your private album]."
 
             caption_prompt.extend(clean_recent_turns)
-            caption_prompt.append({
-                "role": "user",
-                "content": f"[Sending photo to boyfriend. Setting: '{detected_scene}', wearing: '{outfit_label}'{vault_guidance}]. Write 1 natural girlfriend chat sentence:"
-            })
+            if conversational_reply:
+                caption_prompt.append({
+                    "role": "user",
+                    "content": (
+                        f"Boyfriend said: \"{user_text}\".\n"
+                        f"You already replied in chat: \"{conversational_reply}\".\n"
+                        f"Now you are delivering the photo you just took (Setting: '{detected_scene}', wearing: '{outfit_label}'{vault_guidance}).\n"
+                        f"Write 1 sweet, natural, playful girlfriend delivery caption for this photo (1-2 short sentences):"
+                    )
+                })
+            else:
+                caption_prompt.append({
+                    "role": "user",
+                    "content": (
+                        f"Boyfriend said: \"{user_text}\".\n"
+                        f"You are sending him a photo (Setting: '{detected_scene}', wearing: '{outfit_label}'{vault_guidance}).\n"
+                        f"Write 1 sweet, natural girlfriend chat caption that directly answers/responds to his message and matches the photo (1-2 sentences):"
+                    )
+                })
 
             try:
                 caption, _ = llm_client.chat(caption_prompt, max_tokens=120, is_nsfw=is_nude)
@@ -3889,13 +3913,17 @@ def process_photo_request(target, user_text: str, is_proof: bool = False):
                 logger.warning(f"Could not generate dynamic photo caption from LLM: {e_cap}")
                 caption = None
 
+            u_lower = user_text.lower() if user_text else ""
             if is_nude:
-                fallback_caption = f"Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕"
+                fallback_caption = "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕"
+            elif any(k in u_lower for k in ["bobo", "tidur", "ngantuk", "malam", "night"]):
+                fallback_caption = "Ini pap buat nemenin kamu malam ini yaa sayang~ 💕"
+            elif any(k in u_lower for k in ["pagi", "morning", "bangun"]):
+                fallback_caption = "Pagi sayang! Semangat ya hari ini, ini pap manis buat kamu~ 💕"
+            elif "Vault" in source:
+                fallback_caption = "Ini foto manis dari galeri aku yaa~"
             else:
-                if "Vault" in source:
-                    fallback_caption = f"Ini foto manis dari galeri aku yaa~"
-                else:
-                    fallback_caption = f"Spesial buat kamu nih 💕"
+                fallback_caption = "Ini pap spesial buat kamu sayang, suka ga? 🥰"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
             full_caption = f"{clean_caption}\n\n📷 *Model:* `{source}`"
 
@@ -3972,7 +4000,9 @@ def process_video_request(
     base_image_bytes: Optional[bytes] = None,
     scene_override: Optional[str] = None,
     outfit_override: Optional[str] = None,
-    is_nude_override: Optional[bool] = None
+    is_nude_override: Optional[bool] = None,
+    conversational_reply: Optional[str] = None,
+    is_followup: bool = False
 ):
     """Generates and delivers consistent girlfriend animated video clip with caption and voice."""
     def _execute():
@@ -4000,16 +4030,17 @@ def process_video_request(
             pass
 
         status_msg = None
-        status_text = f"🎬 *{persona.get('name')} lagi merekam video...*"
-        if is_callback and hasattr(reply_to_target, "message_id"):
-            status_msg = safe_edit_message_text(status_text, chat_id=chat_id, message_id=reply_to_target.message_id)
-            if not status_msg:
-                status_msg = reply_to_target
-        else:
-            status_msg = safe_reply_to(reply_to_target, status_text)
+        if not is_followup:
+            status_text = f"🎬 *{persona.get('name')} lagi merekam video...*"
+            if is_callback and hasattr(reply_to_target, "message_id"):
+                status_msg = safe_edit_message_text(status_text, chat_id=chat_id, message_id=reply_to_target.message_id)
+                if not status_msg:
+                    status_msg = reply_to_target
+            else:
+                status_msg = safe_reply_to(reply_to_target, status_text)
 
-        if not status_msg:
-            status_msg = safe_send_message(chat_id, status_text)
+            if not status_msg:
+                status_msg = safe_send_message(chat_id, status_text)
 
         history = persona_mgr.get_chat_history(user_id)
         detected_scene = scene_override or persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
@@ -4096,20 +4127,40 @@ def process_video_request(
                 }
             ]
             caption_prompt.extend(clean_recent_turns)
-            caption_prompt.append({
-                "role": "user",
-                "content": f"[Sending private video to boyfriend. Setting: '{detected_scene}', wearing: '{outfit_label}']. Write 1 natural girlfriend chat sentence:"
-            })
+            if conversational_reply:
+                caption_prompt.append({
+                    "role": "user",
+                    "content": (
+                        f"Boyfriend said: \"{user_text}\".\n"
+                        f"You already replied in chat: \"{conversational_reply}\".\n"
+                        f"Now you are delivering the video clip you just recorded (Setting: '{detected_scene}', wearing: '{outfit_label}').\n"
+                        f"Write 1 sweet, natural, playful girlfriend delivery caption for this video (1-2 short sentences):"
+                    )
+                })
+            else:
+                caption_prompt.append({
+                    "role": "user",
+                    "content": (
+                        f"Boyfriend said: \"{user_text}\".\n"
+                        f"You are sending him a private video clip (Setting: '{detected_scene}', wearing: '{outfit_label}').\n"
+                        f"Write 1 natural, sweet girlfriend caption that directly answers/responds to his message and matches the video (1-2 sentences):"
+                    )
+                })
 
             try:
                 caption, _ = llm_client.chat(caption_prompt, max_tokens=120, is_nsfw=is_nude)
             except Exception:
                 caption = None
 
+            u_lower = user_text.lower() if user_text else ""
             if is_nude:
-                fallback_caption = f"Ini videonya yaa ({source})"
+                fallback_caption = "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕"
+            elif any(k in u_lower for k in ["bobo", "tidur", "ngantuk", "malam", "night"]):
+                fallback_caption = "Ini video buat nemenin kamu malam ini yaa sayang~ 💕"
+            elif any(k in u_lower for k in ["pagi", "morning", "bangun"]):
+                fallback_caption = "Pagi sayang! Semangat ya hari ini, ini video manis buat kamu~ 💕"
             else:
-                fallback_caption = f"Ini videonya yaa ({source})"
+                fallback_caption = "Ini video manis buat kamu sayang, suka ga? 🥰"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
 
             if status_msg and hasattr(status_msg, "message_id"):
@@ -5555,12 +5606,16 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 return
 
             is_media, media_type = persona_mgr.detect_media_request(user_text)
-            if is_media and media_type == "video":
-                process_video_request(message, user_text)
-                return
-            elif is_media and media_type == "photo":
-                process_photo_request(message, user_text)
-                return
+            is_conversational_media = is_media and persona_mgr.is_conversational_media_request(user_text)
+
+            # If it is purely a direct photo/video command (not conversational), process immediately
+            if is_media and not is_conversational_media:
+                if media_type == "video":
+                    process_video_request(message, user_text)
+                    return
+                elif media_type == "photo":
+                    process_photo_request(message, user_text)
+                    return
 
             # Check natural reminder request in conversational chat
             rem_res = ReminderEngine.extract_reminder_from_chat(user_text)
@@ -5784,6 +5839,17 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 except Exception:
                     pass
 
+                if is_conversational_media:
+                    media_kind = "video pendek" if media_type == "video" else "pap/foto selfie"
+                    system_inst += (
+                        f"\n\n[PENTING - RESPON OBROLAN & PAP]\n"
+                        f"Pasanganmu sedang mengobrol denganmu dan sekaligus meminta kamu mengirimkan {media_kind}: \"{user_text}\".\n"
+                        f"Instruksi wajib:\n"
+                        f"1. Jawab/tanggapi obrolan dan pertanyaannya terlebih dahulu secara hangat, ekspresif, dan penuh kasih sayang.\n"
+                        f"2. Setelah menjawab pertanyaannya, sebutkan dengan manis bahwa kamu akan mengambilkan {media_kind} untuknya sekarang (misal: 'Bentar ya sayang, aku fotoin sekarang buat kamu~ 🥰').\n"
+                        f"3. DILARANG keras hanya mengirim tag aksi atau langsung memberi foto tanpa menjawab pertanyaannya!"
+                    )
+
                 history = persona_mgr.get_chat_history(message.from_user.id)
 
                 messages = [{"role": "system", "content": system_inst}]
@@ -5834,7 +5900,9 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     "aku fotoin ya", "aku kirim foto ya", "nih foto spesial buat kamu", "aku pap buat kamu"
                 ])
 
-                should_send_photo = has_action_tag or has_pap_phrase
+                should_send_conv_photo = (is_conversational_media and media_type == "photo")
+                should_send_conv_video = (is_conversational_media and media_type == "video")
+                should_send_spontaneous = (has_action_tag or has_pap_phrase) and not (should_send_conv_photo or should_send_conv_video)
 
                 # Clean action tag from text so user only sees natural dialogue
                 clean_reply = re.sub(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", "", reply_text, flags=re.IGNORECASE).strip()
@@ -5848,16 +5916,36 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
                 safe_reply_to(message, clean_reply, parse_mode=None)
 
-                if should_send_photo:
-                    def _send_spontaneous_photo():
+                if should_send_conv_photo or should_send_spontaneous:
+                    def _send_followup_photo():
                         try:
-                            time.sleep(1.5)  # Natural human pause as if snapping a quick selfie
-                            photo_prompt = clean_reply if clean_reply else f"{routine['activity_desc']}"
-                            process_photo_request(message, user_text=photo_prompt, is_proof=False)
+                            time.sleep(1.0)  # Natural pause as if taking the photo
+                            photo_prompt = user_text if should_send_conv_photo else (clean_reply if clean_reply else f"{routine['activity_desc']}")
+                            process_photo_request(
+                                message,
+                                user_text=photo_prompt,
+                                conversational_reply=clean_reply,
+                                is_followup=True
+                            )
                         except Exception as e_photo:
-                            logger.error(f"Error sending spontaneous photo: {e_photo}")
+                            logger.error(f"Error sending follow-up photo: {e_photo}")
 
-                    threading.Thread(target=_send_spontaneous_photo, daemon=True).start()
+                    threading.Thread(target=_send_followup_photo, daemon=True).start()
+
+                elif should_send_conv_video:
+                    def _send_followup_video():
+                        try:
+                            time.sleep(1.0)  # Natural pause as if recording the clip
+                            process_video_request(
+                                message,
+                                user_text=user_text,
+                                conversational_reply=clean_reply,
+                                is_followup=True
+                            )
+                        except Exception as e_video:
+                            logger.error(f"Error sending follow-up video: {e_video}")
+
+                    threading.Thread(target=_send_followup_video, daemon=True).start()
 
                 # Auto-diary entry every 6 turns
                 if len(history) > 0 and len(history) % 6 == 0:
