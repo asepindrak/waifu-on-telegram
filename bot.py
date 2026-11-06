@@ -3835,7 +3835,8 @@ def process_photo_request(
                     outfit_label=outfit_label,
                     is_nude=is_nude,
                     user_query=user_text,
-                    progress_callback=photo_progress
+                    progress_callback=photo_progress,
+                    user_id=user_id
                 )
             if img_bytes:
                 USER_LAST_PHOTO_CONTEXT[user_id]["img_bytes"] = img_bytes

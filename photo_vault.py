@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 VAULT_DIR = os.path.join(PROJECT_ROOT, "data", "photo_vault")
 CATALOG_PATH = os.path.join(VAULT_DIR, "catalog.json")
+USER_SEEN_PATH = os.path.join(VAULT_DIR, "user_seen.json")
 
 # Stopwords to filter out when tokenizing scenes and queries (Indonesian + English)
 STOPWORDS = {
@@ -69,6 +70,39 @@ def save_catalog(catalog: List[Dict[str, Any]]) -> bool:
             except Exception:
                 pass
         return False
+
+def load_user_seen() -> Dict[str, List[str]]:
+    """Loads map of user_id -> list of seen photo filenames."""
+    path = os.path.join(VAULT_DIR, "user_seen.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load user seen photo history: {e}")
+        return {}
+
+def mark_photo_seen_by_user(user_id: Optional[Any], filename: str):
+    """Records that a user has received this photo so it is never repeated."""
+    if not user_id or not filename:
+        return
+    u_str = str(user_id)
+    _ensure_vault_dir()
+    seen_map = load_user_seen()
+    user_list = seen_map.setdefault(u_str, [])
+    if filename not in user_list:
+        user_list.append(filename)
+        if len(user_list) > 500:
+            seen_map[u_str] = user_list[-500:]
+        path = os.path.join(VAULT_DIR, "user_seen.json")
+        temp_path = path + ".tmp"
+        try:
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(seen_map, f, ensure_ascii=False, indent=2)
+            os.replace(temp_path, path)
+        except Exception as e:
+            logger.error(f"Failed to save user seen history: {e}")
 
 def save_photo_to_vault(
     img_bytes: bytes,
@@ -154,17 +188,26 @@ def find_matching_photo(
     scene: str = "",
     outfit_label: str = "",
     is_nude: bool = False,
-    user_query: str = ""
+    user_query: str = "",
+    user_id: Optional[Any] = None
 ) -> Optional[Tuple[bytes, Dict[str, Any]]]:
     """
-    Finds the most relevant previously generated photo from the vault.
-    Strictly respects persona and NSFW/SFW safety boundary.
+    Finds a relevant, UNIQUE previously generated photo from the vault.
+    Strictly respects persona, NSFW/SFW safety boundary, and user unseen history.
+    Never repeats photos that user has already received when MEDIA_VAULT_REUSE is false.
     Returns: (image_bytes, metadata_entry) or None.
     """
     persona_key = (persona or "runa").lower().strip()
     catalog = load_catalog()
     if not catalog:
         return None
+
+    # Load seen photo history for this user
+    user_seen_set = set()
+    if user_id:
+        user_seen_set = set(load_user_seen().get(str(user_id), []))
+
+    allow_reuse = os.environ.get("MEDIA_VAULT_REUSE", "false").lower() in ("true", "1", "yes")
 
     # Query tokens
     query_tokens = set(_tokenize(user_query) + _tokenize(scene) + _tokenize(outfit_label))
@@ -177,6 +220,15 @@ def find_matching_photo(
         # Strict Nude/SFW Check (never mix nude with regular or vice versa)
         if bool(entry.get("is_nude", False)) != bool(is_nude):
             continue
+
+        fname = entry.get("filename", "")
+        # Anti-Repetition Guard: If user already received this photo
+        if fname in user_seen_set:
+            if not allow_reuse:
+                continue  # Strictly never repeat previously seen photo!
+            seen_penalty = 500
+        else:
+            seen_penalty = 0
 
         file_full_path = os.path.join(PROJECT_ROOT, entry.get("file_path", ""))
         if not os.path.exists(file_full_path):
@@ -200,9 +252,9 @@ def find_matching_photo(
             if curr_outfit in entry_outfit or entry_outfit in curr_outfit:
                 score += 25
 
-        # Slight penalty for frequently repeated photos to maintain variety
+        # Meaningful penalty for frequently repeated photos to maintain variety
         usage = entry.get("usage_count", 0)
-        score -= min(usage * 2, 10)
+        score -= (usage * 15) + seen_penalty
 
         candidates.append((score, entry, file_full_path))
 
@@ -211,16 +263,21 @@ def find_matching_photo(
 
     # Sort descending by score
     candidates.sort(key=lambda x: x[0], reverse=True)
-    best_score, best_entry, best_path = candidates[0]
 
     # Must have at least minimum contextual relevance (score > 0)
-    # If query had zero specific keywords, allow returning the freshest photo for that persona/outfit
+    # If query had zero specific keywords, allow returning from candidates
+    valid_candidates = [c for c in candidates if c[0] > 0]
     if not query_tokens and candidates:
-        best_entry = candidates[0][1]
-        best_path = candidates[0][2]
-    elif best_score <= 0:
-        # No contextual match
+        valid_candidates = candidates
+    elif not valid_candidates:
         return None
+
+    # Randomized variety: pick among top candidates (within 80% of top score)
+    import random
+    top_score = valid_candidates[0][0]
+    threshold = top_score * 0.8
+    top_pool = [c for c in valid_candidates if c[0] >= threshold][:4]
+    chosen_score, best_entry, best_path = random.choice(top_pool)
 
     try:
         with open(best_path, "rb") as f:
@@ -231,7 +288,11 @@ def find_matching_photo(
         best_entry["last_used"] = time.strftime("%Y-%m-%d %H:%M:%S")
         save_catalog(catalog)
 
-        logger.info(f"Retrieved photo from vault: {best_path} (Match Score: {best_score})")
+        # Mark seen for this user so it's not repeated
+        if user_id:
+            mark_photo_seen_by_user(user_id, best_entry.get("filename", ""))
+
+        logger.info(f"Retrieved photo from vault: {best_path} (Match Score: {chosen_score}, User: {user_id})")
         return img_bytes, best_entry
     except Exception as e:
         logger.error(f"Failed to read image from vault ({best_path}): {e}")

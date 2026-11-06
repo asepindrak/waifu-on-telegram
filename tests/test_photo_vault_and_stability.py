@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest.mock import patch
 import shutil
 import tempfile
 import photo_vault
@@ -67,6 +68,66 @@ class TestPhotoVaultAndStability(unittest.TestCase):
             user_query="kirim foto telanjang"
         )
         self.assertIsNone(nude_result)
+
+    def test_photo_vault_never_repeats_seen_photo_for_user(self):
+        """Photo vault strictly avoids repeating photos that user has already received."""
+        fake_bytes_1 = b"PHOTO_1_BYTES"
+        fake_bytes_2 = b"PHOTO_2_BYTES"
+
+        e1 = photo_vault.save_photo_to_vault(
+            fake_bytes_1,
+            persona="runa",
+            scene="relaxing on bed cozy bedroom",
+            outfit_label="pajamas",
+            is_nude=False,
+            user_query="pap rebahan"
+        )
+        e2 = photo_vault.save_photo_to_vault(
+            fake_bytes_2,
+            persona="runa",
+            scene="relaxing on bed cozy bedroom",
+            outfit_label="pajamas",
+            is_nude=False,
+            user_query="pap rebahan"
+        )
+
+        user_id = 99887766
+        # First request should return one photo and mark it seen
+        res1 = photo_vault.find_matching_photo(
+            persona="runa",
+            scene="relaxing on bed",
+            outfit_label="pajamas",
+            is_nude=False,
+            user_query="pap",
+            user_id=user_id
+        )
+        self.assertIsNotNone(res1)
+        first_filename = res1[1]["filename"]
+
+        # Second request MUST return the second unique photo, NOT the first!
+        res2 = photo_vault.find_matching_photo(
+            persona="runa",
+            scene="relaxing on bed",
+            outfit_label="pajamas",
+            is_nude=False,
+            user_query="pap",
+            user_id=user_id
+        )
+        self.assertIsNotNone(res2)
+        second_filename = res2[1]["filename"]
+        self.assertNotEqual(first_filename, second_filename)
+
+        # Third request: with MEDIA_VAULT_REUSE=false, all matching photos have been seen, so returns None!
+        with patch.dict(os.environ, {"MEDIA_VAULT_REUSE": "false"}):
+            res3 = photo_vault.find_matching_photo(
+                persona="runa",
+                scene="relaxing on bed",
+                outfit_label="pajamas",
+                is_nude=False,
+                user_query="pap",
+                user_id=user_id
+            )
+            self.assertIsNone(res3, "Should return None instead of repeating an already seen photo!")
 
     def test_llm_client_default_port(self):
         client = LocallyUncensoredClient()

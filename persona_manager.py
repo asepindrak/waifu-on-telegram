@@ -684,7 +684,18 @@ class PersonaManager:
             cat_neg = "cat, kitten, feline, animal, pet, animal ears, cat ears"
             extra_neg = f"{extra_neg}, {cat_neg}" if extra_neg else cat_neg
 
-        visual_prompt = f"{base_visual}, {outfit_prompt}, {scene}, looking directly into camera, phone selfie shot, detailed eyes, masterpiece quality"
+        # Dynamic micro-variations to ensure every generated image has unique framing & mood
+        micro_angles = [
+            "looking directly into camera, phone selfie shot",
+            "close-up candid selfie angle, looking directly into camera with affectionate sweet gaze",
+            "slight head tilt phone selfie perspective, engaging eye contact, natural charm",
+            "cozy intimate portrait angle, smiling into camera, candid handheld shot",
+            "handheld front camera shot, gentle blushing expression, natural cinematic lighting"
+        ]
+        import random
+        chosen_angle = random.choice(micro_angles)
+
+        visual_prompt = f"{base_visual}, {outfit_prompt}, {scene}, {chosen_angle}, detailed eyes, masterpiece quality"
         return (visual_prompt, extra_neg, is_nude, outfit_name)
 
     def craft_visual_prompt(

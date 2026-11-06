@@ -610,13 +610,15 @@ class MediaEngine:
         outfit_label: str = "",
         is_nude: bool = False,
         user_query: str = "",
-        progress_callback: Optional[Callable[[str], None]] = None
+        progress_callback: Optional[Callable[[str], None]] = None,
+        user_id: Optional[Any] = None
     ) -> Tuple[Optional[bytes], str]:
         """
         Main entry for photo generation.
-        1. Tries local ComfyUI.
+        1. Tries local ComfyUI or external engine (AGY / Cloud).
         2. On success: archives photo into Photo Vault with semantic metadata.
-        3. On failure / offline: searches Photo Vault for matching persona & scene (No low-quality cloud!).
+        3. On failure / offline: searches Photo Vault for unseen matching persona & scene.
+        4. If Photo Vault has no unseen photos: invokes live Cloud fallback so photos are ALWAYS unique.
         Returns: (image_bytes, source_label)
         """
         self.last_error = None
@@ -629,7 +631,7 @@ class MediaEngine:
             if agy_img:
                 if photo_vault:
                     try:
-                        photo_vault.save_photo_to_vault(
+                        ent = photo_vault.save_photo_to_vault(
                             agy_img,
                             persona=persona,
                             scene=scene or user_query,
@@ -639,6 +641,8 @@ class MediaEngine:
                             user_query=user_query,
                             aspect_ratio=aspect_ratio or "3:4"
                         )
+                        if ent and user_id and hasattr(photo_vault, "mark_photo_seen_by_user"):
+                            photo_vault.mark_photo_seen_by_user(user_id, ent.get("filename", ""))
                     except Exception:
                         pass
                 return agy_img, "Google Antigravity (AGY Image Generator)"
@@ -661,7 +665,7 @@ class MediaEngine:
                 # Automatically save high-quality local render to Photo Vault
                 if photo_vault:
                     try:
-                        photo_vault.save_photo_to_vault(
+                        ent = photo_vault.save_photo_to_vault(
                             local_img,
                             persona=persona,
                             scene=scene or user_query,
@@ -671,6 +675,8 @@ class MediaEngine:
                             user_query=user_query,
                             aspect_ratio=aspect_ratio or "3:4"
                         )
+                        if ent and user_id and hasattr(photo_vault, "mark_photo_seen_by_user"):
+                            photo_vault.mark_photo_seen_by_user(user_id, ent.get("filename", ""))
                     except Exception as e_save:
                         logger.warning(f"Failed to auto-archive photo to vault: {e_save}")
                 active_ckpt = self.get_active_checkpoint(is_nude=is_nude)
@@ -683,7 +689,7 @@ class MediaEngine:
                     if agy_img:
                         if photo_vault:
                             try:
-                                photo_vault.save_photo_to_vault(
+                                ent = photo_vault.save_photo_to_vault(
                                     agy_img,
                                     persona=persona,
                                     scene=scene or user_query,
@@ -693,31 +699,56 @@ class MediaEngine:
                                     user_query=user_query,
                                     aspect_ratio=aspect_ratio or "3:4"
                                 )
+                                if ent and user_id and hasattr(photo_vault, "mark_photo_seen_by_user"):
+                                    photo_vault.mark_photo_seen_by_user(user_id, ent.get("filename", ""))
                             except Exception:
                                 pass
                         return agy_img, "Google Antigravity (AGY Fallback)" 
         else:
             self.last_error = "ComfyUI URL belum dikonfigurasi (pastikan ComfyUI lokal aktif di port 8188)."
 
-        # 2. Smart Photo Vault Retrieval (Offline Semantic Fallback)
-        if photo_vault:
+        # 2. Smart Photo Vault Retrieval (Offline Semantic Fallback - strictly unique per user)
+        use_vault = os.environ.get("MEDIA_VAULT_FALLBACK", "true").lower() in ("true", "1", "yes")
+        if photo_vault and use_vault:
             try:
                 matched = photo_vault.find_matching_photo(
                     persona=persona,
                     scene=scene or user_query,
                     outfit_label=outfit_label,
                     is_nude=is_nude,
-                    user_query=user_query
+                    user_query=user_query,
+                    user_id=user_id
                 )
                 if matched:
                     vault_img, meta = matched
                     p_name = meta.get('persona', persona).title()
-                    logger.info(f"Retrieved matching photo from vault: {meta.get('filename')} (Scene: {meta.get('scene')})")
+                    logger.info(f"Retrieved unique photo from vault: {meta.get('filename')} (Scene: {meta.get('scene')}, User: {user_id})")
                     return vault_img, f"Photo Vault (Arsip Lokal: {p_name})"
             except Exception as e_find:
                 logger.warning(f"Error querying photo vault: {e_find}")
 
-        # Cloud fallback is intentionally disabled per user request (bad quality)
+        # 3. Live Cloud Fallback (Ensures photos are ALWAYS unique even when AGY / ComfyUI / Vault are exhausted)
+        if not is_nude and os.environ.get("MEDIA_FALLBACK_CLOUD", "true").lower() in ("true", "1", "yes"):
+            cloud_img = self.generate_image_cloud_fallback(effective_prompt)
+            if cloud_img:
+                if photo_vault:
+                    try:
+                        ent = photo_vault.save_photo_to_vault(
+                            cloud_img,
+                            persona=persona,
+                            scene=scene or user_query,
+                            outfit_label=outfit_label,
+                            is_nude=is_nude,
+                            visual_prompt=effective_prompt,
+                            user_query=user_query,
+                            aspect_ratio=aspect_ratio or "3:4"
+                        )
+                        if ent and user_id and hasattr(photo_vault, "mark_photo_seen_by_user"):
+                            photo_vault.mark_photo_seen_by_user(user_id, ent.get("filename", ""))
+                    except Exception:
+                        pass
+                return cloud_img, "Cloud Engine (SFW Fallback Unik)"
+
         return None, "Failed"
 
     def generate_image_agy(
