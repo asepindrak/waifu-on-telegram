@@ -1904,6 +1904,13 @@ def show_desktop_status_menu(chat_id: int, user_id: int, message_to_edit: Option
     is_avail = cu.is_available()
     plat = status.get("data", {}).get("platform", sys.platform)
     perm = status.get("data", {}).get("permissions", {}).get("accessibility", {}).get("state", "unknown")
+    def_prof = cu.get_default_browser_profile()
+    if not def_prof or def_prof.lower() == "ask":
+        prof_display = "🤖 _Selalu Tanya di Chat_"
+    else:
+        all_p = cu.list_browser_profiles()
+        matched = next((p["name"] for p in all_p if p["folder"] == def_prof), def_prof)
+        prof_display = f"🌐 `{matched}` (`{def_prof}`)"
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -1911,7 +1918,10 @@ def show_desktop_status_menu(chat_id: int, user_id: int, message_to_edit: Option
         types.InlineKeyboardButton("📱 Cek Aplikasi", callback_data="desktop_act:apps")
     )
     markup.add(
-        types.InlineKeyboardButton("💻 Menu Projects", callback_data="cfg_submenu:projects"),
+        types.InlineKeyboardButton("🌐 Profil Browser (/profiles)", callback_data="desktop_act:profiles"),
+        types.InlineKeyboardButton("💻 Menu Projects", callback_data="cfg_submenu:projects")
+    )
+    markup.add(
         types.InlineKeyboardButton("🔙 Menu Setup", callback_data="cfg_submenu:dashboard")
     )
 
@@ -1921,10 +1931,55 @@ def show_desktop_status_menu(chat_id: int, user_id: int, message_to_edit: Option
         f"• Status Adapter : {'🟢 Active & Ready' if is_avail else '🔴 Not Found'}\n"
         f"• Platform       : `{plat}`\n"
         f"• Accessibility  : `{perm}`\n"
-        f"• Engine         : `agent-desktop (Native Accessibility Tree)`\n\n"
+        f"• Engine         : `agent-desktop (Native Accessibility Tree)`\n"
+        f"• Default Browser: {prof_display}\n\n"
         f"Waifu bisa melihat layar desktop, membuka aplikasi, mengklik elemen UI, "
         f"dan membantu pekerjaanmu secara real-time!\n\n"
-        f"💡 _Ketik `/screen` untuk screenshot instan atau chat langsung (misal: 'tolong screenshot layar pc')._"
+        f"💡 _Ketik `/screen` untuk screenshot instan atau chat langsung (misal: 'tolong screenshot layar pc' atau 'buka instagram')._"
+    )
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
+
+
+def show_browser_profiles_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders menu to select or inspect browser profiles (Chrome, Edge, Brave)."""
+    cu = get_computer_use_engine()
+    profiles = cu.list_browser_profiles()
+    cur_def = cu.get_default_browser_profile()
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+
+    # Option for Always Ask
+    is_ask_selected = (not cur_def or cur_def.lower() == "ask")
+    ask_label = f"{'✅ ' if is_ask_selected else ''}🤖 Selalu Tanya di Chat (Interaktif)"
+    markup.add(types.InlineKeyboardButton(ask_label, callback_data="bprof_set:ask"))
+
+    # Profile buttons
+    for p in profiles:
+        is_sel = (cur_def and (cur_def.lower() == p["folder"].lower() or cur_def.lower() == p["name"].lower()))
+        b_icon = "🌐" if "chrome" in p["browser"].lower() else ("🌊" if "edge" in p["browser"].lower() else "🦁")
+        email_str = f" ({p['email']})" if p.get("email") else ""
+        btn_text = f"{'✅ ' if is_sel else ''}{b_icon} {p['name']} [{p['browser']}]{email_str}"
+        markup.add(types.InlineKeyboardButton(btn_text, callback_data=f"bprof_set:{p['folder']}"))
+
+    markup.add(
+        types.InlineKeyboardButton("🖥️ Kembali ke Desktop", callback_data="cfg_submenu:desktop"),
+        types.InlineKeyboardButton("🔙 Menu Setup", callback_data="cfg_submenu:dashboard")
+    )
+
+    cur_label = "🤖 Selalu Tanya di Chat" if is_ask_selected else cur_def
+    text = (
+        f"🌐 **Manajemen Profil Browser Desktop**\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Waifu otomatis mendeteksi profil Chromium (Chrome, Edge, Brave) di PC kamu.\n\n"
+        f"• **Profil Default**: `{cur_label}`\n"
+        f"• **Total Terdeteksi**: {len(profiles)} profil\n\n"
+        f"💡 _Pilih salah satu profil di bawah sebagai default, atau pilih 'Selalu Tanya' agar Waifu menanyakan profil saat chat._"
     )
     if message_to_edit:
         try:
@@ -4967,6 +5022,13 @@ def handle_desktop_command(message):
     show_desktop_status_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
 
 
+@bot.message_handler(commands=['profiles', 'browserprofile', 'chrome', 'browser'])
+def handle_browser_profiles_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    show_browser_profiles_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+
+
 @bot.message_handler(commands=['screen', 'screenshot'])
 def handle_screen_command(message):
     if not is_authorized(message.from_user.id):
@@ -5111,6 +5173,41 @@ def callback_desktop_actions(call):
         else:
             msg = "📱 Tidak ada aplikasi GUI terdeteksi yang aktif saat ini."
         bot.send_message(chat_id, msg, parse_mode="Markdown")
+    elif act == "profiles":
+        bot.answer_callback_query(call.id)
+        show_browser_profiles_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("bprof_set:"))
+def callback_browser_profile_set(call):
+    if not is_authorized(call.from_user.id):
+        return
+    folder = call.data.split(":", 1)[1]
+    cu = get_computer_use_engine()
+    cu.set_default_browser_profile(folder)
+    update_env_variable("CHROME_DEFAULT_PROFILE", folder)
+
+    if folder == "ask":
+        bot.answer_callback_query(call.id, "🤖 Mode 'Selalu Tanya di Chat' aktif!", show_alert=True)
+    else:
+        bot.answer_callback_query(call.id, f"✅ Profil default diubah ke '{folder}'!", show_alert=True)
+    show_browser_profiles_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("bprof_launch:"))
+def callback_browser_profile_launch(call):
+    if not is_authorized(call.from_user.id):
+        return
+    folder = call.data.split(":", 1)[1]
+    bot.answer_callback_query(call.id, f"🚀 Membuka browser dengan profil {folder}...")
+    cu = get_computer_use_engine()
+
+    orig_text = call.message.caption or call.message.text or ""
+    url_match = re.search(r'https?://[^\s`]+', orig_text)
+    target_url = url_match.group(0) if url_match else "https://instagram.com"
+
+    ok, msg = cu.launch_browser(url=target_url, profile_query=folder)
+    safe_send_message(call.message.chat.id, f"🌸 **Waifu**:\n{msg}")
 
 
 def process_coding_request(message, user_text: str, is_voice: bool = False):
@@ -5193,11 +5290,26 @@ def process_computer_request(message, user_text: str):
     except Exception:
         pass
 
+    reply_markup = None
+    if "profil browser" in reply_msg and "profil yang mana" in reply_msg:
+        cu = get_computer_use_engine()
+        profs = cu.list_browser_profiles()
+        reply_markup = types.InlineKeyboardMarkup(row_width=1)
+        for p in profs:
+            b_icon = "🌐" if "chrome" in p["browser"].lower() else ("🌊" if "edge" in p["browser"].lower() else "🦁")
+            reply_markup.add(
+                types.InlineKeyboardButton(
+                    f"{b_icon} Buka via {p['name']} ({p['browser']})",
+                    callback_data=f"bprof_launch:{p['folder']}"
+                )
+            )
+        reply_markup.add(types.InlineKeyboardButton("⚙️ Atur Profil Default (/profiles)", callback_data="desktop_act:profiles"))
+
     if screenshot_path and os.path.exists(screenshot_path):
         with open(screenshot_path, "rb") as f:
-            bot.send_photo(chat_id, f, caption=f"🌸 **{p_name}**:\n{reply_msg}", reply_to_message_id=message.message_id, parse_mode="Markdown")
+            bot.send_photo(chat_id, f, caption=f"🌸 **{p_name}**:\n{reply_msg}", reply_to_message_id=message.message_id, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        bot.reply_to(message, f"🌸 **{p_name}**:\n{reply_msg}", parse_mode="Markdown")
+        bot.reply_to(message, f"🌸 **{p_name}**:\n{reply_msg}", reply_markup=reply_markup, parse_mode="Markdown")
 
 
 @bot.message_handler(func=lambda msg: True)

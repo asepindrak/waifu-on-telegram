@@ -36,7 +36,8 @@ CODING_TRIGGERS = [
 COMPUTER_USE_TRIGGERS = [
     r'\b(screenshot|tangkapan layar|foto layar|screen pc)\b',
     r'\b(buka aplikasi|tutup aplikasi|list aplikasi|running apps)\b',
-    r'\b(desktop|computer use|klik tombol|ketik di|buka browser)\b'
+    r'\b(desktop|computer use|klik tombol|ketik di|buka browser|buka chrome|buka edge|buka web|buka instagram)\b',
+    r'\b(profile chrome|profil chrome|profil browser|browser profile)\b'
 ]
 
 
@@ -230,7 +231,9 @@ class CodingEngine:
 
         # General computer control task
         result = self.computer_engine.execute_computer_task(prompt)
-        # Check if screenshot was created
+        # Suppress automatic desktop screenshot for conversational menu / profile queries
+        if any(marker in result for marker in ["profil browser nih", "Daftar Profil Browser", "Profil default browser", "Selalu Tanya"]):
+            return result, None
         ok, path = self.computer_engine.take_screenshot()
         return result, path if ok else None
 

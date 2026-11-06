@@ -862,6 +862,43 @@ def config_workspace_projects(env_vars):
     else:
         env_vars["PROJECTS_DIR"] = current_dir
 
+def config_browser_profile(env_vars):
+    print(c(BOLD + CYAN, "\n--- Configure Default Browser Profile (Chrome / Edge / Brave) ---"))
+    print("Waifu on Telegram can operate desktop browsers using your personal profile (e.g. logged into Instagram).")
+    try:
+        from computer_use_engine import get_computer_use_engine
+        cu = get_computer_use_engine()
+        profiles = cu.list_browser_profiles()
+    except Exception:
+        profiles = []
+
+    cur_profile = env_vars.get("CHROME_DEFAULT_PROFILE", "")
+    print(f"Current Default Profile: {cur_profile or '[Ask Interactively in Chat]'}\n")
+
+    if not profiles:
+        print(c(YELLOW, "No browser profiles automatically detected on this PC."))
+        val = input("Enter Profile Name or Folder (e.g. 'Default', 'Profile 1', or leave empty for auto): ").strip()
+        if val:
+            env_vars["CHROME_DEFAULT_PROFILE"] = val
+            print(c(GREEN, f"✓ Profile set to '{val}'."))
+        return
+
+    print("Detected Browser Profiles on this machine:")
+    print("  [0] 🤖 Ask Interactively in Chat (Waifu will ask which profile to open)")
+    for i, p in enumerate(profiles, 1):
+        email_str = f" ({p['email']})" if p['email'] else ""
+        is_cur = " [CURRENT]" if p['folder'] == cur_profile or p['name'].lower() == cur_profile.lower() else ""
+        print(f"  [{i}] {p['name']} [{p['browser']}] - Folder: '{p['folder']}'{email_str}{is_cur}")
+
+    choice = input(f"\nSelect default profile [0-{len(profiles)}] (or press Enter to keep): ").strip()
+    if choice == "0":
+        env_vars["CHROME_DEFAULT_PROFILE"] = "ask"
+        print(c(GREEN, "✓ Set to 'Ask Interactively in Chat'."))
+    elif choice.isdigit() and 1 <= int(choice) <= len(profiles):
+        chosen = profiles[int(choice) - 1]
+        env_vars["CHROME_DEFAULT_PROFILE"] = chosen["folder"]
+        print(c(GREEN, f"✓ Default browser profile set to: {chosen['name']} ({chosen['folder']})"))
+
 def run_menu():
     env_vars = read_env()
     has_token = bool(env_vars.get("TELEGRAM_BOT_TOKEN"))
@@ -900,6 +937,7 @@ def run_menu():
         print(c(CYAN, f"  • Voice TTS   : {v_disp}"))
         print(c(CYAN, f"  • Workspace   : {env_vars.get('PROJECTS_DIR', os.path.expanduser('~'))}"))
         print(c(CYAN, f"  • Language    : {env_vars.get('BOT_LANGUAGE', 'id')}"))
+        print(c(CYAN, f"  • Browser Prof: {env_vars.get('CHROME_DEFAULT_PROFILE', '[Ask in Chat]') or '[Ask in Chat]'}"))
         print("-" * 70)
         print("  [1] 🤖 Change Telegram Bot Token / Allowed User ID")
         print("  [2] 🧠 Change Chat / LLM Model (Scan new models)")
@@ -911,11 +949,12 @@ def run_menu():
         print("  [8] 📦 AI Assets & Models Manager (Download / Verify Models)")
         print("  [9] 💻 Configure Coding Workspace & Projects Directory (/projects)")
         print("  [10] 🚀 Configure Autorun at System Startup (On / Off)")
-        print("  [11] 🔄 Re-run Complete Setup Wizard")
+        print("  [11] 🌐 Configure Default Browser Profile (Chrome / Edge / Brave)")
+        print("  [12] 🔄 Re-run Complete Setup Wizard")
         print("  [0] ❌ Exit / Done")
         print("-" * 70)
 
-        opt = input("Select option [0-11]: ").strip()
+        opt = input("Select option [0-12]: ").strip()
         if opt == "1":
             config_telegram_credentials(env_vars)
             save_config(env_vars)
@@ -946,6 +985,9 @@ def run_menu():
             auto_in = input("Enable bot automatically on PC boot (Autorun)? [Y/n, default: Y]: ").strip().lower()
             setup_autostart(enable=(auto_in != "n"))
         elif opt == "11":
+            config_browser_profile(env_vars)
+            save_config(env_vars)
+        elif opt == "12":
             run_full_wizard()
             break
         elif opt == "0":
@@ -971,6 +1013,7 @@ def run_full_wizard():
     config_language(env_vars)
 
     config_workspace_projects(env_vars)
+    config_browser_profile(env_vars)
 
     print(c(BOLD + CYAN, "\n[Step 6/7: PC Music Remote Player (YouTube Music)]"))
     print("-" * 60)
