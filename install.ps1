@@ -128,25 +128,143 @@ if ((Test-Path "bot.py") -and (Test-Path "setup.py")) {
     }
 }
 
-# 2. Check Python Environment
-Write-Host "`n[2/8] Checking Python environment..." -ForegroundColor Cyan
-$py = "python"
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
-    if (Get-Command py -ErrorAction SilentlyContinue) {
-        $py = "py"
-    } else {
-        Write-Host "[ERROR] Python 3.8+ was not found on your system." -ForegroundColor Red
-        Write-Host "Please install Python from https://www.python.org/ and check 'Add to PATH'." -ForegroundColor Yellow
-        exit 1
+# 2. Check & Setup Core Runtimes (Python 3.8+ & Node.js LTS)
+Write-Host "`n[2/8] Checking Core Runtimes (Python, Node.js & C++)..." -ForegroundColor Cyan
+
+function Get-RealPythonCommand {
+    $candidates = @("python", "py", "python3")
+    if ($env:LOCALAPPDATA) {
+        $candidates += "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe"
+        $candidates += "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
+        $candidates += "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe"
+        $candidates += "$env:LOCALAPPDATA\Programs\Python\Python310\python.exe"
+    }
+    if ($env:ProgramFiles) {
+        $candidates += "$env:ProgramFiles\Python312\python.exe"
+        $candidates += "$env:ProgramFiles\Python311\python.exe"
+        $candidates += "$env:ProgramFiles\Python310\python.exe"
+    }
+    foreach ($c in $candidates) {
+        try {
+            $out = & $c -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2>$null
+            if ($LASTEXITCODE -eq 0 -and $out) {
+                $parts = $out.Trim().Split('.')
+                if ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 8) {
+                    return $c
+                }
+            }
+        } catch {}
+    }
+    return $null
+}
+
+$py = Get-RealPythonCommand
+if (-not $py) {
+    Write-Host "  [!] Real Python 3.8+ not detected (or Microsoft Store stub active)." -ForegroundColor Yellow
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "  >> Auto-installing Python 3.11 via winget..." -ForegroundColor Yellow
+        try {
+            & winget install Python.Python.3.11 -e --silent --accept-package-agreements --accept-source-agreements
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            $py = Get-RealPythonCommand
+        } catch {}
     }
 }
-$pyVer = & $py --version 2>&1
-Write-Host "  [OK] Python: $pyVer" -ForegroundColor Green
 
-# 3. Install Python Requirements
-Write-Host "`n[3/8] Installing Python requirements..." -ForegroundColor Cyan
+if (-not $py) {
+    Write-Host "[ERROR] Python 3.8+ (64-bit) was not found on your system." -ForegroundColor Red
+    Write-Host "Please install Python from https://www.python.org/ and check 'Add to PATH'." -ForegroundColor Yellow
+    exit 1
+}
+$pyVer = & $py --version 2>&1
+Write-Host "  [OK] Python: $pyVer ($py)" -ForegroundColor Green
+
+# Check Node.js upfront
+function Get-RealNodeCommand {
+    if (Get-Command node -ErrorAction SilentlyContinue) {
+        try {
+            $nodeV = & node -v 2>$null
+            if ($LASTEXITCODE -eq 0 -and $nodeV) {
+                return "node"
+            }
+        } catch {}
+    }
+    $localNode = "$installDir\tools\nodejs\node.exe"
+    if (Test-Path $localNode) {
+        $nodeDir = Split-Path -Parent $localNode
+        $env:Path = "$nodeDir;$env:Path"
+        return $localNode
+    }
+    return $null
+}
+
+$node = Get-RealNodeCommand
+if (-not $node) {
+    Write-Host "  >> Node.js not found. Auto-installing Node.js LTS..." -ForegroundColor Yellow
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        try {
+            & winget install OpenJS.NodeJS.LTS -e --silent --accept-package-agreements --accept-source-agreements
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            $node = Get-RealNodeCommand
+        } catch {}
+    }
+
+    if (-not $node) {
+        $nodeToolDir = "$installDir\tools\nodejs"
+        New-Item -ItemType Directory -Force -Path $nodeToolDir | Out-Null
+        $nodeZipUrl = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-win-x64.zip"
+        $nodeZipDest = "$installDir\tools\nodejs_portable.zip"
+        $ok = Download-FileWithProgress -Url $nodeZipUrl -DestinationPath $nodeZipDest -Description "Node.js LTS Standalone (~30 MB)"
+        if ($ok) {
+            Write-Host "  Extracting Node.js Portable..." -ForegroundColor Yellow
+            $tempExtract = "$env:TEMP\node_extract"
+            if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force }
+            Expand-Archive -Path $nodeZipDest -DestinationPath $tempExtract -Force
+            $extractedFolder = Get-ChildItem -Path $tempExtract -Directory | Select-Object -First 1
+            if ($extractedFolder) {
+                Copy-Item -Path "$($extractedFolder.FullName)\*" -Destination $nodeToolDir -Recurse -Force
+            }
+            Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $nodeZipDest -Force -ErrorAction SilentlyContinue
+
+            $env:Path = "$nodeToolDir;$env:Path"
+            $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+            if ($userPath -notlike "*$nodeToolDir*") {
+                [Environment]::SetEnvironmentVariable("Path", "$nodeToolDir;$userPath", "User")
+            }
+            $node = Get-RealNodeCommand
+        }
+    }
+}
+
+if ($node) {
+    $nodeVer = & node -v
+    Write-Host "  [OK] Node.js: $nodeVer" -ForegroundColor Green
+} else {
+    Write-Host "  [WARNING] Node.js not detected. PC Music Remote will be disabled." -ForegroundColor Yellow
+}
+
+# Check Visual C++ Redistributable
+$hasVc = (Test-Path "$env:SystemRoot\System32\vcruntime140.dll") -or (Test-Path "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64")
+if (-not $hasVc) {
+    Write-Host "  >> Auto-installing Visual C++ 2015-2022 Redistributable (x64)..." -ForegroundColor Yellow
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        try { & winget install Microsoft.VCRedist.2015+.x64 -e --silent --accept-package-agreements --accept-source-agreements } catch {}
+    }
+} else {
+    Write-Host "  [OK] Visual C++ Runtime detected." -ForegroundColor Green
+}
+
+# 3. Install Python & Node.js Requirements
+Write-Host "`n[3/8] Installing Dependencies (Python & Node.js libraries)..." -ForegroundColor Cyan
 & $py -m pip install -r requirements.txt --quiet --disable-pip-version-check
-Write-Host "  [OK] Dependencies installed successfully." -ForegroundColor Green
+Write-Host "  [OK] Python libraries installed successfully." -ForegroundColor Green
+
+if ($node) {
+    Write-Host "  Installing Node.js dependencies (npm install)..." -ForegroundColor DarkGray
+    & npm install --no-audit --no-fund --silent
+    Write-Host "  [OK] Node.js dependencies installed successfully." -ForegroundColor Green
+}
 
 # 4. Check & Setup Local LLM Engine (KoboldCPP / Auto-loading Engine)
 Write-Host "`n[4/8] Checking Local LLM Engine (Chat & Romance Brain)..." -ForegroundColor Cyan
@@ -488,83 +606,43 @@ if ($foundComfy) {
     }
 }
 
-# 6. Check & Auto-Install Node.js for PC Music Remote
-Write-Host "`n[6/8] Checking Node.js for PC Music Remote..." -ForegroundColor Cyan
-
-$hasNode = $false
-if (Get-Command node -ErrorAction SilentlyContinue) {
-    $hasNode = $true
-} else {
-    $localNode = "$installDir\tools\nodejs\node.exe"
-    if (Test-Path $localNode) {
-        $nodeDir = Split-Path -Parent $localNode
-        $env:Path = "$nodeDir;$env:Path"
-        $hasNode = $true
-    }
+# 6. Check Computer Use Engine (agent-desktop)
+Write-Host "`n[6/8] Checking Computer Use & Desktop Engine..." -ForegroundColor Cyan
+if (-not (Get-Command agent-desktop -ErrorAction SilentlyContinue)) {
+    Write-Host "  >> Auto-installing agent-desktop for computer use & browser automation..." -ForegroundColor Yellow
+    try { & npm install -g agent-desktop --silent } catch {}
 }
-
-if (-not $hasNode) {
-    Write-Host "  >> Node.js not found. Auto-installing Node.js for Music Remote..." -ForegroundColor Yellow
-    $installedViaWinget = $false
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
-        try {
-            Write-Host "     Attempting install via winget..." -ForegroundColor DarkGray
-            & winget install OpenJS.NodeJS.LTS -e --silent --accept-package-agreements --accept-source-agreements
-            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-            if (Get-Command node -ErrorAction SilentlyContinue) {
-                $installedViaWinget = $true
-                $hasNode = $true
-            }
-        } catch {}
-    }
-
-    if (-not $installedViaWinget) {
-        # Portable Node.js fallback (Zero admin required, 100% standalone)
-        $nodeToolDir = "$installDir\tools\nodejs"
-        New-Item -ItemType Directory -Force -Path $nodeToolDir | Out-Null
-        $nodeZipUrl = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-win-x64.zip"
-        $nodeZipDest = "$installDir\tools\nodejs_portable.zip"
-        $ok = Download-FileWithProgress -Url $nodeZipUrl -DestinationPath $nodeZipDest -Description "Node.js LTS Standalone (~30 MB)"
-        if ($ok) {
-            Write-Host "  Extracting Node.js Portable..." -ForegroundColor Yellow
-            $tempExtract = "$env:TEMP\node_extract"
-            if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force }
-            Expand-Archive -Path $nodeZipDest -DestinationPath $tempExtract -Force
-            $extractedFolder = Get-ChildItem -Path $tempExtract -Directory | Select-Object -First 1
-            if ($extractedFolder) {
-                Copy-Item -Path "$($extractedFolder.FullName)\*" -Destination $nodeToolDir -Recurse -Force
-            }
-            Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path $nodeZipDest -Force -ErrorAction SilentlyContinue
-
-            $env:Path = "$nodeToolDir;$env:Path"
-            $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-            if ($userPath -notlike "*$nodeToolDir*") {
-                [Environment]::SetEnvironmentVariable("Path", "$nodeToolDir;$userPath", "User")
-            }
-            $hasNode = $true
-        }
-    }
-}
-
-if ($hasNode -or (Get-Command node -ErrorAction SilentlyContinue)) {
-    $nodeVer = & node -v
-    Write-Host "  [OK] Node.js active: $nodeVer. Installing npm dependencies..." -ForegroundColor Green
-    & npm install --no-audit --no-fund --silent
-    Write-Host "  [OK] YouTube Music Remote dependencies installed successfully." -ForegroundColor Green
+if (Get-Command agent-desktop -ErrorAction SilentlyContinue) {
+    Write-Host "  [OK] agent-desktop engine ready." -ForegroundColor Green
 } else {
-    Write-Host "  [WARNING] Could not auto-install Node.js. PC Music remote feature disabled." -ForegroundColor Yellow
+    Write-Host "  [INFO] agent-desktop is optional (can be installed later via 'npm i -g agent-desktop')." -ForegroundColor DarkGray
 }
 
 # 7. Register Global CLI Commands ('waifu')
 Write-Host "`n[7/8] Registering Global CLI Command 'waifu'..." -ForegroundColor Cyan
+
+# Link globally via npm
+if (Get-Command npm -ErrorAction SilentlyContinue) {
+    try {
+        & npm link --silent
+        Write-Host "  [OK] Linked via npm globally (waifu.js active)." -ForegroundColor Green
+    } catch {}
+}
+
 $userBin = "$env:USERPROFILE\.local\bin"
 if (-not (Test-Path $userBin)) { New-Item -ItemType Directory -Force -Path $userBin | Out-Null }
 
+$cliJs = "$installDir\bin\waifu.js"
 $cliPy = "$installDir\bin\cli.py"
-$cmdScript = "@echo off`r`npython `"$cliPy`" %*"
+
+# Create universal .cmd and .ps1 wrappers
+$cmdScript = "@echo off`r`nnode `"$cliJs`" %*"
 Set-Content -Path "$userBin\waifu.cmd" -Value $cmdScript -Force
 Set-Content -Path "$userBin\pacar-ai.cmd" -Value $cmdScript -Force
+
+$psScript = "& `"$py`" `"$cliPy`" `$args"
+Set-Content -Path "$userBin\waifu.ps1" -Value $psScript -Force
+Set-Content -Path "$userBin\pacar-ai.ps1" -Value $psScript -Force
 
 # Add to User PATH if not present
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -573,6 +651,7 @@ if ($userPath -notlike "*$userBin*") {
     $env:Path = "$userBin;$env:Path"
     Write-Host "  [OK] Added '$userBin' to User PATH." -ForegroundColor Green
 }
+Write-Host "  [OK] Global CLI 'waifu' registered successfully." -ForegroundColor Green
 Write-Host "  [OK] Global CLI 'waifu' registered successfully." -ForegroundColor Green
 
 # 8. Configure Windows Startup Autorun (Auto-start on PC boot)

@@ -1087,6 +1087,7 @@ def print_cli_help(unknown_cmd: str = None):
     print(f"    {c(GREEN, 'waifu autorun')} [on|off]      Atur bot berjalan otomatis saat PC boot")
 
     print(c(BOLD + MAGENTA, "\n  🔄 Pemeliharaan & Info:"))
+    print(f"    {c(GREEN, 'waifu doctor')}                Cek kesehatan sistem & kelengkapan tools (Python, Node.js, GPU)")
     print(f"    {c(GREEN, 'waifu update')}                Update repository, dependensi, dan model AI")
     print(f"    {c(GREEN, 'waifu version')}               Tampilkan versi Waifu on Telegram saat ini")
     print(f"    {c(GREEN, 'waifu uninstall')}             Wizard uninstalasi lengkap & pembersihan sistem")
@@ -1152,6 +1153,9 @@ def main():
         sub = args.arg
         remaining = args.extra_args[0] if args.extra_args else (sys.argv[3] if len(sys.argv) > 3 else None)
         cmd_models(sub, remaining)
+    elif cmd in ("doctor", "diagnostics", "check"):
+        from setup import check_system_prerequisites
+        check_system_prerequisites(interactive=False)
     elif cmd == "update":
         cmd_update()
     elif cmd == "release":

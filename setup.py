@@ -17,12 +17,25 @@ import glob
 import json
 import shutil
 import logging
+from typing import Dict, List, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="pydub")
 import platform
 import subprocess
 import argparse
 import tempfile
+
+try:
+    import imageio_ffmpeg
+    ff_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    if ff_exe:
+        ff_dir = os.path.dirname(ff_exe)
+        if ff_dir not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = ff_dir + os.pathsep + os.environ.get("PATH", "")
+except Exception:
+    pass
 
 if sys.platform == "win32":
     try:
@@ -899,6 +912,202 @@ def config_browser_profile(env_vars):
         env_vars["CHROME_DEFAULT_PROFILE"] = chosen["folder"]
         print(c(GREEN, f"✓ Default browser profile set to: {chosen['name']} ({chosen['folder']})"))
 
+def check_system_prerequisites(interactive: bool = True) -> Dict[str, bool]:
+    """
+    Validates all system requirements (Python, Node.js, Git, libraries, C++ runtime).
+    Prints a structured health check report and offers auto-repair if anything is missing.
+    """
+    try:
+        import imageio_ffmpeg
+        ff_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if ff_exe:
+            ff_dir = os.path.dirname(ff_exe)
+            if ff_dir not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = ff_dir + os.pathsep + os.environ.get("PATH", "")
+    except Exception:
+        pass
+
+    print(c(BOLD + MAGENTA, "\n===================================================================="))
+    print(c(BOLD + MAGENTA, "       🩺 WAIFU ON TELEGRAM - SYSTEM PREREQUISITES & HEALTH CHECK    "))
+    print(c(BOLD + MAGENTA, "====================================================================\n"))
+
+    results = {}
+    fixes = []
+
+    # 1. Python Environment Check
+    py_ver = f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}"
+    is_64bit = sys.maxsize > 2**32
+    bit_str = "64-bit" if is_64bit else "32-bit"
+    py_ok = (sys.version_info >= (3, 8)) and is_64bit
+    results["python"] = py_ok
+    if py_ok:
+        print(f"  {c(GREEN, '✓')} Python Environment      : {c(GREEN, f'Python {py_ver} ({bit_str})')}")
+        print(c(DIM, f"     Path: {sys.executable}"))
+    else:
+        print(f"  {c(RED, '❌')} Python Environment      : {c(RED, f'Python {py_ver} (64-bit required, version >= 3.8)')}")
+        fixes.append("Install Python 3.11 64-bit via: winget install Python.Python.3.11")
+
+    # 2. Node.js & NPM Check
+    node_cmd = shutil.which("node")
+    npm_cmd = shutil.which("npm")
+    node_ver = "Not installed"
+    npm_ver = "Not installed"
+    node_ok = False
+    if node_cmd:
+        try:
+            res = subprocess.run([node_cmd, "-v"], capture_output=True, text=True, timeout=5)
+            if res.returncode == 0:
+                node_ver = res.stdout.strip()
+                node_ok = True
+        except Exception:
+            pass
+    if npm_cmd:
+        try:
+            res = subprocess.run([npm_cmd, "-v"], capture_output=True, text=True, timeout=5, shell=(sys.platform == "win32"))
+            if res.returncode == 0:
+                npm_ver = res.stdout.strip()
+        except Exception:
+            pass
+
+    results["nodejs"] = node_ok
+    if node_ok:
+        print(f"  {c(GREEN, '✓')} Node.js Runtime        : {c(GREEN, f'{node_ver} (npm v{npm_ver})')}")
+        print(c(DIM, f"     Path: {node_cmd}"))
+    else:
+        print(f"  {c(RED, '❌')} Node.js Runtime        : {c(RED, 'Not detected / Missing')}")
+        fixes.append("Install Node.js LTS via: winget install OpenJS.NodeJS.LTS")
+
+    # 3. Git Check
+    git_cmd = shutil.which("git")
+    git_ver = "Not installed"
+    git_ok = False
+    if git_cmd:
+        try:
+            res = subprocess.run([git_cmd, "--version"], capture_output=True, text=True, timeout=5)
+            if res.returncode == 0:
+                git_ver = res.stdout.strip()
+                git_ok = True
+        except Exception:
+            pass
+    results["git"] = git_ok
+    if git_ok:
+        print(f"  {c(GREEN, '✓')} Git Version Control    : {c(GREEN, git_ver)}")
+    else:
+        print(f"  {c(YELLOW, '⚠️')} Git Version Control    : {c(YELLOW, 'Not detected')}")
+        fixes.append("Install Git via: winget install Git.Git")
+
+    # 4. Core Python Dependencies Check
+    core_libs = [
+        ("telebot", "pyTelegramBotAPI"),
+        ("dotenv", "python-dotenv"),
+        ("requests", "requests"),
+        ("edge_tts", "edge-tts"),
+        ("websocket", "websocket-client"),
+        ("PIL", "Pillow"),
+        ("speech_recognition", "SpeechRecognition"),
+        ("pydub", "pydub"),
+        ("imageio", "imageio"),
+        ("numpy", "numpy")
+    ]
+    missing_libs = []
+    for mod_name, pkg_name in core_libs:
+        try:
+            __import__(mod_name)
+        except ImportError:
+            missing_libs.append(pkg_name)
+
+    results["python_libraries"] = (len(missing_libs) == 0)
+    if not missing_libs:
+        print(f"  {c(GREEN, '✓')} Python Libraries        : {c(GREEN, f'All core packages verified ({len(core_libs)}/{len(core_libs)})')}")
+    else:
+        missing_str = ", ".join(missing_libs)
+        print(f"  {c(RED, '❌')} Python Libraries        : {c(RED, f'Missing: {missing_str}')}")
+        fixes.append("Install missing Python packages: pip install -r requirements.txt")
+
+    # 5. Node.js Music Remote Dependencies
+    yt_music_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "node_modules", "ytmusic-api", "package.json")
+    results["node_dependencies"] = os.path.exists(yt_music_pkg)
+    if results["node_dependencies"]:
+        print(f"  {c(GREEN, '✓')} Node.js Dependencies   : {c(GREEN, 'ytmusic-api ready in node_modules')}")
+    else:
+        print(f"  {c(YELLOW, '⚠️')} Node.js Dependencies   : {c(YELLOW, 'ytmusic-api not installed in node_modules')}")
+        fixes.append("Install npm dependencies: npm install")
+
+    # 6. Computer Use & Desktop Engine
+    desktop_cmd = shutil.which("agent-desktop")
+    results["agent_desktop"] = bool(desktop_cmd)
+    if desktop_cmd:
+        print(f"  {c(GREEN, '✓')} Computer Use Engine    : {c(GREEN, 'agent-desktop active')}")
+    else:
+        print(f"  {c(YELLOW, 'ℹ')} Computer Use Engine    : {c(DIM, 'agent-desktop optional (install via npm i -g agent-desktop)')}")
+
+    # 7. Hardware GPU & VRAM
+    hw = asset_manager.detect_hardware_profile() if asset_manager else {}
+    gpu_name = hw.get("gpu_name", "CPU / Integrated Graphics")
+    vram_gb = hw.get("vram_gb", 0.0)
+    results["gpu"] = (hw.get("vram_mb", 0) > 0)
+    print(f"  {c(GREEN, '✓')} Graphics Hardware      : {c(GREEN, f'{gpu_name} ({vram_gb} GB VRAM)')}")
+
+    # 8. Visual C++ Redistributable (Windows only)
+    if sys.platform == "win32":
+        sys_dir = os.environ.get("SystemRoot", "C:\\Windows")
+        vc_exists = (
+            os.path.exists(os.path.join(sys_dir, "System32", "vcruntime140.dll")) or
+            os.path.exists(os.path.join(sys_dir, "SysWOW64", "vcruntime140.dll"))
+        )
+        results["vc_redist"] = vc_exists
+        if vc_exists:
+            print(f"  {c(GREEN, '✓')} Visual C++ Runtime     : {c(GREEN, 'VC++ 2015-2022 Redistributable installed')}")
+        else:
+            print(f"  {c(YELLOW, '⚠️')} Visual C++ Runtime     : {c(YELLOW, 'vcruntime140.dll missing (KoboldCPP might require this)')}")
+            fixes.append("Install VC++ Redistributable: winget install Microsoft.VCRedist.2015+.x64")
+
+    # Summary
+    print("-" * 70)
+    all_ok = all(v for k, v in results.items() if k in ("python", "nodejs", "python_libraries"))
+    if all_ok:
+        print(c(BOLD + GREEN, "✨ All critical prerequisites are verified and healthy! Waifu is ready to run."))
+    else:
+        print(c(BOLD + RED, "⚠️ Some required tools/libraries are missing!"))
+        print("Recommended actions:")
+        for i, fix in enumerate(fixes, 1):
+            print(f"  [{i}] {fix}")
+
+        if interactive and fixes:
+            do_fix = input("\nWould you like Waifu to attempt auto-repairing missing dependencies now? [Y/n, default: Y]: ").strip().lower()
+            if do_fix != "n":
+                auto_repair_prerequisites(fixes)
+
+    if interactive:
+        input("\nPress Enter to return to menu...")
+    return results
+
+def auto_repair_prerequisites(fixes: List[str]):
+    print(c(CYAN, "\n🔧 Starting automated repair of prerequisites..."))
+    proj_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Run pip install -r requirements.txt
+    req_path = os.path.join(proj_dir, "requirements.txt")
+    if os.path.exists(req_path):
+        print(c(CYAN, "  >> Running: pip install -r requirements.txt..."))
+        try:
+            res = subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_path, "--quiet", "--disable-pip-version-check"])
+            if res.returncode == 0:
+                print(c(GREEN, "  ✓ Python libraries installed successfully."))
+        except Exception as e:
+            print(c(YELLOW, f"  ⚠️ pip error: {e}"))
+
+    # Run npm install
+    npm_cmd = shutil.which("npm")
+    if npm_cmd:
+        print(c(CYAN, "  >> Running: npm install..."))
+        try:
+            res = subprocess.run([npm_cmd, "install", "--no-audit", "--no-fund", "--silent"], cwd=proj_dir, shell=(sys.platform == "win32"))
+            if res.returncode == 0:
+                print(c(GREEN, "  ✓ npm dependencies installed successfully."))
+        except Exception as e:
+            print(c(YELLOW, f"  ⚠️ npm error: {e}"))
+
 def run_menu():
     env_vars = read_env()
     has_token = bool(env_vars.get("TELEGRAM_BOT_TOKEN"))
@@ -950,11 +1159,12 @@ def run_menu():
         print("  [9] 💻 Configure Coding Workspace & Projects Directory (/projects)")
         print("  [10] 🚀 Configure Autorun at System Startup (On / Off)")
         print("  [11] 🌐 Configure Default Browser Profile (Chrome / Edge / Brave)")
-        print("  [12] 🔄 Re-run Complete Setup Wizard")
+        print("  [12] 🩺 System Pre-flight Diagnostics & Health Check (Tools, Python, Node.js)")
+        print("  [13] 🔄 Re-run Complete Setup Wizard")
         print("  [0] ❌ Exit / Done")
         print("-" * 70)
 
-        opt = input("Select option [0-12]: ").strip()
+        opt = input("Select option [0-13]: ").strip()
         if opt == "1":
             config_telegram_credentials(env_vars)
             save_config(env_vars)
@@ -988,6 +1198,8 @@ def run_menu():
             config_browser_profile(env_vars)
             save_config(env_vars)
         elif opt == "12":
+            check_system_prerequisites(interactive=True)
+        elif opt == "13":
             run_full_wizard()
             break
         elif opt == "0":
@@ -1000,6 +1212,9 @@ def run_full_wizard():
     print(c(BOLD + MAGENTA, "\n" + "=" * 70))
     print(c(BOLD + MAGENTA, "       💖 WAIFU ON TELEGRAM - FULL SETUP WIZARD 🤖       "))
     print(c(BOLD + MAGENTA, "=" * 70))
+
+    # Step 0: Pre-flight System & Tools Diagnostics
+    check_system_prerequisites(interactive=False)
 
     env_vars = read_env()
     config_telegram_credentials(env_vars)

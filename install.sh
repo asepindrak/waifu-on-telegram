@@ -35,8 +35,8 @@ else
     fi
 fi
 
-# 2. Check Python
-echo "[2/7] Checking Python environment..."
+# 2. Check Python & Node.js Runtimes
+echo "[2/7] Checking Python & Node.js environments..."
 if command -v python3 &>/dev/null; then
     PY="python3"
 elif command -v python &>/dev/null; then
@@ -47,9 +47,39 @@ else
 fi
 echo "  ✓ Python: $($PY --version)"
 
+# Check Node.js upfront
+if ! command -v node &>/dev/null; then
+    echo "  >> Node.js not detected. Auto-installing Node.js LTS..."
+    if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &>/dev/null; then
+        echo "     Installing Node.js via Homebrew..."
+        brew install node || true
+    else
+        echo "     Installing Node.js LTS via NVM..."
+        export NVM_DIR="$HOME/.nvm"
+        if [ ! -d "$NVM_DIR" ]; then
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash || true
+        fi
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm install --lts || true
+        nvm use --lts || true
+    fi
+fi
+
+if command -v node &>/dev/null; then
+    echo "  ✓ Node.js active: $(node -v) (npm $(npm -v 2>/dev/null || echo 'N/A'))"
+else
+    echo "  ℹ Node.js not detected. (Music remote feature will be disabled)."
+fi
+
 # 3. Install dependencies
-echo "[3/7] Installing Python dependencies..."
+echo "[3/7] Installing dependencies (Python requirements & npm)..."
 $PY -m pip install -r requirements.txt --quiet --disable-pip-version-check
+echo "  ✓ Python libraries installed successfully."
+
+if command -v npm &>/dev/null; then
+    npm install --silent
+    echo "  ✓ Node.js dependencies installed successfully."
+fi
 
 # 4. Check & Setup Local LLM Engine (KoboldCPP)
 echo "[4/7] Checking Local LLM Engine (Chat & Romance Brain)..."
@@ -105,35 +135,11 @@ else
     echo "  ✓ Vision Adapter detected: $(basename "$EXISTING_MMPROJ")"
 fi
 
-# 5. Check & Auto-Install Node.js for PC Music Remote
-echo "[5/7] Checking Node.js for Music Remote..."
-if ! command -v node &>/dev/null; then
-    echo "  >> Node.js not detected. Auto-installing Node.js..."
-    if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &>/dev/null; then
-        echo "     Installing Node.js via Homebrew..."
-        brew install node || true
-    else
-        echo "     Installing Node.js LTS via NVM..."
-        export NVM_DIR="$HOME/.nvm"
-        if [ ! -d "$NVM_DIR" ]; then
-            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash || true
-        fi
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm install --lts || true
-        nvm use --lts || true
-    fi
+# 5. Register global CLI script
+echo "[5/7] Registering global CLI 'waifu'..."
+if command -v npm &>/dev/null; then
+    npm link --silent || true
 fi
-
-if command -v node &>/dev/null; then
-    echo "  ✓ Node.js active: $(node -v). Installing npm packages..."
-    npm install --silent
-    echo "  ✓ YouTube Music Remote dependencies installed successfully."
-else
-    echo "  ℹ Node.js could not be installed automatically. Music remote feature will be disabled."
-fi
-
-# 6. Register global CLI script
-echo "[6/7] Registering global CLI 'waifu' in ~/.local/bin..."
 mkdir -p "$HOME/.local/bin"
 cat <<EOF > "$HOME/.local/bin/waifu"
 #!/usr/bin/env bash

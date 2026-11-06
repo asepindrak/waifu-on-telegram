@@ -4,8 +4,8 @@
   "description": "Waifu on Telegram - Autonomous AI Girlfriend & Romance Companion Powered by Local LLM & ComfyUI (SFW & NSFW)",
   "main": "music_player_server.js",
   "bin": {
-    "waifu": "./bin/cli.py",
-    "waifu-on-telegram": "./bin/cli.py"
+    "waifu": "./bin/waifu.js",
+    "waifu-on-telegram": "./bin/waifu.js"
   },
   "scripts": {
     "start": "python bot.py",
