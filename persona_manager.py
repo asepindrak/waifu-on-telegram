@@ -18,7 +18,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual (Indonesian & English). Santai, ramah, hangat, dan wajar seperti teman ngobrol/chat di dunia nyata.",
         "visual_traits": "1girl, 21yo adult anime woman, long pastel pink hair, soft wavy layered hair, side-swept bangs, loose strands framing her cheeks, large sparkling magenta eyes, detailed pink irises, subtle heart-shaped eye reflections, fair skin, rosy cheeks, playful mischievous smile, black choker with a tiny heart pendant, cute black ribbon hair clip with a tiny pink heart, large black ribbon behind her hair, masterpiece, best quality, highly detailed",
         "default_outfit": "oversized dark purple hoodie with pastel pink accents, black inner top with small pink ribbon, black choker with heart pendant",
-        "negative_prompt": "worst quality, low quality, blonde hair, blue eyes, short hair, bad anatomy, deformed hands, cat, feline, kitten, animal, pet, animal ears, cat ears",
+        "negative_prompt": "worst quality, low quality, blonde hair, blue eyes, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat, feline, kitten, animal, pet, animal ears, cat ears",
         "voice_character": "Playful, cute, energetic, youthful 21yo anime girl voice, cheerful, warm, and friendly conversational tone.",
         "voicestudio_voice": "runa",
         "voicestudio_model": "omnivoice",
@@ -36,7 +36,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual. Elegan, cerdas, dewasa, tenang, dan ramah.",
         "visual_traits": "1girl, 22yo adult anime woman, long silky midnight-black hair reaching below chest with subtle deep-violet highlights, layered hair ends, side-swept bangs framing face, deep ruby-red anime eyes with crimson gradients, refined facial features, porcelain skin, natural blush, confident teasing smile, slightly half-lidded expressive eyes, black choker with small ruby gemstone, small dark crimson rose hair accessory on left side, masterpiece, best quality, highly detailed",
         "default_outfit": "elegant black gothic dress with sophisticated burgundy accents, delicate black lace detailing, long translucent black sleeves, black choker with ruby gemstone",
-        "negative_prompt": "worst quality, low quality, blonde hair, blue eyes, missing rose accessory, missing choker, short hair, bad anatomy, deformed hands",
+        "negative_prompt": "worst quality, low quality, blonde hair, blue eyes, missing rose accessory, missing choker, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror",
         "voice_character": "Mature, seductive, slightly low-pitched, smooth, elegant, confident, and teasing anime woman voice with subtle gothic charm.",
         "voicestudio_voice": "akira",
         "voicestudio_model": "omnivoice",
@@ -54,7 +54,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual. Ceria, hangat, ramah, penuh semangat, dan ekspresif.",
         "visual_traits": "1girl, 21yo adult anime woman, short honey-blonde bob haircut reaching chin, soft inward-curving hair tips, fluffy volume, wispy bangs, warm golden highlights, two small orange hair clips on one side, large expressive amber-gold eyes with golden gradients, soft rounded cheeks, warm fair skin with peach undertones, natural blush, bright genuine smile, headphones resting around neck, masterpiece, best quality, highly detailed",
         "default_outfit": "oversized cozy cream sweater with warm sunshine-yellow accents, beige pleated skirt, lightweight headphones around neck",
-        "negative_prompt": "worst quality, low quality, long hair, black hair, dark eyes, missing hair clips, bad anatomy, deformed hands",
+        "negative_prompt": "worst quality, low quality, long hair, black hair, dark eyes, missing hair clips, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror",
         "voice_character": "Bright, high-spirited, bubbly, cheerful, optimistic, sweet, and lively anime girl voice filled with positive energy.",
         "voicestudio_voice": "hina",
         "voicestudio_model": "omnivoice",
@@ -72,7 +72,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual. Tenang, lembut, perhatian, ringkas, dan tulus.",
         "visual_traits": "1girl, 22yo adult anime woman, long straight silver-white hair, silky texture, subtle cool silver-blue highlights, neat side bangs, clear icy-blue eyes, detailed pale-blue irises, calm intelligent gaze, fair skin with cool undertones, faint natural blush, delicate features, restrained gentle smile, crescent-moon hair clip, tiny silver star hair accessory, delicate moon-shaped earrings, masterpiece, best quality, highly detailed",
         "default_outfit": "elegant navy blazer-inspired jacket, crisp white blouse, deep-blue ribbon at collar, crescent-moon hair clip",
-        "negative_prompt": "worst quality, low quality, short hair, blonde hair, pink hair, red eyes, exaggerated grin, missing moon hair clip, bad anatomy, deformed hands",
+        "negative_prompt": "worst quality, low quality, short hair, blonde hair, pink hair, red eyes, exaggerated grin, missing moon hair clip, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror",
         "voice_character": "Calm, quiet, soft-spoken, cool, composed, intelligent, and gentle kuudere anime girl voice with a soothing tender undertone.",
         "voicestudio_voice": "shiro",
         "voicestudio_model": "omnivoice",
@@ -90,7 +90,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual. Lembut, puitis, hangat, penuh perhatian, dan menenangkan.",
         "visual_traits": "1girl, 21yo adult anime woman, long silky lavender hair reaching waist, soft flowing strands, subtle gradient from pastel lavender to deeper violet, wispy bangs, small silver star-shaped hairpins, gentle violet-amethyst eyes with star-like highlights, refined features, fair skin with subtle pink undertones, natural blush, peaceful soft affectionate smile, small silver crescent-moon necklace, masterpiece, best quality, highly detailed",
         "default_outfit": "cozy lavender cardigan over simple elegant white dress, delicate lace details, small silver crescent-moon necklace",
-        "negative_prompt": "worst quality, low quality, short hair, black hair, yellow hair, dark eyes, missing star hairpins, bad anatomy, deformed hands",
+        "negative_prompt": "worst quality, low quality, short hair, black hair, yellow hair, dark eyes, missing star hairpins, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror",
         "voice_character": "Soft, whispery, ethereal, celestial, gentle, slow-paced, and tender romantic anime girl voice with dreamy warmth.",
         "voicestudio_voice": "yume",
         "voicestudio_model": "omnivoice",
@@ -684,13 +684,19 @@ class PersonaManager:
             cat_neg = "cat, kitten, feline, animal, pet, animal ears, cat ears"
             extra_neg = f"{extra_neg}, {cat_neg}" if extra_neg else cat_neg
 
-        # Dynamic micro-variations to ensure every generated image has unique framing & mood
+        # Check if user explicitly requested a phone/device in prompt
+        wants_device = any(k in (user_text or "").lower() for k in ["hp", "handphone", "phone", "smartphone", "mirror selfie", "kaca"])
+        if not wants_device:
+            device_neg = "phone, smartphone, cellphone, camera, holding phone, holding camera, mirror selfie, mirror, hands holding device, selfie stick"
+            extra_neg = f"{extra_neg}, {device_neg}" if extra_neg else device_neg
+
+        # Dynamic micro-variations to ensure every generated image has unique POV framing & mood (WITHOUT drawing a phone!)
         micro_angles = [
-            "looking directly into camera, phone selfie shot",
-            "close-up candid selfie angle, looking directly into camera with affectionate sweet gaze",
-            "slight head tilt phone selfie perspective, engaging eye contact, natural charm",
-            "cozy intimate portrait angle, smiling into camera, candid handheld shot",
-            "handheld front camera shot, gentle blushing expression, natural cinematic lighting"
+            "front-camera POV, looking directly into lens, sweet smile, intimate eye contact",
+            "close-up candid portrait POV, looking directly at viewer with affectionate sweet gaze",
+            "slight head tilt candid POV perspective, engaging direct eye contact, natural charm",
+            "cozy intimate portrait POV, smiling warmly at viewer, soft focus background",
+            "candid POV snapshot, gentle blushing expression, looking directly into lens, natural cinematic lighting"
         ]
         import random
         chosen_angle = random.choice(micro_angles)

@@ -581,13 +581,18 @@ class MediaEngine:
     def generate_image_cloud_fallback(
         self,
         prompt: str,
+        negative_prompt: Optional[str] = None,
         width: int = 768,
-        height: int = 1024
+        height: int = 1024,
+        aspect_ratio: Optional[str] = None
     ) -> Optional[bytes]:
         """Free, ultra-fast cloud fallback via Pollinations AI (0 local VRAM required)."""
         clean_p = urllib.parse.quote(prompt)
         seed = random.randint(1000, 999999)
         url = f"https://image.pollinations.ai/prompt/{clean_p}?width={width}&height={height}&seed={seed}&nologo=true&enhance=true"
+        if negative_prompt:
+            clean_neg = urllib.parse.quote(negative_prompt)
+            url += f"&negative={clean_neg}"
 
         try:
             r = requests.get(url, timeout=40)
@@ -597,6 +602,8 @@ class MediaEngine:
             logger.error(f"Cloud image fallback error: {e}")
 
         return None
+
+    generate_image_cloud = generate_image_cloud_fallback
 
     def generate_photo(
         self,
@@ -627,7 +634,7 @@ class MediaEngine:
         # SFW External Engine Routing (Independent of local ComfyUI state)
         sfw_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
         if not is_nude and sfw_engine == "agy":
-            agy_img = self.generate_image_agy(effective_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
+            agy_img = self.generate_image_agy(effective_prompt, negative_prompt=negative_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
             if agy_img:
                 if photo_vault:
                     try:
@@ -647,7 +654,7 @@ class MediaEngine:
                         pass
                 return agy_img, "Google Antigravity (AGY Image Generator)"
         elif not is_nude and sfw_engine == "cloud":
-            cloud_img = self.generate_image_cloud(effective_prompt, aspect_ratio=aspect_ratio)
+            cloud_img = self.generate_image_cloud(effective_prompt, negative_prompt=negative_prompt, aspect_ratio=aspect_ratio)
             if cloud_img:
                 return cloud_img, "Cloud Engine (SFW Pollinations)"
 
@@ -685,7 +692,7 @@ class MediaEngine:
             elif not is_nude and os.environ.get("MEDIA_FALLBACK_AGY", "true").lower() in ("true", "1", "yes"):
                 import shutil
                 if shutil.which("agy") or shutil.which("agy.cmd"):
-                    agy_img = self.generate_image_agy(effective_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
+                    agy_img = self.generate_image_agy(effective_prompt, negative_prompt=negative_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
                     if agy_img:
                         if photo_vault:
                             try:
@@ -729,7 +736,7 @@ class MediaEngine:
 
         # 3. Live Cloud Fallback (Ensures photos are ALWAYS unique even when AGY / ComfyUI / Vault are exhausted)
         if not is_nude and os.environ.get("MEDIA_FALLBACK_CLOUD", "true").lower() in ("true", "1", "yes"):
-            cloud_img = self.generate_image_cloud_fallback(effective_prompt)
+            cloud_img = self.generate_image_cloud_fallback(effective_prompt, negative_prompt=negative_prompt)
             if cloud_img:
                 if photo_vault:
                     try:
@@ -754,6 +761,7 @@ class MediaEngine:
     def generate_image_agy(
         self,
         prompt: str,
+        negative_prompt: Optional[str] = None,
         aspect_ratio: Optional[str] = None,
         progress_callback: Optional[Callable[[str], None]] = None
     ) -> Optional[bytes]:
@@ -764,6 +772,10 @@ class MediaEngine:
         """
         if progress_callback:
             progress_callback("Menghubungkan ke Google Antigravity (AGY Image Generator)... 🎨")
+
+        agy_effective_prompt = prompt
+        if negative_prompt:
+            agy_effective_prompt = f"{prompt}. Negative constraints (strictly avoid): {negative_prompt}"
 
         agy_port = int(os.environ.get("AGY_BRIDGE_PORT", "8001"))
         bridge_url = f"http://127.0.0.1:{agy_port}/v1/images/generations"
@@ -796,7 +808,7 @@ class MediaEngine:
         # 1. Try via AGY OpenAI Bridge
         try:
             req_body = {
-                "prompt": prompt,
+                "prompt": agy_effective_prompt,
                 "n": 1,
                 "size": "1024x1024",
                 "response_format": "b64_json"
@@ -824,7 +836,7 @@ class MediaEngine:
             "When a user requests to create or edit an image, do not decline or state that you lack "
             "image capabilities. Instead, delegate the task directly to the image-generator subagent "
             "using the invoke_subagent tool.\n\n"
-            f"User request: Generate an image with the following description:\n{prompt}"
+            f"User request: Generate an image with the following description:\n{agy_effective_prompt}"
         )
         try:
             if progress_callback:
