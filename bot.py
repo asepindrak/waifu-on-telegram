@@ -3797,8 +3797,13 @@ def process_photo_request(
             }
 
             with ChatActionLoop(bot, chat_id, "upload_photo"):
-                if is_nude or not media_engine.allow_cloud_fallback or os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip() == "comfyui":
-                    idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id)
+                sfw_img_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
+                if is_nude:
+                    idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id, is_nude=True)
+                elif sfw_img_engine == "comfyui":
+                    idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id, is_nude=False)
+                elif sfw_img_engine == "agy":
+                    idle_engine.ensure_agy_bridge_active()
 
                 def photo_progress(stage_text: str):
                     if status_msg and hasattr(status_msg, "message_id"):

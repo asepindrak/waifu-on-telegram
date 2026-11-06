@@ -505,11 +505,17 @@ class IdleEngine:
         self.record_activity()
         return ok
 
-    def ensure_comfyui_active(self, bot=None, chat_id: Optional[int] = None) -> bool:
+    def ensure_comfyui_active(self, bot=None, chat_id: Optional[int] = None, is_nude: bool = False) -> bool:
         """
         Ensures ComfyUI is active before generating photos/videos on-demand.
+        If user configured AGY or Cloud as active image engine, ComfyUI is bypassed.
         """
         if not self.enabled or not self.comfyui_on_demand:
+            return True
+
+        # Check if active visual engine actually uses ComfyUI
+        sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
+        if not is_nude and sfw_img in ("agy", "cloud"):
             return True
 
         if self.is_comfyui_ready():

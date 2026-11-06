@@ -116,6 +116,26 @@ class TestIdleEngine(unittest.TestCase):
             edit_args = mock_bot.edit_message_text.call_args[0]
             self.assertIn("belum bisa dibangunkan", edit_args[0])
 
+    def test_ensure_comfyui_active_bypasses_for_agy_sfw(self):
+        """When SFW_IMAGE_ENGINE is agy, ensure_comfyui_active immediately returns True without alerting Telegram."""
+        mock_bot = MagicMock()
+        with patch.dict(os.environ, {"SFW_IMAGE_ENGINE": "agy"}), \
+             patch.object(self.idle_engine, "wake_comfyui") as mock_wake:
+            ok = self.idle_engine.ensure_comfyui_active(bot=mock_bot, chat_id=123, is_nude=False)
+            self.assertTrue(ok)
+            mock_wake.assert_not_called()
+            mock_bot.send_message.assert_not_called()
+
+    def test_ensure_comfyui_active_wakes_comfyui_for_nude(self):
+        """When is_nude is True, ensure_comfyui_active targets local ComfyUI regardless of SFW_IMAGE_ENGINE."""
+        mock_bot = MagicMock()
+        with patch.dict(os.environ, {"SFW_IMAGE_ENGINE": "agy"}), \
+             patch.object(self.idle_engine, "is_comfyui_ready", return_value=False), \
+             patch.object(self.idle_engine, "wake_comfyui", return_value=True) as mock_wake:
+            ok = self.idle_engine.ensure_comfyui_active(bot=mock_bot, chat_id=123, is_nude=True)
+            self.assertTrue(ok)
+            mock_wake.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
