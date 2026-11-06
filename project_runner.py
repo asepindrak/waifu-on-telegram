@@ -487,3 +487,4 @@ def get_project_runner() -> ProjectRunner:
     if _GLOBAL_PROJECT_RUNNER is None:
         _GLOBAL_PROJECT_RUNNER = ProjectRunner()
     return _GLOBAL_PROJECT_RUNNER
+

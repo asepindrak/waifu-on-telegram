@@ -116,6 +116,31 @@ class TestComputerUseEngine(unittest.TestCase):
         if apps:
             self.assertIsInstance(apps[0], str)
 
+    def test_list_chrome_profiles(self):
+        """Verify list_chrome_profiles reads profiles safely."""
+        profs = self.cu.list_chrome_profiles()
+        self.assertIsInstance(profs, list)
+        if profs:
+            p = profs[0]
+            self.assertIn("folder", p)
+            self.assertIn("name", p)
+
+    @patch("subprocess.Popen")
+    @patch("shutil.which", return_value="C:\\Program Files\\Google\\Chrome\\chrome.exe")
+    def test_launch_chrome_with_profile(self, mock_which, mock_popen):
+        """Verify launch_chrome uses --profile-directory flag correctly."""
+        with patch.object(self.cu, "list_chrome_profiles", return_value=[
+            {"folder": "Profile 1", "name": "Work", "email": "work@company.com"},
+            {"folder": "Default", "name": "Personal", "email": "me@gmail.com"}
+        ]):
+            ok, msg = self.cu.launch_chrome("https://instagram.com", profile_query="Work")
+            self.assertTrue(ok)
+            self.assertIn("Profile 1", msg)
+            mock_popen.assert_called_once()
+            args = mock_popen.call_args[0][0]
+            self.assertIn("--profile-directory=Profile 1", args)
+            self.assertIn("https://instagram.com", args)
+
 
 class TestCodingEngine(unittest.TestCase):
     def setUp(self):
