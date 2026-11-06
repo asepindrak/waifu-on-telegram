@@ -189,10 +189,16 @@ class HealthEngine:
 
     def heal_llm(self) -> bool:
         """
-        Attempts to automatically start or resurrect the local LLM service (KoboldCPP / Ollama).
+        Attempts to automatically start or resurrect the active LLM service (AGY Bridge / KoboldCPP / Ollama).
         Guarantees strict singleton execution: prevents multiple KoboldCPP instances from spawning.
         Returns True if service is running and healthy.
         """
+        # If active LLM is AGY OpenAI Bridge (Port 8001)
+        base_url = getattr(self.llm_client, "base_url", "")
+        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
+        if sfw_p == "agy" or ":8001" in str(base_url):
+            return self.heal_agy()
+
         with _KOBOLD_SPAWN_LOCK:
             if is_port_listening(5001):
                 stat = self.llm_client.check_health()
@@ -424,11 +430,13 @@ class HealthEngine:
         try:
             popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
             logger.info("Self-healing: Spawning AGY OpenAI Bridge on port 8001...")
-            subprocess.Popen([sys.executable, agy_script], cwd=self.project_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
-            for _ in range(10):
+            log_path = os.path.join(self.project_root, "agy_bridge.log")
+            with open(log_path, "a", encoding="utf-8") as f_log:
+                subprocess.Popen([sys.executable, agy_script], cwd=self.project_root, stdout=f_log, stderr=f_log, **popen_kwargs)
+            for _ in range(30):
                 time.sleep(0.5)
                 if is_port_listening(8001):
-                    logger.info("Self-healing: AGY Bridge restored successfully.")
+                    logger.info("Self-healing: AGY Bridge restored successfully on port 8001.")
                     return True
         except Exception as e:
             logger.error(f"Self-healing failed to spawn AGY Bridge: {e}")

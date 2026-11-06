@@ -369,10 +369,13 @@ class HybridLLMClient:
                     if os.path.exists(agy_script):
                         logger.info("AGY Bridge is offline. Auto-starting AGY OpenAI Bridge on port 8001...")
                         popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
-                        subprocess.Popen([sys.executable, agy_script], cwd=proj_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
-                        for _ in range(10):
+                        log_path = os.path.join(proj_root, "agy_bridge.log")
+                        with open(log_path, "a", encoding="utf-8") as f_log:
+                            subprocess.Popen([sys.executable, agy_script], cwd=proj_root, stdout=f_log, stderr=f_log, **popen_kwargs)
+                        for _ in range(24):
                             time.sleep(0.5)
                             if is_port_listening(8001):
+                                logger.info("✓ AGY OpenAI Bridge successfully awakened on port 8001.")
                                 break
                 except Exception as e_start:
                     logger.debug(f"Failed to auto-start AGY bridge: {e_start}")
@@ -398,12 +401,13 @@ class HybridLLMClient:
                 image_bytes=image_bytes
             )
         except Exception as e:
-            # Automatic Safety Fallback:
-            # If SFW provider (e.g. OpenAI / Groq) rejected prompt due to safety policy,
-            # or if SFW is unreachable, seamlessly retry with uncensored NSFW engine!
+            # Automatic High-Availability Fallback:
+            # If primary provider rejected prompt or is unreachable, seamlessly retry with backup engine!
             err_str = str(e).lower()
             is_policy_violation = any(k in err_str for k in ["policy", "filter", "safety", "moderation", "violat", "blocked", "forbidden", "400"])
-            if target_client != self.nsfw_client and (is_policy_violation or "connection" in err_str):
+            is_conn_error = any(k in err_str for k in ["connection", "timeout", "refused", "10061", "max retries"])
+
+            if target_client != self.nsfw_client and (is_policy_violation or is_conn_error):
                 logger.warning(f"SFW LLM rejection / failure ({e}). Auto-redirecting to NSFW Uncensored Engine...")
                 return self.nsfw_client.chat(
                     messages,
@@ -411,6 +415,22 @@ class HybridLLMClient:
                     max_tokens=max_tokens,
                     image_bytes=image_bytes
                 )
+
+            # High-Availability fallback between port 8001 (AGY) and port 5001 (KoboldCPP)
+            if is_conn_error:
+                from idle_engine import is_port_listening
+                from lu_llm_client import LocallyUncensoredClient
+
+                if "8001" in str(client_url) and is_port_listening(5001):
+                    logger.warning(f"AGY Bridge unreachable ({e}). Seamlessly falling back to local KoboldCPP (port 5001)...")
+                    backup = LocallyUncensoredClient(base_url="http://127.0.0.1:5001/v1", model="default")
+                    return backup.chat(messages, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
+
+                elif "5001" in str(client_url) and is_port_listening(8001):
+                    logger.warning(f"Local KoboldCPP unreachable ({e}). Seamlessly falling back to AGY Bridge (port 8001)...")
+                    backup = LocallyUncensoredClient(base_url="http://127.0.0.1:8001/v1", model="gemini-3.8-flash-medium")
+                    return backup.chat(messages, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
+
             raise
 
 

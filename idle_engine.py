@@ -98,7 +98,22 @@ class IdleEngine:
                 self.last_agy_activity = now
 
     def is_llm_ready(self) -> bool:
-        """Checks if KoboldCPP / LLM service is online and listening on port 5001."""
+        """Checks if active LLM service is online and listening."""
+        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
+        sfw_url = os.environ.get("SFW_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", ""))
+
+        # AGY OpenAI Bridge (Port 8001)
+        if sfw_p == "agy" or ":8001" in sfw_url:
+            return is_port_listening(8001)
+
+        # Ollama (Port 11434)
+        if ":11434" in sfw_url:
+            return is_port_listening(11434)
+
+        # Remote Cloud (OpenAI, Groq, etc.)
+        if sfw_url and not any(p in sfw_url for p in ["127.0.0.1", "localhost"]):
+            return True
+
         if not is_port_listening(5001):
             return False
         if self.health_engine and hasattr(self.health_engine, "llm_client"):
@@ -206,13 +221,15 @@ class IdleEngine:
                 return False
             try:
                 popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
-                subprocess.Popen([sys.executable, agy_script], cwd=self.project_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
-                for _ in range(timeout_seconds):
-                    time.sleep(1)
+                log_path = os.path.join(self.project_root, "agy_bridge.log")
+                with open(log_path, "a", encoding="utf-8") as f_log:
+                    subprocess.Popen([sys.executable, agy_script], cwd=self.project_root, stdout=f_log, stderr=f_log, **popen_kwargs)
+                for _ in range(timeout_seconds * 2):
+                    time.sleep(0.5)
                     if self.is_agy_bridge_ready():
                         self.is_agy_sleeping = False
                         self.record_activity(is_agy=True)
-                        logger.info("✓ Smart Idle: AGY OpenAI Bridge successfully awakened!")
+                        logger.info("✓ Smart Idle: AGY OpenAI Bridge successfully awakened on port 8001!")
                         return True
             except Exception as e:
                 logger.error(f"Failed to wake AGY Bridge: {e}")
@@ -280,9 +297,17 @@ class IdleEngine:
 
     def wake_llm(self, timeout_seconds: int = 40) -> bool:
         """
-        Wakes KoboldCPP on-demand.
-        Loads model weights into VRAM and waits until port 5001 is responsive.
+        Wakes active LLM on-demand (AGY Bridge or KoboldCPP).
         """
+        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
+        sfw_url = os.environ.get("SFW_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", ""))
+        if sfw_p == "agy" or ":8001" in sfw_url:
+            ok = self.wake_agy_bridge(timeout_seconds=min(timeout_seconds, 20))
+            if ok:
+                self.is_llm_sleeping = False
+                self.record_activity()
+            return ok
+
         with self.wake_lock:
             if self.is_llm_ready():
                 self.is_llm_sleeping = False
@@ -612,13 +637,15 @@ class IdleEngine:
                             )
                             self.sleep_voicestudio()
 
-                # 4. Check AGY Bridge idle
+                # 4. Check AGY Bridge idle (Only sleep if NOT active primary LLM!)
                 sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
-                sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "").lower().strip()
-                if (sfw_p == "agy" or sfw_img == "agy" or is_port_listening(8001)):
+                llm_url = os.environ.get("LLM_BASE_URL", "")
+                is_active_agy_llm = (sfw_p == "agy" or ":8001" in llm_url)
+
+                if not is_active_agy_llm and is_port_listening(8001):
                     agy_idle_sec = self.agy_timeout_minutes * 60
                     if (now - self.last_agy_activity) >= agy_idle_sec:
-                        if is_port_listening(8001) and not self.is_agy_sleeping:
+                        if not self.is_agy_sleeping:
                             logger.info(
                                 f"💤 Smart Idle: No AGY Bridge activity for {self.agy_timeout_minutes}m. "
                                 f"Putting AGY Bridge to sleep to free RAM..."
