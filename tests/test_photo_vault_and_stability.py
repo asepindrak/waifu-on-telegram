@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import photo_vault
 from lu_llm_client import LocallyUncensoredClient
+from media_engine import format_agy_error, MediaEngine
 
 class TestPhotoVaultAndStability(unittest.TestCase):
 
@@ -133,6 +134,33 @@ class TestPhotoVaultAndStability(unittest.TestCase):
         client = LocallyUncensoredClient()
         self.assertEqual(client.base_url, "http://127.0.0.1:5001/v1")
         self.assertEqual(client.get_api_key(), "kobold")
+
+    def test_format_agy_error(self):
+        err_429 = "Failed to generate image: Quota exhausted (429 RESOURCE_EXHAUSTED). Reset in 3 hours."
+        res = format_agy_error(err_429)
+        self.assertIn("Batas kuota model gambar Google Antigravity habis", res)
+
+        err_refused = "Connection refused: [WinError 10061] No connection could be made"
+        res2 = format_agy_error(err_refused)
+        self.assertIn("AGY Bridge (port 8001) terputus", res2)
+
+    def test_fallback_notice_captured_when_generator_fails(self):
+        me = MediaEngine()
+        def mock_agy(*args, **kwargs):
+            me.last_error = "Quota exhausted (429 RESOURCE_EXHAUSTED)"
+            return None
+
+        with patch.object(me, "generate_image_agy", side_effect=mock_agy), \
+             patch.object(me, "generate_image_cloud_fallback", return_value=b"CLOUD_FALLBACK_BYTES"):
+            with patch.dict(os.environ, {"SFW_IMAGE_ENGINE": "agy"}):
+                res, label = me.generate_photo("selfie in park", persona="akira")
+                # When primary AGY fails, last_fallback_notice must be populated
+                self.assertIsNotNone(me.last_fallback_notice)
+                self.assertEqual(me.last_fallback_notice["primary_engine"], "Google Antigravity (AGY)")
+                self.assertIn("Batas kuota model gambar Google Antigravity habis", me.last_fallback_notice["error"])
+                # Fallback delivers image via Vault or Cloud
+                self.assertEqual(res, b"CLOUD_FALLBACK_BYTES")
+                self.assertIn("Cloud Engine", label)
 
 if __name__ == "__main__":
     unittest.main()

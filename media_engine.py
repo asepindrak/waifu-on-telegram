@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import json
 import uuid
@@ -49,6 +50,22 @@ def format_comfy_validation_error(res: requests.Response) -> str:
     except Exception:
         pass
     return f"ComfyUI menolak prompt (HTTP {res.status_code}): {res.text[:250]}"
+
+def format_agy_error(raw_err: Optional[str]) -> str:
+    """Formats a concise, user-friendly explanation of why AGY image generation failed."""
+    if not raw_err:
+        return "Layanan Google Antigravity (AGY) tidak memberikan respon gambar."
+    raw_lower = raw_err.lower()
+    if "429" in raw_err or "quota exhausted" in raw_lower or "resource_exhausted" in raw_lower:
+        return "Batas kuota model gambar Google Antigravity habis (429 RESOURCE_EXHAUSTED). Model sedang cooldown."
+    if "connection refused" in raw_lower or "10061" in raw_err or "failed to establish a new connection" in raw_lower:
+        return "Koneksi ke AGY Bridge (port 8001) terputus atau service sedang offline."
+    if "timeout" in raw_lower or "timed out" in raw_lower:
+        return "Waktu tunggu generasi gambar AGY habis (Timeout > 120 detik)."
+    if "tidak ditemukan di path" in raw_lower:
+        return "Executable Antigravity CLI ('agy') tidak ditemukan di PATH sistem PC."
+    clean = re.sub(r'^(?:AGY CLI selesai namun tidak menemukan file gambar output:\s*|Failed to generate image:\s*|AGY Bridge error:\s*)', '', raw_err).strip()
+    return clean[:160] if clean else raw_err[:160]
 
 def extract_combo_choices(raw_field: Any) -> List[str]:
     """Safely extracts list of string choices from ComfyUI node input definitions."""
@@ -629,6 +646,7 @@ class MediaEngine:
         Returns: (image_bytes, source_label)
         """
         self.last_error = None
+        self.last_fallback_notice = None
         effective_prompt = prompt or visual_prompt
 
         # SFW External Engine Routing (Independent of local ComfyUI state)
@@ -653,66 +671,66 @@ class MediaEngine:
                     except Exception:
                         pass
                 return agy_img, "Google Antigravity (AGY Image Generator)"
+            else:
+                self.last_fallback_notice = {
+                    "primary_engine": "Google Antigravity (AGY)",
+                    "error": format_agy_error(self.last_error)
+                }
         elif not is_nude and sfw_engine == "cloud":
             cloud_img = self.generate_image_cloud(effective_prompt, negative_prompt=negative_prompt, aspect_ratio=aspect_ratio)
             if cloud_img:
                 return cloud_img, "Cloud Engine (SFW Pollinations)"
+            else:
+                self.last_fallback_notice = {
+                    "primary_engine": "Cloud Engine",
+                    "error": self.last_error or "Layanan cloud Pollinations tidak merespons."
+                }
 
         # Local ComfyUI (Used for NSFW and for SFW when engine is comfyui)
-        if self.comfyui_url:
-            local_img = self.generate_image_comfyui(
-                effective_prompt,
-                negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
-                aspect_ratio=aspect_ratio,
-                quality=quality,
-                is_nude=is_nude,
-                progress_callback=progress_callback
-            )
-            if local_img:
-                # Automatically save high-quality local render to Photo Vault
-                if photo_vault:
-                    try:
-                        ent = photo_vault.save_photo_to_vault(
-                            local_img,
-                            persona=persona,
-                            scene=scene or user_query,
-                            outfit_label=outfit_label,
-                            is_nude=is_nude,
-                            visual_prompt=effective_prompt,
-                            user_query=user_query,
-                            aspect_ratio=aspect_ratio or "3:4"
-                        )
-                        if ent and user_id and hasattr(photo_vault, "mark_photo_seen_by_user"):
-                            photo_vault.mark_photo_seen_by_user(user_id, ent.get("filename", ""))
-                    except Exception as e_save:
-                        logger.warning(f"Failed to auto-archive photo to vault: {e_save}")
-                active_ckpt = self.get_active_checkpoint(is_nude=is_nude)
-                clean_name = os.path.splitext(active_ckpt)[0]
-                return local_img, f"Local ComfyUI ({clean_name})"
-            elif not is_nude and os.environ.get("MEDIA_FALLBACK_AGY", "true").lower() in ("true", "1", "yes"):
-                import shutil
-                if shutil.which("agy") or shutil.which("agy.cmd"):
-                    agy_img = self.generate_image_agy(effective_prompt, negative_prompt=negative_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
-                    if agy_img:
-                        if photo_vault:
-                            try:
-                                ent = photo_vault.save_photo_to_vault(
-                                    agy_img,
-                                    persona=persona,
-                                    scene=scene or user_query,
-                                    outfit_label=outfit_label,
-                                    is_nude=is_nude,
-                                    visual_prompt=effective_prompt,
-                                    user_query=user_query,
-                                    aspect_ratio=aspect_ratio or "3:4"
-                                )
-                                if ent and user_id and hasattr(photo_vault, "mark_photo_seen_by_user"):
-                                    photo_vault.mark_photo_seen_by_user(user_id, ent.get("filename", ""))
-                            except Exception:
-                                pass
-                        return agy_img, "Google Antigravity (AGY Fallback)" 
-        else:
-            self.last_error = "ComfyUI URL belum dikonfigurasi (pastikan ComfyUI lokal aktif di port 8188)."
+        if is_nude or sfw_engine == "comfyui":
+            if self.comfyui_url:
+                local_img = self.generate_image_comfyui(
+                    effective_prompt,
+                    negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
+                    aspect_ratio=aspect_ratio,
+                    quality=quality,
+                    is_nude=is_nude,
+                    progress_callback=progress_callback
+                )
+                if local_img:
+                    # Automatically save high-quality local render to Photo Vault
+                    if photo_vault:
+                        try:
+                            ent = photo_vault.save_photo_to_vault(
+                                local_img,
+                                persona=persona,
+                                scene=scene or user_query,
+                                outfit_label=outfit_label,
+                                is_nude=is_nude,
+                                visual_prompt=effective_prompt,
+                                user_query=user_query,
+                                aspect_ratio=aspect_ratio or "3:4"
+                            )
+                            if ent and user_id and hasattr(photo_vault, "mark_photo_seen_by_user"):
+                                photo_vault.mark_photo_seen_by_user(user_id, ent.get("filename", ""))
+                        except Exception as e_save:
+                            logger.warning(f"Failed to auto-archive photo to vault: {e_save}")
+                    active_ckpt = self.get_active_checkpoint(is_nude=is_nude)
+                    clean_name = os.path.splitext(active_ckpt)[0]
+                    return local_img, f"Local ComfyUI ({clean_name})"
+                else:
+                    if not self.last_fallback_notice:
+                        self.last_fallback_notice = {
+                            "primary_engine": "Local ComfyUI",
+                            "error": self.last_error or "Layanan ComfyUI di port 8188 tidak merespons atau model gagal dimuat."
+                        }
+            else:
+                self.last_error = "ComfyUI URL belum dikonfigurasi (pastikan ComfyUI lokal aktif di port 8188)."
+                if not self.last_fallback_notice:
+                    self.last_fallback_notice = {
+                        "primary_engine": "Local ComfyUI",
+                        "error": self.last_error
+                    }
 
         # 2. Smart Photo Vault Retrieval (Offline Semantic Fallback - strictly unique per user)
         use_vault = os.environ.get("MEDIA_VAULT_FALLBACK", "true").lower() in ("true", "1", "yes")

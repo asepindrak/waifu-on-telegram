@@ -3862,6 +3862,21 @@ def process_photo_request(
             history = persona_mgr.get_chat_history(user_id)
             clean_recent_turns = [m for m in history[-4:] if not m.get("content", "").startswith("[")]
 
+            # Notify user if primary image engine failed and fallback was used
+            fallback_notice = getattr(media_engine, "last_fallback_notice", None)
+            if fallback_notice and isinstance(fallback_notice, dict):
+                p_engine = fallback_notice.get("primary_engine", "Image Engine")
+                p_err = fallback_notice.get("error", "Layanan sedang tidak merespons.")
+                p_name = persona.get("name", "Waifu")
+                notice_text = (
+                    "⚠️ *Pemberitahuan Sistem Visual (Fallback Aktif)*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Image engine pilihanmu (*{p_engine}*) sedang mengalami kendala:\n"
+                    f"❌ `{p_err}`\n\n"
+                    f"📁 {p_name} mengambilkan foto alternatif dari *{source}* agar kamu tidak menunggu kosong yaa! ✨"
+                )
+                safe_send_message(chat_id, notice_text, parse_mode="Markdown")
+
             nude_guidance = ""
             if is_nude:
                 nude_guidance = (
@@ -3890,7 +3905,7 @@ def process_photo_request(
             ]
             vault_guidance = ""
             if "Vault" in source:
-                vault_guidance = " [ComfyUI is offline; you are happily sending a matching saved photo from your private album]."
+                vault_guidance = " [Primary image engine was unavailable; you are happily sending a matching saved photo from your private album]."
 
             caption_prompt.extend(clean_recent_turns)
             if conversational_reply:
@@ -3931,7 +3946,8 @@ def process_photo_request(
             else:
                 fallback_caption = "Ini pap spesial buat kamu sayang, suka ga? 🥰"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
-            full_caption = f"{clean_caption}\n\n📷 *Model:* `{source}`"
+            fallback_tag = " _(Fallback Otomatis)_" if fallback_notice else ""
+            full_caption = f"{clean_caption}\n\n📷 *Model:* `{source}`{fallback_tag}"
 
             if status_msg and hasattr(status_msg, "message_id"):
                 try:
