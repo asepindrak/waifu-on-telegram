@@ -425,6 +425,25 @@ try {
         $skCount = (Get-ChildItem -Path (Join-Path $PSScriptRoot "open_design\skills") -Directory -ErrorAction SilentlyContinue).Count
         Write-Host "  [DESIGN]  Open-Design UI/UX: ONLINE ($dsCount Design Systems • $skCount Skills • Aktif)" -ForegroundColor Green
     }
+
+    # 4d. Active Project Web Servers & Previews
+    try {
+        $srvFile = Join-Path $PSScriptRoot "data\active_preview_servers.json"
+        if (Test-Path $srvFile) {
+            $srvJson = Get-Content $srvFile -Raw | ConvertFrom-Json
+            $sList = @()
+            foreach ($prop in $srvJson.PSObject.Properties) {
+                $item = $prop.Value
+                if ($item.port) {
+                    $sList += "$($item.project): http://localhost:$($item.port)/"
+                }
+            }
+            if ($sList.Count -gt 0) {
+                $joined = $sList -join " • "
+                Write-Host "  [SERVERS] Web Previews: ONLINE ($joined)" -ForegroundColor Green
+            }
+        }
+    } catch {}
 } catch {}
 
 # 5. Check Music Server (Port 8002)

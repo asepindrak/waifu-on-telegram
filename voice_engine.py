@@ -359,6 +359,27 @@ class VoiceEngine:
         """Full alias for generate_voice_note for complete backward and cross-engine compatibility."""
         return self.generate_voice_note(text, voice_override=voice_name, auto_translate=auto_translate)
 
+    def generate_voice_bytes(
+        self,
+        text: str,
+        voice_name: Optional[str] = None,
+        auto_translate: bool = True
+    ) -> Optional[bytes]:
+        """Generates voice audio and returns the raw audio bytes directly."""
+        path = self.generate_voice_note(text, voice_override=voice_name, auto_translate=auto_translate)
+        if path and os.path.exists(path):
+            try:
+                with open(path, "rb") as f:
+                    content = f.read()
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+                return content
+            except Exception as e:
+                logger.error(f"Error reading voice bytes from {path}: {e}")
+        return None
+
     def transcribe_audio(self, audio_path: str) -> Optional[str]:
         """Transcribes incoming Telegram voice note (.oga/.ogg) to text."""
         # 1. Try Groq Whisper (Fastest cloud whisper if key configured)

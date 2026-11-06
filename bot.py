@@ -2649,6 +2649,18 @@ def build_system_diagnostics_report(user_id: int) -> str:
     curr_proj = project_manager.get_active_project(user_id) if project_manager else "general"
     root_proj_dir = project_manager.get_projects_root_dir() if project_manager else os.path.expanduser("~")
 
+    # Preview Web Servers
+    servers_str = "⚪ Tidak Ada (Otomatis aktif saat coding web)"
+    try:
+        from project_server_manager import get_project_server_manager
+        psm = get_project_server_manager()
+        live_servers = psm.list_active_servers()
+        if live_servers:
+            srv_desc = ", ".join([f"`{s['project']}` ([Port {s['port']}]({s['url']}))" for s in live_servers])
+            servers_str = f"🟢 `{len(live_servers)} Server Aktif` ({srv_desc}) — `/servers`"
+    except Exception:
+        pass
+
     # Bot Process & Windows Autorun
     bot_pid = os.getpid()
     autorun_str = "🟢 Aktif (Auto-boot PC)" if is_autorun_enabled() else "⚪ Nonaktif"
@@ -2698,7 +2710,9 @@ def build_system_diagnostics_report(user_id: int) -> str:
         f"• Server Musik : {music_str}\n\n"
         f"💻 **Coding & Workspace**:\n"
         f"• Project Aktif: `{curr_proj}`\n"
-        f"• Root Folder  : `{root_proj_dir}`\n\n"
+        f"• Root Folder  : `{root_proj_dir}`\n"
+        f"• Open-Design  : `🟢 Aktif (153 Design Systems • 169 Skills)`\n"
+        f"• Web Preview  : {servers_str}\n\n"
         f"⚙️ **Sistem & Resource**:\n"
         f"• Bot Process  : `🟢 Berjalan (PID: {bot_pid})`\n"
         f"• PC Autorun   : `{autorun_str}`\n"
@@ -2728,6 +2742,40 @@ def handle_status(message):
         types.InlineKeyboardButton("⚙️ Panel Setup (/setup)", callback_data="cfg_submenu:dashboard")
     )
     bot.reply_to(message, report, reply_markup=markup, parse_mode="Markdown")
+
+
+@bot.message_handler(commands=['servers', 'preview', 'ports'])
+def handle_servers_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    try:
+        from project_server_manager import get_project_server_manager
+        psm = get_project_server_manager()
+        msg_text = psm.format_active_servers_message()
+        bot.reply_to(message, msg_text, parse_mode="Markdown")
+    except Exception as e:
+        bot.reply_to(message, f"⚠️ Gagal membaca daftar server: {e}")
+
+
+@bot.message_handler(commands=['stop_server'])
+def handle_stop_server_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    args = message.text.split()[1:]
+    if not args:
+        bot.reply_to(message, "💡 Format perintah: `/stop_server <port_atau_nama_project>`\nContoh: `/stop_server 8086`", parse_mode="Markdown")
+        return
+    target = args[0].strip()
+    try:
+        from project_server_manager import get_project_server_manager
+        psm = get_project_server_manager()
+        ok = psm.stop_preview_server(target)
+        if ok:
+            bot.reply_to(message, f"✓ Preview server `{target}` berhasil dimatikan.", parse_mode="Markdown")
+        else:
+            bot.reply_to(message, f"⚠️ Tidak menemukan preview server aktif dengan port/nama `{target}`.", parse_mode="Markdown")
+    except Exception as e:
+        bot.reply_to(message, f"⚠️ Gagal menghentikan server: {e}")
 
 
 def show_persona_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
@@ -5411,17 +5459,24 @@ def process_coding_request(message, user_text: str, is_voice: bool = False):
     v_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")
     should_send_vn = (v_mode == "always") or (v_mode == "match_vn" and is_voice)
     if should_send_vn and voice_engine:
-        spoken = voice_text or f"Kodenya sudah aku selesaikan di project {active_proj} yaa! Coba kamu cek hasilnya yaa~"
-        clean_spoken = re.sub(r'[*_`#~]', '', spoken).strip()
-        vn_bytes = voice_engine.generate_voice_bytes(clean_spoken)
-        if vn_bytes:
-            try:
-                import io
-                bio = io.BytesIO(vn_bytes)
-                bio.name = "waifu_reply.ogg"
-                bot.send_voice(chat_id, bio, caption=f"🌸 {p_name}")
-            except Exception as e_vn:
-                logger.warning(f"Voice send failed: {e_vn}")
+        # User requested: batasi voice note secukupnya saja (singkat & manis, tidak membaca teks panjang / kode)
+        raw_spoken = voice_text or ""
+        clean_spoken = re.sub(r'[*_`#~<>]', '', raw_spoken).strip()
+        if not clean_spoken or len(clean_spoken) > 100 or "\n" in clean_spoken or "http" in clean_spoken.lower():
+            clean_spoken = f"Proyek {active_proj} sudah aku selesaikan yaa! Kamu bisa langsung cek dan coba preview hasilnya~"
+
+        try:
+            with acquire_gpu_heavy_lock("Coding Task Voice Note"):
+                vn_path = voice_engine.generate_voice_note(clean_spoken)
+            if vn_path and os.path.exists(vn_path):
+                with open(vn_path, "rb") as bio:
+                    bot.send_voice(chat_id, bio, caption=f"🌸 {p_name}")
+                try:
+                    os.remove(vn_path)
+                except Exception:
+                    pass
+        except Exception as e_vn:
+            logger.warning(f"Voice send failed: {e_vn}")
 
 
 def process_computer_request(message, user_text: str):

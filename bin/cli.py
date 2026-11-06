@@ -479,6 +479,17 @@ def cmd_status():
         except Exception:
             pass
 
+        # Active Project Web Previews
+        try:
+            from project_server_manager import get_project_server_manager
+            psm = get_project_server_manager()
+            live_srvs = psm.list_active_servers()
+            if live_srvs:
+                desc = " • ".join([f"{s['project']} -> http://localhost:{s['port']}/" for s in live_srvs])
+                print(f"  🌐 Web Previews: ONLINE ({desc}) " + c(GREEN, "[AKTIF ✓]"))
+        except Exception:
+            pass
+
         # Scheduled message buffer info
         buf_file = os.path.join(PROJECT_ROOT, "data", "scheduled_message_buffer.json")
         buf_count = 0

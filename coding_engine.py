@@ -197,6 +197,22 @@ class CodingEngine:
                 if applied_design_style:
                     final_text += f"\n\n🎨 *Design System:* `Open-Design ({applied_design_style.title()})`"
 
+                # Auto-detect and launch live preview server if web/HTML assets exist
+                try:
+                    from project_server_manager import get_project_server_manager
+                    psm = get_project_server_manager()
+                    preview_info = psm.start_preview_server(active_project, project_path)
+                    if preview_info:
+                        p_url = preview_info.get("url")
+                        p_port = preview_info.get("port")
+                        final_text += (
+                            f"\n\n🌐 **Live Web Preview (Port {p_port}):**\n"
+                            f"👉 [{p_url}]({p_url})\n"
+                            f"*(Web server sudah otomatis menyala di background PC kamu!)*"
+                        )
+                except Exception as e_srv:
+                    logger.warning(f"Error starting preview server: {e_srv}")
+
                 return final_text, voice_text
             except subprocess.TimeoutExpired:
                 if temp_task_file and os.path.exists(temp_task_file):
