@@ -50,6 +50,8 @@ import asset_manager
 from health_engine import HealthEngine, is_port_listening
 from idle_engine import IdleEngine
 from scheduled_buffer import scheduled_buffer
+from pending_message_manager import get_pending_message_manager
+pending_manager = get_pending_message_manager()
 from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
@@ -2719,6 +2721,7 @@ def build_system_diagnostics_report(user_id: int) -> str:
         f"• Mode Hemat   : `{idle_engine.get_status_summary()}`\n"
         f"• GPU Lock     : `🟢 Aktif (Proteksi Tabrakan VRAM Image & Voice)`\n"
         f"• Buffer Jadwal: `{scheduled_buffer.get_status_summary(user_id)}`\n"
+        f"• Chat Tertunda: `{pending_manager.get_pending_count()} pesan (Auto-Retry saat LLM Online)`\n"
         f"• Buku Ingatan : `{facts_count} fakta tersimpan`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 _Ketik `/setup` untuk membuka panel kontrol dan pengaturan lengkap._"
@@ -2776,6 +2779,33 @@ def handle_stop_server_command(message):
             bot.reply_to(message, f"⚠️ Tidak menemukan preview server aktif dengan port/nama `{target}`.", parse_mode="Markdown")
     except Exception as e:
         bot.reply_to(message, f"⚠️ Gagal menghentikan server: {e}")
+
+
+@bot.message_handler(commands=['pending'])
+def handle_pending_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    count = pending_manager.get_pending_count()
+    if count == 0:
+        bot.reply_to(message, "✨ Tidak ada pesan yang tertunda! Semua chat sudah terbalas dengan baik 💕")
+    else:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔄 Coba Balas Sekarang", callback_data="cfg_action:retry_pending"))
+        bot.reply_to(
+            message,
+            f"📌 Ada **{count}** pesan yang tertunda menunggu server LLM siap.\n"
+            f"Begitu server online, waifu akan langsung membalasnya otomatis!",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'cfg_action:retry_pending')
+def callback_retry_pending(call):
+    if not is_authorized(call.from_user.id):
+        return
+    bot.answer_callback_query(call.id, "🔄 Memproses pesan tertunda...")
+    pending_manager.retry_all_pending(bot, process_text_chat)
 
 
 def show_persona_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
@@ -3520,6 +3550,8 @@ def callback_cfg_self_heal(call):
                 f"{report}"
             )
             bot.send_message(call.message.chat.id, summary, reply_markup=markup, parse_mode="Markdown")
+            if results.get("llm"):
+                pending_manager.retry_all_pending(bot, process_text_chat)
         except Exception:
             pass
     threading.Thread(target=_run_heal, daemon=True).start()
@@ -5455,6 +5487,7 @@ def process_coding_request(message, user_text: str, is_voice: bool = False):
         pass
 
     send_long_chat_message(chat_id, response_text, reply_to_id=message.message_id)
+    pending_manager.clear_pending(chat_id)
 
     v_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")
     should_send_vn = (v_mode == "always") or (v_mode == "match_vn" and is_voice)
@@ -5918,13 +5951,13 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 # 2. Check if Local LLM backend is online
                 stat = llm_client.check_health()
                 if not stat.get("online"):
+                    pending_manager.record_failed_message(message, user_text, is_voice=is_voice, error=stat.get("error"))
                     health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=stat.get("error"))
                     backend_msg = (
                         "⚠️ *Service LLM Sedang Offline / Belum Siap!*\n\n"
                         f"Otak AI lokal (`{LLM_BASE_URL}`) belum merespon permintaan chat.\n\n"
-                        "👉 Coba jalankan layanan dari terminal dengan perintah:\n`waifu start --daemon`\n\n"
-                        "Atau klik ganda file `start_services.bat` di folder PC kamu yaa!\n"
-                        "Ketik `/status` untuk melihat laporan koneksi lengkap."
+                        "🩹 **Self-Healing Otomatis Aktif!**\n"
+                        "Pesan kamu sudah aku catat dan **akan langsung aku balas otomatis begitu server siap yaa~** Tunggu sebentar 🥰⏳"
                     )
                     safe_reply_to(message, backend_msg)
                     return
@@ -6020,15 +6053,18 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     reply_text, _ = llm_client.chat(messages, max_tokens=150, is_nsfw=is_nsfw_turn)
                 except Exception as e:
                     logger.error(f"Chat error / LLM timeout: {e}")
+                    pending_manager.record_failed_message(message, user_text, is_voice=is_voice, error=str(e))
                     health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=str(e))
                     err_msg = (
                         f"⚠️ *Service LLM Mengalami Gangguan / Timeout!*\n\n"
                         f"Koneksi ke service LLM lokal (`{LLM_BASE_URL}`) gagal atau tidak merespon: `{e}`\n\n"
-                        f"👉 Silakan periksa apakah KoboldCPP hang/crash, atau jalankan `start_services.bat`.\n"
-                        f"Ketik `/status` untuk cek kondisi server."
+                        f"🩹 **Self-healing otomatis aktif!** Pesan kamu sudah aku catat dan **akan langsung aku balas otomatis begitu server LLM online kembali** yaa~ Tunggu sebentar 🥰⏳"
                     )
                     safe_reply_to(message, err_msg)
                     return
+
+                # Successfully obtained reply: clear any pending retry for this chat
+                pending_manager.clear_pending(message.chat.id)
 
                 if not reply_text or not reply_text.strip():
                     reply_text = "Aku dengerin kok, lagi mikirin apa nih?"
@@ -6174,12 +6210,24 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
         except Exception as e_proc:
             logger.error(f"Error handling message in process_text_chat: {e_proc}", exc_info=True)
+            err_str = str(e_proc).lower()
+            if any(k in err_str for k in ["llm", "connection", "timeout", "refused", "8001", "5001", "offline"]):
+                pending_manager.record_failed_message(message, user_text, is_voice=is_voice, error=str(e_proc))
+                health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=str(e_proc))
             safe_reply_to(
                 message,
                 f"⚠️ *Maaf, ada sedikit gangguan saat memproses pesan:*\n`{e_proc}`\n\nKetik `/status` untuk mengecek status bot."
             )
 
     threading.Thread(target=_execute, daemon=True).start()
+
+
+def _handle_service_recovery_callback(service: str, stat: dict):
+    if service == "llm":
+        logger.info("Service LLM recovered! Triggering pending chat retries...")
+        pending_manager.retry_all_pending(bot, process_text_chat)
+
+health_engine.register_recovery_callback(_handle_service_recovery_callback)
 
 
 def send_scheduled_greeting(user_id: int, time_of_day: str):

@@ -30,7 +30,10 @@ CODING_TRIGGERS = [
     r'\b(npm|pip|cargo|python|node|bash|powershell)\s+',
     r'\b(buat file|baca file|edit file|tambah file|hapus file)\b',
     r'\b(bikin web|bikin app|landing page|endpoint|api|database)\b',
-    r'\b(run test|unit test|pytest|unittest|benchmark)\b'
+    r'\b(run test|unit test|pytest|unittest|benchmark)\b',
+    r'\b(run|jalankan|start|nyalakan|preview|lihat|buka|tes)\s+(project|proyek|web|server|app|aplikasi)\b',
+    r'\b(coba\s+run|coba\s+jalankan|coba\s+start|coba\s+preview)\b',
+    r'\b(coba\s+lihat|buka\s+link|link\s+preview|live\s+preview)\b'
 ]
 
 COMPUTER_USE_TRIGGERS = [

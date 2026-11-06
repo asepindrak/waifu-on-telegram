@@ -148,9 +148,24 @@ class HealthEngine:
         self.heal_cooldown_seconds: int = 45
 
         self.startup_notified: bool = False
+        self.recovery_callbacks: List[Callable[[str, Dict[str, Any]], None]] = []
         self.lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self._running = False
+
+    def register_recovery_callback(self, callback: Callable[[str, Dict[str, Any]], None]) -> None:
+        """Registers a callback hook invoked whenever a service recovers."""
+        if callback not in self.recovery_callbacks:
+            self.recovery_callbacks.append(callback)
+
+    def _notify_recovery(self, service: str, stat: Optional[Dict[str, Any]] = None):
+        """Dispatches recovery notification to registered callbacks."""
+        stat_dict = stat or {"online": True, "service": service}
+        for cb in list(self.recovery_callbacks):
+            try:
+                cb(service, stat_dict)
+            except Exception as e:
+                logger.error(f"Error in recovery callback for {service}: {e}")
 
     def send_safe_message(self, bot, chat_id: int, text: str, reply_markup=None):
         """Sends a Telegram message safely, falling back to plain text if Markdown parsing fails."""
@@ -530,6 +545,7 @@ class HealthEngine:
             for uid in recipients:
                 self.send_safe_message(bot, uid, succ_text, reply_markup=markup)
             logger.info(f"Self-healing successfully restored service: {service}")
+            self._notify_recovery(service, {"online": True, "service": service})
             return True
         else:
             logger.warning(f"Self-healing attempt {attempt_num} failed for service: {service}")
@@ -696,6 +712,8 @@ class HealthEngine:
 
         self.startup_notified = True
         logger.info(f"Startup ready notification sent to {len(recipients)} recipient(s). LLM online={is_llm_online}")
+        if is_llm_online:
+            self._notify_recovery("llm", stat)
 
     def broadcast_failure(self, bot, recipients: List[int], stat: Dict[str, Any]):
         """Alerts all users that the local LLM service has crashed or become unreachable."""
@@ -789,6 +807,7 @@ class HealthEngine:
                         if was_offline:
                             self.llm_offline_alert_sent = False
                             self.broadcast_recovery(bot, recipients, stat)
+                            self._notify_recovery("llm", stat)
                     elif not is_sleeping:
                         self.consecutive_llm_failures += 1
                         should_alert = (self.consecutive_llm_failures >= 2 or self.last_llm_online is True) and not self.llm_offline_alert_sent
