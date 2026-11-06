@@ -466,6 +466,19 @@ def cmd_status():
         p_root = os.environ.get("PROJECTS_DIR", os.path.expanduser("~"))
         print(f"  💻 Coding Workspace: Active Project '{act_proj}' (Root: {p_root})")
 
+        # Open-Design Systems
+        try:
+            from open_design_engine import get_open_design_engine
+            ode = get_open_design_engine()
+            ds_count = len(ode.list_available_systems())
+            sk_count = len(ode.list_available_skills())
+            if ds_count > 0:
+                print(f"  🎨 Open-Design UI/UX: ONLINE ({ds_count} Design Systems • {sk_count} Skills) " + c(GREEN, "[AKTIF ✓]"))
+            else:
+                print(f"  🎨 Open-Design UI/UX: " + c(YELLOW, "Belum terpasang"))
+        except Exception:
+            pass
+
         # Scheduled message buffer info
         buf_file = os.path.join(PROJECT_ROOT, "data", "scheduled_message_buffer.json")
         buf_count = 0

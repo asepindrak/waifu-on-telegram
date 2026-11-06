@@ -121,7 +121,19 @@ class CodingEngine:
                 "<<<END_VOICE_REPLY>>>\n"
             )
 
-        full_prompt = f"{system_instruction}{voice_instruction}\n\nUser Request: {prompt}"
+        # Open-Design integration for UI/UX & frontend requests
+        applied_design_style = None
+        try:
+            from open_design_engine import get_open_design_engine
+            ode = get_open_design_engine()
+            enhanced_user_prompt, applied_design_style = ode.enhance_coding_prompt(prompt)
+            if applied_design_style:
+                ode.scaffold_design_tokens(applied_design_style, project_path)
+        except Exception as e_od:
+            logger.warning(f"Open-Design enhancement error: {e_od}")
+            enhanced_user_prompt = prompt
+
+        full_prompt = f"{system_instruction}{voice_instruction}\n\nUser Request: {enhanced_user_prompt}"
 
         # 1. Try Google Antigravity CLI (agy)
         agy_bin = shutil.which("agy") or shutil.which("agy.cmd")
@@ -181,7 +193,11 @@ class CodingEngine:
                 except Exception as e_mem:
                     logger.warning(f"Failed to record completed task to vault: {e_mem}")
 
-                return raw_output or "Tugas coding selesai tanpa catatan output.", voice_text
+                final_text = raw_output or "Tugas coding selesai tanpa catatan output."
+                if applied_design_style:
+                    final_text += f"\n\n🎨 *Design System:* `Open-Design ({applied_design_style.title()})`"
+
+                return final_text, voice_text
             except subprocess.TimeoutExpired:
                 if temp_task_file and os.path.exists(temp_task_file):
                     try:

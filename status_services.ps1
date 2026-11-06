@@ -418,6 +418,13 @@ try {
         } catch {}
     }
     Write-Host "  [CODING]  Coding Workspace: Active Project '$activeProj' (Root: $projectsRoot)" -ForegroundColor Cyan
+
+    $openDesignDir = Join-Path $PSScriptRoot "open_design\design-systems"
+    if (Test-Path $openDesignDir) {
+        $dsCount = (Get-ChildItem -Path $openDesignDir -Directory -ErrorAction SilentlyContinue).Count
+        $skCount = (Get-ChildItem -Path (Join-Path $PSScriptRoot "open_design\skills") -Directory -ErrorAction SilentlyContinue).Count
+        Write-Host "  [DESIGN]  Open-Design UI/UX: ONLINE ($dsCount Design Systems • $skCount Skills • Aktif)" -ForegroundColor Green
+    }
 } catch {}
 
 # 5. Check Music Server (Port 8002)
