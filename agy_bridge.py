@@ -168,8 +168,22 @@ def process_message_content(content: Union[str, List[Any]], temp_dir: str) -> st
 
 
 def run_agy_cli(full_prompt: str, target_model: str, effort: str) -> str:
-    """Executes Antigravity CLI ('agy -p <prompt>') synchronously."""
-    cmd = ["agy", "-p", full_prompt, "--dangerously-skip-permissions"]
+    """Executes Antigravity CLI ('agy -p <prompt>') synchronously with large context buffer support."""
+    temp_prompt_file = None
+    exec_prompt = full_prompt
+    if len(full_prompt) > 7500:
+        try:
+            buffer_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "temp_prompts")
+            os.makedirs(buffer_dir, exist_ok=True)
+            temp_prompt_file = os.path.join(buffer_dir, f"prompt_{uuid.uuid4().hex[:8]}.txt")
+            with open(temp_prompt_file, "w", encoding="utf-8") as f:
+                f.write(full_prompt)
+            exec_prompt = f"Please process and respond to the complete conversational prompt stored in: '{temp_prompt_file}'"
+        except Exception as e_buf:
+            logger.warning(f"Prompt buffer creation failed: {e_buf}")
+            exec_prompt = full_prompt[:7500]
+
+    cmd = ["agy", "-p", exec_prompt, "--dangerously-skip-permissions"]
     if target_model and target_model not in ("agy-default", "gpt-4o", "gpt-4o-mini", "default"):
         cmd.extend(["--model", target_model])
     if effort:
@@ -185,6 +199,13 @@ def run_agy_cli(full_prompt: str, target_model: str, effort: str) -> str:
             timeout=180
         )
         out = proc.stdout.strip()
+        # Clean up temporary buffer file
+        if temp_prompt_file and os.path.exists(temp_prompt_file):
+            try:
+                os.remove(temp_prompt_file)
+            except Exception:
+                pass
+
         # Clean any outer markdown code blocks if the response wrapped itself
         if out.startswith("```") and out.endswith("```"):
             lines = out.splitlines()
@@ -195,8 +216,18 @@ def run_agy_cli(full_prompt: str, target_model: str, effort: str) -> str:
             out = f"[AGY CLI Error]: {proc.stderr.strip()}"
         return out or "Selesai."
     except subprocess.TimeoutExpired:
+        if temp_prompt_file and os.path.exists(temp_prompt_file):
+            try:
+                os.remove(temp_prompt_file)
+            except Exception:
+                pass
         return "[AGY CLI Timeout]: Antigravity CLI proses melebihi batas waktu (180 detik)."
     except Exception as e:
+        if temp_prompt_file and os.path.exists(temp_prompt_file):
+            try:
+                os.remove(temp_prompt_file)
+            except Exception:
+                pass
         return f"[AGY Bridge Server Exception]: {str(e)}"
 
 

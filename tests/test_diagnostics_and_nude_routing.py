@@ -41,7 +41,7 @@ class TestDiagnosticsAndNudeRouting(unittest.TestCase):
         self.assertIn("Tanpa Busana", outfit_label)
 
         v_prompt, neg_prompt, is_nude, label = self.pm.craft_visual_prompt_full(
-            "kirim foto selfie kamu dong", user_id=user_id
+            "kirim foto selfie kamu di kamar dong", user_id=user_id, scene_override="private bedroom"
         )
         self.assertTrue(is_nude)
         self.assertIn("nude", v_prompt.lower())
@@ -106,18 +106,19 @@ class TestDiagnosticsAndNudeRouting(unittest.TestCase):
             "VOICE_LANGUAGE": "ja-JP",
             "VOICE_REPLY_MODE": "smart"
         }):
-            report = bot.build_system_diagnostics_report(user_id)
-            self.assertIn("Arsitektur LLM", report)
-            self.assertIn("SFW Engine", report)
-            self.assertIn("NSFW Engine", report)
-            self.assertIn("Generator Visual", report)
-            self.assertIn("Model Foto Aktif", report)
-            self.assertIn("NSFW Model Dipakai Otomatis", report)
-            self.assertIn("Audio & Suara", report)
-            self.assertIn("VoiceStudio", report)
-            self.assertIn("Coding & Workspace", report)
-            self.assertIn("GPU Lock", report)
-            self.assertIn("Tanpa Busana", report)
+            with patch("bot.is_port_listening", return_value=True):
+                report = bot.build_system_diagnostics_report(user_id)
+                self.assertIn("Arsitektur LLM", report)
+                self.assertIn("SFW Engine", report)
+                self.assertIn("NSFW Engine", report)
+                self.assertIn("Generator Visual", report)
+                self.assertIn("Model Foto Aktif", report)
+                self.assertIn("NSFW Model Dipakai Otomatis", report)
+                self.assertIn("Audio & Suara", report)
+                self.assertIn("VoiceStudio", report)
+                self.assertIn("Coding & Workspace", report)
+                self.assertIn("GPU Lock", report)
+                self.assertIn("Tanpa Busana", report)
 
 
 if __name__ == "__main__":

@@ -40,6 +40,9 @@ from coding_engine import get_coding_engine
 project_manager = get_project_manager()
 computer_use_engine = get_computer_use_engine()
 coding_engine = get_coding_engine()
+from project_intent_router import get_project_intent_router
+from project_vault import get_project_vault
+project_intent_router = get_project_intent_router()
 AWAITING_PROJECTS_DIR: dict = {}
 import asset_manager
 from health_engine import HealthEngine, is_port_listening
@@ -5325,6 +5328,23 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 process_computer_request(message, user_text)
                 return
 
+            # Check Conversational Project & Memory Intent (Zero-command project awareness)
+            p_intent = project_intent_router.route_intent(user_text, user_id=message.from_user.id)
+            if p_intent.intent_type != "NONE":
+                p_persona = persona_mgr.get_active_persona()
+                p_name = p_persona.get("name", "Akira")
+                ok, reply_msg = project_intent_router.handle_project_intent(
+                    intent=p_intent,
+                    user_id=message.from_user.id,
+                    persona_name=p_name
+                )
+                if ok:
+                    safe_reply_to(message, reply_msg)
+                    # If this was switch/create AND the user also gave a coding prompt, continue to coding!
+                    if p_intent.intent_type in ("SWITCH", "CREATE") and coding_engine.is_coding_intent(user_text):
+                        process_coding_request(message, user_text, is_voice=is_voice)
+                    return
+
             # Check Coding Intent (programming / workspace tasks)
             if coding_engine.is_coding_intent(user_text):
                 process_coding_request(message, user_text, is_voice=is_voice)
@@ -5547,6 +5567,18 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
                 if mem_context:
                     system_inst += "\n" + mem_context
+
+                # Injected active project awareness
+                try:
+                    cur_proj = project_manager.get_active_project(message.from_user.id)
+                    cur_path = project_manager.get_active_project_path(message.from_user.id)
+                    system_inst += (
+                        f"\n\n[WORKSPACE & PROJECT AKTIF]\n"
+                        f"Project aktif saat ini: '{cur_proj}' (Path: '{cur_path}'). "
+                        f"Kamu sepenuhnya menguasai konteks teknis dan arsitektur project ini jika user membahas pekerjaan atau coding."
+                    )
+                except Exception:
+                    pass
 
                 history = persona_mgr.get_chat_history(message.from_user.id)
 

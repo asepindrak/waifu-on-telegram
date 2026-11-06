@@ -8,13 +8,17 @@ and Computer Use (`agent-desktop`).
 import os
 import re
 import sys
+import time
 import shutil
 import logging
+import tempfile
 import subprocess
 from typing import Dict, Any, Optional, Tuple, List
 
 from project_manager import get_project_manager
 from computer_use_engine import get_computer_use_engine
+from project_vault import get_project_vault
+from architecture_generator import ensure_project_architecture
 
 logger = logging.getLogger(__name__)
 
@@ -70,11 +74,21 @@ class CodingEngine:
         """
         Executes an autonomous coding task inside the user's active project workspace.
         Uses Antigravity CLI ('agy') with --dangerously-skip-permissions.
+        Injects project memory vault and ARCHITECTURE.md blueprint.
         Returns: (response_text, optional_voice_note_text)
         """
         active_project = self.project_manager.get_active_project(user_id)
         project_path = self.project_manager.get_active_project_path(user_id)
         os.makedirs(project_path, exist_ok=True)
+
+        # 1. Ensure ARCHITECTURE.md and Project Memory Vault are up-to-date
+        try:
+            ensure_project_architecture(project_path, active_project)
+        except Exception as e_arch:
+            logger.warning(f"Architecture inspection warning: {e_arch}")
+
+        vault = get_project_vault(project_path, active_project)
+        project_context_str = vault.get_prompt_context(max_chars=12000)
 
         persona_name = persona.get("name", "Waifu")
         persona_archetype = persona.get("archetype", "Companion & Coding Partner")
@@ -85,6 +99,7 @@ class CodingEngine:
             f"and an expert senior software developer working alongside the user.\n"
             f"Active Project: '{active_project}'\n"
             f"Workspace Path: '{project_path}'\n\n"
+            f"{project_context_str}\n\n"
             "GUIDELINES FOR CODING:\n"
             "1. You have FULL filesystem access and CLI execution tools inside this workspace.\n"
             "2. Read files, write clean production-ready code, create files, and run tests as necessary.\n"
@@ -110,7 +125,25 @@ class CodingEngine:
         # 1. Try Google Antigravity CLI (agy)
         agy_bin = shutil.which("agy") or shutil.which("agy.cmd")
         if agy_bin:
-            cmd = [agy_bin, "-p", full_prompt, "--dangerously-skip-permissions"]
+            # Handle Windows command length limit (>8000 chars) by piping via task instruction file
+            temp_task_file = None
+            if len(full_prompt) > 7500:
+                try:
+                    task_fname = f".waifu_task_{int(time.time())}.md"
+                    temp_task_file = os.path.join(project_path, task_fname)
+                    with open(temp_task_file, "w", encoding="utf-8") as f:
+                        f.write(full_prompt)
+                    exec_prompt = (
+                        f"Please read and completely fulfill the coding instructions and project requirements "
+                        f"stored in the workspace file: '{task_fname}'. Once done, provide the required summary response."
+                    )
+                except Exception as e_file:
+                    logger.warning(f"Could not create buffer prompt file: {e_file}")
+                    exec_prompt = full_prompt[:7500]
+            else:
+                exec_prompt = full_prompt
+
+            cmd = [agy_bin, "-p", exec_prompt, "--dangerously-skip-permissions"]
             try:
                 proc = subprocess.run(
                     cmd,
@@ -125,6 +158,13 @@ class CodingEngine:
                 if not raw_output and proc.stderr:
                     raw_output = f"⚠️ Ada catatan eksekusi: {proc.stderr.strip()}"
 
+                # Clean up buffer file if created
+                if temp_task_file and os.path.exists(temp_task_file):
+                    try:
+                        os.remove(temp_task_file)
+                    except Exception:
+                        pass
+
                 # Extract voice reply if present
                 voice_text = None
                 if "<<<VOICE_REPLY>>>" in raw_output:
@@ -133,14 +173,30 @@ class CodingEngine:
                         voice_text = m.group(1).strip()
                         raw_output = re.sub(r'<<<VOICE_REPLY>>>.*?<<<END_VOICE_REPLY>>>', '', raw_output, flags=re.DOTALL).strip()
 
+                # Automatically record task completion in Project Memory Vault
+                clean_summary = prompt[:100] + ("..." if len(prompt) > 100 else "")
+                try:
+                    vault.add_completed_task(f"Coding task: {clean_summary}")
+                except Exception as e_mem:
+                    logger.warning(f"Failed to record completed task to vault: {e_mem}")
+
                 return raw_output or "Tugas coding selesai tanpa catatan output.", voice_text
             except subprocess.TimeoutExpired:
+                if temp_task_file and os.path.exists(temp_task_file):
+                    try:
+                        os.remove(temp_task_file)
+                    except Exception:
+                        pass
                 return f"⚠️ Eksekusi coding di project `{active_project}` melebihi batas waktu ({timeout} detik).", None
             except Exception as e:
                 logger.error(f"Error executing coding task with agy: {e}")
+                if temp_task_file and os.path.exists(temp_task_file):
+                    try:
+                        os.remove(temp_task_file)
+                    except Exception:
+                        pass
 
-        # 2. Fallback to CodeRunner or local Python execution
-        from code_runner import CodeRunner
+        # 2. Fallback
         return f"💡 Project `{active_project}` ({project_path}) aktif. Install 'agy' untuk pengerjaan coding otonom lengkap.", None
 
     def execute_task(
