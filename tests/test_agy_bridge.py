@@ -196,6 +196,25 @@ Here is your cute anime cat image!
             self.assertEqual(client.sfw_client.base_url, "http://127.0.0.1:8001/v1")
             self.assertEqual(client.sfw_client.model, "flash")
 
+    def test_idle_engine_keeps_agy_always_on_when_selected(self):
+        """User request test: If user selects AGY as LLM, AGY bridge must stay permanently awake and never sleep."""
+        from idle_engine import IdleEngine
+        env_patch = {
+            "SFW_LLM_PROVIDER": "agy",
+            "SFW_LLM_BASE_URL": "http://127.0.0.1:8001/v1",
+            "LLM_BASE_URL": "http://127.0.0.1:8001/v1",
+            "SMART_IDLE_ENABLED": "true"
+        }
+        with patch.dict(os.environ, env_patch):
+            ie = IdleEngine(enabled=True)
+            self.assertTrue(ie.is_agy_active_provider())
+            # sleep_agy_bridge must refuse to sleep
+            slept = ie.sleep_agy_bridge()
+            self.assertFalse(slept)
+            self.assertFalse(ie.is_agy_sleeping)
+            summary = ie.get_status_summary()
+            self.assertIn("Always-On", summary)
+
 
 if __name__ == "__main__":
     unittest.main()

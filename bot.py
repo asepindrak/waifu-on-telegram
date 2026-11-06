@@ -2645,7 +2645,15 @@ def build_system_diagnostics_report(user_id: int) -> str:
     music_str = "🟢 Online (Port 8002)" if is_music_server_online() else "⚪ Inactive"
 
     # AGY OpenAI Bridge
-    agy_str = "🟢 Online (Port 8001 - OpenAI Ready)" if is_agy_bridge_online() else "⚪ Inactive"
+    is_agy_selected = (
+        sfw_p == "agy" or nsfw_p == "agy" or
+        ":8001" in os.environ.get("LLM_BASE_URL", "") or
+        sfw_img_engine == "agy" or nsfw_img_engine == "agy"
+    )
+    if is_agy_bridge_online():
+        agy_str = "🟢 Online (Port 8001 - Always-On)" if is_agy_selected else "🟢 Online (Port 8001 - OpenAI Ready)"
+    else:
+        agy_str = "⚡ Memulai Ulang..." if is_agy_selected else "⚪ Inactive"
 
     # Coding Workspace & Active Project
     curr_proj = project_manager.get_active_project(user_id) if project_manager else "general"

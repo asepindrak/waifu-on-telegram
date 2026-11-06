@@ -836,6 +836,15 @@ class HealthEngine:
                 if self.self_healing_enabled and music_feat and os.path.exists(music_js) and not is_port_listening(8002) and self.can_attempt_heal("music"):
                     self.attempt_heal_service("music", bot, recipients)
 
+                # 4. Auxiliary Check: AGY OpenAI Bridge (Port 8001 - Keep alive if selected)
+                sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
+                nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "").lower().strip()
+                sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "").lower().strip()
+                base_url = getattr(self.llm_client, "base_url", "")
+                is_agy_target = (sfw_p == "agy" or nsfw_p == "agy" or sfw_img == "agy" or ":8001" in str(base_url))
+                if is_agy_target and self.self_healing_enabled and not is_port_listening(8001) and self.can_attempt_heal("agy"):
+                    self.attempt_heal_service("agy", bot, recipients)
+
             except Exception as e:
                 logger.error(f"Error in health monitor loop: {e}")
 

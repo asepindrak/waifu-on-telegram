@@ -232,3 +232,4 @@ def get_pending_message_manager() -> PendingMessageManager:
     if _GLOBAL_PENDING_MGR is None:
         _GLOBAL_PENDING_MGR = PendingMessageManager()
     return _GLOBAL_PENDING_MGR
+

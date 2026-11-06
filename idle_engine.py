@@ -78,12 +78,27 @@ class IdleEngine:
         self.is_llm_sleeping = not is_port_listening(5001)
         self.is_comfyui_sleeping = not is_port_listening(8188)
         self.is_voicestudio_sleeping = not is_port_listening(3900)
-        self.is_agy_sleeping = not is_port_listening(8001)
+        self.is_agy_sleeping = False if self.is_agy_active_provider() else (not is_port_listening(8001))
 
         self.wake_lock = threading.Lock()
         self.state_lock = threading.Lock()
         self._running = False
         self._thread: Optional[threading.Thread] = None
+
+    def is_agy_active_provider(self) -> bool:
+        """Determines if AGY CLI is configured as active provider for LLM or Image generation."""
+        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
+        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "").lower().strip()
+        llm_url = os.environ.get("LLM_BASE_URL", "").lower()
+        sfw_url = os.environ.get("SFW_LLM_BASE_URL", "").lower()
+        sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "").lower().strip()
+        nsfw_img = os.environ.get("NSFW_IMAGE_ENGINE", "").lower().strip()
+
+        return (
+            sfw_p == "agy" or nsfw_p == "agy" or
+            ":8001" in llm_url or ":8001" in sfw_url or
+            sfw_img == "agy" or nsfw_img == "agy"
+        )
 
     def record_activity(self, is_media: bool = False, is_voice: bool = False, is_agy: bool = False):
         """Records user interaction timestamp to reset idle countdown."""
@@ -188,7 +203,13 @@ class IdleEngine:
         return self.wake_voicestudio()
 
     def sleep_agy_bridge(self) -> bool:
-        """Puts AGY Bridge to sleep, terminating python agy_bridge.py to free RAM."""
+        """Puts AGY Bridge to sleep, terminating python agy_bridge.py to free RAM. (Blocked if AGY is active provider)"""
+        # User requested: klo misalkan user pilih LLM agy , agy bridge nya jangan sampai off atau idle, biarkan nyala saja terus
+        if self.is_agy_active_provider():
+            logger.info("⚡ Smart Idle: User selected AGY as active LLM/Image provider. AGY Bridge stays permanently awake!")
+            self.is_agy_sleeping = False
+            return False
+
         with self.wake_lock:
             if not is_port_listening(8001):
                 self.is_agy_sleeping = True
@@ -643,12 +664,13 @@ class IdleEngine:
                             )
                             self.sleep_voicestudio()
 
-                # 4. Check AGY Bridge idle (Only sleep if NOT active primary LLM!)
-                sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
-                llm_url = os.environ.get("LLM_BASE_URL", "")
-                is_active_agy_llm = (sfw_p == "agy" or ":8001" in llm_url)
-
-                if not is_active_agy_llm and is_port_listening(8001):
+                # 4. Check AGY Bridge idle (Never sleep if active provider, keep alive continuously!)
+                if self.is_agy_active_provider():
+                    self.is_agy_sleeping = False
+                    if not is_port_listening(8001):
+                        logger.info("⚡ Smart Idle: User selected AGY as active LLM/Image provider and port 8001 is offline. Auto-starting AGY Bridge...")
+                        self.wake_agy_bridge()
+                elif is_port_listening(8001):
                     agy_idle_sec = self.agy_timeout_minutes * 60
                     if (now - self.last_agy_activity) >= agy_idle_sec:
                         if not self.is_agy_sleeping:
@@ -680,5 +702,8 @@ class IdleEngine:
         llm_state = "💤 Tidur (VRAM Bebas)" if self.is_llm_sleeping else ("🟢 Online" if is_port_listening(5001) else "💤 Standby")
         comfy_state = "💤 Standby On-Demand" if self.comfyui_on_demand else ("🟢 Online" if is_port_listening(8188) else "🔴 Offline")
         vs_state = "🟢 Online" if is_port_listening(3900) else "💤 Standby"
-        agy_state = "🟢 Online" if is_port_listening(8001) else "💤 Standby"
+        if self.is_agy_active_provider():
+            agy_state = "🟢 Online (Always-On)" if is_port_listening(8001) else "⚡ Auto-Wake"
+        else:
+            agy_state = "🟢 Online" if is_port_listening(8001) else "💤 Standby"
         return f"🟢 Aktif (Idle: {self.idle_timeout_minutes}m • LLM: {llm_state} • Foto: {comfy_state} • Voice: {vs_state} • AGY: {agy_state})"
