@@ -211,6 +211,7 @@ class CodingEngine:
                         final_text += (
                             f"\n\n🌐 **Live Web Preview (Port {p_port}):**\n"
                             f"👉 [{p_url}]({p_url})\n"
+                            f"Direct Link: {p_url}\n"
                             f"*(Web server sudah otomatis menyala di background PC kamu!)*"
                         )
                 except Exception as e_srv:

@@ -360,7 +360,7 @@ class ProjectRunner:
 
         tailscale_url = f"http://{ts_ip}:{active_port}" if ts_ip else None
         magic_dns_url = f"http://{ts_dns}:{active_port}" if ts_dns else None
-        local_url = f"http://localhost:{active_port}"
+        local_url = f"http://127.0.0.1:{active_port}"
 
         # Attempt Tailscale Serve HTTPS
         serve_ok, serve_url = TailscaleManager.setup_tailscale_serve(active_port)

@@ -195,15 +195,20 @@ def send_long_chat_message(
     text: str,
     reply_to_id: Optional[int] = None,
     parse_mode: str = "Markdown",
-    max_chunk_size: int = 3800
+    max_chunk_size: int = 3800,
+    reply_markup: Optional[Any] = None
 ) -> List[Any]:
     """
     Safely sends long messages to chat_id, automatically splitting text that
     exceeds Telegram's 4096-character limit into clean chunks without breaking paragraphs.
     Falls back gracefully from Markdown to plain text if parsing errors occur.
+    Also auto-linkifies localhost URLs into 127.0.0.1 so Telegram clients render clickable hyperlinks.
     """
     if not text:
         return []
+
+    # Auto-linkify localhost into 127.0.0.1 for Telegram client clickable link support
+    text = re.sub(r'https?://localhost(?=[:/])', lambda m: m.group(0).replace('localhost', '127.0.0.1'), text)
 
     sent_messages = []
     # If text fits inside limit, send directly
@@ -213,7 +218,8 @@ def send_long_chat_message(
                 chat_id,
                 text,
                 parse_mode=parse_mode,
-                reply_to_message_id=reply_to_id
+                reply_to_message_id=reply_to_id,
+                reply_markup=reply_markup
             )
             return [msg]
         except Exception as e_md:
@@ -223,7 +229,8 @@ def send_long_chat_message(
                 msg = bot.send_message(
                     chat_id,
                     clean_text,
-                    reply_to_message_id=reply_to_id
+                    reply_to_message_id=reply_to_id,
+                    reply_markup=reply_markup
                 )
                 return [msg]
             except Exception as e_plain:
@@ -251,18 +258,25 @@ def send_long_chat_message(
 
     # Send each chunk sequentially
     first = True
-    for chunk in chunks:
+    total_chunks = len(chunks)
+    for idx, chunk in enumerate(chunks):
         r_id = reply_to_id if first else None
         first = False
+        is_last = (idx == total_chunks - 1)
+        chunk_markup = reply_markup if is_last else None
         try:
-            m = bot.send_message(chat_id, chunk, parse_mode=parse_mode, reply_to_message_id=r_id)
+            m = bot.send_message(chat_id, chunk, parse_mode=parse_mode, reply_to_message_id=r_id, reply_markup=chunk_markup)
             if m:
                 sent_messages.append(m)
         except Exception as e_chk:
             logger.warning(f"Chunk markdown send failed: {e_chk}. Retrying as plain text.")
             try:
                 clean_chunk = chunk.replace("*", "").replace("_", "").replace("`", "")
-                m = bot.send_message(chat_id, clean_chunk, reply_to_message_id=r_id)
+                m = bot.send_message(chat_id, clean_chunk, reply_to_message_id=r_id, reply_markup=chunk_markup)
+                if m:
+                    sent_messages.append(m)
+            except Exception as e_cplain:
+                logger.error(f"Failed sending plain chunk: {e_cplain}")
                 if m:
                     sent_messages.append(m)
             except Exception as e_chk_plain:
@@ -2763,7 +2777,16 @@ def handle_servers_command(message):
         from project_server_manager import get_project_server_manager
         psm = get_project_server_manager()
         msg_text = psm.format_active_servers_message()
-        bot.reply_to(message, msg_text, parse_mode="Markdown")
+        active_srvs = psm.list_active_servers()
+        markup = None
+        if active_srvs:
+            markup = types.InlineKeyboardMarkup()
+            for s in active_srvs:
+                p_name = s.get("project", "Project")
+                p_port = s.get("port")
+                p_url = f"http://127.0.0.1:{p_port}/"
+                markup.add(types.InlineKeyboardButton(f"🌐 Buka {p_name} (Port {p_port})", url=p_url))
+        bot.reply_to(message, msg_text, reply_markup=markup, parse_mode="Markdown")
     except Exception as e:
         bot.reply_to(message, f"⚠️ Gagal membaca daftar server: {e}")
 
@@ -5494,7 +5517,16 @@ def process_coding_request(message, user_text: str, is_voice: bool = False):
     except Exception:
         pass
 
-    send_long_chat_message(chat_id, response_text, reply_to_id=message.message_id)
+    # Detect preview URL (127.0.0.1 or localhost) and attach an Inline Keyboard Button for 1-tap direct opening
+    preview_match = re.search(r'http://(?:127\.0\.0\.1|localhost):(\d+)/?', response_text)
+    preview_markup = None
+    if preview_match:
+        p_port = preview_match.group(1)
+        p_url = f"http://127.0.0.1:{p_port}/"
+        preview_markup = types.InlineKeyboardMarkup()
+        preview_markup.add(types.InlineKeyboardButton(f"🌐 Buka Live Web Preview (Port {p_port})", url=p_url))
+
+    send_long_chat_message(chat_id, response_text, reply_to_id=message.message_id, reply_markup=preview_markup)
     pending_manager.clear_pending(chat_id)
 
     v_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")

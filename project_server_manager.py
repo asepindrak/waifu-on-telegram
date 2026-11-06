@@ -204,7 +204,7 @@ class ProjectServerManager:
         server_info = {
             "project": project_name,
             "port": port,
-            "url": f"http://localhost:{port}/",
+            "url": f"http://127.0.0.1:{port}/",
             "dir": web_dir,
             "entry_file": entry_file,
             "pid": proc.pid,
@@ -214,7 +214,14 @@ class ProjectServerManager:
         server_key = f"{project_name}_{port}"
         registry[server_key] = server_info
         self._write_registry(registry)
-        logger.info(f"✓ Started preview web server for '{project_name}' at http://localhost:{port}/ (PID: {proc.pid})")
+        logger.info(f"✓ Started preview web server for '{project_name}' at http://127.0.0.1:{port}/ (PID: {proc.pid})")
+
+        # Automatically launch page in default browser on PC
+        try:
+            import webbrowser
+            threading.Thread(target=lambda: webbrowser.open(server_info["url"]), daemon=True).start()
+        except Exception as e_br:
+            logger.debug(f"Could not auto-launch browser for preview: {e_br}")
 
         return server_info
 
@@ -269,7 +276,7 @@ class ProjectServerManager:
         for idx, s in enumerate(servers, 1):
             p_name = s.get("project", "Project")
             p_port = s.get("port")
-            p_url = s.get("url", f"http://localhost:{p_port}/")
+            p_url = s.get("url", f"http://127.0.0.1:{p_port}/")
             p_dir = s.get("dir", "")
             lines.append(
                 f"{idx}. 🚀 **{p_name}**\n"

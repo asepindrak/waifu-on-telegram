@@ -59,7 +59,7 @@ class TestProjectServerManager(unittest.TestCase):
         self.assertIsNotNone(s_info)
         port = s_info.get("port")
         self.assertIsNotNone(port)
-        self.assertTrue(s_info["url"].startswith("http://localhost:"))
+        self.assertTrue(s_info["url"].startswith("http://127.0.0.1:"))
 
         # Check list active servers
         active = self.mgr.list_active_servers()

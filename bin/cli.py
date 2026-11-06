@@ -485,7 +485,7 @@ def cmd_status():
             psm = get_project_server_manager()
             live_srvs = psm.list_active_servers()
             if live_srvs:
-                desc = " • ".join([f"{s['project']} -> http://localhost:{s['port']}/" for s in live_srvs])
+                desc = " • ".join([f"{s['project']} -> http://127.0.0.1:{s['port']}/" for s in live_srvs])
                 print(f"  🌐 Web Previews: ONLINE ({desc}) " + c(GREEN, "[AKTIF ✓]"))
         except Exception:
             pass
