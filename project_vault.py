@@ -348,3 +348,4 @@ def get_project_vault(project_path: str, project_name: str) -> ProjectVault:
     if key not in _VAULT_CACHE:
         _VAULT_CACHE[key] = ProjectVault(project_path=project_path, project_name=project_name)
     return _VAULT_CACHE[key]
+

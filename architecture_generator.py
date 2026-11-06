@@ -334,3 +334,4 @@ def ensure_project_architecture(workspace_path: str, project_name: str, force: b
     """Helper to inspect project workspace and ensure ARCHITECTURE.md and memory are in sync."""
     gen = ArchitectureGenerator(workspace_path=workspace_path, project_name=project_name)
     return gen.scan_and_generate(force_overwrite=force)
+

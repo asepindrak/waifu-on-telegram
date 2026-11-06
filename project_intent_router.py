@@ -2,7 +2,7 @@
 project_intent_router.py - Conversational Project Intent Router & God-View Coordinator
 Enables zero-command conversational switching, natural project creation,
 task management (done/todo), cross-project relations (ERP multi-module),
-and executive multi-project overview (God View).
+executive multi-project overview (God View), and background server execution with Tailscale port opening.
 """
 
 import os
@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Tuple, Any
 from project_manager import get_project_manager, ProjectManager
 from project_vault import get_project_vault, ProjectVault
 from architecture_generator import ensure_project_architecture
+from project_runner import get_project_runner, ProjectRunner
 
 logger = logging.getLogger(__name__)
 
@@ -27,17 +28,19 @@ class ProjectIntentResult:
         extracted_task: Optional[str] = None,
         relation_target: Optional[str] = None,
         relation_type: Optional[str] = None,
+        custom_port: Optional[int] = None,
         cleaned_text: Optional[str] = None
     ):
-        self.intent_type = intent_type  # SWITCH, CREATE, GOD_VIEW, STATUS, ADD_TODO, MARK_DONE, ADD_RELATION, NONE
+        self.intent_type = intent_type  # SWITCH, CREATE, GOD_VIEW, STATUS, ADD_TODO, MARK_DONE, ADD_RELATION, RUN_PROJECT, STOP_PROJECT, SERVER_STATUS, SERVER_LOGS, NONE
         self.target_project = target_project
         self.extracted_task = extracted_task
         self.relation_target = relation_target
         self.relation_type = relation_type
+        self.custom_port = custom_port
         self.cleaned_text = cleaned_text or ""
 
     def __repr__(self):
-        return f"<ProjectIntentResult intent={self.intent_type} target={self.target_project} task={self.extracted_task}>"
+        return f"<ProjectIntentResult intent={self.intent_type} target={self.target_project} port={self.custom_port}>"
 
 
 class ProjectIntentRouter:
@@ -49,14 +52,51 @@ class ProjectIntentRouter:
     def route_intent(self, message: str, user_id: int) -> ProjectIntentResult:
         """
         Parses user message and determines if it intends to switch project,
-        spawn a new one, view God-View, or manage memory/tasks.
+        spawn a new one, view God-View, manage memory/tasks, or run with Tailscale port.
         """
         raw_text = message.strip()
         lower = raw_text.lower()
         active_proj = self.pm.get_active_project(user_id)
         projs = self.pm.list_projects()
 
-        # 1. Check God View / Overview of all projects
+        # 1. Check Server Logs
+        if re.search(r'\b(log\s+(?:server|project)|lihat\s+log|cek\s+log)\b', lower):
+            return ProjectIntentResult(intent_type="SERVER_LOGS", target_project=active_proj)
+
+        # 2. Check Server Status / Open Ports
+        if re.search(r'\b(status\s+server|cek\s+server|server\s+apa\s+aja|port\s+yang\s+(?:lagi\s+)?kebuka|list\s+server)\b', lower):
+            return ProjectIntentResult(intent_type="SERVER_STATUS")
+
+        # 3. Check Stop Project / Server
+        stop_pattern = r'\b(stop\s+(?:project|server|app)|matikan\s+(?:project|server|aplikasi)|hentikan\s+(?:project|server|app)|kill\s+server|close\s+port|tutup\s+port)\b'
+        if re.search(stop_pattern, lower):
+            target_p = None
+            for p_name in projs.keys():
+                if p_name != "general" and re.search(r'\b' + re.escape(p_name) + r'\b', lower):
+                    target_p = p_name
+                    break
+            return ProjectIntentResult(intent_type="STOP_PROJECT", target_project=target_p or active_proj)
+
+        # 4. Check Run Project / Open Port (Tailscale dev server)
+        # e.g.: "run project", "jalankan project", "buka port", "start server", "running project di port 5000"
+        run_pattern = r'\b(run\s+(?:project|server|app)|jalankan\s+(?:project|server|aplikasi)|start\s+(?:project|server|app)|buka\s+port|open\s+port|running\s+project|serve\s+project)\b'
+        if re.search(run_pattern, lower):
+            # Extract port if specified
+            port_match = re.search(r'\b(?:port|ke\s+port)\s+(\d+)\b', lower)
+            custom_port = int(port_match.group(1)) if port_match else None
+            # Check if user mentioned another specific project
+            target_p = None
+            for p_name in projs.keys():
+                if p_name != "general" and re.search(r'\b' + re.escape(p_name) + r'\b', lower):
+                    target_p = p_name
+                    break
+            return ProjectIntentResult(
+                intent_type="RUN_PROJECT",
+                target_project=target_p or active_proj,
+                custom_port=custom_port
+            )
+
+        # 5. Check God View / Overview of all projects
         god_view_patterns = [
             r'\b(god\s*view|peta\s*dewa)\b',
             r'\b(semua\s*project|seluruh\s*project|list\s*project|daftar\s*project)\b',
@@ -67,7 +107,7 @@ class ProjectIntentRouter:
             if re.search(pat, lower):
                 return ProjectIntentResult(intent_type="GOD_VIEW")
 
-        # 2. Check Project Status / Memory of active project
+        # 6. Check Project Status / Memory of active project
         status_patterns = [
             r'\b(status\s*project(\s*ini)?|progres\s*project(\s*ini)?)\b',
             r'\b(ingatan\s*project|memory\s*project|catatan\s*project)\b',
@@ -78,8 +118,7 @@ class ProjectIntentRouter:
             if re.search(pat, lower):
                 return ProjectIntentResult(intent_type="STATUS", target_project=active_proj)
 
-        # 3. Check Cross-Project Relation (ERP Dependencies)
-        # e.g.: "project billing ada relasi ke auth" or "modul pos butuh api dari inventory"
+        # 7. Check Cross-Project Relation (ERP Dependencies)
         rel_pattern = r'\b(?:project|modul)\s+([a-zA-Z0-9_\-]+)\s+(?:ada\s+relasi\s+ke|butuh\s+api\s+dari|konek\s+ke|bergantung\s+pada)\s+([a-zA-Z0-9_\-]+)\b'
         m_rel = re.search(rel_pattern, lower)
         if m_rel:
@@ -92,45 +131,38 @@ class ProjectIntentRouter:
                 relation_type="dependency"
             )
 
-        # 4. Check Add To-Do / Pending Task
-        # e.g.: "catat to do: bikin unit test" or "tambah task nanti bikin export pdf"
+        # 8. Check Add To-Do / Pending Task
         todo_pattern = r'\b(?:catat\s+to\s*do|tambah\s+to\s*do|tambah\s+task|nanti\s+tolong)\s*[:\-]?\s*(.+)$'
         m_todo = re.search(todo_pattern, raw_text, re.IGNORECASE)
         if m_todo:
             task_desc = m_todo.group(1).strip()
             return ProjectIntentResult(intent_type="ADD_TODO", target_project=active_proj, extracted_task=task_desc)
 
-        # 5. Check Mark Task Done
-        # e.g.: "task login udah selesai" or "tandai selesai: fix cors"
+        # 9. Check Mark Task Done
         done_pattern = r'\b(?:tandai\s+selesai|task\s+(?:sudah|udah)\s+selesai|selesai\s+ngerjain)\s*[:\-]?\s*(.+)$'
         m_done = re.search(done_pattern, raw_text, re.IGNORECASE)
         if m_done:
             task_desc = m_done.group(1).strip()
             return ProjectIntentResult(intent_type="MARK_DONE", target_project=active_proj, extracted_task=task_desc)
 
-        # 6. Check Create New Project
-        # e.g.: "buat project baru inventory-service", "bikin project pos-system", "spawn project backend"
+        # 10. Check Create New Project
         create_pattern = r'\b(?:buat|bikin|spawn|create)\s+project\s+(?:baru\s+)?([a-zA-Z0-9_\-]+)'
         m_create = re.search(create_pattern, lower)
         if m_create:
             proj_name = m_create.group(1).strip()
-            # Avoid matching reserved keywords like "baru", "ini"
             if proj_name not in ["baru", "ini", "itu", "dong"]:
                 return ProjectIntentResult(intent_type="CREATE", target_project=proj_name)
 
-        # 7. Check Switch Project (Explicit switch phrasing)
-        # e.g.: "switch ke project pos", "pindah ke project crm", "buka project inventory", "fokus ke project mobile"
+        # 11. Check Switch Project (Explicit switch phrasing)
         switch_pattern = r'\b(?:switch\s+(?:ke\s+)?(?:project\s+)?|pindah\s+(?:ke\s+)?(?:project\s+)?|buka\s+project\s+|fokus\s+(?:ke\s+)?(?:project\s+)?|kerjain\s+project\s+)([a-zA-Z0-9_\-]+)'
         m_switch = re.search(switch_pattern, lower)
         if m_switch:
             candidate = m_switch.group(1).strip()
-            # Match against known projects
             matched = self._match_project_name(candidate, projs)
             if matched:
                 return ProjectIntentResult(intent_type="SWITCH", target_project=matched)
 
-        # 8. Check Contextual Mention in Coding Request
-        # e.g.: "di project crm-backend tolong tambahin endpoint user", "tolong edit auth di invoice-app"
+        # 12. Check Contextual Mention in Coding Request
         context_pattern = r'\bdi\s+project\s+([a-zA-Z0-9_\-]+)\b'
         m_ctx = re.search(context_pattern, lower)
         if m_ctx:
@@ -139,12 +171,10 @@ class ProjectIntentRouter:
             if matched and matched != active_proj:
                 return ProjectIntentResult(intent_type="SWITCH", target_project=matched)
 
-        # Also check if user mentions an exact existing project name when discussing coding tasks
+        # Check exact existing project name when discussing coding tasks
         for p_name in projs.keys():
             if p_name != "general" and p_name != active_proj:
-                # Check if whole word appears in message
                 if re.search(r'\b' + re.escape(p_name) + r'\b', lower):
-                    # Check if there's coding or inspection context
                     if any(w in lower for w in ["update", "cek", "bikin", "fix", "tambah", "kerjain", "buka", "edit"]):
                         return ProjectIntentResult(intent_type="SWITCH", target_project=p_name)
 
@@ -160,7 +190,6 @@ class ProjectIntentRouter:
             if k.lower() == clean or k.lower().replace("-", "") == clean.replace("-", ""):
                 return k
 
-        # Partial matching if candidate is substantive
         if len(clean) >= 3:
             for k in projs.keys():
                 if clean in k.lower() or k.lower() in clean:
@@ -174,17 +203,100 @@ class ProjectIntentRouter:
         persona_name: str = "Akira"
     ) -> Tuple[bool, str]:
         """
-        Executes the required project operation (switch, create, update, or query).
+        Executes the required project operation (switch, create, update, query, or run/stop server).
         Returns: (handled_successfully, formatted_response_message)
         """
-        if intent.intent_type == "GOD_VIEW":
+        runner = get_project_runner()
+
+        if intent.intent_type == "RUN_PROJECT":
+            target_p = intent.target_project or self.pm.get_active_project(user_id)
+            projs = self.pm.list_projects()
+            p_path = projs.get(target_p, self.pm.get_active_project_path(user_id))
+
+            res = runner.start_project(
+                project_name=target_p,
+                project_path=p_path,
+                custom_port=intent.custom_port
+            )
+            if not res.get("success"):
+                return False, f"⚠️ Gagal menjalankan project `{target_p}`: {res.get('error')}"
+
+            entry = res["entry"]
+            port = entry["port"]
+            ts_url = entry.get("tailscale_url")
+            magic_url = entry.get("magic_dns_url")
+            https_url = entry.get("https_serve_url")
+            local_url = entry.get("local_url")
+            peers = entry.get("peer_devices", [])
+            peers_str = ", ".join([f"`{p}`" for p in peers]) if peers else "Perangkat di akun Tailscale kamu"
+
+            lines = [
+                f"🚀 **Project `{target_p}` Berhasil Dijalankan!** ✨",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📂 **Workspace:** `{p_path}`",
+                f"⚡ **Command:** `{entry['command']}`",
+                f"🔌 **Port Aktif:** `{port}` (PID: `{entry['pid']}`)",
+                f"📡 **Status Tailscale:** 🟢 Online ({entry.get('tailscale_ip') or 'Terhubung'})\n",
+                f"🌐 **AKSES TAILSCALE (HP & Perangkat Lain):**"
+            ]
+            if ts_url:
+                lines.append(f"👉 **IP URL:** {ts_url}")
+            if magic_url:
+                lines.append(f"👉 **MagicDNS:** {magic_url}")
+            if https_url:
+                lines.append(f"🔒 **HTTPS Serve:** {https_url}")
+            lines.append(f"💻 **Lokal:** {local_url}\n")
+
+            lines.append(f"📱 **Siap dibuka dari perangkatmu:** {peers_str}")
+            lines.append(f"💡 *Pastikan HP / perangkat lain sudah terhubung ke aplikasi Tailscale yaa!*")
+            lines.append(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            lines.append(f"Ketik _'stop server'_ jika mau mematikan project ini.")
+            return True, "\n".join(lines)
+
+        elif intent.intent_type == "STOP_PROJECT":
+            target_p = intent.target_project or self.pm.get_active_project(user_id)
+            ok, stop_msg = runner.stop_project(target_p)
+            return ok, f"🛑 {stop_msg}"
+
+        elif intent.intent_type == "SERVER_STATUS":
+            active_servers = runner.list_running()
+            if not active_servers:
+                return True, (
+                    "ℹ️ Saat ini belum ada server project yang aktif di background.\n\n"
+                    "💡 Ketik *'run project'* atau *'buka port'* untuk menjalankan project dan membukanya di Tailscale! 🚀"
+                )
+
+            lines = [
+                f"🖥️ **Daftar Server Project yang Sedang Aktif**",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            ]
+            for name, srv in active_servers.items():
+                lines.append(f"🟢 **`{name}`** (Port: `{srv['port']}` • PID: `{srv['pid']}`)")
+                lines.append(f"   📂 `{srv['project_path']}`")
+                lines.append(f"   🌐 Tailscale: {srv.get('tailscale_url') or 'N/A'}")
+                lines.append(f"   📱 MagicDNS : {srv.get('magic_dns_url') or 'N/A'}")
+                lines.append(f"   💻 Local    : {srv.get('local_url')}")
+                lines.append("")
+            lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            lines.append("Ketik _'stop server'_ untuk menghentikan server.")
+            return True, "\n".join(lines)
+
+        elif intent.intent_type == "SERVER_LOGS":
+            target_p = intent.target_project or self.pm.get_active_project(user_id)
+            logs = runner.get_server_logs(target_p, lines=25)
+            msg = (
+                f"📄 **Log Server: `{target_p}`**\n"
+                f"```text\n{logs}\n```"
+            )
+            return True, msg
+
+        elif intent.intent_type == "GOD_VIEW":
             return True, self.render_god_view(user_id=user_id, persona_name=persona_name)
 
         elif intent.intent_type == "STATUS":
             active_p = intent.target_project or self.pm.get_active_project(user_id)
             p_path = self.pm.get_active_project_path(user_id)
             vault = get_project_vault(p_path, active_p)
-            # Ensure architecture is analyzed
             ensure_project_architecture(p_path, active_p)
             return True, self.render_project_status(vault, persona_name=persona_name)
 
@@ -197,7 +309,6 @@ class ProjectIntentRouter:
             if not ok:
                 return False, f"⚠️ Gagal berpindah: {p_path}"
 
-            # Auto-ensure ARCHITECTURE.md and vault exist
             ensure_project_architecture(p_path, target_p)
             vault = get_project_vault(p_path, target_p)
             mem = vault.load_memory()
@@ -225,7 +336,6 @@ class ProjectIntentRouter:
             if not ok:
                 return False, f"⚠️ Gagal membuat project: {p_path}"
 
-            # Generate ARCHITECTURE.md and init vault
             ensure_project_architecture(p_path, clean_name, force=True)
             vault = get_project_vault(p_path, clean_name)
             vault.add_completed_task(f"Inisialisasi workspace dan pembuatan ARCHITECTURE.md untuk project {clean_name}")

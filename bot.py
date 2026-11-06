@@ -42,7 +42,9 @@ computer_use_engine = get_computer_use_engine()
 coding_engine = get_coding_engine()
 from project_intent_router import get_project_intent_router
 from project_vault import get_project_vault
+from project_runner import get_project_runner
 project_intent_router = get_project_intent_router()
+project_runner = get_project_runner()
 AWAITING_PROJECTS_DIR: dict = {}
 import asset_manager
 from health_engine import HealthEngine, is_port_listening
@@ -1824,37 +1826,67 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
 
 
 def show_projects_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
-    """Renders interactive projects & workspace directory selection menu."""
+    """Renders interactive projects & workspace directory selection menu with Tailscale server integration."""
     curr_proj = project_manager.get_active_project(user_id)
     curr_path = project_manager.get_active_project_path(user_id)
     root_dir = project_manager.get_projects_root_dir()
     projs = project_manager.list_projects()
+    running_map = project_runner.list_running()
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     buttons = []
     for p_name in projs.keys():
         is_cur = (p_name == curr_proj)
-        label = f"✅ {p_name}" if is_cur else f"📁 {p_name}"
+        is_run = (p_name in running_map)
+        badge = "🟢 " if is_run else ("✅ " if is_cur else "📁 ")
+        label = f"{badge}{p_name}"
         buttons.append(types.InlineKeyboardButton(label, callback_data=f"select_proj:{p_name}"))
     markup.add(*buttons)
+
+    # Server control button for current project
+    if curr_proj in running_map:
+        srv_entry = running_map[curr_proj]
+        markup.add(
+            types.InlineKeyboardButton(f"🛑 Stop Server (Port {srv_entry['port']})", callback_data=f"srv_stop:{curr_proj}"),
+            types.InlineKeyboardButton("📄 Cek Log Server", callback_data=f"srv_logs:{curr_proj}")
+        )
+    else:
+        markup.add(
+            types.InlineKeyboardButton("🚀 Jalankan Server & Buka Port (Tailscale)", callback_data=f"srv_run:{curr_proj}")
+        )
+
     markup.add(
         types.InlineKeyboardButton("➕ Buat Project Baru (/spawn)", callback_data="proj_action:spawn"),
         types.InlineKeyboardButton("📂 Ganti Root Folder", callback_data="proj_action:set_root")
     )
     markup.add(
-        types.InlineKeyboardButton("🖥️ Status Desktop (/desktop)", callback_data="proj_action:desktop"),
+        types.InlineKeyboardButton("🌐 Status Server Tailscale", callback_data="proj_action:server_status"),
+        types.InlineKeyboardButton("🖥️ Status Desktop (/desktop)", callback_data="proj_action:desktop")
+    )
+    markup.add(
         types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
     )
+
+    srv_status_text = ""
+    if curr_proj in running_map:
+        srv = running_map[curr_proj]
+        srv_status_text = (
+            f"🚀 **Dev Server** : 🟢 **Running** (Port `{srv['port']}`, PID `{srv['pid']}`)\n"
+            f"🌐 **Tailscale**  : {srv.get('tailscale_url') or 'N/A'}\n"
+            f"📱 **MagicDNS**   : {srv.get('magic_dns_url') or 'N/A'}\n"
+        )
+    else:
+        srv_status_text = "🚀 **Dev Server** : ⚪ Offline (Klik tombol di bawah untuk start)\n"
 
     text = (
         f"💻 **Manajemen Workspace & Project Coding**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👑 **Project Aktif** : **{curr_proj}**\n"
         f"📂 **Lokasi Folder** : `{curr_path}`\n"
-        f"🏠 **Root Directory**: `{root_dir}`\n\n"
-        f"Pilih project di atas untuk beralih workspace dengan 1 klik, "
-        f"atau ketik `/spawn <nama>` untuk membuat project baru!\n\n"
-        f"💡 _Semua tugas coding, file, dan terminal dari waifu akan dijalankan di dalam folder project aktif._"
+        f"🏠 **Root Directory**: `{root_dir}`\n"
+        f"{srv_status_text}\n"
+        f"Pilih project di atas untuk beralih workspace, atau jalankan server agar port bisa dibuka dan diakses dari HP kamu via Tailscale!\n\n"
+        f"💡 _Tugas coding, file, dan terminal dari waifu dijalankan di dalam folder project aktif._"
     )
     if message_to_edit:
         try:
@@ -4992,6 +5024,66 @@ def callback_proj_actions(call):
         bot.send_message(chat_id, msg_text, parse_mode="Markdown")
     elif act == "desktop":
         show_desktop_status_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith(("srv_run:", "srv_stop:", "srv_logs:")) or call.data == "proj_action:server_status")
+def callback_project_runner_actions(call):
+    if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        return
+    data = call.data
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+
+    if data == "proj_action:server_status":
+        bot.answer_callback_query(call.id)
+        from project_intent_router import ProjectIntentResult
+        ok, msg = project_intent_router.handle_project_intent(
+            ProjectIntentResult(intent_type="SERVER_STATUS"),
+            user_id=user_id
+        )
+        safe_send_message(chat_id, msg)
+        return
+
+    action, p_name = data.split(":", 1)
+    if action == "srv_run":
+        bot.answer_callback_query(call.id, f"🚀 Menjalankan {p_name}...")
+        projs = project_manager.list_projects()
+        p_path = projs.get(p_name, project_manager.get_active_project_path(user_id))
+        res = project_runner.start_project(project_name=p_name, project_path=p_path)
+        if res.get("success"):
+            entry = res["entry"]
+            ts_url = entry.get("tailscale_url")
+            local_url = entry.get("local_url")
+            magic_url = entry.get("magic_dns_url")
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("🛑 Stop Server", callback_data=f"srv_stop:{p_name}"),
+                types.InlineKeyboardButton("📄 Cek Log", callback_data=f"srv_logs:{p_name}")
+            )
+            msg = (
+                f"🚀 **Project `{p_name}` Sedang Berjalan!** ✨\n\n"
+                f"🔌 **Port:** `{entry['port']}` (PID: `{entry['pid']}`)\n"
+                f"🌐 **Tailscale IP:** {ts_url}\n"
+                f"📱 **MagicDNS:** {magic_url}\n"
+                f"💻 **Local:** {local_url}\n\n"
+                f"💡 _Bisa langsung dibuka di HP/tablet kamu yang terhubung Tailscale!_"
+            )
+            safe_send_message(chat_id, msg, reply_markup=markup)
+            show_projects_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+        else:
+            safe_send_message(chat_id, f"⚠️ Gagal menjalankan server: {res.get('error')}")
+
+    elif action == "srv_stop":
+        ok, msg = project_runner.stop_project(p_name)
+        bot.answer_callback_query(call.id, "Server dihentikan" if ok else "Gagal")
+        safe_send_message(chat_id, f"🛑 {msg}")
+        show_projects_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+
+    elif action == "srv_logs":
+        logs = project_runner.get_server_logs(p_name, lines=25)
+        bot.answer_callback_query(call.id)
+        safe_send_message(chat_id, f"📄 **Log Server `{p_name}`**:\n```text\n{logs}\n```")
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("desktop_act:"))
