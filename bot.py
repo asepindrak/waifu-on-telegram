@@ -188,6 +188,88 @@ def safe_send_message(chat_id: int, text: str, reply_markup=None, parse_mode="Ma
             return None
 
 
+def send_long_chat_message(
+    chat_id: int,
+    text: str,
+    reply_to_id: Optional[int] = None,
+    parse_mode: str = "Markdown",
+    max_chunk_size: int = 3800
+) -> List[Any]:
+    """
+    Safely sends long messages to chat_id, automatically splitting text that
+    exceeds Telegram's 4096-character limit into clean chunks without breaking paragraphs.
+    Falls back gracefully from Markdown to plain text if parsing errors occur.
+    """
+    if not text:
+        return []
+
+    sent_messages = []
+    # If text fits inside limit, send directly
+    if len(text) <= max_chunk_size:
+        try:
+            msg = bot.send_message(
+                chat_id,
+                text,
+                parse_mode=parse_mode,
+                reply_to_message_id=reply_to_id
+            )
+            return [msg]
+        except Exception as e_md:
+            logger.warning(f"send_long_chat_message single markdown send failed: {e_md}. Retrying as plain text.")
+            try:
+                clean_text = text.replace("*", "").replace("_", "").replace("`", "")
+                msg = bot.send_message(
+                    chat_id,
+                    clean_text,
+                    reply_to_message_id=reply_to_id
+                )
+                return [msg]
+            except Exception as e_plain:
+                logger.error(f"send_long_chat_message failed: {e_plain}")
+                return []
+
+    # Split text into chunks respecting paragraphs / newlines
+    chunks = []
+    current_chunk = []
+    current_len = 0
+
+    lines = text.split("\n")
+    for line in lines:
+        line_len = len(line) + 1  # include newline
+        if current_len + line_len > max_chunk_size and current_chunk:
+            chunks.append("\n".join(current_chunk))
+            current_chunk = [line]
+            current_len = line_len
+        else:
+            current_chunk.append(line)
+            current_len += line_len
+
+    if current_chunk:
+        chunks.append("\n".join(current_chunk))
+
+    # Send each chunk sequentially
+    first = True
+    for chunk in chunks:
+        r_id = reply_to_id if first else None
+        first = False
+        try:
+            m = bot.send_message(chat_id, chunk, parse_mode=parse_mode, reply_to_message_id=r_id)
+            if m:
+                sent_messages.append(m)
+        except Exception as e_chk:
+            logger.warning(f"Chunk markdown send failed: {e_chk}. Retrying as plain text.")
+            try:
+                clean_chunk = chunk.replace("*", "").replace("_", "").replace("`", "")
+                m = bot.send_message(chat_id, clean_chunk, reply_to_message_id=r_id)
+                if m:
+                    sent_messages.append(m)
+            except Exception as e_chk_plain:
+                logger.error(f"Failed to send chunk: {e_chk_plain}")
+        time.sleep(0.3)  # Respect Telegram rate limits
+
+    return sent_messages
+
+
 def safe_edit_message_text(text: str, chat_id: int, message_id: int, reply_markup=None, parse_mode="Markdown"):
     """
     Safely edits a message with automatic Markdown fallback to plain text
