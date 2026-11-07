@@ -161,17 +161,17 @@ AWAITING_CUSTOM_LANG: dict = {}      # user_id -> bool
 
 def format_roleplay_italics(text: str) -> str:
     """
-    Formats roleplay actions into cleanly separated Telegram Markdown italics (_action_),
-    while preserving double-asterisk bold (**bold**) and inline code blocks.
-    Ensures clear newline separation between emotional actions and spoken dialogue so they
-    never merge into a single run-on sentence.
+    Formats roleplay actions with leading and trailing dashes (- _action_ -),
+    cleanly separated from spoken dialogue by a newline, while preserving
+    double-asterisk bold (**bold**) and inline code blocks.
     Example: "*tersenyum sambil merapikan buku* Ini tugasnya..."
-         -> "_tersenyum sambil merapikan buku_\n\nIni tugasnya..."
+         -> "- _tersenyum sambil merapikan buku_ -\n\nIni tugasnya..."
     """
     if not text:
         return text
 
-    # 1. Normalize parentheses actions like (tersenyum manis) or (sambil ...) into *action*
+    # 1. Normalize existing dashes or parentheses around action cues
+    text = re.sub(r'[-—~]\s*\*([^*\n]+?)\*\s*[-—~]', r'*\1*', text)
     text = re.sub(
         r'(?i)\(((?:tersenyum|tersipu|tertawa|merapikan|menatap|menghela|melirik|berbisik|memegang|menggenggam|mengusap|memeluk|duduk|berdiri|sambil)[^)]+)\)',
         r'*\1*',
@@ -184,9 +184,12 @@ def format_roleplay_italics(text: str) -> str:
     # Normalize excessive newlines to at most 2
     text = re.sub(r'\n{3,}', '\n\n', text).strip()
 
-    # 3. Convert single *action* into Telegram Markdown italic _action_
+    # 3. Convert single *action* into Telegram Markdown italic with dash padding: - _action_ -
     def _convert_segment(seg: str) -> str:
-        return re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'_\1_', seg)
+        def _dash_replace(m):
+            content = m.group(1).strip(" -—~")
+            return f"- _{content}_ -"
+        return re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', _dash_replace, seg)
 
     if "`" in text:
         parts = re.split(r'(`[^`]+`)', text)
