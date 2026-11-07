@@ -43,9 +43,10 @@ class TestBotMenusAndResilience(unittest.TestCase):
         msg.text = "  /outfit@YunaAoiBot  "
         msg.message_id = 555
 
-        with patch.object(bot, 'show_outfit_menu') as mock_outfit:
-            bot.handle_text_messages(msg)
-            mock_outfit.assert_called_once_with(6402709138, 6402709138, reply_to_id=555)
+        with patch.object(bot, 'is_authorized', return_value=True):
+            with patch.object(bot, 'show_outfit_menu') as mock_outfit:
+                bot.handle_text_messages(msg)
+                mock_outfit.assert_called_once_with(6402709138, 6402709138, reply_to_id=555)
 
     def test_handle_text_messages_fallback_persona(self):
         msg = MagicMock()
@@ -54,9 +55,10 @@ class TestBotMenusAndResilience(unittest.TestCase):
         msg.text = " /persona "
         msg.message_id = 556
 
-        with patch.object(bot, 'show_persona_menu') as mock_persona:
-            bot.handle_text_messages(msg)
-            mock_persona.assert_called_once_with(6402709138, 6402709138, reply_to_id=556)
+        with patch.object(bot, 'is_authorized', return_value=True):
+            with patch.object(bot, 'show_persona_menu') as mock_persona:
+                bot.handle_text_messages(msg)
+                mock_persona.assert_called_once_with(6402709138, 6402709138, reply_to_id=556)
 
     def test_apply_ckpt_choice_agy(self):
         with patch.object(bot, 'update_env_variable'):

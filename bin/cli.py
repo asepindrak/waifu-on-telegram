@@ -376,7 +376,8 @@ def cmd_status():
                 with open(outfit_file, "r", encoding="utf-8") as of:
                     odata = json.load(of)
                     if odata:
-                        outfit_key = list(odata.values())[-1]
+                        last_val = list(odata.values())[-1]
+                        outfit_key = last_val.get("key", "default") if isinstance(last_val, dict) else str(last_val)
             except Exception:
                 pass
         outfit_disp = outfit_key

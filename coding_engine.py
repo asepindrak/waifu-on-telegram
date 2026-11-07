@@ -23,7 +23,7 @@ from architecture_generator import ensure_project_architecture
 logger = logging.getLogger(__name__)
 
 CODING_TRIGGERS = [
-    r'\b(bikin|buat|buatkan|tulis)\s+(kode|code|program|script|aplikasi|app|web|website|landing page|endpoint|api|database|fitur|feature|fungsi|function|komponen|component|backend|frontend|html|css|javascript|python)\b',
+    r'\b(bikin|buat|buatkan|tulis)\s+([\w\-\.]+\.(?:html|css|js|jsx|ts|tsx|py|json|md|sql)|kode|code|program|script|aplikasi|app|web|website|landing page|endpoint|api|database|fitur|feature|fungsi|function|komponen|component|backend|frontend|html|css|javascript|python)\b',
     r'\b(buat file|baca file|edit file|tambah file|hapus file)\b',
     r'\b(coding|programmer|ngoding|scripting|source\s*code|pull\s*request)\b',
     r'\b(debug|fix|perbaiki)\s+(kode|code|script|bug|error|issue|program|web|app)\b',

@@ -817,7 +817,8 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
     else:
         b_str = "Belum Disetel"
 
-    _, cur_outfit_name = persona_mgr.get_user_outfit(user_id)
+    outfit_det = persona_mgr.get_user_outfit_details(user_id)
+    cur_outfit_name = outfit_det["name"]
 
     cur_llm_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip()
     if cur_llm_mode in ("split", "hybrid"):
@@ -2585,7 +2586,9 @@ def build_system_diagnostics_report(user_id: int) -> str:
     # Resolve Persona & Outfit
     p_name = persona.get("name", "Waifu")
     p_arch = persona.get("archetype", "Companion")
-    raw_outfit_key, cur_outfit = persona_mgr.get_user_outfit(user_id)
+    outfit_det = persona_mgr.get_user_outfit_details(user_id)
+    raw_outfit_key = outfit_det["key"]
+    cur_outfit = outfit_det["name"]
     if raw_outfit_key == "nude":
         outfit_disp = f"`{cur_outfit}` 🔞 _(Auto-Switch NSFW Engine Aktif)_"
     else:
@@ -2873,24 +2876,64 @@ def show_persona_menu(chat_id: int, user_id: int, message_to_edit: Optional[int]
 
 
 def show_outfit_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
-    """Renders interactive outfit selection keyboard."""
-    cur_key, cur_name = persona_mgr.get_user_outfit(user_id)
-    outfits = persona_mgr.list_outfits()
+    """Renders interactive outfit selection keyboard with auto-dynamic and session-aware controls."""
+    details = persona_mgr.get_user_outfit_details(user_id)
+    cur_key = details["key"]
+    mode = details["mode"]
+    is_auto = (mode == "auto" or cur_key == "default")
+
     markup = types.InlineKeyboardMarkup(row_width=2)
+
+    # 1. Primary Auto Mode button at top
+    auto_label = "🌟 Mode Otomatis (Dinamis Sesuai Jadwal) ✓" if is_auto else "🌟 Mode Otomatis (Dinamis Sesuai Jadwal)"
+    markup.add(types.InlineKeyboardButton(auto_label, callback_data="set_outfit:default"))
+
+    # Quick action buttons for active session/locked outfit
+    if mode == "session":
+        markup.add(
+            types.InlineKeyboardButton("🔄 Reset ke Otomatis", callback_data="set_outfit:default"),
+            types.InlineKeyboardButton(f"🔒 Kunci Outfit Ini", callback_data=f"lock_outfit:{cur_key}")
+        )
+    elif mode == "locked":
+        markup.add(
+            types.InlineKeyboardButton("🔓 Buka Kunci (Kembali ke Otomatis)", callback_data="set_outfit:default")
+        )
+
+    outfits = persona_mgr.list_outfits()
     btns = []
     for key, name in outfits:
-        is_cur = (key == cur_key)
+        if key in ("default", "auto"):
+            continue
+        is_cur = (key == cur_key and not is_auto)
         label = f"{name} ✓" if is_cur else name
         btns.append(types.InlineKeyboardButton(label, callback_data=f"set_outfit:{key}"))
     markup.add(*btns)
     markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
 
+    if mode == "auto":
+        status_line = (
+            f"• Mode: **🌟 Otomatis (Dinamis Sesuai Jadwal)**\n"
+            f"• Pakaian Saat Ini: **{details['dynamic_name']}**\n"
+            f"_(Akira otomatis berganti pakaian mengikuti jam dan kegiatannya: tidur = piyama, mandi = handuk, kuliah = baju kampus, santai = baju santai)_\n"
+        )
+    elif mode == "session":
+        status_line = (
+            f"• Mode: **👗 Sesi Khusus**\n"
+            f"• Pakaian Aktif: **{details['name']}**\n"
+            f"_(Berlaku untuk sesi foto saat ini. Otomatis kembali ke pakaian harian saat kegiatan/topik berpindah)_\n"
+        )
+    else:
+        status_line = (
+            f"• Mode: **🔒 Terkunci**\n"
+            f"• Pakaian Aktif: **{details['name']}**\n"
+            f"_(Terkunci permanen sampai kamu memilih Mode Otomatis)_\n"
+        )
+
     text = (
         f"👗 **Lemari Pakaian Waifu (/outfit)**\n\n"
-        f"• Pakaian Aktif: **{cur_name}**\n\n"
+        f"{status_line}\n"
         f"Pilih gaya busana waifumu untuk sesi foto & selfie! 💕\n\n"
-        f"💡 *Tips Dinamis*: Kamu juga bisa langsung meminta gaya pakaian atau tanpa busana secara alami di chat kapan saja "
-        f"(misal: *'pap pake kimono'*, *'pap pake hoodie'*, *'pap santai di cafe'*, dll)."
+        f"💡 *Tips*: Dalam **Mode Otomatis**, Akira akan otomatis menyesuaikan pakaiannya secara realistis dengan apa yang sedang dia lakukan!"
     )
     if message_to_edit:
         try:
@@ -3684,17 +3727,75 @@ def callback_set_outfit(call):
         return
     key = call.data.split(":", 1)[1]
     if persona_mgr.set_user_outfit(call.from_user.id, key):
-        _, name = persona_mgr.get_user_outfit(call.from_user.id)
-        bot.answer_callback_query(call.id, f"Outfit set to: {name}")
+        details = persona_mgr.get_user_outfit_details(call.from_user.id)
+        if key in ("default", "auto"):
+            bot.answer_callback_query(call.id, "🌟 Mode Otomatis Aktif!")
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            markup.add(
+                types.InlineKeyboardButton("📸 Minta PAP Sekarang", callback_data="open_pap_menu"),
+                types.InlineKeyboardButton("👗 Lemari Baju", callback_data="open_outfit_menu"),
+                types.InlineKeyboardButton("🔙 Panel Setup", callback_data="cfg_submenu:dashboard")
+            )
+            msg = (
+                f"🌟 **Mode Otomatis Aktif!**\n\n"
+                f"Akira sekarang akan **otomatis berganti pakaian sendiri** mengikuti jadwal & kegiatan nyatanya!\n"
+                f"• Tidur / Malam : Piyama santai\n"
+                f"• Mandi : Handuk mandi\n"
+                f"• Kuliah : Baju mahasiswi kampus\n"
+                f"• Kafe : Cozy knit sweater\n"
+                f"• Santai Rumah : Kaos kasual\n\n"
+                f"_Pakaian saat ini:_ **{details['dynamic_name']}** 🥰📸"
+            )
+        else:
+            name = details['raw_name']
+            bot.answer_callback_query(call.id, f"Outfit Sesi: {name}")
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            markup.add(
+                types.InlineKeyboardButton("📸 Minta PAP Sekarang", callback_data="open_pap_menu"),
+                types.InlineKeyboardButton("🔄 Reset ke Otomatis", callback_data="set_outfit:default"),
+                types.InlineKeyboardButton("🔒 Kunci Outfit Ini", callback_data=f"lock_outfit:{key}"),
+                types.InlineKeyboardButton("👗 Ganti Pakaian", callback_data="open_outfit_menu")
+            )
+            msg = (
+                f"👗 **Outfit Sesi Khusus Aktif!**\n\n"
+                f"Waifumu sekarang mengenakan **{name}** untuk sesi foto & selfie saat ini! 🥰📸\n\n"
+                f"💡 _Catatan: Pakaian ini berlaku untuk sesi ini. Akira akan otomatis kembali ke pakaian harian yang sesuai saat berganti aktivitas (tidur, mandi, kuliah, santai, dll)._"
+            )
+        try:
+            bot.edit_message_text(
+                msg,
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=markup,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('lock_outfit:'))
+def callback_lock_outfit(call):
+    if not is_authorized(call.from_user.id):
+        return
+    key = call.data.split(":", 1)[1]
+    if persona_mgr.set_user_outfit(call.from_user.id, key, is_locked=True):
+        details = persona_mgr.get_user_outfit_details(call.from_user.id)
+        name = details['raw_name']
+        bot.answer_callback_query(call.id, f"🔒 Pakaian dikunci: {name}")
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
             types.InlineKeyboardButton("📸 Minta PAP Sekarang", callback_data="open_pap_menu"),
-            types.InlineKeyboardButton("👗 Ganti Pakaian Lain", callback_data="open_outfit_menu"),
+            types.InlineKeyboardButton("🌟 Buka Kunci (Mode Otomatis)", callback_data="set_outfit:default"),
+            types.InlineKeyboardButton("👗 Lemari Baju", callback_data="open_outfit_menu"),
             types.InlineKeyboardButton("🔙 Panel Setup", callback_data="cfg_submenu:dashboard")
+        )
+        msg = (
+            f"🔒 **Outfit Berhasil Dikunci!**\n\n"
+            f"Waifumu akan **terus mengenakan {name}** di setiap foto dan obrolan sampai kamu mengubahnya kembali ke Mode Otomatis! 🥰"
         )
         try:
             bot.edit_message_text(
-                f"👗 **Outfit Berhasil Diganti!**\n\nWaifumu sekarang mengenakan **{name}** untuk sesi foto & selfie berikutnya! 🥰📸",
+                msg,
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
                 reply_markup=markup,
@@ -4189,6 +4290,7 @@ def process_photo_request(
             memory_engine.set_affinity(user_id, new_aff)
             persona_mgr.add_message(user_id, "user", f"[Requested photo: {user_text}]")
             persona_mgr.add_message(user_id, "assistant", f"[Sent selfie: {detected_scene}] {clean_caption}")
+            persona_mgr.notify_photo_delivered(user_id)
             waifu_status_tracker.record_photo_event(
                 user_id=user_id,
                 scene=detected_scene,
@@ -4414,6 +4516,7 @@ def process_video_request(
             memory_engine.set_affinity(user_id, new_aff)
             persona_mgr.add_message(user_id, "user", f"[Requested video: {user_text}]")
             persona_mgr.add_message(user_id, "assistant", f"[Sent video clip: {detected_scene}] {clean_caption}")
+            persona_mgr.notify_photo_delivered(user_id)
             waifu_status_tracker.record_photo_event(
                 user_id=user_id,
                 scene=detected_scene,
@@ -6055,11 +6158,16 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 # Inject daily story episode
                 story_ctx = story_engine.get_story_prompt_context(persona_mgr.active_key)
 
+                # Check for natural context shift to expire session outfits when activity changes
+                persona_mgr.check_context_shift(message.from_user.id, user_text)
+                cur_outfit_details = persona_mgr.get_user_outfit_details(message.from_user.id)
+
                 status_block = waifu_status_tracker.format_status_instruction(
                     user_id=message.from_user.id,
                     cur_hour=cur_hour,
                     routine_desc=routine['activity_desc'],
-                    major=p_prof['major']
+                    major=p_prof['major'],
+                    cur_outfit=cur_outfit_details.get("raw_name")
                 )
 
                 system_inst = persona.get("system_instruction", "")

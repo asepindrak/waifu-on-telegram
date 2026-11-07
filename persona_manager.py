@@ -135,7 +135,7 @@ VIDEO_INTENT_KEYWORDS = [
 
 OUTFIT_PRESETS = {
     "default": {
-        "name": "🌸 Default (Persona Style)",
+        "name": "🌟 Mode Otomatis (Dinamis Sesuai Kondisi)",
         "prompt": "",
         "negative": ""
     },
@@ -226,7 +226,8 @@ class PersonaManager:
         self.personas: Dict[str, Dict[str, Any]] = {}
         self.user_conversations: Dict[int, List[Dict[str, str]]] = {}
         self.user_affinity: Dict[int, int] = {}
-        self.user_outfits: Dict[int, str] = {}
+        self.user_outfits: Dict[int, Any] = {}
+        self.session_outfits: Dict[int, Dict[str, Any]] = {}
         self.outfits_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_outfits.json")
         self.history_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "chat_history.json")
         self._history_mtime = 0.0
@@ -236,11 +237,29 @@ class PersonaManager:
 
     def _load_user_outfits(self):
         """Loads user selected outfits from persistent JSON storage."""
+        self.user_outfits = {}
+        self.session_outfits = {}
         if os.path.exists(self.outfits_file):
             try:
                 with open(self.outfits_file, "r", encoding="utf-8") as f:
                     raw = json.load(f)
-                    self.user_outfits = {int(k): str(v) for k, v in raw.items() if str(k).isdigit()}
+                    now = time.time()
+                    for k, v in raw.items():
+                        if not str(k).isdigit():
+                            continue
+                        uid = int(k)
+                        if isinstance(v, dict):
+                            self.user_outfits[uid] = v
+                            if v.get("mode") == "session" and v.get("expires_at", 0) > now:
+                                self.session_outfits[uid] = v
+                        elif isinstance(v, str):
+                            # Handle legacy plain string:
+                            if v in ("default", "auto"):
+                                self.user_outfits[uid] = {"key": "default", "mode": "auto"}
+                            else:
+                                # Migrate legacy persistent outfit to dynamic auto so user is never trapped
+                                logger.info(f"Migrated legacy outfit '{v}' for user {uid} to dynamic auto mode.")
+                                self.user_outfits[uid] = {"key": "default", "mode": "auto"}
             except Exception as e:
                 logger.error(f"Error loading user outfits: {e}")
                 self.user_outfits = {}
@@ -455,19 +474,180 @@ class PersonaManager:
         """Returns list of (key, name) for all outfit presets."""
         return [(k, v["name"]) for k, v in OUTFIT_PRESETS.items()]
 
-    def set_user_outfit(self, user_id: int, key: str) -> bool:
-        """Sets chosen outfit preset for user and persists to disk."""
-        if key in OUTFIT_PRESETS:
-            self.user_outfits[int(user_id)] = key
+    def get_user_outfit_details(self, user_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Returns complete details of the active outfit state:
+        - mode: 'auto' | 'session' | 'locked'
+        - key: outfit key (or 'default' for auto)
+        - name: display name
+        - raw_name: preset display name
+        - dynamic_name: name of current student schedule outfit
+        - is_locked: bool
+        - is_session: bool
+        - expires_at: Optional[float]
+        """
+        uid = int(user_id) if user_id else 0
+        now = time.time()
+
+        cur_hour = time.localtime().tm_hour
+        routine = get_hourly_routine(cur_hour, persona_key=self.active_key)
+        dynamic_name = routine.get("outfit_name", "Pakaian Harian")
+
+        rec = self.user_outfits.get(uid)
+
+        # 1. Check permanently locked outfit
+        if isinstance(rec, dict) and rec.get("mode") == "locked":
+            key = rec.get("key", "default")
+            preset_name = OUTFIT_PRESETS.get(key, OUTFIT_PRESETS["default"])["name"]
+            return {
+                "key": key,
+                "name": f"{preset_name} 🔒",
+                "raw_name": preset_name,
+                "mode": "locked",
+                "is_locked": True,
+                "is_session": False,
+                "expires_at": None,
+                "dynamic_name": dynamic_name
+            }
+
+        # 2. Check active temporary session outfit
+        sess = self.session_outfits.get(uid)
+        if sess:
+            exp = sess.get("expires_at", 0)
+            if now < exp:
+                key = sess.get("key", "default")
+                preset_name = OUTFIT_PRESETS.get(key, OUTFIT_PRESETS["default"])["name"]
+                return {
+                    "key": key,
+                    "name": f"{preset_name} (Sesi Aktif)",
+                    "raw_name": preset_name,
+                    "mode": "session",
+                    "is_locked": False,
+                    "is_session": True,
+                    "expires_at": exp,
+                    "dynamic_name": dynamic_name
+                }
+            else:
+                logger.info(f"Session outfit '{sess.get('key')}' expired for user {uid}.")
+                self.session_outfits.pop(uid, None)
+                if isinstance(rec, dict) and rec.get("mode") == "session":
+                    self.user_outfits[uid] = {"key": "default", "mode": "auto"}
+                    self._save_user_outfits()
+
+        # 3. Default: Auto Dynamic Mode
+        return {
+            "key": "default",
+            "name": f"🌟 Otomatis ({dynamic_name})",
+            "raw_name": dynamic_name,
+            "mode": "auto",
+            "is_locked": False,
+            "is_session": False,
+            "expires_at": None,
+            "dynamic_name": dynamic_name
+        }
+
+    def get_user_outfit(self, user_id: int) -> Tuple[str, str]:
+        """
+        Returns (key, name) of active outfit for user.
+        Preserves backwards-compatibility with all existing callers and tests.
+        """
+        details = self.get_user_outfit_details(user_id)
+        return details["key"], details["raw_name"]
+
+    def set_user_outfit(
+        self,
+        user_id: int,
+        key: str,
+        is_locked: bool = False,
+        duration_seconds: int = 3600
+    ) -> bool:
+        """
+        Sets chosen outfit preset for user.
+        - If key in ('default', 'auto'): Reverts to dynamic auto mode.
+        - If is_locked is True: Locks this outfit permanently until manually unlocked.
+        - Otherwise: Sets a temporary session outfit that naturally expires on activity change or timeout.
+        """
+        uid = int(user_id) if user_id else 0
+        now = time.time()
+
+        if key in ("default", "auto"):
+            self.session_outfits.pop(uid, None)
+            self.user_outfits[uid] = {"key": "default", "mode": "auto", "updated_at": now}
             self._save_user_outfits()
-            logger.info(f"User {user_id} outfit set and saved: {key}")
+            logger.info(f"User {uid} outfit reset to dynamic auto mode.")
+            return True
+
+        if key in OUTFIT_PRESETS:
+            if is_locked:
+                self.session_outfits.pop(uid, None)
+                self.user_outfits[uid] = {
+                    "key": key,
+                    "mode": "locked",
+                    "updated_at": now
+                }
+                logger.info(f"User {uid} outfit locked to '{key}'.")
+            else:
+                sess = {
+                    "key": key,
+                    "mode": "session",
+                    "set_at": now,
+                    "expires_at": now + duration_seconds,
+                    "photos_count": 0
+                }
+                self.session_outfits[uid] = sess
+                self.user_outfits[uid] = sess
+                logger.info(f"User {uid} session outfit set: '{key}' (Expires in {duration_seconds}s).")
+            self._save_user_outfits()
+            return True
+
+        return False
+
+    def clear_session_outfit(self, user_id: int) -> bool:
+        """Clears active session outfit and reverts to auto dynamic mode."""
+        uid = int(user_id) if user_id else 0
+        details = self.get_user_outfit_details(uid)
+        if details.get("is_session"):
+            self.session_outfits.pop(uid, None)
+            self.user_outfits[uid] = {"key": "default", "mode": "auto", "updated_at": time.time()}
+            self._save_user_outfits()
+            logger.info(f"Session outfit cleared for user {uid}, reverted to dynamic auto mode.")
             return True
         return False
 
-    def get_user_outfit(self, user_id: int) -> Tuple[str, str]:
-        """Returns (key, name) of active outfit for user."""
-        key = self.user_outfits.get(int(user_id), "default")
-        return key, OUTFIT_PRESETS.get(key, OUTFIT_PRESETS["default"])["name"]
+    def notify_photo_delivered(self, user_id: int):
+        """Notifies persona manager that a photo was delivered with current outfit."""
+        uid = int(user_id) if user_id else 0
+        sess = self.session_outfits.get(uid)
+        if sess:
+            sess["photos_count"] = sess.get("photos_count", 0) + 1
+
+    def check_context_shift(self, user_id: int, user_text: str) -> bool:
+        """
+        Inspects incoming chat message for changes in waifu activity or routine.
+        If a session outfit is active, automatically clears it when routine changes!
+        """
+        uid = int(user_id) if user_id else 0
+        details = self.get_user_outfit_details(uid)
+        if not details.get("is_session"):
+            return False
+
+        t = user_text.lower()
+        # Routine shifts that invalidate previous costume dress-up session:
+        SHIFT_TRIGGERS = [
+            r"\b(tidur|bobo|rebahan|ngantuk|good\s*night|selamat\s*malam|mimpi\s*indah)\b",
+            r"\b(mandi|keramas|shower|bath|handuk)\b",
+            r"\b(kuliah|kampus|kelas|dosen|makul|matkul|skripsi|praktikum|perpustakaan|perpus)\b",
+            r"\b(cafe|kafe|kopi|coffee|starbucks|nongkrong)\b",
+            r"\b(mall|belanja|shopping|bioskop|jalan-jalan)\b",
+            r"\b(gym|olahraga|fitness|workout|jogging)\b",
+            r"\b(pulang\s+ke\s+rumah|udah\s+di\s+rumah|santai\s+di\s+rumah|istirahat\s+di\s+kamar)\b"
+        ]
+        for pat in SHIFT_TRIGGERS:
+            if re.search(pat, t):
+                logger.info(f"Natural context shift detected for user {uid} ('{user_text[:30]}'). Reverting session outfit '{details['key']}' to auto.")
+                self.clear_session_outfit(uid)
+                return True
+        return False
 
     def extract_contextual_scene(
         self,
@@ -595,21 +775,23 @@ class PersonaManager:
         # 4. Other Preset Outfits explicitly requested in user_text
         DYNAMIC_PRESET_KEYWORDS = [
             ("romantic", ["romantic", "romantis", "sensual", "intimate", "mesra"]),
-            ("bikini", ["bikini", "swimsuit", "baju renang", "renang", "pantai"]),
-            ("pajamas", ["piyama", "pajamas", "baju tidur", "camisole", "tidur"]),
-            ("campus_casual", ["baju kuliah", "kampus", "kuliah", "campus"]),
-            ("mall_casual", ["mall", "streetwear", "jalan-jalan", "shopping"]),
-            ("cafe_cozy", ["cafe", "kafe", "kopi"]),
+            ("bikini", ["bikini", "swimsuit", "baju renang"]),
+            ("pajamas", ["piyama", "pajamas", "baju tidur", "camisole"]),
+            ("campus_casual", ["baju kuliah", "outfit kuliah", "seragam kampus"]),
+            ("mall_casual", ["baju mall", "streetwear"]),
+            ("cafe_cozy", ["baju cafe", "cozy knit"]),
             ("maid", ["maid", "pelayan", "french maid"]),
             ("kimono", ["kimono", "yukata"]),
-            ("school_jk", ["sekolah", "seragam", "school", "jk", "sailor"]),
-            ("gym", ["gym", "olahraga", "sport", "fitness", "yoga"]),
+            ("school_jk", ["seragam sekolah", "school jk", "sailor uniform", "baju sekolah"]),
+            ("gym", ["baju gym", "baju olahraga", "activewear"]),
             ("dress", ["dress", "gaun", "cocktail dress"]),
             ("sweater", ["sweater", "rajut"])
         ]
         for key, keywords in DYNAMIC_PRESET_KEYWORDS:
             if any(k in lower for k in keywords):
                 preset = OUTFIT_PRESETS.get(key, OUTFIT_PRESETS["default"])
+                if user_id:
+                    self.set_user_outfit(user_id, key, is_locked=False, duration_seconds=1800)
                 return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
 
         # 5. Context-aware Student Routine & Conversation History
@@ -624,12 +806,37 @@ class PersonaManager:
             if any(k in lower_s for k in ["mall", "campus", "classroom", "library", "cafe", "park", "street", "store"]):
                 is_public = True
 
-        # Check persistent user outfit setting
-        outfit_key = self.user_outfits.get(int(user_id), "default") if user_id else "default"
+        outfit_details = self.get_user_outfit_details(user_id) if user_id else {
+            "key": "default", "mode": "auto", "is_locked": False, "is_session": False,
+            "name": ctx["outfit_name"], "raw_name": ctx["outfit_name"]
+        }
+        outfit_key = outfit_details.get("key", "default")
+        outfit_mode = outfit_details.get("mode", "auto")
 
-        # Check if conversation has a specific active scenario (mandi, mall, kampus, cafe, gym, pantai, dapur, tidur)
+        # Check if conversation has an explicit active scenario that conflicts with current session outfit
+        is_explicit = bool(ctx.get("is_explicit", False))
         activity_str = ctx.get("activity", "").lower()
-        has_specific_scenario = any(act_kw in activity_str for act_kw in ["mandi", "mall", "kampus", "perpus", "cafe", "gym", "pantai", "dapur"])
+        intimate_outfits = ("nude", "lingerie", "romantic", "pajamas", "towel")
+
+        is_conflicting = False
+        if is_explicit and outfit_mode == "session":
+            if "mandi" in activity_str and outfit_key not in ("towel", "nude"):
+                is_conflicting = True
+            elif any(s in activity_str for s in ["tidur", "bobo", "ngantuk"]) and outfit_key not in intimate_outfits:
+                is_conflicting = True
+            elif is_public and outfit_key in ("nude", "lingerie", "pajamas", "towel"):
+                is_conflicting = True
+            elif any(c in activity_str for c in ["kampus", "kuliah", "perpus"]) and outfit_key in ("maid", "kimono", "bikini", "lingerie", "nude"):
+                is_conflicting = True
+
+        # If user had a temporary session outfit, but current context explicitly shifted to a conflicting routine,
+        # the session outfit gracefully yields and returns to dynamic auto mode!
+        if is_conflicting and outfit_mode == "session":
+            logger.info(f"Context shift: Session outfit '{outfit_key}' yielded to active routine '{activity_str}'.")
+            if user_id:
+                self.clear_session_outfit(user_id)
+            outfit_mode = "auto"
+            outfit_key = "default"
 
         # COHERENCE SAFETY GUARD: NEVER allow lingerie or nude in public spaces (e.g. mall, campus)!
         if is_public and outfit_key in ("nude", "lingerie"):
@@ -647,8 +854,8 @@ class PersonaManager:
                     preset = OUTFIT_PRESETS["pajamas"]
                 return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
 
-        # If there is a specific active conversational scenario, prioritize the activity's realistic attire!
-        if has_specific_scenario:
+        # If there is a specific active conversational scenario and no locked outfit, prioritize the activity's realistic attire!
+        if is_explicit and outfit_mode == "auto":
             return (ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
 
         if outfit_key != "default" and outfit_key in OUTFIT_PRESETS:

@@ -163,7 +163,8 @@ class WaifuStatusTracker:
         user_id: int,
         cur_hour: int,
         routine_desc: str,
-        major: str = "Ilmu Hukum"
+        major: str = "Ilmu Hukum",
+        cur_outfit: Optional[str] = None
     ) -> str:
         """
         Builds the system instruction prompt section.
@@ -174,14 +175,24 @@ class WaifuStatusTracker:
             loc = st.get("location", "Rumah / Kamar kos")
             act = st.get("activity")
             p_cap = st.get("photo_caption")
+            outfit = cur_outfit or st.get("outfit")
 
             caption_ref = f' (Caption yang baru saja kamu kirim: "{p_cap}")' if p_cap else ""
+            outfit_line = f"• Pakaian kamu saat ini: {outfit}\n" if outfit else ""
+            outfit_guideline = (
+                f"4. KONSISTENSI PAKAIAN: Pakaian kamu saat ini adalah {outfit}. "
+                "Jika lawan bicaramu menanyakan apa yang sedang kamu pakai atau mengomentari fotomu, "
+                "jawabanmu harus konsisten dengan pakaian tersebut. "
+                "Jika sebelumnya kamu sempat memakai kostum khusus (seperti maid, kimono, atau bikini) namun sekarang kegiatanmu sudah berganti "
+                "(seperti tidur, mandi, santai di rumah, atau kuliah), kamu sudah mengganti pakaianmu menjadi pakaian yang sesuai dan tidak lagi memakai kostum tersebut.\n"
+            ) if outfit else ""
 
             return (
                 f"\n\n[SITUASI & LOKASI DIRI SAAT INI - WAJIB KONSISTEN]\n"
                 f"Waktu sekarang: Jam {cur_hour:02d}:00.\n"
                 f"• Lokasi kamu saat ini: {loc}\n"
                 f"• Kegiatanmu saat ini: \"{act}\"{caption_ref}\n"
+                f"{outfit_line}"
                 f"• Status mahasiswa: Mahasiswi ({major}).\n\n"
                 f"ATURAN MUTLAK KONSISTENSI DIRI (SANGAT PENTING):\n"
                 f"1. Kamu WAJIB SADAR dan KONSISTEN dengan lokasi dan kegiatan di atas!\n"
@@ -189,12 +200,14 @@ class WaifuStatusTracker:
                 f"Jika kamu sebelumnya bilang sedang di rumah/kamar (misal rebahan santai baru beres pulang dari kampus), "
                 f"DILARANG TIBA-TIBA bilang masih di kampus atau sedang di perpustakaan/kelas!\n"
                 f"3. Jika lawan bicaramu bertanya sedang apa, berada di mana, atau membahas fotomu, respons sesuai dengan situasi nyatamu saat ini di {loc}.\n"
+                f"{outfit_guideline}"
             )
 
         # Fallback to standard college routine if no recent dynamic statement exists
+        outfit_line = f" Pakaianmu: {cur_outfit}." if cur_outfit else ""
         return (
             f"\n\n[KEGIATAN MAHASISWI HARI INI]\n"
-            f"Waktu sekarang: Jam {cur_hour:02d}:00. Kegiatanmu saat ini: {routine_desc}. "
+            f"Waktu sekarang: Jam {cur_hour:02d}:00. Kegiatanmu saat ini: {routine_desc}.{outfit_line} "
             f"Kamu adalah mahasiswi ({major}). Tetap konsisten dan wajar dengan kegiatan ini.\n"
         )
 
@@ -207,3 +220,4 @@ def get_waifu_status_tracker() -> WaifuStatusTracker:
     if _GLOBAL_TRACKER is None:
         _GLOBAL_TRACKER = WaifuStatusTracker()
     return _GLOBAL_TRACKER
+

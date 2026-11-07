@@ -289,11 +289,23 @@ def detect_contextual_activity_and_outfit(
                 "is_public": True
             }
 
+        # 10. Home / Relaxing / Kos Context
+        if any(k in t for k in ["rumah", "kosan", "kost", "kos", "apartemen", "santai di rumah", "pulang ke rumah"]):
+            return {
+                "activity": "lagi santai di rumah / kamar kos",
+                "scene": "relaxing comfortably in cozy modern apartment room, warm ambient lighting",
+                "outfit_prompt": "(wearing cute comfortable casual loungewear, oversized pastel tee, relaxed shorts:1.35)",
+                "outfit_negative": "bikini, lingerie, swimwear, naked, uniform, coat",
+                "outfit_name": "🛋️ Pakaian Santai Rumahan",
+                "is_public": False
+            }
+
         return None
 
     # Step A: Check current user_text explicitly FIRST!
     res = match_scenario(user_text)
     if res:
+        res["is_explicit"] = True
         return res
 
     # Step B: If user query has no explicit activity, inspect recent chat history (newest first)
@@ -301,6 +313,7 @@ def detect_contextual_activity_and_outfit(
         for turn in reversed(history_turns[-5:]):
             res = match_scenario(turn)
             if res:
+                res["is_explicit"] = True
                 return res
 
     # Step C: Fallback to real-world hourly routine schedule
@@ -312,5 +325,6 @@ def detect_contextual_activity_and_outfit(
         "outfit_prompt": routine["outfit_prompt"],
         "outfit_negative": "bikini, lingerie, swimwear" if routine["is_public"] else "",
         "outfit_name": routine["outfit_name"],
-        "is_public": routine["is_public"]
+        "is_public": routine["is_public"],
+        "is_explicit": False
     }
