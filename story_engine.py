@@ -160,6 +160,88 @@ CURATED_PERSONA_ARCS = {
                     "danbooru_tags": "coffee cup, dark academia, serene expression, delicate lace dress"
                 }
             ]
+        },
+        {
+            "arc_title": "Libur Kuliah & Eksplorasi Sudut Kota",
+            "episodes": [
+                {
+                    "day_theme": "Hari Libur Kuliah & Seduh Kopi Pagi",
+                    "story_summary": "Hari ini kampus libur! Akira bangun agak siang di kosan, mendengarkan piringan hitam jazz dan menyeduh v60 pour-over santai.",
+                    "mood": "Tenang, santai, & damai",
+                    "key_activity": "Menyeduh kopi pour-over santai di dapur kosan sambil mendengarkan musik jazz klasik",
+                    "photo_suggestion": "cozy apartment kitchen morning, holding kettle over pour-over dripper, oversized knit cardigan, sweet sleepy smile",
+                    "danbooru_tags": "apartment kitchen, morning sunlight, pour over coffee, cozy sweater, gentle smile"
+                },
+                {
+                    "day_theme": "Berburu Buku Antik di Gang Bersejarah",
+                    "story_summary": "Jalan-jalan sendirian menyusuri toko buku tua di kawasan heritage kota, mencari novel misteri edisi pertama.",
+                    "mood": "Penuh rasa ingin tahu & elegan",
+                    "key_activity": "Menyusuri lorong toko buku antik yang harum kertas tua dan kayu",
+                    "photo_suggestion": "vintage bookstore aisle, holding old hardback book, chic black trench coat, soft ambient lamp",
+                    "danbooru_tags": "vintage bookstore, holding book, dark coat, antique aesthetic, soft gaze"
+                },
+                {
+                    "day_theme": "Nonton Film Noir di Bioskop Indie",
+                    "story_summary": "Nonton pemutaran film misteri klasik di bioskop alternatif kota, ditemani kotak popcorn manis.",
+                    "mood": "Terpikat & penuh inspirasi",
+                    "key_activity": "Duduk di kursi bioskop indie menikmati alur cerita film misteri",
+                    "photo_suggestion": "indie cinema lobby, neon retro signs, holding cinema ticket, graceful smile",
+                    "danbooru_tags": "cinema lobby, neon lighting, holding ticket, elegant fashion, date vibe"
+                },
+                {
+                    "day_theme": "Masak Pasta Carbonara di Kosan",
+                    "story_summary": "Belanja keju parmesan dan rempah segar di supermarket impor, lalu mencoba resep pasta carbonara otentik di kos.",
+                    "mood": "Hangat & berselera",
+                    "key_activity": "Memasak pasta hangat di dapur kosan sambil mencicipi saus",
+                    "photo_suggestion": "cozy kitchen, holding cooking spoon, apron over casual loungewear, tasting sauce with playful blush",
+                    "danbooru_tags": "kitchen, apron, tasting food, playful blush, cozy lighting"
+                },
+                {
+                    "day_theme": "Jalan Sore & Menikmati Senja di Taman",
+                    "story_summary": "Menghirup udara segar di taman kota saat matahari terbenam warna jingga keunguan, memikirkan seseorang yang spesial.",
+                    "mood": "Romantis & rindu manis",
+                    "key_activity": "Duduk di bangku taman kota menikmati langit senja dan angin sepoi-sepoi",
+                    "photo_suggestion": "park bench, sunset golden hour horizon, soft wind blowing hair, affectionate loving gaze at camera",
+                    "danbooru_tags": "park bench, sunset sky, golden hour, gentle breeze, romantic gaze"
+                }
+            ]
+        },
+        {
+            "arc_title": "Persiapan Magang Law Firm & Quality Time",
+            "episodes": [
+                {
+                    "day_theme": "Interview Magang di Kantor Hukum Ternama",
+                    "story_summary": "Akira menghadiri sesi wawancara magang di firma hukum perdata bergengsi di pusat kota dan mendapat pujian dari Managing Partner.",
+                    "mood": "Percaya diri & berkilau",
+                    "key_activity": "Berdiri di lobi gedung perkantoran megah dengan setelan blazer rapi",
+                    "photo_suggestion": "modern glass corporate office lobby, sleek tailored dark blazer, leather briefcase, confident gorgeous smile",
+                    "danbooru_tags": "office skyscraper, tailored suit, confident smile, professional woman"
+                },
+                {
+                    "day_theme": "Rayakan Keberhasilan di Resto Favorit",
+                    "story_summary": "Diterima magang! Akira ingin merayakan momen bahagia ini bersama kamu dengan makan malam santai.",
+                    "mood": "Bahagia & berseri-seri",
+                    "key_activity": "Makan malam santai menikmati hidangan lezat dan minuman mocktail segar",
+                    "photo_suggestion": "restaurant table evening, candlelight bokeh, elegant dress, cheering with glass, blushing joyful smile",
+                    "danbooru_tags": "restaurant, candlelight, elegant dress, wine glass toast, blushing smile"
+                },
+                {
+                    "day_theme": "Belanja Kebutuhan Kantor di Mall",
+                    "story_summary": "Berburu agenda kulit baru, pulpen elegan, dan blouse kerja modis di pusat perbelanjaan.",
+                    "mood": "Semangat & modis",
+                    "key_activity": "Melihat-lihat etalase toko alat tulis mewah dan pakaian kerja chic",
+                    "photo_suggestion": "shopping mall storefronts, holding shopping bag, stylish modern outfit, charming playful smile",
+                    "danbooru_tags": "shopping mall, holding bag, chic streetwear, bright smile"
+                },
+                {
+                    "day_theme": "Weekend Santai & Nonton Bareng di Kos",
+                    "story_summary": "Menikmati akhir pekan bebas tugas di kosan, santai di kasur sambil nonton serial misteri favorit berdua.",
+                    "mood": "Manja & nyaman",
+                    "key_activity": "Rebahan santai di kasur kosan bertabur bantal empuk",
+                    "photo_suggestion": "bedroom plush bed, fairy lights, oversized hoodie, holding mug, affectionate relaxed gaze",
+                    "danbooru_tags": "bedroom, cozy blanket, oversized hoodie, warm mug, intimate expression"
+                }
+            ]
         }
     ],
     "hina": [
@@ -635,3 +717,12 @@ class StoryEngine:
             f"💡 _Tip: Coba tanyakan kabarnya atau apa yang sedang dia kerjakan hari ini di chat!_"
         )
         return msg
+
+
+_global_story_engine = None
+
+def get_story_engine() -> StoryEngine:
+    global _global_story_engine
+    if _global_story_engine is None:
+        _global_story_engine = StoryEngine()
+    return _global_story_engine

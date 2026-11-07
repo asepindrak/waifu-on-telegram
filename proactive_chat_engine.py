@@ -126,7 +126,22 @@ class ProactiveChatEngine:
 
     def get_routine_fallback(self, user_id: int, persona_key: str = "runa") -> str:
         """Returns natural girlfriend fallback check-in based on real-time routine (0% GPU/VRAM load, zero gaming lag)."""
-        cur_hour = time.localtime().tm_hour
+        now = time.localtime()
+        cur_hour = now.tm_hour
+        is_weekend = now.tm_wday in (5, 6)
+
+        if is_weekend:
+            if 9 <= cur_hour < 12:
+                return "Pagi sayang~ Selamat berakhir pekan yaa! Hari ini ada rencana santai atau mau rebahan aja nih?"
+            elif 12 <= cur_hour < 15:
+                return "Hai! Udah makan siang belum? Aku lagi santai nih, nanti sore ada waktu buat jalan atau ngopi berdua nggak? 🥰"
+            elif 15 <= cur_hour < 18:
+                return "Lagi santai di mana nih? Cuacanya enak banget buat jalan sore atau nonton bioskop bareng lho~ Mau nemenin aku jalan?"
+            elif 18 <= cur_hour < 21:
+                return "Malam sayang! Gimana weekend kamu hari ini? Mau main ke kosanku atau ngobrol santai nemenin malam minggu?"
+            else:
+                return "Udah mau siap-siap istirahat ya? Semoga weekend kamu hari ini menyenangkan yaa sayang 💕"
+
         if 9 <= cur_hour < 12:
             return "Lagi sibuk ya? Semangat kerjanya/kuliahnya hari ini yaa~ Nanti kabarin kalau udah senggang."
         elif 12 <= cur_hour < 15:

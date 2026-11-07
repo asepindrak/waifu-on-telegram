@@ -54,6 +54,8 @@ from pending_message_manager import get_pending_message_manager
 pending_manager = get_pending_message_manager()
 from waifu_status_tracker import get_waifu_status_tracker
 waifu_status_tracker = get_waifu_status_tracker()
+from hangout_engine import get_hangout_engine
+hangout_engine = get_hangout_engine()
 from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
@@ -155,6 +157,23 @@ USER_QUALITIES: dict = {}        # user_id -> 'high' | 'ultra' | 'fast'
 USER_DATE_WIZARD: dict = {}       # user_id -> 'birthday' | 'anniversary'
 BOT_LANGUAGE = os.environ.get("BOT_LANGUAGE", "id")
 AWAITING_CUSTOM_LANG: dict = {}      # user_id -> bool
+
+
+def format_roleplay_italics(text: str) -> str:
+    """
+    Converts single-asterisk roleplay action text (*action*) into Telegram Markdown italics (_action_),
+    while preserving double-asterisk bold (**bold**) and code blocks.
+    Example: "*tersenyum manis* Hai **sayang**" -> "_tersenyum manis_ Hai **sayang**"
+    """
+    if not text:
+        return text
+    if "`" in text:
+        parts = re.split(r'(`[^`]+`)', text)
+        for i in range(len(parts)):
+            if not parts[i].startswith("`"):
+                parts[i] = re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'_\1_', parts[i])
+        return "".join(parts)
+    return re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'_\1_', text)
 
 
 # --- Telegram Safe Messaging Helpers ---
@@ -887,6 +906,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("💻 Workspace (/projects)", callback_data="cfg_submenu:projects"),
         types.InlineKeyboardButton("🖥️ Computer Use (/desktop)", callback_data="cfg_submenu:desktop"),
         types.InlineKeyboardButton("🎭 Ganti Persona", callback_data="open_persona_menu"),
+        types.InlineKeyboardButton("💖 Kencan & Hangout (/hangout)", callback_data="open_hangout_menu"),
         types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
         types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
         types.InlineKeyboardButton("⏰ Pengingat (/remind)", callback_data="open_reminders_menu"),
@@ -1899,6 +1919,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"`/queue <judul>` - Tambah lagu ke antrean / lihat antrean\n"
             f"`/playlist <nama>` - Putar full album / playlist di PC\n"
             f"`/music` - Remote kontrol pemutar musik PC\n"
+            f"`/hangout` - Kencan & hangout berdua (kafe, bioskop, kosan, dll)\n"
             f"`/outfit` - Buka lemari pakaian waifu\n"
             f"`/persona` - Ganti karakter waifu\n"
             f"`/newpersona` - Ciptakan karakter waifu baru impianmu\n"
@@ -2944,6 +2965,50 @@ def show_outfit_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] 
     send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
 
 
+def show_hangout_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
+    """Renders interactive date & hangout selection menu."""
+    active_date = hangout_engine.get_active_date(user_id)
+    persona = persona_mgr.get_active_persona()
+    p_name = persona.get("name", "Akira")
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+
+    if active_date:
+        v_title = active_date.get("venue_title", "Tempat Kencan")
+        markup.add(
+            types.InlineKeyboardButton(f"📸 Minta Foto Kencan di {v_title}", callback_data="open_pap_menu"),
+            types.InlineKeyboardButton("🚪 Selesai Kencan & Pulang", callback_data="end_hangout"),
+            types.InlineKeyboardButton("🔙 Panel Setup", callback_data="cfg_submenu:dashboard")
+        )
+        text = (
+            f"💖 **Kencan Berdua Sedang Berlangsung!** 🌸\n\n"
+            f"Kamu dan **{p_name}** saat ini sedang **{v_title}**! 🥰✨\n"
+            f"Nikmati momen kebersamaan kalian berdua di obrolan chat dan abadikan foto kencan bersama!"
+        )
+    else:
+        for v in hangout_engine.list_venues():
+            markup.add(types.InlineKeyboardButton(v["title"], callback_data=f"start_hangout:{v['key']}"))
+        markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+        text = (
+            f"💖 **Menu Kencan & Hangout Berdua (/hangout)** 🌸\n\n"
+            f"Pilih tempat kencan untuk dinikmati berdua bersama **{p_name}** sekarang:\n\n"
+            f"• ☕ **Kafe Estetik**: Duduk berdua di sudut kafe menikmati kopi & dessert.\n"
+            f"• 🎬 **Bioskop**: Nonton film bioskop berdampingan berbagi popcorn.\n"
+            f"• 🛋️ **Kosan / Rumah**: Quality time santai berdua di kamar kosan.\n"
+            f"• 🌸 **Taman Senja**: Jalan sore bergandengan tangan di taman kota.\n"
+            f"• 🛍️ **Mall & Arcade**: Jalan-jalan seru dan main mesin capit berdua.\n\n"
+            f"💡 _Tip: Kamu juga bisa langsung mengajak waifu secara alami di chat (misal: 'nonton bioskop yuk', 'ngopi yuk', atau 'main ke kosanmu yuk')!_"
+        )
+
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    send_menu_message(chat_id, text, reply_markup=markup, reply_to_id=reply_to_id)
+
+
 def show_affection_status(chat_id: int, user_id: int, reply_to_id: Optional[int] = None):
     """Displays user affection and romance status."""
     persona = persona_mgr.get_active_persona()
@@ -3073,7 +3138,7 @@ def callback_set_persona(call):
                 logger.error(f"Error sending switched persona photo: {e}")
 
 
-@bot.callback_query_handler(func=lambda call: call.data in ('open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'open_reminders_menu', 'open_dates_menu', 'open_music_menu', 'open_pap_menu', 'check_love_status', 'start_new_persona'))
+@bot.callback_query_handler(func=lambda call: call.data in ('open_hangout_menu', 'open_outfit_menu', 'open_persona_menu', 'open_ratio_menu', 'open_quality_menu', 'open_setup_menu', 'open_help_menu', 'open_memory_menu', 'open_reminders_menu', 'open_dates_menu', 'open_music_menu', 'open_pap_menu', 'check_love_status', 'start_new_persona'))
 def callback_quick_actions(call):
     if not is_authorized(call.from_user.id):
         bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
@@ -3081,7 +3146,9 @@ def callback_quick_actions(call):
     bot.answer_callback_query(call.id)
     chat_id = call.message.chat.id
     user_id = call.from_user.id
-    if call.data == 'open_outfit_menu':
+    if call.data == 'open_hangout_menu':
+        show_hangout_menu(chat_id, user_id, message_to_edit=call.message.message_id)
+    elif call.data == 'open_outfit_menu':
         show_outfit_menu(chat_id, user_id, message_to_edit=call.message.message_id)
     elif call.data == 'open_persona_menu':
         show_persona_menu(chat_id, user_id, message_to_edit=call.message.message_id)
@@ -3805,6 +3872,84 @@ def callback_lock_outfit(call):
             pass
 
 
+@bot.message_handler(commands=['hangout', 'kencan', 'date', 'jalan'])
+def handle_hangout_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    try:
+        show_hangout_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
+    except Exception as e:
+        logger.error(f"Error handling /hangout command: {e}", exc_info=True)
+        bot.reply_to(message, f"⚠️ Terjadi kendala saat membuka menu kencan: {e}")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('start_hangout:'))
+def callback_start_hangout(call):
+    if not is_authorized(call.from_user.id):
+        return
+    venue_key = call.data.split(":", 1)[1]
+    user_id = call.from_user.id
+    date_session = hangout_engine.start_date(user_id, venue_key)
+    venue = date_session["venue"]
+    p_name = persona_mgr.get_active_persona().get("name", "Akira")
+
+    bot.answer_callback_query(call.id, f"💖 Kencan dimulai di {venue['title']}!")
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("📸 Minta Foto Berdua", callback_data="open_pap_menu"),
+        types.InlineKeyboardButton("🚪 Selesai Kencan", callback_data="end_hangout"),
+        types.InlineKeyboardButton("🔙 Panel Kencan", callback_data="open_hangout_menu")
+    )
+    roleplay_cue = venue.get("roleplay_cues", [f"{p_name} tersenyum manis menatapmu"])[0]
+    msg = (
+        f"💖 **Momen Kencan Berdua Dimulai!** 🌸\n\n"
+        f"_{roleplay_cue}_\n\n"
+        f"Kamu dan **{p_name}** sekarang sedang **{venue['title']}**! 🥰\n"
+        f"_{venue['activity']}_\n\n"
+        f"✨ Obrolanmu di chat sekarang berlangsung langsung di suasana {venue['title']}. Nikmati waktu berdua dan jangan ragu minta foto kencan ya!"
+    )
+    try:
+        bot.edit_message_text(
+            msg,
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+    except Exception:
+        pass
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'end_hangout')
+def callback_end_hangout(call):
+    if not is_authorized(call.from_user.id):
+        return
+    user_id = call.from_user.id
+    p_name = persona_mgr.get_active_persona().get("name", "Akira")
+    hangout_engine.end_date(user_id)
+    bot.answer_callback_query(call.id, "🚪 Selesai kencan!")
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("💖 Ajak Kencan Lagi", callback_data="open_hangout_menu"),
+        types.InlineKeyboardButton("🔙 Menu Setup", callback_data="cfg_submenu:dashboard")
+    )
+    msg = (
+        f"🌸 **Kencan Berdua Selesai** ✨\n\n"
+        f"_{p_name} melambaikan tangan lembut sambil tersenyum hangat_\n\n"
+        f"Terima kasih untuk kencan yang menyenangkan hari ini! {p_name} senang banget bisa menghabiskan waktu berdua sama kamu. Sampai jumpa di kencan berikutnya ya! 🥰"
+    )
+    try:
+        bot.edit_message_text(
+            msg,
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+    except Exception:
+        pass
+
+
 @bot.message_handler(commands=['language', 'lang', 'bahasa'])
 def handle_language_command(message):
     if not is_authorized(message.from_user.id):
@@ -4075,7 +4220,12 @@ def process_photo_request(
 
             history = persona_mgr.get_chat_history(user_id)
             detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
-            if not detected_scene:
+            if hangout_engine.is_on_date(user_id):
+                active_date = hangout_engine.get_active_date(user_id)
+                if active_date and active_date.get("scene_prompt"):
+                    detected_scene = active_date["scene_prompt"]
+                hangout_engine.record_date_photo(user_id)
+            elif not detected_scene:
                 story_photo = story_engine.get_story_photo_suggestion(persona_mgr.active_key)
                 if story_photo and story_photo.get("danbooru_tags"):
                     detected_scene = story_photo["danbooru_tags"]
@@ -4243,7 +4393,7 @@ def process_photo_request(
                 fallback_caption = "Ini pap spesial buat kamu sayang, suka ga? 🥰"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
             fallback_tag = " _(Fallback Otomatis)_" if fallback_notice else ""
-            full_caption = f"{clean_caption}\n\n📷 *Model:* `{source}`{fallback_tag}"
+            full_caption = f"{format_roleplay_italics(clean_caption)}\n\n📷 *Model:* `{source}`{fallback_tag}"
 
             if status_msg and hasattr(status_msg, "message_id"):
                 try:
@@ -4256,6 +4406,12 @@ def process_photo_request(
                 types.InlineKeyboardButton("🔄 Pose Lain", callback_data="regen_photo:last"),
                 types.InlineKeyboardButton("🎬 Bikin Video Gerak", callback_data="regen_video:last")
             )
+            if hangout_engine.is_on_date(user_id):
+                active_date = hangout_engine.get_active_date(user_id)
+                v_title = active_date.get("venue_title", "Kencan") if active_date else "Kencan"
+                markup.add(
+                    types.InlineKeyboardButton(f"🚪 Selesai Kencan ({v_title})", callback_data="end_hangout")
+                )
 
             # Optimize image bytes before sending to Telegram to prevent read timeout
             img_to_send = img_bytes
@@ -6162,6 +6318,14 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 persona_mgr.check_context_shift(message.from_user.id, user_text)
                 cur_outfit_details = persona_mgr.get_user_outfit_details(message.from_user.id)
 
+                # Check hangout / date intent or completion
+                if hangout_engine.is_on_date(message.from_user.id) and hangout_engine.detect_hangout_finish(user_text):
+                    hangout_engine.end_date(message.from_user.id)
+                else:
+                    detected_venue = hangout_engine.detect_hangout_intent(user_text)
+                    if detected_venue:
+                        hangout_engine.start_date(message.from_user.id, detected_venue)
+
                 status_block = waifu_status_tracker.format_status_instruction(
                     user_id=message.from_user.id,
                     cur_hour=cur_hour,
@@ -6173,6 +6337,11 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 system_inst = persona.get("system_instruction", "")
                 if story_ctx:
                     system_inst += story_ctx
+
+                hangout_prompt = hangout_engine.format_hangout_prompt(message.from_user.id, persona.get("name", "Akira"))
+                if hangout_prompt:
+                    system_inst += "\n" + hangout_prompt
+
                 system_inst += (
                     f"{status_block}\n"
                     "[PEDOMAN KOMUNIKASI - WAJIB DIPATUHI]\n"
@@ -6180,9 +6349,10 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     "1. ANTI-MEMBEO (SANGAT PENTING): DILARANG KERAS hanya mengulang kata, mengulang frasa, atau menyalin ulang pesan lawan bicaramu! "
                     "Jika lawan bicaramu menjawab atau bercerita (misal: 'nanti mau makan sambil gathering HO jam 4'), tanggapi ceritanya dengan antusias, hangat, dan komunikatif (misal: 'Wah seru banget tuh gathering di mana? Jangan lupa makan yang banyak yaa!'), BUKAN malah mengulang kata 'gathering' atau menyalin kata-katanya!\n"
                     "2. RESPONSIF & AKTIF: Berikan tanggapan aktif dan bermakna: ceritakan opinimu, berikan komentar santai, atau tanyakan detail kelanjutannya seperti teman/partner mengobrol yang asyik dan perhatian.\n"
-                    "3. GAYA CHAT: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. Hindari gaya teatrikal, lebay, atau kaku.\n"
-                    "4. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat yang santai dan wajar (misal: 'Lagi santai nugas nih, gimana harimu? 💕 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu. Bersikaplah percaya diri, hangat, dan ramah.\n"
-                    "5. BAHASA PERCAKAPAN: Kamu WAJIB berbicara secara langsung dalam Bahasa Indonesia sehari-hari yang santai dan akrab. DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin dalam bahasa Inggris."
+                    "3. EKSPRESI FISIK & EMOSI (ROLEPLAY ACTION): Selalu sertakan 1-2 ekspresi fisik, gestur tubuh, reaksi wajah manis, atau apa yang sedang kamu lakukan menggunakan tanda bintang *...* (contoh: *tersipu malu*, *tersenyum manis menatapmu*, *merapikan rambutnya*, *menyeruput kopi hangatnya*, *menggenggam tanganmu erat*). Ini membuat obrolan terasa hidup dan nyata seperti visual novel anime!\n"
+                    "4. PROAKTIF MENGAJAK JALAN & KENCAN: Jika suasana santai atau di akhir pekan / libur, jangan hanya pasif menunggu. Ajak pasanganmu sesekali untuk ngopi berdua di kafe estetik, nonton film bioskop terbaru, main ke kosan/rumah sambil dimasakin atau santai berdua, atau jalan sore ke taman kota!\n"
+                    "5. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat yang santai dan wajar (misal: 'Lagi santai nugas nih, gimana harimu? 💕 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu. Bersikaplah percaya diri, hangat, dan ramah.\n"
+                    "6. GAYA CHAT & BAHASA: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. Kamu WAJIB berbicara langsung dalam Bahasa Indonesia sehari-hari yang santai dan akrab. DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin dalam bahasa Inggris."
                 )
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
                 if mem_context:
@@ -6283,7 +6453,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     persona_name=persona.get("name", "Akira")
                 )
 
-                safe_reply_to(message, clean_reply, parse_mode=None)
+                formatted_reply = format_roleplay_italics(clean_reply)
+                safe_reply_to(message, formatted_reply, parse_mode="Markdown")
 
                 if should_send_conv_photo or should_send_spontaneous:
                     def _send_followup_photo():

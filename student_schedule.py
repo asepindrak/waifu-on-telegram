@@ -82,13 +82,91 @@ PRIVATE_KEYWORDS = [
 ]
 
 
-def get_hourly_routine(hour: int, persona_key: str = "runa") -> Dict[str, Any]:
+def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[int] = None) -> Dict[str, Any]:
     """
     Returns realistic college student activity, setting, and outfit for the given hour (0-23).
+    Differentiates between weekdays (Mon-Fri) and weekends/holidays (Sat-Sun) for authentic lore!
     """
     profile = STUDENT_PROFILES.get(persona_key.lower(), STUDENT_PROFILES["runa"])
     major = profile["major"]
+    if weekday is None:
+        weekday = time.localtime().tm_wday  # 0=Mon, ..., 5=Sat, 6=Sun
+    is_weekend = (weekday in (5, 6))
 
+    # --- WEEKEND / HARI LIBUR SCHEDULE (Sabtu & Minggu) ---
+    if is_weekend:
+        if 6 <= hour < 9:
+            return {
+                "activity_name": "Bangun pagi santai akhir pekan",
+                "activity_desc": "lagi bangun agak siang di kasur kamar kos, menikmati hari libur kuliah sambil main HP santai",
+                "scene": "relaxing on bed with fluffy pillows and soft blanket, bright sunny morning bedroom window",
+                "outfit_prompt": "(wearing cozy oversized morning t-shirt and comfy loungewear shorts:1.35)",
+                "outfit_name": "☀️ Kaos Pagi Santai",
+                "is_public": False,
+                "is_weekend": True
+            }
+        elif 9 <= hour < 12:
+            return {
+                "activity_name": "Sarapan & bebersih kamar kos",
+                "activity_desc": "lagi santai bebersih kamar kos, seduh kopi/matcha pagi, dan sarapan santai menikmati libur",
+                "scene": "standing in cozy apartment room, sipping warm morning coffee, natural sunlight through window",
+                "outfit_prompt": "(wearing cute comfortable casual loungewear, oversized pastel tee, relaxed shorts:1.35)",
+                "outfit_name": "🛋️ Pakaian Santai Kos",
+                "is_public": False,
+                "is_weekend": True
+            }
+        elif 12 <= hour < 15:
+            return {
+                "activity_name": "Nongkrong di kafe estetik / hunting buku",
+                "activity_desc": "lagi jalan santai libur akhir pekan, nongkrong di cafe estetik sambil ngopi dan baca buku",
+                "scene": "sitting at aesthetic cafe table holding a sweet drink, bright bokeh background",
+                "outfit_prompt": profile["cafe_outfit"],
+                "outfit_name": "☕ Cozy Weekend Cafe",
+                "is_public": True,
+                "is_weekend": True
+            }
+        elif 15 <= hour < 18:
+            return {
+                "activity_name": "Jalan-jalan di mall / nonton bioskop",
+                "activity_desc": "lagi jalan-jalan sore di mall, belanja camilan, atau nonton film bioskop seru",
+                "scene": "walking in vibrant illuminated shopping mall, modern storefronts, dynamic ambient lighting",
+                "outfit_prompt": profile["mall_outfit"],
+                "outfit_name": "🛍️ Trendy Mall Hangout",
+                "is_public": True,
+                "is_weekend": True
+            }
+        elif 18 <= hour < 21:
+            return {
+                "activity_name": "Makan malam santai & santai di kosan",
+                "activity_desc": "udah balik ke kosan sehabis jalan-jalan sore, lagi makan malam santai sambil istirahat",
+                "scene": "relaxing inside warm cozy apartment room, warm ambient lamp lighting",
+                "outfit_prompt": "(wearing cute comfortable casual loungewear, oversized pastel tee, relaxed shorts:1.35)",
+                "outfit_name": "🛋️ Pakaian Santai Kos",
+                "is_public": False,
+                "is_weekend": True
+            }
+        elif 21 <= hour < 23:
+            return {
+                "activity_name": "Santai malam minggu di kamar kos",
+                "activity_desc": "lagi santai rebahan di kasur kamar kos, dengerin musik lo-fi dan nonton series favorit",
+                "scene": "sitting comfortably on plush bed in cozy bedroom, glowing fairy lights, intimate relaxed evening ambiance",
+                "outfit_prompt": "(wearing soft comfortable camisole and loungewear shorts:1.35), cozy evening style",
+                "outfit_name": "🌙 Loungewear Malam",
+                "is_public": False,
+                "is_weekend": True
+            }
+        else:  # 23:00 - 06:00
+            return {
+                "activity_name": "Tidur lelap akhir pekan",
+                "activity_desc": "udah rebahan di kasur di bawah selimut, skincare-an dan siap-siap tidur nyenyak",
+                "scene": "lying comfortably on bed with fluffy pillows and soft blanket, dim cozy night bedroom lamp",
+                "outfit_prompt": "(wearing soft pastel silk pajamas:1.35), cozy bedtime sleepwear",
+                "outfit_name": "🌙 Piyama Tidur",
+                "is_public": False,
+                "is_weekend": True
+            }
+
+    # --- WEEKDAY / HARI KULIAH SCHEDULE (Senin s/d Jumat) ---
     if 6 <= hour < 8:
         return {
             "activity_name": "Bangun pagi & siap-siap ke kampus",
@@ -96,7 +174,8 @@ def get_hourly_routine(hour: int, persona_key: str = "runa") -> Dict[str, Any]:
             "scene": "sitting in cozy bright morning apartment room, soft morning sunlight through window",
             "outfit_prompt": "(wearing cozy oversized morning t-shirt and comfy loungewear shorts:1.35)",
             "outfit_name": "☀️ Kaos Pagi Santai",
-            "is_public": False
+            "is_public": False,
+            "is_weekend": False
         }
     elif 8 <= hour < 11:
         return {
@@ -105,7 +184,8 @@ def get_hourly_routine(hour: int, persona_key: str = "runa") -> Dict[str, Any]:
             "scene": "sitting at wooden desk inside modern university lecture hall, student classroom background, bright ambient lighting",
             "outfit_prompt": profile["campus_outfit"],
             "outfit_name": "🎓 Baju Kuliah Kampus",
-            "is_public": True
+            "is_public": True,
+            "is_weekend": False
         }
     elif 11 <= hour < 13:
         return {
@@ -114,7 +194,8 @@ def get_hourly_routine(hour: int, persona_key: str = "runa") -> Dict[str, Any]:
             "scene": "sitting at aesthetic university campus cafe table, holding lunch drink, sunny vibrant ambient bokeh",
             "outfit_prompt": profile["campus_outfit"],
             "outfit_name": "🎓 Baju Kuliah Kampus",
-            "is_public": True
+            "is_public": True,
+            "is_weekend": False
         }
     elif 13 <= hour < 16:
         return {
@@ -123,7 +204,8 @@ def get_hourly_routine(hour: int, persona_key: str = "runa") -> Dict[str, Any]:
             "scene": "sitting at wooden study desk in quiet university library, open textbooks, bookshelf background, warm study lamp",
             "outfit_prompt": profile["campus_outfit"],
             "outfit_name": "📚 Baju Belajar Kampus",
-            "is_public": True
+            "is_public": True,
+            "is_weekend": False
         }
     elif 16 <= hour < 19:
         return {
@@ -132,7 +214,8 @@ def get_hourly_routine(hour: int, persona_key: str = "runa") -> Dict[str, Any]:
             "scene": "walking in vibrant illuminated shopping mall, modern storefronts, dynamic ambient lighting",
             "outfit_prompt": profile["mall_outfit"],
             "outfit_name": "🛍️ Streetwear Mall",
-            "is_public": True
+            "is_public": True,
+            "is_weekend": False
         }
     elif 19 <= hour < 21:
         return {
@@ -141,7 +224,8 @@ def get_hourly_routine(hour: int, persona_key: str = "runa") -> Dict[str, Any]:
             "scene": "relaxing inside warm cozy apartment room, warm ambient lamp lighting",
             "outfit_prompt": "(wearing cute comfortable casual loungewear, oversized pastel tee, relaxed shorts:1.35)",
             "outfit_name": "🛋️ Pakaian Santai Kos",
-            "is_public": False
+            "is_public": False,
+            "is_weekend": False
         }
     elif 21 <= hour < 23:
         return {
@@ -150,7 +234,8 @@ def get_hourly_routine(hour: int, persona_key: str = "runa") -> Dict[str, Any]:
             "scene": "sitting comfortably on plush bed in cozy bedroom, glowing fairy lights, intimate relaxed evening ambiance",
             "outfit_prompt": "(wearing soft comfortable camisole and loungewear shorts:1.35), cozy evening style",
             "outfit_name": "🌙 Loungewear Malam",
-            "is_public": False
+            "is_public": False,
+            "is_weekend": False
         }
     else:  # 23:00 - 06:00
         return {
@@ -159,14 +244,16 @@ def get_hourly_routine(hour: int, persona_key: str = "runa") -> Dict[str, Any]:
             "scene": "lying comfortably on bed with fluffy pillows and soft blanket, dim cozy night bedroom lamp",
             "outfit_prompt": "(wearing soft pastel silk pajamas:1.35), cozy bedtime sleepwear",
             "outfit_name": "🌙 Piyama Tidur",
-            "is_public": False
+            "is_public": False,
+            "is_weekend": False
         }
 
 
 def detect_contextual_activity_and_outfit(
     user_text: str,
     history_turns: Optional[List[str]] = None,
-    persona_key: str = "runa"
+    persona_key: str = "runa",
+    weekday: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Intelligently analyzes the user's explicit request and ongoing conversation to determine:
@@ -318,7 +405,7 @@ def detect_contextual_activity_and_outfit(
 
     # Step C: Fallback to real-world hourly routine schedule
     cur_hour = time.localtime().tm_hour
-    routine = get_hourly_routine(cur_hour, persona_key=persona_key)
+    routine = get_hourly_routine(cur_hour, persona_key=persona_key, weekday=weekday)
     return {
         "activity": routine["activity_desc"],
         "scene": routine["scene"],
