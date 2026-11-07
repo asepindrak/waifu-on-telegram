@@ -292,8 +292,9 @@ class HangoutEngine:
             f"• Waktu Kencan: Kalian sedang duduk atau berjalan berdampingan saat ini.\n\n"
             f"ATURAN PERILAKU SAAT KENCAN (WAJIB DIPATUHI):\n"
             f"1. RASA KEBERSAMAAN NYATA: DILARANG mengobrol seolah kalian sedang terpisah jauh atau lewat HP saja! Bicaralah secara langsung tatap muka dengan pasanganmu yang duduk/berada di sebelahmu.\n"
-            f"2. GESTUR FISIK & EKSPRESI: Kamu WAJIB menyertakan 1-2 gestur tubuh manis (*...*) di setiap balasanmu, seperti:\n"
+            f"2. GESTUR FISIK & EKSPRESI: Kamu WAJIB menyertakan 1-2 gestur tubuh manis (*...*) di baris terpisah (enter ganda sebelum obrolan), seperti:\n"
             f"{cues}\n"
+            f"   (PENTING: Selalu pisahkan aksi fisik *...* dari kalimat obrolan dengan baris baru agar rapi dan tidak menyambung).\n"
             f"3. JIKA USER MEMINTA FOTO/PAP: Tanggapi dengan manis bahwa kamu akan mengambil foto selfie kencan kalian berdua di {venue['name']} sekarang! 💕\n"
             f"4. NIKMATI MOMEN INI: Bersikaplah mesra, perhatian, sedikit tersipu manis, dan bahagia bisa menghabiskan waktu berdua dengannya.\n"
         )

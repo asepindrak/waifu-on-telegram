@@ -29,22 +29,33 @@ class TestHangoutAndRoleplayExpression(unittest.TestCase):
         self.assertTrue(any(k in sun_routine["activity_desc"].lower() for k in ["mall", "bioskop", "jalan", "santai"]))
 
     def test_format_roleplay_italics(self):
-        """Converts *action* to _action_ for Telegram Markdown italics while preserving **bold** and code."""
-        # 1. Basic roleplay action conversion
-        raw = "*tersenyum manis menatapmu* Hai sayang, ada apa?"
+        """Converts *action* to _action_ with clean newline separation from speech, while preserving bold and code."""
+        # 1. Action at beginning separated from chat with newline
+        raw = "*tersenyum sambil merapikan beberapa buku ke dalam tas* Ini tugas kelompoknya udah hampir kelar kok"
         formatted = bot.format_roleplay_italics(raw)
-        self.assertEqual(formatted, "_tersenyum manis menatapmu_ Hai sayang, ada apa?")
+        self.assertEqual(formatted, "_tersenyum sambil merapikan beberapa buku ke dalam tas_\n\nIni tugas kelompoknya udah hampir kelar kok")
 
-        # 2. Preserves **bold** text
+        # 2. Action in middle separated before and after
+        raw_mid = "Halo sayang! *tersenyum manis* Gimana harimu?"
+        formatted_mid = bot.format_roleplay_italics(raw_mid)
+        self.assertEqual(formatted_mid, "Halo sayang!\n\n_tersenyum manis_\n\nGimana harimu?")
+
+        # 3. Parentheses emotion action converted and separated
+        raw_paren = "(tersipu malu) ih kamu mah..."
+        formatted_paren = bot.format_roleplay_italics(raw_paren)
+        self.assertEqual(formatted_paren, "_tersipu malu_\n\nih kamu mah...")
+
+        # 4. Preserves **bold** text
         raw_bold = "*tersipu malu* Kamu itu **ganteng banget** hari ini!"
         formatted_bold = bot.format_roleplay_italics(raw_bold)
-        self.assertEqual(formatted_bold, "_tersipu malu_ Kamu itu **ganteng banget** hari ini!")
+        self.assertIn("**ganteng banget**", formatted_bold)
+        self.assertIn("_tersipu malu_\n\n", formatted_bold)
 
-        # 3. Code blocks remain untouched
+        # 5. Code blocks remain untouched
         raw_code = "*mengetik cepat* Coba cek `print(*args)` ini ya!"
         formatted_code = bot.format_roleplay_italics(raw_code)
         self.assertIn("`print(*args)`", formatted_code)
-        self.assertIn("_mengetik cepat_", formatted_code)
+        self.assertIn("_mengetik cepat_\n\n", formatted_code)
 
     def test_hangout_engine_lifecycle(self):
         """Tests starting a date, verifying active state, recording photos, and ending the date."""

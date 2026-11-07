@@ -161,19 +161,40 @@ AWAITING_CUSTOM_LANG: dict = {}      # user_id -> bool
 
 def format_roleplay_italics(text: str) -> str:
     """
-    Converts single-asterisk roleplay action text (*action*) into Telegram Markdown italics (_action_),
-    while preserving double-asterisk bold (**bold**) and code blocks.
-    Example: "*tersenyum manis* Hai **sayang**" -> "_tersenyum manis_ Hai **sayang**"
+    Formats roleplay actions into cleanly separated Telegram Markdown italics (_action_),
+    while preserving double-asterisk bold (**bold**) and inline code blocks.
+    Ensures clear newline separation between emotional actions and spoken dialogue so they
+    never merge into a single run-on sentence.
+    Example: "*tersenyum sambil merapikan buku* Ini tugasnya..."
+         -> "_tersenyum sambil merapikan buku_\n\nIni tugasnya..."
     """
     if not text:
         return text
+
+    # 1. Normalize parentheses actions like (tersenyum manis) or (sambil ...) into *action*
+    text = re.sub(
+        r'(?i)\(((?:tersenyum|tersipu|tertawa|merapikan|menatap|menghela|melirik|berbisik|memegang|menggenggam|mengusap|memeluk|duduk|berdiri|sambil)[^)]+)\)',
+        r'*\1*',
+        text
+    )
+
+    # 2. Add visual separation (double newline) around roleplay *action* blocks (strictly single asterisk)
+    text = re.sub(r'(?<!\*)\*([^*\n]+?)\*(?!\*)[ \t]*([^\n*])', r'*\1*\n\n\2', text)
+    text = re.sub(r'([^\n*])[ \t]*(?<!\*)\*([^*\n]+?)\*(?!\*)', r'\1\n\n*\2*', text)
+    # Normalize excessive newlines to at most 2
+    text = re.sub(r'\n{3,}', '\n\n', text).strip()
+
+    # 3. Convert single *action* into Telegram Markdown italic _action_
+    def _convert_segment(seg: str) -> str:
+        return re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'_\1_', seg)
+
     if "`" in text:
         parts = re.split(r'(`[^`]+`)', text)
         for i in range(len(parts)):
             if not parts[i].startswith("`"):
-                parts[i] = re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'_\1_', parts[i])
+                parts[i] = _convert_segment(parts[i])
         return "".join(parts)
-    return re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'_\1_', text)
+    return _convert_segment(text)
 
 
 # --- Telegram Safe Messaging Helpers ---
@@ -182,13 +203,16 @@ def safe_reply_to(message, text, reply_markup=None, parse_mode="Markdown"):
     """
     Safely replies to a message with automatic Markdown fallback to plain text
     if Telegram API rejects parsing entities (400 Bad Request).
+    In plain text fallback, restores *action* asterisks so roleplay actions remain readable.
     """
     try:
         return bot.reply_to(message, text, parse_mode=parse_mode, reply_markup=reply_markup)
     except Exception as e:
         logger.warning(f"safe_reply_to failed with {parse_mode=}: {e}. Retrying as plain text.")
         try:
-            clean_text = text.replace("*", "").replace("_", "").replace("`", "")
+            # Preserve action markers as *action* in plain text instead of erasing them
+            clean_text = re.sub(r'(?<!_)_([^_]+?)_(?!_)', r'*\1*', text)
+            clean_text = clean_text.replace("`", "")
             return bot.reply_to(message, clean_text, reply_markup=reply_markup)
         except Exception as e2:
             logger.error(f"Fatal error in safe_reply_to: {e2}")
@@ -198,13 +222,15 @@ def safe_reply_to(message, text, reply_markup=None, parse_mode="Markdown"):
 def safe_send_message(chat_id: int, text: str, reply_markup=None, parse_mode="Markdown"):
     """
     Safely sends a message to chat_id with automatic Markdown fallback to plain text.
+    In plain text fallback, restores *action* asterisks so roleplay actions remain readable.
     """
     try:
         return bot.send_message(chat_id, text, parse_mode=parse_mode, reply_markup=reply_markup)
     except Exception as e:
         logger.warning(f"safe_send_message failed with {parse_mode=}: {e}. Retrying as plain text.")
         try:
-            clean_text = text.replace("*", "").replace("_", "").replace("`", "")
+            clean_text = re.sub(r'(?<!_)_([^_]+?)_(?!_)', r'*\1*', text)
+            clean_text = clean_text.replace("`", "")
             return bot.send_message(chat_id, clean_text, reply_markup=reply_markup)
         except Exception as e2:
             logger.error(f"Fatal error in safe_send_message: {e2}")
@@ -6349,7 +6375,10 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     "1. ANTI-MEMBEO (SANGAT PENTING): DILARANG KERAS hanya mengulang kata, mengulang frasa, atau menyalin ulang pesan lawan bicaramu! "
                     "Jika lawan bicaramu menjawab atau bercerita (misal: 'nanti mau makan sambil gathering HO jam 4'), tanggapi ceritanya dengan antusias, hangat, dan komunikatif (misal: 'Wah seru banget tuh gathering di mana? Jangan lupa makan yang banyak yaa!'), BUKAN malah mengulang kata 'gathering' atau menyalin kata-katanya!\n"
                     "2. RESPONSIF & AKTIF: Berikan tanggapan aktif dan bermakna: ceritakan opinimu, berikan komentar santai, atau tanyakan detail kelanjutannya seperti teman/partner mengobrol yang asyik dan perhatian.\n"
-                    "3. EKSPRESI FISIK & EMOSI (ROLEPLAY ACTION): Selalu sertakan 1-2 ekspresi fisik, gestur tubuh, reaksi wajah manis, atau apa yang sedang kamu lakukan menggunakan tanda bintang *...* (contoh: *tersipu malu*, *tersenyum manis menatapmu*, *merapikan rambutnya*, *menyeruput kopi hangatnya*, *menggenggam tanganmu erat*). Ini membuat obrolan terasa hidup dan nyata seperti visual novel anime!\n"
+                    "3. EKSPRESI FISIK & EMOSI (ROLEPLAY ACTION & PEMISAH JELAS): Selalu sertakan 1-2 ekspresi fisik, gestur tubuh, reaksi wajah, atau apa yang sedang kamu lakukan menggunakan tanda bintang *...* (contoh: *tersipu malu*, *tersenyum manis menatapmu*, *merapikan helai rambutnya*). "
+                    "PENTING TENTANG PEMISAH: Berikan BARIS BARU (enter ganda / newline) antara aksi emosi *...* dengan kalimat obrolan/dialogmu! DILARANG menyambung aksi fisik dan ucapan langsung tanpa jeda baris. Contoh format yang benar:\n"
+                    "*tersenyum sambil merapikan beberapa buku ke dalam tas*\n\n"
+                    "Ini tugas kelompoknya udah hampir kelar kok, sore ini ada rencana mau jalan keluar?\n"
                     "4. PROAKTIF MENGAJAK JALAN & KENCAN: Jika suasana santai atau di akhir pekan / libur, jangan hanya pasif menunggu. Ajak pasanganmu sesekali untuk ngopi berdua di kafe estetik, nonton film bioskop terbaru, main ke kosan/rumah sambil dimasakin atau santai berdua, atau jalan sore ke taman kota!\n"
                     "5. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat yang santai dan wajar (misal: 'Lagi santai nugas nih, gimana harimu? 💕 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu. Bersikaplah percaya diri, hangat, dan ramah.\n"
                     "6. GAYA CHAT & BAHASA: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. Kamu WAJIB berbicara langsung dalam Bahasa Indonesia sehari-hari yang santai dan akrab. DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin dalam bahasa Inggris."
