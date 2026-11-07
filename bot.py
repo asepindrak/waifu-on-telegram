@@ -52,6 +52,8 @@ from idle_engine import IdleEngine
 from scheduled_buffer import scheduled_buffer
 from pending_message_manager import get_pending_message_manager
 pending_manager = get_pending_message_manager()
+from waifu_status_tracker import get_waifu_status_tracker
+waifu_status_tracker = get_waifu_status_tracker()
 from setup import scan_local_llm_models, scan_image_models, setup_autostart, read_env, write_env
 
 # Load environment configuration
@@ -4187,6 +4189,13 @@ def process_photo_request(
             memory_engine.set_affinity(user_id, new_aff)
             persona_mgr.add_message(user_id, "user", f"[Requested photo: {user_text}]")
             persona_mgr.add_message(user_id, "assistant", f"[Sent selfie: {detected_scene}] {clean_caption}")
+            waifu_status_tracker.record_photo_event(
+                user_id=user_id,
+                scene=detected_scene,
+                caption=clean_caption,
+                outfit=outfit_label,
+                persona_name=persona.get("name", "Akira")
+            )
 
         except Exception as e:
             logger.error(f"Error in photo delivery: {e}", exc_info=True)
@@ -4405,6 +4414,13 @@ def process_video_request(
             memory_engine.set_affinity(user_id, new_aff)
             persona_mgr.add_message(user_id, "user", f"[Requested video: {user_text}]")
             persona_mgr.add_message(user_id, "assistant", f"[Sent video clip: {detected_scene}] {clean_caption}")
+            waifu_status_tracker.record_photo_event(
+                user_id=user_id,
+                scene=detected_scene,
+                caption=clean_caption,
+                outfit=outfit_label,
+                persona_name=persona.get("name", "Akira")
+            )
 
         except Exception as e:
             logger.error(f"Error in video delivery: {e}", exc_info=True)
@@ -6039,13 +6055,18 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 # Inject daily story episode
                 story_ctx = story_engine.get_story_prompt_context(persona_mgr.active_key)
 
+                status_block = waifu_status_tracker.format_status_instruction(
+                    user_id=message.from_user.id,
+                    cur_hour=cur_hour,
+                    routine_desc=routine['activity_desc'],
+                    major=p_prof['major']
+                )
+
                 system_inst = persona.get("system_instruction", "")
                 if story_ctx:
                     system_inst += story_ctx
                 system_inst += (
-                    f"\n\n[KEGIATAN MAHASISWI HARI INI]\n"
-                    f"Waktu sekarang: Jam {cur_hour:02d}:00. Kegiatanmu saat ini: {routine['activity_desc']}. "
-                    f"Kamu adalah mahasiswi ({p_prof['major']}).\n\n"
+                    f"{status_block}\n"
                     "[PEDOMAN KOMUNIKASI - WAJIB DIPATUHI]\n"
                     f"{calling_guideline}\n"
                     "1. ANTI-MEMBEO (SANGAT PENTING): DILARANG KERAS hanya mengulang kata, mengulang frasa, atau menyalin ulang pesan lawan bicaramu! "
@@ -6148,6 +6169,11 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 memory_engine.set_affinity(message.from_user.id, new_aff)
                 persona_mgr.add_message(message.from_user.id, "user", user_text)
                 persona_mgr.add_message(message.from_user.id, "assistant", clean_reply)
+                waifu_status_tracker.record_chat_statement(
+                    user_id=message.from_user.id,
+                    statement=clean_reply,
+                    persona_name=persona.get("name", "Akira")
+                )
 
                 safe_reply_to(message, clean_reply, parse_mode=None)
 

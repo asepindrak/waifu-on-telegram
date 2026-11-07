@@ -23,17 +23,26 @@ from architecture_generator import ensure_project_architecture
 logger = logging.getLogger(__name__)
 
 CODING_TRIGGERS = [
-    r'\b(bikin|buat|buatkan|tulis|coding|program|script|kode)\b',
-    r'\b(debug|fix|perbaiki|error|bug|issue|exception)\b',
+    r'\b(bikin|buat|buatkan|tulis)\s+(kode|code|program|script|aplikasi|app|web|website|landing page|endpoint|api|database|fitur|feature|fungsi|function|komponen|component|backend|frontend|html|css|javascript|python)\b',
+    r'\b(buat file|baca file|edit file|tambah file|hapus file)\b',
+    r'\b(coding|programmer|ngoding|scripting|source\s*code|pull\s*request)\b',
+    r'\b(debug|fix|perbaiki)\s+(kode|code|script|bug|error|issue|program|web|app)\b',
     r'\b(refactor|optimize|analisa code|review code)\b',
     r'\b(git\s+(status|diff|add|commit|push|pull|log|branch))\b',
     r'\b(npm|pip|cargo|python|node|bash|powershell)\s+',
-    r'\b(buat file|baca file|edit file|tambah file|hapus file)\b',
     r'\b(bikin web|bikin app|landing page|endpoint|api|database)\b',
     r'\b(run test|unit test|pytest|unittest|benchmark)\b',
-    r'\b(run|jalankan|start|nyalakan|preview|lihat|buka|tes)\s+(project|proyek|web|server|app|aplikasi)\b',
-    r'\b(coba\s+run|coba\s+jalankan|coba\s+start|coba\s+preview)\b',
-    r'\b(coba\s+lihat|buka\s+link|link\s+preview|live\s+preview)\b'
+    r'\b(run|jalankan|start|nyalakan|preview|tes)\s+(project|proyek|web|server|app|aplikasi)\b',
+    r'\b(coba\s+run|coba\s+preview)\b',
+    r'\b(coba\s+jalankan|coba\s+start)\s+(project|proyek|web|server|app|aplikasi)?\b',
+    r'\b(live\s+preview|link\s+preview)\b'
+]
+
+# Conversational expressions that should NEVER falsely trigger coding tasks
+CONVERSATIONAL_EXCLUSIONS = [
+    r'\b(foto|pap|selfie|pose|senyum|wajah|muka|baju|outfit|pakaian|telanjang|nude|cantik|sayang|kangen|cinta)\b',
+    r'\b(kamu lagi|kamu sedang|lagi ngapain|lagi apa|udah makan|mau makan|sarapan|kopi|teh|masak|bikin kopi|bikin teh)\b',
+    r'\b(coba lihat|lihat dong|liat dong|coba liat)\b'
 ]
 
 COMPUTER_USE_TRIGGERS = [
@@ -54,6 +63,12 @@ class CodingEngine:
     def is_coding_intent(self, text: str) -> bool:
         """Determines if user input is asking for programming, coding, or workspace file work."""
         lower = text.lower().strip()
+
+        # Guard against conversational / romantic / selfie false-positives
+        for excl in CONVERSATIONAL_EXCLUSIONS:
+            if re.search(excl, lower) and not re.search(r'\b(kode|code|script|project|proyek|html|website|aplikasi|program|terminal)\b', lower):
+                return False
+
         for pattern in CODING_TRIGGERS:
             if re.search(pattern, lower):
                 return True
@@ -200,22 +215,29 @@ class CodingEngine:
                 if applied_design_style:
                     final_text += f"\n\n🎨 *Design System:* `Open-Design ({applied_design_style.title()})`"
 
-                # Auto-detect and launch live preview server if web/HTML assets exist
-                try:
-                    from project_server_manager import get_project_server_manager
-                    psm = get_project_server_manager()
-                    preview_info = psm.start_preview_server(active_project, project_path)
-                    if preview_info:
-                        p_url = preview_info.get("url")
-                        p_port = preview_info.get("port")
-                        final_text += (
-                            f"\n\n🌐 **Live Web Preview (Port {p_port}):**\n"
-                            f"👉 [{p_url}]({p_url})\n"
-                            f"Direct Link: {p_url}\n"
-                            f"*(Web server sudah otomatis menyala di background PC kamu!)*"
-                        )
-                except Exception as e_srv:
-                    logger.warning(f"Error starting preview server: {e_srv}")
+                # Auto-detect and launch live preview server ONLY if prompt asks for web / frontend / server / preview / app
+                is_web_or_preview_task = any(
+                    k in prompt.lower() for k in [
+                        "web", "html", "landing page", "frontend", "ui", "ux", "halaman",
+                        "preview", "run", "jalankan", "start", "server", "app", "aplikasi", "port"
+                    ]
+                )
+                if is_web_or_preview_task:
+                    try:
+                        from project_server_manager import get_project_server_manager
+                        psm = get_project_server_manager()
+                        preview_info = psm.start_preview_server(active_project, project_path)
+                        if preview_info:
+                            p_url = preview_info.get("url")
+                            p_port = preview_info.get("port")
+                            final_text += (
+                                f"\n\n🌐 **Live Web Preview (Port {p_port}):**\n"
+                                f"👉 [{p_url}]({p_url})\n"
+                                f"Direct Link: {p_url}\n"
+                                f"*(Web server sudah otomatis menyala di background PC kamu!)*"
+                            )
+                    except Exception as e_srv:
+                        logger.warning(f"Error starting preview server: {e_srv}")
 
                 return final_text, voice_text
             except subprocess.TimeoutExpired:
