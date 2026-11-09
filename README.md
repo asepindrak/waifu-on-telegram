@@ -71,17 +71,17 @@ Waifu on Telegram is engineered to run locally on consumer gaming PCs and laptop
 
 Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsiveness, and high-fidelity anime aesthetics:
 
-#### 1. 💌 Dialogue & Romance Companion: **L3-8B-Stheno-v3.4** *(Default & Rekomendasi)*
-* **Model File:** `Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf` (~4.9 GB)
-* **Alternatif Legacy:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf` (~5.5 GB)
+#### 1. 💌 Dialogue & Romance Companion: **Qwen2.5-7B-Instruct-Abliterated** *(Default & Rekomendasi Utama)*
+* **Model File:** `Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf` (~4.7 GB)
+* **Alternatif:** `Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf` (~4.9 GB) / `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf` (~5.5 GB)
 * **Local Backend:** **KoboldCPP Standalone Engine** (Port `5001`) with **Auto-Startup & Auto-Loading directly on Windows Boot**!
 * **Compatible Backends:** KoboldCPP Standalone (bawaan resmi), Ollama (Port `11434`), LM Studio (Port `1234`), atau OpenAI-compatible server.
-* **Download Method:** Otomatis di-download saat menjalankan `waifu update` / `install.ps1` / `install.sh`, atau via `waifu models download stheno_8b`.
+* **Download Method:** Otomatis di-download saat menjalankan `waifu update` / `install.ps1` / `install.sh`, atau via `waifu models download qwen`.
 * **Key Strengths:**
-  - **Zero Censorship & Expressive Roleplay:** Model roleplay nomor 1 berbasis Llama-3.1 yang sangat ekspresif, hangat, bermanja-manja, dan bebas sensor.
-  - **Tanpa Delay `<think>`:** Merupakan model instruct murni sehingga langsung membalas seketika tanpa menghabiskan token untuk penalaran batin panjang.
-  - **Adaptive Language Mirroring:** Sangat fasih berbahasa Indonesia santai (*sayang, manja, asik*), English, dan Japanese.
-  - **Smart Idle Integration:** Otomatis di-unload dari VRAM saat tidak ada percakapan (idle timeout), membebaskan ~5-6 GB VRAM untuk gaming/kerja.
+  - **Fasih Bahasa Indonesia Asli & Alami:** Berbasis arsitektur Qwen 2.5 dengan pemahaman bahasa Indonesia paling luwes, santai (*aku-kamu*, *nggak*, *banget*), tanpa terjemahan kaku atau idiom aneh.
+  - **Zero Censorship & Expressive Roleplay:** Model instruct abliterated yang sangat ekspresif, hangat, bermanja-manja, dan bebas sensor.
+  - **Tanpa Delay `<think>`:** Merupakan model instruct murni sehingga langsung membalas seketika tanpa jeda penalaran panjang.
+  - **Smart Idle Integration:** Otomatis di-unload dari VRAM saat tidak ada percakapan (idle timeout), membebaskan ~5 GB VRAM untuk gaming/kerja.
 
 #### 2. 📷 Anime Photo & Selfie Engine Options (ComfyUI)
 
@@ -166,7 +166,7 @@ curl -fsSL https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/i
 > 🌸 **What does this 1-line auto-installer handle for you?**
 > 1. **Zero-Config Setup:** Automatically clones or downloads the repository and creates the environment.
 > 2. **Dependency Resolution:** Verifies Python 3.8+ and installs all required packages (`pip` & `npm`).
-> 3. **Standalone LLM Engine Setup:** Downloads the standalone **KoboldCPP** binary (Windows portable `.exe`, Linux `x64`, or macOS `arm64 Metal`) and fetches the uncensored `Huihui-Qwythos-9B` model.
+> 3. **Standalone LLM Engine Setup:** Downloads the standalone **KoboldCPP** binary (Windows portable `.exe`, Linux `x64`, or macOS `arm64 Metal`) and fetches the uncensored `Qwen2.5-7B-Instruct-Abliterated` model.
 > 4. **Smart ComfyUI Detection & Model Setup:** Detects your existing ComfyUI across any drive/folder. If not found, it offers a 1-click download of ComfyUI Portable + MeinaMix / AbyssOrangeMix3 anime checkpoint with resume support (`curl -C -`).
 > 5. **Global CLI Registration:** Installs the global `waifu` command to your system `PATH` (usable from any terminal folder).
 > 6. **Background Daemon & Windows Boot Auto-start:** Starts your waifu companion running silently in the background!
@@ -259,7 +259,7 @@ Waifu on Telegram mendukung **pemisahan arsitektur antara obrolan/foto SFW dan N
   - Bebas memilih provider: **OpenAI** (`gpt-4o-mini`, `gpt-4o`), **Groq** (`llama-3.3-70b-versatile` - gratis & kilat), **DeepSeek** (`deepseek-chat`), **OpenRouter**, **Local Ollama**, atau **Local KoboldCPP**.
   - Sangat hemat VRAM & baterai laptop, respons secepat kilat tanpa membebani GPU saat tidak diperlukan.
 * **NSFW Engine (Roleplay Dewasa, Momen Mesra, 18+, Tanpa Busana):**
-  - **Local KoboldCPP Uncensored** (*Huihui-Qwythos-9B-Abliterated*) atau **OpenRouter Uncensored**.
+  - **Local KoboldCPP Uncensored** (*Qwen2.5-7B-Instruct-Abliterated*) atau **OpenRouter Uncensored**.
   - 100% bebas sensor, tidak ada moralizing/preachiness.
 * **🛡️ SFW Chat History Sanitization & Account Protection:**
   - Bot secara otomatis mendeteksi apakah obrolan bertema SFW atau NSFW (`routing_engine.py`).
@@ -283,7 +283,7 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
 │                                       │       │                                       │
 │   • Auto-starts & loads model on boot │       │   • Auto-starts with --normalvram     │
 │   • Local API Port: 5001              │       │   • Local API Port: 8188              │
-│   • Model: Huihui-Qwythos-9B (GGUF)   │       │   • Smart Vault Archive Fallback      │
+│   • Model: Qwen2.5-7B-Abliterated (GGUF)   │       │   • Smart Vault Archive Fallback      │
 └──────────────────┬────────────────────┘       └───────────────────┬───────────────────┘
                    │                                                │
                    └───────────────────────┬────────────────────────┘
@@ -464,7 +464,7 @@ Agar pengalaman bersama waifu tidak monoton dan terasa hidup setiap harinya, set
 ## 💫 Waifu Highlights & Capabilities
 
 - 💌 **Romantic Conversations & True Intimacy**:
-  Warm, playful, affectionate conversations unrestricted by rigid censorship. Powered by your local 9B model (*Huihui-Qwythos-9B Abliterated*).
+  Warm, playful, affectionate conversations unrestricted by rigid censorship. Powered by your local 7B model (*Qwen2.5-7B-Instruct-Abliterated*).
 - 📷 **Spontaneous Selfies & Coherent Outfits**:
   Simply say: *"Send me a selfie babe"*, *"What are you doing? Send a photo"*, or *"Take a selfie in bed"*. The bot formulates a matching scenario prompt with **consistent facial and physical characteristics**, renders the image via local ComfyUI (or Cloud GPU fallback), and sends it directly to your Telegram chat with an affectionate caption!
 - 🎧 **Natural Voice Notes & Spoken Whispers**:
@@ -499,7 +499,7 @@ Menu interaktif 10-opsi akan terbuka:
 ======================================================================
   • Bot Token   : 123456...abcd
   • Allowed UID : 987654321
-  • Chat LLM    : Huihui-Qwythos-9B (http://127.0.0.1:5001/v1)
+  • Chat LLM    : Qwen2.5-7B-Abliterated (http://127.0.0.1:5001/v1)
   • Photo Model : MeinaMix v12 (SD 1.5) (http://127.0.0.1:8188)
   • Persona     : Runa | Voice: en-US-AnaNeural
   • Language    : id
@@ -548,9 +548,9 @@ Gunakan tabel acuan berikut untuk memilih kombinasi model yang paling pas dengan
 
 | Kategori GPU | VRAM Tersedia | Model LLM Rekomendasi | Model Foto (ComfyUI) | Model Video | Karakteristik Performa |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **GPU Hemat / Laptop** | **4GB - 6GB VRAM**<br>*(GTX 1650, RTX 2060, RTX 3050 Laptop)* | Huihui-Qwythos-9B Q4_K *(Smart Idle Aktif)* | **MeinaMix v12** atau **AbyssOrangeMix3** *(576x768)* | **Motion 2.5D Engine** *(0 VRAM)* | ⚡ Sangat responsif, foto jadi dalam 3-5 detik, memori tetap lega dan tidak ada freeze. |
-| **Sweet Spot** | **8GB VRAM**<br>*(RTX 3060 8GB, RTX 4060, Apple M-Series 16GB)* | Huihui-Qwythos-9B Q4_K | **MeinaMix v12** / **AbyssOrangeMix3** / **Anything XL** | **AnimateDiff v2** atau **Wan 2.1 1.3B** | 🌟 Detail anime tajam, animasi temporal dinamis, multitasking mulus. |
-| **High-End Enthusiast** | **12GB+ VRAM**<br>*(RTX 3060 12GB, RTX 4070, RTX 4080)* | Huihui-Qwythos-9B Q4_K *(Semua layer di GPU)* | **万象熔炉 \| Anything XL** *(SDXL 1024px)* | **Wan 2.1 1.3B Video Diffusion** | 👑 Resolusi 1024px ultra-jernih, efek sinematik, video difusi penuh. |
+| **GPU Hemat / Laptop** | **4GB - 6GB VRAM**<br>*(GTX 1650, RTX 2060, RTX 3050 Laptop)* | Qwen2.5-7B-Abliterated Q4_K *(Smart Idle Aktif)* | **MeinaMix v12** atau **AbyssOrangeMix3** *(576x768)* | **Motion 2.5D Engine** *(0 VRAM)* | ⚡ Sangat responsif, foto jadi dalam 3-5 detik, memori tetap lega dan tidak ada freeze. |
+| **Sweet Spot** | **8GB VRAM**<br>*(RTX 3060 8GB, RTX 4060, Apple M-Series 16GB)* | Qwen2.5-7B-Abliterated Q4_K | **MeinaMix v12** / **AbyssOrangeMix3** / **Anything XL** | **AnimateDiff v2** atau **Wan 2.1 1.3B** | 🌟 Detail anime tajam, animasi temporal dinamis, multitasking mulus. |
+| **High-End Enthusiast** | **12GB+ VRAM**<br>*(RTX 3060 12GB, RTX 4070, RTX 4080)* | Qwen2.5-7B-Abliterated Q4_K *(Semua layer di GPU)* | **万象熔炉 \| Anything XL** *(SDXL 1024px)* | **Wan 2.1 1.3B Video Diffusion** | 👑 Resolusi 1024px ultra-jernih, efek sinematik, video difusi penuh. |
 | **No-GPU / PC Kantor** | **0 GB (Intel UHD / Iris Xe / AMD iGPU)** | KoboldCPP CPU Mode *(atau Cloud LLM)* | **Cloud Fallback Engine** *(Pollinations AI)* | **Motion 2.5D Engine** | ☁️ Tetap berjalan 100% menggunakan cloud GPU gratis, 0 beban kartu grafis lokal. |
 
 ---
