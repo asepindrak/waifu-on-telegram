@@ -473,7 +473,15 @@ class WaifuCLISession:
                 return
 
         if not raw_reply or not raw_reply.strip():
-            raw_reply = "Ehh maaf, tadi aku agak melamun sebentar... Kamu ngomong apa tadi?"
+            try:
+                dyn_messages = [
+                    {"role": "system", "content": system_inst},
+                    {"role": "user", "content": f"[Lawan bicaramu berkata: \"{user_text}\"]. Sebagai {p_name}, berikan respon spontan dan ekspresif dalam format Visual Novel."}
+                ]
+                dyn_res, _ = self.llm_client.chat(dyn_messages, max_tokens=300, temperature=0.92)
+                raw_reply = dyn_res if (dyn_res and dyn_res.strip()) else f"*{p_name} tersenyum menatapmu*\n\nAku seneng nemenin kamu ngobrol, ceritain dong gimana kelanjutannya~"
+            except Exception:
+                raw_reply = f"*{p_name} tersenyum menatapmu*\n\nAku seneng nemenin kamu ngobrol, ceritain dong gimana kelanjutannya~"
 
         # Post-process
         clean_reply = re.sub(r'\[ACTION:\s*SEND_PAP\]', '', raw_reply, flags=re.IGNORECASE).strip()

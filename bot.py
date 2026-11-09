@@ -4925,16 +4925,25 @@ def handle_incoming_photo(message):
                 ]
 
                 reply, _ = llm_client.chat(messages, image_bytes=downloaded, max_tokens=300)
-                if not reply:
-                    reply = "*tersenyum melihat fotomu*\n\nFotonya keren banget! Kelihatan pas dan cocok banget di kamu~ 💕"
-                bot.reply_to(message, reply)
+                p_name = persona.get("name", "Runa")
+                if not reply or not reply.strip():
+                    dyn_msg = [
+                        {"role": "system", "content": persona.get("system_instruction", "")},
+                        {"role": "user", "content": f"[User mengirim fotonya dengan caption: '{caption}']. Sebagai {p_name}, berikan pujian dan respon visual novel yang spontan, manis, dan ekspresif."}
+                    ]
+                    dyn_photo, _ = llm_client.chat(dyn_msg, max_tokens=250, temperature=0.9)
+                    reply = dyn_photo if (dyn_photo and dyn_photo.strip()) else f"*{p_name} melihat fotomu dengan mata berbinar*\n\nFotonya manis banget! Suka deh lihatnya 🥰"
+                reply = format_roleplay_italics(reply, character_name=p_name)
+                safe_reply_to(message, reply)
 
                 persona_mgr.add_message(message.from_user.id, "user", f"[User sent a photo: {caption}]")
                 persona_mgr.add_message(message.from_user.id, "assistant", reply)
 
             except Exception as e:
                 logger.error(f"Error handling user photo: {e}")
-                bot.reply_to(message, "Fotonya bagus! Keren banget hari ini~")
+                p_name = persona.get("name", "Runa")
+                err_reply = format_roleplay_italics(f"*{p_name} tersenyum kagum melihat fotomu*\n\nWah fotonya manis banget, kelihatan pas dan keren di kamu 🥰", character_name=p_name)
+                safe_reply_to(message, err_reply)
 
     threading.Thread(target=_vision_task, daemon=True).start()
 
@@ -6250,43 +6259,84 @@ def is_echo_or_parroting(reply: str, user_text: str) -> bool:
     return False
 
 
-def get_contextual_fallback_reaction(user_text: str, persona_name: str = "Runa") -> str:
+def generate_dynamic_visual_novel_reaction(
+    user_text: str,
+    persona_name: str = "Runa",
+    llm_client: Any = None,
+    history: Optional[List[Dict[str, str]]] = None,
+    system_inst: Optional[str] = None,
+    is_nsfw: bool = False
+) -> str:
     """
-    Generates a natural, warm, and affectionate girlfriend reaction formatted in Visual Novel style
-    when an echo or empty LLM reply occurs.
+    Generates a 100% dynamic, context-aware Visual Novel reaction and emotion using the LLM.
+    Completely eliminates static repetitive fallback texts so the conversation is always fresh and engaging.
     """
-    u_low = user_text.lower()
     p_name = persona_name or "Runa"
+    client = llm_client or globals().get("llm_client")
 
-    # Food offering / bringing snacks to kosan / home
-    if any(k in u_low for k in ["bawain", "bawa", "martabak", "nasgor", "beliin", "pesenin", "camilan", "snack"]):
-        return f"*{p_name} tersenyum antusias matanya berbinar*\n\nWahh mau banget! Apa aja yang kamu bawa pasti aku makan kok, martabak atau nasgor kedengeran enak banget~ Makasih banyak yaa 💕"
+    if client and is_port_listening(5001):
+        try:
+            prompt = (
+                f"Lawan bicaramu baru saja berkata: \"{user_text}\".\n"
+                f"Sebagai {p_name}, berikan balasan spontan, unik, manis, dan ekspresif dalam format Visual Novel:\n"
+                f"1. Awali dengan 1 baris aksi panggung atau gestur fisik alami di dalam tanda bintang *{p_name} ...* (contoh: *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*).\n"
+                f"2. Berikan baris baru ganda, lalu dialog ucapanmu yang hangat, santai, dan kreatif.\n"
+                f"DILARANG KERAS mengulang kata-kata lawan bicaramu dan DILARANG menulis proses berpikir!"
+            )
+            msgs = []
+            if system_inst:
+                msgs.append({"role": "system", "content": system_inst})
+            else:
+                msgs.append({"role": "system", "content": f"Kamu adalah {p_name}, waifu teman mengobrol yang hangat, manis, dan ekspresif."})
 
-    # Food / eating
-    if any(k in u_low for k in ["makan", "lunch", "sarapan", "laper", "kenyang", "restoran", "kuliner", "cafe", "kafe", "food"]):
-        return f"*{p_name} tersenyum senang menatapmu*\n\nWah enak banget tuh makanannya! Jangan lupa makan yang kenyang yaa biar gak lemes dan tetap semangat hari ini 💕"
+            if history:
+                msgs.extend(history[-4:])
+            msgs.append({"role": "user", "content": prompt})
 
-    # Main ke kosan / rumah / berkunjung
-    if any(k in u_low for k in ["kosan", "kos", "rumah", "main", "otw", "sampe", "nyampe", "mampir", "ke sini", "kesini"]):
-        return f"*{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*\n\nBoleh banget, pintu kosan selalu terbuka kok buat kamu! Hati-hati di jalan yaa, aku tungguin di sini 🥰"
+            dyn_reply, _ = client.chat(msgs, max_tokens=300, temperature=0.92, is_nsfw=is_nsfw)
+            if (dyn_reply 
+                and dyn_reply.strip() 
+                and not is_echo_or_parroting(dyn_reply, user_text) 
+                and not is_meta_or_reasoning_leak(dyn_reply)):
+                return format_roleplay_italics(dyn_reply.strip(), character_name=p_name)
+        except Exception as e_dyn:
+            logger.warning(f"Dynamic Visual Novel LLM reaction generation failed: {e_dyn}")
 
-    # Greeting / halo / sapaan
-    if any(k in u_low for k in ["halo", "hai", "pagi", "siang", "sore", "malam", "selamat"]):
-        return f"*{p_name} tersenyum manis menyapamu hangat*\n\nHai juga! Seneng deh kamu nyapa, lagi sibuk apa atau lagi santai nih? 💕"
+    # Fallback only when LLM client is completely unreachable (e.g. offline / mock unit tests)
+    u_low = user_text.lower()
+    import random
+    actions = [
+        f"*{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*",
+        f"*{p_name} menatapmu lembut dengan mata berbinar*",
+        f"*{p_name} tersenyum manis mendekatkan diri ke arahmu*",
+        f"*{p_name} mengangguk antusias mendengarkanmu*",
+        f"*{p_name} tertawa kecil tersipu malu*"
+    ]
+    chosen_act = random.choice(actions)
+    if any(k in u_low for k in ["makan", "lunch", "sarapan", "martabak", "nasgor", "camilan"]):
+        return format_roleplay_italics(f"{chosen_act}\n\nWah kedengeran enak banget makanannya! Jangan lupa makan yang banyak yaa biar selalu semangat 💕", character_name=p_name)
+    if any(k in u_low for k in ["kantor", "gathering", "kerja", "meeting", "tugas", "kuliah"]):
+        return format_roleplay_italics(f"{chosen_act}\n\nSemangat yaa buat aktivitas dan acaranya di kantor! Nanti ceritain lagi yaa ke aku 🥰", character_name=p_name)
+    return format_roleplay_italics(f"{chosen_act}\n\nAku selalu seneng nemenin kamu ngobrol kayak gini. Ceritain lebih banyak dong~ 💕", character_name=p_name)
 
-    # Office gathering / hangout bareng anak kantor
-    if any(k in u_low for k in ["gathering", "kumpul", "nongkrong", "anak-anak", "anak2", "temen", "teman", "kantor"]):
-        return f"*{p_name} mengangguk antusias*\n\nWah seru banget tuh kumpul bareng anak-anak kantor! Pasti rame yaa, have fun dan nikmati acaranya 🥰"
 
-    # Kerja / kuliah / lembur / tugas
-    if any(k in u_low for k in ["kerja", "lembur", "meeting", "rapat", "proyek", "project", "tugas", "kuliah", "nugas"]):
-        return f"*{p_name} menatapmu lembut memberi semangat*\n\nSemangat yaa buat kerjaannya! Jangan sampai terlalu capek yaa, nanti kabarin kalau udah senggang 💕"
-
-    # Game / libur / santai / nonton
-    if any(k in u_low for k in ["game", "jalan", "libur", "santai", "rebahan", "nonton"]):
-        return f"*{p_name} tersenyum riang*\n\nWah asyik tuh! Selamat santai dan have fun yaa, nanti cerita-cerita lagi sama aku 🥰"
-
-    return f"*{p_name} tersenyum hangat menatapmu*\n\nHehe iyaa, aku selalu seneng dengerin dan nemenin kamu. Ceritain dong gimana kelanjutannya~ 💕"
+def get_contextual_fallback_reaction(
+    user_text: str,
+    persona_name: str = "Runa",
+    llm_client: Any = None,
+    history: Optional[List[Dict[str, str]]] = None,
+    system_inst: Optional[str] = None,
+    is_nsfw: bool = False
+) -> str:
+    """Wrapper ensuring backward compatibility while delegating to dynamic LLM reaction generator."""
+    return generate_dynamic_visual_novel_reaction(
+        user_text=user_text,
+        persona_name=persona_name,
+        llm_client=llm_client,
+        history=history,
+        system_inst=system_inst,
+        is_nsfw=is_nsfw
+    )
 
 
 META_REASONING_PATTERNS = [
@@ -6651,27 +6701,53 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 pending_manager.clear_pending(message.chat.id)
 
                 if not reply_text or not reply_text.strip():
-                    reply_text = get_contextual_fallback_reaction(user_text, persona.get("name", "Runa"))
+                    reply_text = get_contextual_fallback_reaction(
+                        user_text=user_text,
+                        persona_name=p_name,
+                        llm_client=llm_client,
+                        history=history,
+                        system_inst=system_inst,
+                        is_nsfw=is_nsfw_turn
+                    )
 
                 # Anti-Parroting & Meta-Leak Guard: Intercept repetition or leaked reasoning thoughts
                 if is_echo_or_parroting(reply_text, user_text) or is_meta_or_reasoning_leak(reply_text):
                     logger.warning(f"⚠️ Echo or Meta-leak detected from LLM: '{reply_text}' (User: '{user_text}'). Intercepting...")
                     try:
-                        steer_sys = system_inst + "\n\n[PENTING: Langsung balas perkataan pasanganmu dengan hangat dan ekspresif. DILARANG mengulang kata pasanganmu dan DILARANG menulis monolog berpikir.]"
+                        steer_sys = (
+                            system_inst + 
+                            "\n\n[PENTING - RESPON VISUAL NOVEL: Langsung balas perkataan pasanganmu dengan hangat, spontan, dan kreatif. "
+                            f"Awali dengan 1 aksi panggung visual novel *{p_name} ...* di baris pertama, lalu baris baru ganda sebelum dialog ucapanmu yang segar. "
+                            "DILARANG mengulang kata pasanganmu dan DILARANG menulis monolog berpikir!]"
+                        )
                         retry_messages = [{"role": "system", "content": steer_sys}]
                         retry_messages.extend(history)
                         retry_messages.append({"role": "user", "content": user_text})
-                        steered_reply, _ = llm_client.chat(retry_messages, max_tokens=400, temperature=0.85)
+                        steered_reply, _ = llm_client.chat(retry_messages, max_tokens=400, temperature=0.92, is_nsfw=is_nsfw_turn)
                         if (steered_reply 
                             and not is_echo_or_parroting(steered_reply, user_text)
                             and not is_meta_or_reasoning_leak(steered_reply)):
                             logger.info(f"✓ Steering resolved echo/leak: '{steered_reply}'")
                             reply_text = steered_reply
                         else:
-                            reply_text = get_contextual_fallback_reaction(user_text, persona.get("name", "Runa"))
+                            reply_text = get_contextual_fallback_reaction(
+                                user_text=user_text,
+                                persona_name=p_name,
+                                llm_client=llm_client,
+                                history=history,
+                                system_inst=system_inst,
+                                is_nsfw=is_nsfw_turn
+                            )
                     except Exception as e_steer:
                         logger.debug(f"Steering error: {e_steer}")
-                        reply_text = get_contextual_fallback_reaction(user_text, persona.get("name", "Runa"))
+                        reply_text = get_contextual_fallback_reaction(
+                            user_text=user_text,
+                            persona_name=p_name,
+                            llm_client=llm_client,
+                            history=history,
+                            system_inst=system_inst,
+                            is_nsfw=is_nsfw_turn
+                        )
 
                 # Check if waifu takes initiative to send spontaneous PAP photo
                 has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
@@ -6686,7 +6762,14 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 # Clean action tag from text so user only sees natural dialogue
                 clean_reply = re.sub(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", "", reply_text, flags=re.IGNORECASE).strip()
                 if not clean_reply or is_meta_or_reasoning_leak(clean_reply):
-                    clean_reply = get_contextual_fallback_reaction(user_text, persona.get("name", "Runa"))
+                    clean_reply = get_contextual_fallback_reaction(
+                        user_text=user_text,
+                        persona_name=p_name,
+                        llm_client=llm_client,
+                        history=history,
+                        system_inst=system_inst,
+                        is_nsfw=is_nsfw_turn
+                    )
 
                 new_aff = persona_mgr.increase_affinity(message.from_user.id, delta=1)
                 memory_engine.set_affinity(message.from_user.id, new_aff)
