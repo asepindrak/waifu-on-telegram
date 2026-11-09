@@ -741,6 +741,8 @@ def cmd_models(subcmd=None, target=None):
             return
         if target in ("stheno", "stheno-8b"):
             target = "stheno_8b"
+        if target in ("qwen", "qwen25", "qwen2.5", "qwen-7b", "qwen2.5-7b", "qwen25_7b"):
+            target = "qwen25_7b"
         info = asset_manager.get_asset_info(target)
         if not info:
             print(c(RED, f"Unknown asset key: '{target}'. Available: {list(asset_manager.ASSET_REGISTRY.keys())}"))
@@ -894,46 +896,49 @@ def cmd_update():
     # Step 5: Check & Auto-Download Core AI Models (Chat Brain, Vision, and Image Generation)
     print(c(CYAN, "\n📦 [5/5] Checking and auto-downloading AI Models & Vision mmproj..."))
     if asset_manager:
-        # 1. Main Chat Brain: L3-8B-Stheno-v3.4 (Uncensored Roleplay LLM)
-        info_stheno = asset_manager.get_asset_info("stheno_8b")
-        if info_stheno and not info_stheno.get("installed"):
-            print(c(YELLOW, f"  ⏳ Core Brain '{info_stheno['name']}' missing. Auto-downloading (~{info_stheno['size_mb']} MB)..."))
-            ok = asset_manager.download_asset("stheno_8b")
+        # 1. Main Chat Brain: Qwen2.5-7B-Instruct-Abliterated (Natural Indonesian Roleplay LLM)
+        info_qwen = asset_manager.get_asset_info("qwen25_7b")
+        if info_qwen and not info_qwen.get("installed"):
+            print(c(YELLOW, f"  ⏳ Core Brain '{info_qwen['name']}' missing. Auto-downloading (~{info_qwen['size_mb']} MB)..."))
+            ok = asset_manager.download_asset("qwen25_7b")
             if ok:
-                print(c(GREEN, f"  ✓ '{info_stheno['name']}' downloaded successfully!"))
+                print(c(GREEN, f"  ✓ '{info_qwen['name']}' downloaded successfully!"))
             else:
-                print(c(RED, f"  ❌ Download failed for '{info_stheno['name']}'. Run 'waifu models download stheno_8b'."))
+                print(c(RED, f"  ❌ Download failed for '{info_qwen['name']}'. Run 'waifu models download qwen25_7b'."))
         else:
-            sz = info_stheno.get("current_size_mb", 0) if info_stheno else 0
-            print(c(GREEN, f"  ✓ Core Chat Brain '{info_stheno['name']}' is ready ({sz} MB)."))
+            sz = info_qwen.get("current_size_mb", 0) if info_qwen else 0
+            print(c(GREEN, f"  ✓ Core Chat Brain '{info_qwen['name']}' is ready ({sz} MB)."))
 
-        # Auto-switch to Stheno ONLY if user currently has Huihui selected
+        # Auto-switch to Qwen 2.5 7B if user has previous models (Stheno, Huihui, Qwythos, Llama)
         try:
             from setup import read_env, write_env
             env_dict = read_env()
             cur_llm = env_dict.get("LLM_MODEL", "").lower()
             cur_local = env_dict.get("LOCAL_LLM_MODEL", "").lower()
             cur_nsfw = env_dict.get("NSFW_LLM_MODEL", "").lower()
-            is_using_huihui = any("huihui" in m or "qwythos" in m for m in [cur_llm, cur_local, cur_nsfw])
-            if is_using_huihui:
-                stheno_fn = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
-                print(c(CYAN, f"\n🔄 Terdeteksi model lama (Huihui) aktif. Otomatis beralih ke model terbaru: {stheno_fn}..."))
+            qwen_fn = "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+            is_using_old = any(
+                "stheno" in m or "huihui" in m or "qwythos" in m or "llama" in m
+                for m in [cur_llm, cur_local, cur_nsfw]
+            )
+            if is_using_old:
+                print(c(CYAN, f"\n🔄 Terdeteksi model lama aktif. Otomatis beralih ke model terbaru yang fasih Bahasa Indonesia: {qwen_fn}..."))
                 changed = False
-                if "huihui" in cur_llm or "qwythos" in cur_llm:
-                    env_dict["LLM_MODEL"] = stheno_fn
-                    os.environ["LLM_MODEL"] = stheno_fn
+                if any(x in cur_llm for x in ("stheno", "huihui", "qwythos", "llama")):
+                    env_dict["LLM_MODEL"] = qwen_fn
+                    os.environ["LLM_MODEL"] = qwen_fn
                     changed = True
-                if "huihui" in cur_local or "qwythos" in cur_local:
-                    env_dict["LOCAL_LLM_MODEL"] = stheno_fn
-                    os.environ["LOCAL_LLM_MODEL"] = stheno_fn
+                if any(x in cur_local for x in ("stheno", "huihui", "qwythos", "llama")):
+                    env_dict["LOCAL_LLM_MODEL"] = qwen_fn
+                    os.environ["LOCAL_LLM_MODEL"] = qwen_fn
                     changed = True
-                if "huihui" in cur_nsfw or "qwythos" in cur_nsfw:
-                    env_dict["NSFW_LLM_MODEL"] = stheno_fn
-                    os.environ["NSFW_LLM_MODEL"] = stheno_fn
+                if any(x in cur_nsfw for x in ("stheno", "huihui", "qwythos", "llama")):
+                    env_dict["NSFW_LLM_MODEL"] = qwen_fn
+                    os.environ["NSFW_LLM_MODEL"] = qwen_fn
                     changed = True
                 if changed:
                     write_env(env_dict)
-                    print(c(GREEN, f"  ✓ Auto-select model terbaru berhasil!"))
+                    print(c(GREEN, f"  ✓ Auto-select model terbaru ({qwen_fn}) berhasil!"))
         except Exception as e_env:
             logger.debug(f"Auto-select error: {e_env}")
 

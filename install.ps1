@@ -320,12 +320,12 @@ if ($existingGgufs.Count -eq 0) {
         }
     } else {
         Write-Host "  [INFO] No GGUF chat model found in '$modelsDir'." -ForegroundColor Yellow
-        $dlModel = Read-Host "  Auto-download uncensored 'L3-8B-Stheno-v3.4' Q4_K_M model (~4.9 GB)? [Y/n, default: Y]"
+        $dlModel = Read-Host "  Auto-download uncensored 'Qwen2.5-7B-Instruct-Abliterated' model (~4.7 GB • Natural Indonesian)? [Y/n, default: Y]"
         if ($dlModel.Trim().ToLower() -ne "n") {
-            $sthenoUrl = "https://huggingface.co/bartowski/Llama-3.1-8B-Stheno-v3.4-GGUF/resolve/main/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
-            $sthenoFallback = "https://hf-mirror.com/bartowski/Llama-3.1-8B-Stheno-v3.4-GGUF/resolve/main/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
-            $destGguf = "$modelsDir\Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
-            Download-FileWithProgress -Url $sthenoUrl -DestinationPath $destGguf -Description "L3-8B-Stheno-v3.4 Q4_K_M (~4.9 GB)" -FallbackUrl $sthenoFallback -MinExpectedBytes ([long](3800*1024*1024))
+            $qwenUrl = "https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+            $qwenFallback = "https://hf-mirror.com/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+            $destGguf = "$modelsDir\Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+            Download-FileWithProgress -Url $qwenUrl -DestinationPath $destGguf -Description "Qwen2.5-7B-Instruct-Abliterated Q4_K_M (~4.7 GB)" -FallbackUrl $qwenFallback -MinExpectedBytes ([long](3800*1024*1024))
         }
     }
 } else {

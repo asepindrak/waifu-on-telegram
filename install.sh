@@ -108,11 +108,11 @@ fi
 GGUF_COUNT=$(ls "$INSTALL_DIR/models/"*.gguf 2>/dev/null | grep -v "mmproj" | wc -l)
 if [ "$GGUF_COUNT" -eq 0 ]; then
     echo "  ℹ No GGUF chat model found in '$INSTALL_DIR/models'."
-    read -p "  Auto-download uncensored 'L3-8B-Stheno-v3.4' Q4_K_M model (~4.9 GB)? [Y/n, default: Y]: " DL_MODEL
+    read -p "  Auto-download uncensored 'Qwen2.5-7B-Instruct-Abliterated' model (~4.7 GB • Natural Indonesian)? [Y/n, default: Y]: " DL_MODEL
     DL_MODEL=${DL_MODEL:-Y}
     if [[ "$DL_MODEL" =~ ^[Yy]$ ]]; then
-        curl -fL -C - -o "$INSTALL_DIR/models/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf" \
-          "https://huggingface.co/bartowski/Llama-3.1-8B-Stheno-v3.4-GGUF/resolve/main/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+        curl -fL -C - -o "$INSTALL_DIR/models/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf" \
+          "https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
         echo "  ✓ Model downloaded successfully."
     fi
 else

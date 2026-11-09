@@ -170,8 +170,9 @@ def format_roleplay_italics(text: str) -> str:
     if not text:
         return text
 
-    # 1. Normalize existing dashes or parentheses around action cues
+    # 1. Normalize existing dashes, third-person tags, or parentheses around action cues
     text = re.sub(r'[-—~]\s*\*([^*\n]+?)\*\s*[-—~]', r'*\1*', text)
+    text = re.sub(r'(?i)(?:,\s*)?(?:ia|dia)\s+(?:menyebutkan|berkata|menjawab|berbisik|menimpali)\s*:\s*', ' ', text)
     text = re.sub(
         r'(?i)\(((?:tersenyum|tersipu|tertawa|merapikan|menatap|menghela|melirik|berbisik|memegang|menggenggam|mengusap|memeluk|duduk|berdiri|sambil)[^)]+)\)',
         r'*\1*',
@@ -469,7 +470,13 @@ def start_env_hot_reload_watcher():
 def apply_llm_choice(choice: str) -> str:
     global LLM_BASE_URL
     detected_llms = scan_local_llm_models()
-    if choice in ("stheno", "stheno_8b"):
+    if choice in ("qwen", "qwen25", "qwen2.5", "qwen25_7b"):
+        new_base = "http://127.0.0.1:5001/v1"
+        new_model = "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+        label = "Qwen2.5-7B-Instruct-Abliterated (KoboldCPP)"
+        update_env_variable("LOCAL_LLM_MODEL", new_model)
+        update_env_variable("NSFW_LLM_MODEL", new_model)
+    elif choice in ("stheno", "stheno_8b"):
         new_base = "http://127.0.0.1:5001/v1"
         new_model = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
         label = "L3-8B-Stheno-v3.4 (KoboldCPP)"
@@ -2212,17 +2219,17 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
         # NSFW Providers section
         markup.add(types.InlineKeyboardButton("─── 🔞 PROVIDER CHAT NSFW ───", callback_data="noop"))
         markup.add(types.InlineKeyboardButton(f"🔞 Local KoboldCPP Uncensored {'✓' if nsfw_p == 'local' else ''}", callback_data="cfg_set_nsfw_p:local"))
-        has_stheno_split = any("stheno" in mname.lower() for _, mname, _ in detected)
-        if not has_stheno_split:
-            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih L3-8B-Stheno-v3.4 (~4.9 GB)", callback_data="cfg_set_llm:stheno_auto"))
+        has_qwen_split = any("qwen" in mname.lower() for _, mname, _ in detected)
+        if not has_qwen_split:
+            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih Qwen2.5-7B-Abliterated (~4.7 GB)", callback_data="cfg_set_llm:qwen_auto"))
         markup.add(types.InlineKeyboardButton(f"☁️ OpenRouter Uncensored {'✓' if nsfw_p == 'openrouter_uncensored' else ''}", callback_data="cfg_set_nsfw_p:openrouter_uncensored"))
     else:
         is_kobold = ("5001" in cur_base)
         markup.add(types.InlineKeyboardButton(f"🤖 KoboldCPP (Port 5001 - Auto-start) {'✓' if is_kobold else ''}", callback_data="cfg_set_llm:kobold"))
 
-        has_stheno = any("stheno" in mname.lower() for _, mname, _ in detected)
-        if not has_stheno:
-            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih L3-8B-Stheno-v3.4 (~4.9 GB • Rekomendasi)", callback_data="cfg_set_llm:stheno_auto"))
+        has_qwen = any("qwen" in mname.lower() for _, mname, _ in detected)
+        if not has_qwen:
+            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih Qwen2.5-7B-Abliterated (~4.7 GB • Rekomendasi Utama)", callback_data="cfg_set_llm:qwen_auto"))
 
         for idx, (source, mname, mpath) in enumerate(detected):
             is_cur = (cur_llm.lower() in mname.lower())
@@ -3373,7 +3380,58 @@ def callback_set_llm(call):
     if not is_authorized(call.from_user.id):
         return
     key = call.data.split(":", 1)[1]
-    if key in ("stheno_auto", "stheno", "stheno_8b"):
+    if key in ("qwen_auto", "qwen", "qwen25", "qwen2.5", "qwen25_7b"):
+        info_qwen = asset_manager.get_asset_info("qwen25_7b") if asset_manager else None
+        if info_qwen and not info_qwen.get("installed"):
+            bot.answer_callback_query(call.id, "📥 Memulai unduhan Qwen2.5-7B-Abliterated...")
+            chat_id = call.message.chat.id
+            mid = call.message.message_id
+            msg_prompt = bot.send_message(
+                chat_id,
+                "⏳ **Sedang Mengunduh Qwen2.5-7B-Instruct-Abliterated (~4.7 GB)**\n\n"
+                "Model terbaik yang sangat fasih Bahasa Indonesia sedang diunduh di latar belakang. "
+                "Begitu selesai, model ini akan **otomatis dipilih & diaktifkan** sebagai otak utama waifu! 💕",
+                parse_mode="Markdown"
+            )
+            def _async_dl_qwen():
+                ok = asset_manager.download_asset("qwen25_7b") if asset_manager else False
+                if ok:
+                    apply_llm_choice("qwen25_7b")
+                    try:
+                        bot.edit_message_text(
+                            "🎉 **Qwen2.5-7B-Instruct-Abliterated Berhasil Dipasang & Aktif!** 💕\n\n"
+                            "Model Bahasa Indonesia terbaru sudah aktif. Gaya bicara waifu sekarang alami, santai, dan ekspresif! ✨",
+                            chat_id=chat_id,
+                            message_id=msg_prompt.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+                    try:
+                        health_engine.heal_llm()
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        bot.edit_message_text(
+                            "⚠️ **Gagal Mengunduh Qwen2.5-7B-Instruct-Abliterated**\n\n"
+                            "Koneksi terputus. Silakan coba lagi nanti atau jalankan di terminal:\n"
+                            "`waifu models download qwen25_7b`",
+                            chat_id=chat_id,
+                            message_id=msg_prompt.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+            threading.Thread(target=_async_dl_qwen, daemon=True).start()
+            show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=mid)
+            return
+        else:
+            label = apply_llm_choice("qwen25_7b")
+            bot.answer_callback_query(call.id, f"LLM: {label}")
+            show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+            return
+    elif key in ("stheno_auto", "stheno", "stheno_8b"):
         info_stheno = asset_manager.get_asset_info("stheno_8b") if asset_manager else None
         if info_stheno and not info_stheno.get("installed"):
             bot.answer_callback_query(call.id, "📥 Memulai unduhan L3-8B-Stheno-v3.4...")
@@ -6481,7 +6539,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     "Ini tugas kelompoknya udah hampir kelar kok, sore ini ada rencana mau jalan keluar?\n"
                     "4. PROAKTIF MENGAJAK JALAN & KENCAN: Jika suasana santai atau di akhir pekan / libur, jangan hanya pasif menunggu. Ajak pasanganmu sesekali untuk ngopi berdua di kafe estetik, nonton film bioskop terbaru, main ke kosan/rumah sambil dimasakin atau santai berdua, atau jalan sore ke taman kota!\n"
                     "5. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat yang santai dan wajar (misal: 'Lagi santai nugas nih, gimana harimu? 💕 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu. Bersikaplah percaya diri, hangat, dan ramah.\n"
-                    "6. GAYA CHAT & BAHASA: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. Kamu WAJIB berbicara langsung dalam Bahasa Indonesia sehari-hari yang santai dan akrab. DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin dalam bahasa Inggris."
+                    "6. GAYA CHAT & BAHASA: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. Kamu WAJIB berbicara langsung dalam Bahasa Indonesia sehari-hari yang santai dan akrab. DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin dalam bahasa Inggris.\n"
+                    "7. SUDUT PANDANG ORANG PERTAMA (FIRST-PERSON POV - SANGAT PENTING): Kamu WAJIB berbicara langsung sebagai dirimu sendiri ('aku') kepada pasanganmu ('kamu'). DILARANG KERAS menggunakan sudut pandang narator orang ketiga seperti 'ia menatapmu', 'ia berkata', 'ia menyebutkan', atau menyebut dirimu dari sudut pandang novel! Dalam aksi emosi *...*, gunakan kata kerja langsung (contoh: *tersenyum senang sambil menatapmu*, BUKAN *ia tersenyum*)."
                 )
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
                 if mem_context:

@@ -22,6 +22,21 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # Registry of AI Models, Custom Nodes, and Third-Party Dependencies
 ASSET_REGISTRY = {
+    "qwen25_7b": {
+        "name": "Qwen2.5-7B-Instruct-Abliterated (Natural Indonesian & Roleplay LLM)",
+        "type": "llm_model",
+        "filename": "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf",
+        "patterns": ["*Qwen2.5*7B*abliterated*.gguf", "*Qwen2.5-7B-Instruct-abliterated*.gguf", "*Qwen2.5*7B*.gguf", "*qwen2.5-7b*.gguf"],
+        "size_mb": 4466,
+        "url": "https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf",
+        "fallback_url": "https://hf-mirror.com/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf",
+        "mirrors": [
+            "https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf",
+            "https://hf-mirror.com/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+        ],
+        "description": "Model chat/roleplay terbaik untuk Bahasa Indonesia (Qwen 2.5 7B abliterated uncensored, tata bahasa alami, tanpa delay thinking).",
+        "required_for": "Otak Utama Chat & Roleplay Waifu (Qwen2.5-7B-Instruct-Abliterated)"
+    },
     "stheno_8b": {
         "name": "L3-8B-Stheno-v3.4 (Uncensored Roleplay LLM)",
         "type": "llm_model",
@@ -750,6 +765,11 @@ def get_llm_launch_spec(project_root: Optional[str] = None) -> Optional[Dict[str
     mmproj_path = None
 
     if not model_path:
+        info_qwen = get_asset_info("qwen25_7b")
+        if info_qwen and info_qwen.get("installed") and info_qwen.get("target_path"):
+            model_path = info_qwen["target_path"]
+
+    if not model_path:
         info_stheno = get_asset_info("stheno_8b")
         if info_stheno and info_stheno.get("installed") and info_stheno.get("target_path"):
             model_path = info_stheno["target_path"]
@@ -804,11 +824,13 @@ def get_llm_launch_spec(project_root: Optional[str] = None) -> Optional[Dict[str
         if info_vis and info_vis.get("installed") and info_vis.get("target_path"):
             mmproj_path = info_vis["target_path"]
 
-    # Incompatible mmproj guard: mmproj trained for Qwen/Mythos must not be loaded on Llama/Stheno
+    # Incompatible mmproj guard: mmproj trained for specific models must not be loaded on text LLMs
     if model_path and mmproj_path:
         m_lower = os.path.basename(model_path).lower()
         mm_lower = os.path.basename(mmproj_path).lower()
-        if ("stheno" in m_lower or "llama" in m_lower) and "llama" not in mm_lower:
+        if "qwythos" in mm_lower and "qwythos" not in m_lower:
+            mmproj_path = None
+        elif ("stheno" in m_lower or "llama" in m_lower or "qwen2.5" in m_lower) and "moondream" not in mm_lower:
             mmproj_path = None
 
     mm_args = ["--mmproj", mmproj_path] if (mmproj_path and os.path.isfile(mmproj_path)) else []

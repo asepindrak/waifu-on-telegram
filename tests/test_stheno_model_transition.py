@@ -28,8 +28,8 @@ class TestSthenoModelTransition(unittest.TestCase):
         self.assertIn("bartowski", entry["url"])
         self.assertIn("Llama-3.1-8B-Stheno-v3.4", entry["url"])
 
-    def test_get_llm_launch_spec_prioritizes_stheno_and_omits_incompatible_mmproj(self):
-        """Ensures get_llm_launch_spec chooses Stheno when installed and drops Qwythos mmproj."""
+    def test_get_llm_launch_spec_prioritizes_qwen25_and_omits_incompatible_mmproj(self):
+        """Ensures get_llm_launch_spec chooses Qwen2.5 when installed and drops Qwythos mmproj."""
         with patch.object(asset_manager, "shutil") as mock_shutil, \
              patch.object(asset_manager, "get_asset_info") as mock_info, \
              patch("os.path.isfile", return_value=True):
@@ -37,10 +37,10 @@ class TestSthenoModelTransition(unittest.TestCase):
             mock_shutil.which.return_value = "/tools/koboldcpp.exe"
 
             def fake_info(key):
-                if key == "stheno_8b":
+                if key == "qwen25_7b":
                     return {
                         "installed": True,
-                        "target_path": "/models/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+                        "target_path": "/models/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
                     }
                 if key == "qwythos_vision":
                     return {
@@ -53,8 +53,8 @@ class TestSthenoModelTransition(unittest.TestCase):
 
             spec = asset_manager.get_llm_launch_spec()
             self.assertIsNotNone(spec)
-            self.assertIn("Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf", spec["model"])
-            # mmproj must be omitted for Stheno to prevent runtime tensor dimension crash
+            self.assertIn("Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf", spec["model"])
+            # mmproj must be omitted for standalone text model to prevent runtime tensor dimension crash
             self.assertNotIn("--mmproj", spec["cmd"])
 
     @patch("subprocess.run")
@@ -93,15 +93,15 @@ class TestSthenoModelTransition(unittest.TestCase):
 
         cmd_update()
 
-        # Download asset should have been called for stheno_8b
+        # Download asset should have been called for qwen25_7b
         downloaded = [call_args[0][0] for call_args in mock_dl.call_args_list]
-        self.assertIn("stheno_8b", downloaded)
+        self.assertIn("qwen25_7b", downloaded)
 
-        # write_env must have been called with new Stheno model
+        # write_env must have been called with new Qwen 2.5 model
         mock_write_env.assert_called()
         saved_env = mock_write_env.call_args[0][0]
-        self.assertEqual(saved_env["LLM_MODEL"], "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf")
-        self.assertEqual(saved_env["LOCAL_LLM_MODEL"], "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf")
+        self.assertEqual(saved_env["LLM_MODEL"], "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf")
+        self.assertEqual(saved_env["LOCAL_LLM_MODEL"], "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf")
 
     @patch("subprocess.run")
     @patch.object(asset_manager, "ensure_nodejs", return_value=True)
@@ -149,6 +149,14 @@ class TestSthenoModelTransition(unittest.TestCase):
         self.assertIn("Stheno", label)
         mock_update_env.assert_any_call("LLM_MODEL", "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf")
         mock_update_env.assert_any_call("LOCAL_LLM_MODEL", "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf")
+
+    @patch("bot.update_env_variable")
+    def test_apply_llm_choice_qwen25(self, mock_update_env):
+        """Verifies apply_llm_choice correctly selects Qwen 2.5 7B."""
+        label = apply_llm_choice("qwen25_7b")
+        self.assertIn("Qwen2.5", label)
+        mock_update_env.assert_any_call("LLM_MODEL", "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf")
+        mock_update_env.assert_any_call("LOCAL_LLM_MODEL", "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf")
 
 
 if __name__ == "__main__":
