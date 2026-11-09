@@ -536,10 +536,20 @@ class StoryEngine:
                     return True
             return False
 
-    def get_story_prompt_context(self, persona_key: str, date_str: Optional[str] = None) -> str:
+    def get_story_prompt_context(
+        self,
+        persona_key: str,
+        date_str: Optional[str] = None,
+        is_ongoing_chat: bool = False,
+        user_asked_activity: bool = False
+    ) -> str:
         """
         Builds the narrative instruction segment injected into the LLM system prompt.
         Gives the character realistic life depth while maintaining conversational focus on user.
+        If an ongoing active conversation is happening and user hasn't explicitly asked about
+        today's activity, the story is kept in passive background context so the waifu does not
+        hallucinate or insist on past solitary routines (e.g. insisting she's playing games alone
+        when user has invited her to play or talk about something else).
         """
         ep = self.get_today_story(persona_key, date_str=date_str)
         if not ep:
@@ -553,6 +563,23 @@ class StoryEngine:
         day_idx = ep.get("day_index", 1)
         tot_days = ep.get("total_days", 5)
 
+        if is_ongoing_chat and not user_asked_activity:
+            return (
+                f"\n[LATAR KEHIDUPAN & CERITA HARI INI (LATAR BELAKANG PASIF)]\n"
+                f"• Arc Cerita: {arc_title} (Fokus: {day_theme})\n"
+                f"• Suasana Hati (Mood): {mood}\n"
+                f"PEDOMAN KESADARAN PERCAKAPAN (SANGAT PENTING):\n"
+                f"1. FOKUS 100% PADA CHAT & AJAKAN PASANGAN: Obrolan saat ini sedang berlangsung aktif. Berikan perhatian penuh pada apa yang sedang dibicarakan atau diajak oleh lawan bicaramu!\n"
+                f"2. JANGAN MEMAKSAKAN CERITA ATAU RUTINITAS: DILARANG KERAS mengulang-ulang kegiatan lama (misal: terus mengaku lagi main game di kamar) atau memaksakan jalan cerita harian jika lawan bicaramu sedang membicarakan hal lain atau mengajakmu main/jalan!\n"
+                f"3. Jadikan rutinitas hari ini hanya sebagai ingatan pasif, bukan sesuatu yang harus kamu bicarakan terus-menerus kecuali ditanya langsung.\n"
+            )
+
+        activity_guideline = (
+            "1. User baru saja menanyakan kabarmu atau apa yang sedang kamu lakukan. Ceritakan kegiatanmu di atas secara alami, hangat, dan antusias!"
+            if user_asked_activity else
+            "1. Ini adalah obrolan awal setelah jeda waktu atau hari baru. Kamu boleh menceritakan sedikit kabarmu atau aktivitasmu secara alami layaknya teman mengobrol."
+        )
+
         return (
             f"\n[LATAR KEHIDUPAN & EPISODE CERITA HARI INI]\n"
             f"• Arc Cerita: {arc_title} (Hari ke-{day_idx} dari {tot_days})\n"
@@ -561,9 +588,9 @@ class StoryEngine:
             f"• Suasana Hati (Mood): {mood}\n"
             f"• Aktivitas Utama: {activity}\n"
             f"ATURAN INTEGRASI OBROLAN (PENTING):\n"
-            f"1. Jadikan cerita ini sebagai latar belakang kehidupanmu yang hidup dan realistis.\n"
-            f"2. JIKA user bertanya tentang kabarmu, lagi apa, atau topik santai, ceritakan hal ini secara antusias dan alami layaknya teman mengobrol.\n"
-            f"3. JIKA user membicarakan topik lain (curhat, teknologi, kegiatan mereka sendiri), FOKUSKAN perhatianmu pada user terlebih dahulu tanpa memaksakan jalan ceritamu.\n"
+            f"{activity_guideline}\n"
+            f"2. Jadikan cerita ini sebagai latar belakang kehidupanmu yang hidup dan realistis.\n"
+            f"3. JIKA user membicarakan topik lain (curhat, teknologi, kegiatan mereka sendiri, atau mengajak main/jalan), SEGERA PRIORITASKAN perhatianmu pada user tanpa memaksakan jalan ceritamu.\n"
         )
 
     def get_story_photo_suggestion(self, persona_key: str) -> Optional[Dict[str, str]]:

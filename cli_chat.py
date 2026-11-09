@@ -42,6 +42,8 @@ import student_schedule
 from project_manager import get_project_manager
 from computer_use_engine import get_computer_use_engine
 from coding_engine import get_coding_engine
+from hangout_engine import get_hangout_engine
+from waifu_status_tracker import get_waifu_status_tracker
 
 logger = logging.getLogger("WaifuCLI")
 
@@ -211,6 +213,9 @@ class WaifuCLISession:
         self.project_manager = get_project_manager()
         self.coding_engine = get_coding_engine()
         self.computer_use_engine = get_computer_use_engine()
+        self.hangout_engine = get_hangout_engine()
+        self.status_tracker = get_waifu_status_tracker()
+        self.last_user_ts: float = 0.0
 
     def print_welcome_banner(self):
         persona = self.persona_mgr.get_active_persona()
@@ -422,19 +427,80 @@ class WaifuCLISession:
                 "Kamu bukan langsung bertindak sebagai pacar jika belum diminta; bersikaplah sebagai teman ngobrol mahasiswi yang ramah, hangat, dan asyik. Biarkan dinamika hubungan berkembang secara alami sesuai kenyamanan user."
             )
 
-        # 2. Hourly routine & Daily Story Arc
+        # 2. Hourly routine, Story Arc & Activity Awareness
+        now_ts = time.time()
+        is_new_day = False
+        is_long_silence = False
+        if self.last_user_ts > 0:
+            last_date = time.strftime("%Y-%m-%d", time.localtime(self.last_user_ts))
+            cur_date = time.strftime("%Y-%m-%d", time.localtime(now_ts))
+            is_new_day = (last_date != cur_date)
+            elapsed_hours = (now_ts - self.last_user_ts) / 3600.0
+            if elapsed_hours >= 2.5:
+                is_long_silence = True
+        else:
+            is_new_day = True
+            is_long_silence = True
+
+        is_ongoing_chat = (not is_new_day) and (not is_long_silence)
+        self.last_user_ts = now_ts
+
+        user_asked_activity = self.hangout_engine.detect_activity_query(user_text)
+        is_inviting_out = self.hangout_engine.detect_activity_invitation(user_text)
+
         cur_hour = time.localtime().tm_hour
         routine = student_schedule.get_hourly_routine(cur_hour, persona_key=self.persona_mgr.active_key)
         p_prof = student_schedule.STUDENT_PROFILES.get(self.persona_mgr.active_key.lower(), student_schedule.STUDENT_PROFILES["runa"])
-        story_ctx = self.story_engine.get_story_prompt_context(self.persona_mgr.active_key)
+        story_ctx = self.story_engine.get_story_prompt_context(
+            self.persona_mgr.active_key,
+            is_ongoing_chat=is_ongoing_chat,
+            user_asked_activity=user_asked_activity
+        )
+
+        invitation_instruction = ""
+        if is_inviting_out:
+            detected_venue = self.hangout_engine.detect_hangout_intent(user_text)
+            if detected_venue:
+                venue_info = self.hangout_engine.HANGOUT_VENUES.get(detected_venue, {})
+                v_name = venue_info.get("name", "Tempat Main")
+                self.status_tracker.update_status(
+                    self.user_id,
+                    location=v_name,
+                    activity=f"Lagi main dan menghabiskan waktu bersama di {v_name}",
+                    persona_name=p_name
+                )
+            else:
+                self.status_tracker.update_status(
+                    self.user_id,
+                    location="Bersama kamu",
+                    activity=f"Lagi bersenang-senang dan main bersama {user_call_pref or 'kamu'}",
+                    persona_name=p_name
+                )
+
+            invitation_instruction = (
+                "\n[AJAKAN BERAKTIVITAS DARI PASANGAN - PRIORITAS TERTINGGI]\n"
+                "Lawan bicaramu baru saja mengajakmu main/beraktivitas bersama! "
+                "1. TERIMA AJAKAN INI DENGAN SENANG HATI DAN ANTUSIAS!\n"
+                "2. DILARANG KERAS menolak atau beralasan kamu sedang sibuk main game sendiri, sedang belajar, atau ada kegiatan lain! "
+                "Tinggalkan kegiatan sendirianmu yang lama untuk bersenang-senang bareng pasanganmu.\n"
+                "3. Sambut ajakan tersebut layaknya teman dekat/pacar yang gembira diajak main, tanyakan mau main apa atau ajak mulai sekarang juga!"
+            )
+
+        status_block = self.status_tracker.format_status_instruction(
+            user_id=self.user_id,
+            cur_hour=cur_hour,
+            routine_desc=routine['activity_desc'],
+            major=p_prof['major'],
+            is_inviting_out=is_inviting_out
+        )
 
         system_inst = persona.get("system_instruction", "")
         if story_ctx:
             system_inst += story_ctx
+        if invitation_instruction:
+            system_inst += "\n" + invitation_instruction
         system_inst += (
-            f"\n\n[KEGIATAN MAHASISWI HARI INI]\n"
-            f"Waktu sekarang: Jam {cur_hour:02d}:00. Kegiatanmu saat ini: {routine['activity_desc']}. "
-            f"Kamu adalah mahasiswi ({p_prof['major']}).\n\n"
+            f"{status_block}\n"
             "[PEDOMAN KOMUNIKASI - WAJIB DIPATUHI]\n"
             f"{calling_guideline}\n"
             "1. ANTI-MEMBEO (SANGAT PENTING): DILARANG KERAS hanya mengulang kata, mengulang frasa, atau menyalin ulang pesan lawan bicaramu!\n"

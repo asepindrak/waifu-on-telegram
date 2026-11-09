@@ -723,7 +723,7 @@ class IdleEngine:
         comfy_state = "💤 Standby On-Demand" if self.comfyui_on_demand else ("🟢 Online" if is_port_listening(8188) else "🔴 Offline")
         vs_state = "🟢 Online" if is_port_listening(3900) else "💤 Standby"
         if self.is_agy_active_provider():
-            agy_state = "🟢 Online (Always-On)" if is_port_listening(8001) else "⚡ Auto-Wake"
+            agy_state = "🟢 Online (Always-On)" if is_port_listening(8001) else "⚡ Always-On (Auto-Wake)"
         else:
             agy_state = "🟢 Online" if is_port_listening(8001) else "💤 Standby"
         return f"🟢 Aktif (Idle: {self.idle_timeout_minutes}m • LLM: {llm_state} • Foto: {comfy_state} • Voice: {vs_state} • AGY: {agy_state})"

@@ -6622,14 +6622,40 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     safe_reply_to(message, backend_msg)
                     return
 
-                # 3. Record activity for proactive check-ins & learn facts
+                # 3. Check chat continuity & time elapsed since last user message
+                uid_str = str(message.from_user.id)
+                user_chat_meta = proactive_engine.user_data.get(uid_str, {})
+                last_user_ts = user_chat_meta.get("last_user_ts", 0)
+                now_ts = time.time()
+
+                is_new_day = False
+                is_long_silence = False
+                if last_user_ts > 0:
+                    last_date = time.strftime("%Y-%m-%d", time.localtime(last_user_ts))
+                    cur_date = time.strftime("%Y-%m-%d", time.localtime(now_ts))
+                    is_new_day = (last_date != cur_date)
+                    elapsed_hours = (now_ts - last_user_ts) / 3600.0
+                    if elapsed_hours >= 2.5:
+                        is_long_silence = True
+                else:
+                    is_new_day = True
+                    is_long_silence = True
+
+                is_ongoing_chat = (not is_new_day) and (not is_long_silence)
+
+                # Record activity for proactive check-ins & learn facts
                 proactive_engine.record_user_activity(message.from_user.id)
                 memory_engine.auto_extract_facts(user_text, message.from_user.id)
 
-                # 3. Construct system instruction with injected student routine & memory context
+                # Check if user explicitly asked what waifu is doing or invited waifu out
+                user_asked_activity = hangout_engine.detect_activity_query(user_text)
+                is_inviting_out = hangout_engine.detect_activity_invitation(user_text)
+
+                # 4. Construct system instruction with injected student routine & memory context
                 cur_hour = time.localtime().tm_hour
                 routine = student_schedule.get_hourly_routine(cur_hour, persona_key=persona_mgr.active_key)
                 p_prof = student_schedule.STUDENT_PROFILES.get(persona_mgr.active_key.lower(), student_schedule.STUDENT_PROFILES["runa"])
+                p_name = persona.get("name", "Runa")
                 
                 # Check user calling preference / pet name request
                 user_prof = memory_engine.get_profile(message.from_user.id)
@@ -6656,37 +6682,76 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                         "Kamu bukan langsung bertindak sebagai pacar jika belum diminta; bersikaplah sebagai teman ngobrol mahasiswi yang ramah, hangat, dan asyik. Biarkan dinamika hubungan berkembang secara alami sesuai kenyamanan user."
                     )
 
-                # Inject daily story episode
-                story_ctx = story_engine.get_story_prompt_context(persona_mgr.active_key)
+                # Inject daily story episode (passive background during active ongoing chats, active after silence/new day or when asked)
+                story_ctx = story_engine.get_story_prompt_context(
+                    persona_mgr.active_key,
+                    is_ongoing_chat=is_ongoing_chat,
+                    user_asked_activity=user_asked_activity
+                )
 
                 # Check for natural context shift to expire session outfits when activity changes
                 persona_mgr.check_context_shift(message.from_user.id, user_text)
                 cur_outfit_details = persona_mgr.get_user_outfit_details(message.from_user.id)
 
+                invitation_instruction = ""
                 # Check hangout / date intent or completion
                 if hangout_engine.is_on_date(message.from_user.id) and hangout_engine.detect_hangout_finish(user_text):
                     hangout_engine.end_date(message.from_user.id)
+                    waifu_status_tracker.update_status(
+                        message.from_user.id,
+                        location="Rumah / Kamar kos",
+                        activity="Baru saja selesai kencan/main dan pulang santai di rumah/kamar kos",
+                        persona_name=p_name
+                    )
                 else:
                     detected_venue = hangout_engine.detect_hangout_intent(user_text)
                     if detected_venue:
                         hangout_engine.start_date(message.from_user.id, detected_venue)
+                        venue_info = hangout_engine.HANGOUT_VENUES.get(detected_venue, {})
+                        v_name = venue_info.get("name", "Tempat Main")
+                        waifu_status_tracker.update_status(
+                            message.from_user.id,
+                            location=v_name,
+                            activity=f"Lagi main dan menghabiskan waktu bersama di {v_name}",
+                            persona_name=p_name
+                        )
+                    elif is_inviting_out:
+                        waifu_status_tracker.update_status(
+                            message.from_user.id,
+                            location="Bersama kamu",
+                            activity=f"Lagi bersenang-senang dan main bersama {user_call_pref or 'kamu'}",
+                            persona_name=p_name
+                        )
+
+                if is_inviting_out:
+                    invitation_instruction = (
+                        "\n[AJAKAN BERAKTIVITAS DARI PASANGAN - PRIORITAS TERTINGGI]\n"
+                        "Lawan bicaramu baru saja mengajakmu main/beraktivitas bersama! "
+                        "1. TERIMA AJAKAN INI DENGAN SENANG HATI DAN ANTUSIAS!\n"
+                        "2. DILARANG KERAS menolak atau beralasan kamu sedang sibuk main game sendiri, sedang belajar, atau ada kegiatan lain! "
+                        "Tinggalkan kegiatan sendirianmu yang lama untuk bersenang-senang bareng pasanganmu.\n"
+                        "3. Sambut ajakan tersebut layaknya teman dekat/pacar yang gembira diajak main, tanyakan mau main apa atau ajak mulai sekarang juga!"
+                    )
 
                 status_block = waifu_status_tracker.format_status_instruction(
                     user_id=message.from_user.id,
                     cur_hour=cur_hour,
                     routine_desc=routine['activity_desc'],
                     major=p_prof['major'],
-                    cur_outfit=cur_outfit_details.get("raw_name")
+                    cur_outfit=cur_outfit_details.get("raw_name"),
+                    is_inviting_out=is_inviting_out
                 )
 
                 system_inst = persona.get("system_instruction", "")
                 if story_ctx:
                     system_inst += story_ctx
 
-                p_name = persona.get("name", "Runa")
                 hangout_prompt = hangout_engine.format_hangout_prompt(message.from_user.id, p_name)
                 if hangout_prompt:
                     system_inst += "\n" + hangout_prompt
+
+                if invitation_instruction:
+                    system_inst += "\n" + invitation_instruction
 
                 system_inst += (
                     f"{status_block}\n"

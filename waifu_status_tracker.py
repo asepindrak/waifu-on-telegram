@@ -147,6 +147,30 @@ class WaifuStatusTracker:
                 }
                 self._save_to_disk()
 
+    def update_status(
+        self,
+        user_id: int,
+        location: str,
+        activity: str,
+        outfit: Optional[str] = None,
+        persona_name: str = "Waifu",
+        photo_caption: Optional[str] = None
+    ):
+        """Directly updates waifu location and activity state for user."""
+        with self._lock:
+            cur = self._statuses.get(str(user_id), {})
+            self._statuses[str(user_id)] = {
+                "persona_name": persona_name,
+                "location": location,
+                "activity": activity,
+                "photo_caption": photo_caption if photo_caption is not None else cur.get("photo_caption", ""),
+                "scene": location,
+                "outfit": outfit if outfit is not None else cur.get("outfit", ""),
+                "updated_at": time.time()
+            }
+            self._save_to_disk()
+        logger.info(f"✨ Waifu status updated for user {user_id}: Location='{location}', Activity='{activity}'")
+
     def get_current_status(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Returns the active status if updated within expiration window."""
         with self._lock:
@@ -164,11 +188,13 @@ class WaifuStatusTracker:
         cur_hour: int,
         routine_desc: str,
         major: str = "Ilmu Hukum",
-        cur_outfit: Optional[str] = None
+        cur_outfit: Optional[str] = None,
+        is_inviting_out: bool = False
     ) -> str:
         """
         Builds the system instruction prompt section.
-        Prioritizes recently stated dynamic reality over static hourly schedule!
+        Prioritizes recently stated dynamic reality and flexible user responsiveness
+        over rigid, repetitive statements!
         """
         st = self.get_current_status(user_id)
         if st and st.get("activity"):
@@ -188,17 +214,20 @@ class WaifuStatusTracker:
             ) if outfit else ""
 
             return (
-                f"\n\n[SITUASI & LOKASI DIRI SAAT INI - WAJIB KONSISTEN]\n"
+                f"\n\n[SITUASI & LOKASI DIRI SAAT INI]\n"
                 f"Waktu sekarang: Jam {cur_hour:02d}:00.\n"
                 f"• Lokasi kamu saat ini: {loc}\n"
-                f"• Kegiatanmu saat ini: \"{act}\"{caption_ref}\n"
+                f"• Konteks kegiatan terakhir: \"{act}\"{caption_ref}\n"
                 f"{outfit_line}"
                 f"• Status mahasiswa: Mahasiswi ({major}).\n\n"
-                f"ATURAN MUTLAK KONSISTENSI DIRI (SANGAT PENTING):\n"
-                f"1. Kamu WAJIB SADAR dan KONSISTEN dengan lokasi dan kegiatan di atas!\n"
-                f"2. JANGAN PERNAH berkontradiksi dengan apa yang baru saja kamu katakan atau foto yang baru saja kamu kirim! "
-                f"Jika kamu sebelumnya bilang sedang di rumah/kamar (misal rebahan santai baru beres pulang dari kampus), "
-                f"DILARANG TIBA-TIBA bilang masih di kampus atau sedang di perpustakaan/kelas!\n"
+                f"PEDOMAN DINAMIKA KEGIATAN & PERCAKAPAN:\n"
+                f"1. FLEKSIBEL & RESPONSIF TERHADAP AJAKAN / PERUBAHAN TOPIK: Konteks kegiatan di atas adalah kegiatanmu sebelumnya. "
+                f"Jika lawan bicaramu mengajak main, jalan, atau berganti topik pembicaraan, SEGERA IKUTI dan BERADAPTASI secara alami! "
+                f"DILARANG KERAS mengulang-ulang kegiatan lama (misalnya: terus bersikeras mengaku lagi main game sendiri) "
+                f"jika lawan bicaramu sudah mengajak main bareng atau membicarakan hal lain!\n"
+                f"2. KONSISTENSI FISIK & LOGIKA RUANG: Jaga konsistensi lokasi secara wajar (jangan berpindah tempat secara mustahil tanpa konteks perjalanan/ajakan). "
+                f"Jika kamu sebelumnya santai di rumah/kamar, DILARANG TIBA-TIBA bilang masih di kampus atau sedang di kelas tanpa jeda waktu. "
+                f"Namun jika lawan bicaramu mengajakmu pergi atau kencan, kamu boleh bersiap-siap dan berangkat bersama.\n"
                 f"3. Jika lawan bicaramu bertanya sedang apa, berada di mana, atau membahas fotomu, respons sesuai dengan situasi nyatamu saat ini di {loc}.\n"
                 f"{outfit_guideline}"
             )
@@ -207,8 +236,8 @@ class WaifuStatusTracker:
         outfit_line = f" Pakaianmu: {cur_outfit}." if cur_outfit else ""
         return (
             f"\n\n[KEGIATAN MAHASISWI HARI INI]\n"
-            f"Waktu sekarang: Jam {cur_hour:02d}:00. Kegiatanmu saat ini: {routine_desc}.{outfit_line} "
-            f"Kamu adalah mahasiswi ({major}). Tetap konsisten dan wajar dengan kegiatan ini.\n"
+            f"Waktu sekarang: Jam {cur_hour:02d}:00. Konteks waktu: {routine_desc}.{outfit_line} "
+            f"Kamu adalah mahasiswi ({major}). Tanggapi obrolan lawan bicaramu secara alami, hangat, dan fleksibel.\n"
         )
 
 

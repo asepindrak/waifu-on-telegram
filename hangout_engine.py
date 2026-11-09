@@ -229,20 +229,54 @@ class HangoutEngine:
     def detect_hangout_intent(self, text: str) -> Optional[str]:
         """Analyzes text to detect explicit date/hangout proposal or request."""
         t = text.lower()
-        if any(k in t for k in ["ke kafe", "ke cafe", "ngopi yuk", "ngopi bareng", "ke coffee shop", "starbucks", "nongkrong di kafe"]):
+        if any(k in t for k in ["ke kafe", "ke cafe", "ngopi yuk", "ngopi bareng", "ke coffee shop", "starbucks", "nongkrong di kafe", "nongkrong yuk", "nongkrong bareng"]):
             return "cafe"
-        if any(k in t for k in ["nonton bioskop", "ke bioskop", "nonton film", "cinema", "nonton bareng", "movie date"]):
+        if any(k in t for k in ["nonton bioskop", "ke bioskop", "nonton film", "cinema", "nonton bareng", "movie date", "nonton yuk"]):
             return "cinema"
-        if any(k in t for k in ["main ke kosan", "ke kosanmu", "ke rumahmu", "ke apartemen", "main ke tempatmu", "ke rumah", "mampir ke kosan"]):
+        if any(k in t for k in ["main ke kosan", "ke kosanmu", "ke rumahmu", "ke apartemen", "main ke tempatmu", "ke rumah", "mampir ke kosan", "mabar yuk", "mabar bareng", "main game bareng", "mabar"]):
             return "home"
         if any(k in t for k in ["ke taman", "taman kota", "jalan sore", "jalan-jalan sore"]):
             return "park"
-        if any(k in t for k in ["ke mall", "jalan ke mall", "main arcade", "belanja bareng"]):
+        if any(k in t for k in ["ke mall", "jalan ke mall", "main arcade", "belanja bareng", "ke timezone", "main timezone", "mesin capit"]):
             return "mall"
-        if any(k in t for k in ["kencan yuk", "jalan yuk", "main yuk", "hangout yuk", "jalan-jalan yuk", "nge-date", "date yuk"]):
+        if any(k in t for k in [
+            "kencan yuk", "jalan yuk", "main yuk", "hangout yuk", "jalan-jalan yuk", "nge-date", "date yuk",
+            "ayo main", "main bareng", "yuk main", "kita main", "keluar yuk", "ayo keluar",
+            "temenin jalan", "temenin main", "temenin aku main", "jalan bareng", "ayo hangout", "ayo jalan",
+            "ajak main", "ajak jalan", "mau main bareng", "pengen jalan", "ayo kencan", "keluar bareng", "pergi bareng"
+        ]):
             # General date request -> randomly pick attractive venue
-            return random.choice(["cafe", "cinema", "mall"])
+            return random.choice(["cafe", "cinema", "mall", "home"])
         return None
+
+    def detect_activity_invitation(self, text: str) -> bool:
+        """Detects whether user is proposing to hang out, play, or do activities together."""
+        if self.detect_hangout_intent(text):
+            return True
+        t = text.lower()
+        invitation_patterns = [
+            r"\b(ayo|yuk|kita|mau)\s+(?:ikut\s+)?(main|jalan|keluar|nonton|makan|ngopi|nongkrong|mabar|belanja|pergi|kencan)\b",
+            r"\b(main|jalan|keluar|nonton|makan|ngopi|nongkrong|mabar|kencan|hangout)\s+(?:yuk|bareng|sama\s+aku)\b",
+            r"\b(temenin\s+(?:aku\s+)?(?:main|jalan|keluar|nonton|makan|ngopi|belanja))\b",
+            r"\b(ajak\s+(?:kamu\s+)?(?:main|jalan|keluar|nonton|kencan))\b",
+            r"\b(mabar\s+yuk|mabar\s+bareng|main\s+game\s+bareng|ayo\s+main)\b"
+        ]
+        return any(re.search(pat, t) for pat in invitation_patterns)
+
+    def detect_activity_query(self, text: str) -> bool:
+        """Detects if user is asking what waifu is currently doing or how her day is going."""
+        t = text.lower()
+        patterns = [
+            r"\b(lagi\s+(?:apa|ngapain|sibuk\s+apa))\b",
+            r"\b(sedang\s+(?:apa|ngapain|sibuk\s+apa))\b",
+            r"\b(kegiatan(?:mu)?\s+(?:apa|ngapain|hari\s+ini))\b",
+            r"\b(hari\s+ini\s+ngapain\s+aja)\b",
+            r"\b(gimana\s+hari(?:mu)?)\b",
+            r"\b(cerita\s+dong\s+(?:hari\s+ini|kegiatanmu))\b",
+            r"\b(lagi\s+di\s+mana)\b",
+            r"\b(kabarmu\s+gimana|gimana\s+kabarmu)\b",
+        ]
+        return any(re.search(pat, t) for pat in patterns)
 
     def detect_hangout_acceptance(self, text: str) -> bool:
         """Detects whether user agreed to waifu's date proposal."""
