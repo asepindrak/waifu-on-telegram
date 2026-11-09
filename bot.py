@@ -518,18 +518,27 @@ def start_env_hot_reload_watcher():
 def apply_llm_choice(choice: str) -> str:
     global LLM_BASE_URL
     detected_llms = scan_local_llm_models()
-    if choice in ("qwen", "qwen25", "qwen2.5", "qwen25_7b"):
+    if choice in ("huihui", "qwythos", "qwythos_9b"):
+        new_base = "http://127.0.0.1:5001/v1"
+        new_model = "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+        label = "Huihui-Qwythos 9B (KoboldCPP Uncensored)"
+        update_env_variable("LOCAL_LLM_MODEL", new_model)
+        update_env_variable("NSFW_LLM_MODEL", new_model)
+        update_env_variable("LLM_MODEL", new_model)
+    elif choice in ("qwen", "qwen25", "qwen2.5", "qwen25_7b"):
         new_base = "http://127.0.0.1:5001/v1"
         new_model = "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
         label = "Qwen2.5-7B-Instruct-Abliterated (KoboldCPP)"
         update_env_variable("LOCAL_LLM_MODEL", new_model)
         update_env_variable("NSFW_LLM_MODEL", new_model)
+        update_env_variable("LLM_MODEL", new_model)
     elif choice in ("stheno", "stheno_8b"):
         new_base = "http://127.0.0.1:5001/v1"
         new_model = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
         label = "L3-8B-Stheno-v3.4 (KoboldCPP)"
         update_env_variable("LOCAL_LLM_MODEL", new_model)
         update_env_variable("NSFW_LLM_MODEL", new_model)
+        update_env_variable("LLM_MODEL", new_model)
     elif choice == "kobold" or choice == "auto":
         new_base = "http://127.0.0.1:5001/v1"
         new_model = "default"
@@ -2267,17 +2276,17 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
         # NSFW Providers section
         markup.add(types.InlineKeyboardButton("─── 🔞 PROVIDER CHAT NSFW ───", callback_data="noop"))
         markup.add(types.InlineKeyboardButton(f"🔞 Local KoboldCPP Uncensored {'✓' if nsfw_p == 'local' else ''}", callback_data="cfg_set_nsfw_p:local"))
-        has_qwen_split = any("qwen" in mname.lower() for _, mname, _ in detected)
-        if not has_qwen_split:
-            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih Qwen2.5-7B-Abliterated (~4.7 GB)", callback_data="cfg_set_llm:qwen_auto"))
+        has_huihui_split = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
+        if not has_huihui_split:
+            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih Huihui-Qwythos 9B (~5.5 GB • 100% Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
         markup.add(types.InlineKeyboardButton(f"☁️ OpenRouter Uncensored {'✓' if nsfw_p == 'openrouter_uncensored' else ''}", callback_data="cfg_set_nsfw_p:openrouter_uncensored"))
     else:
         is_kobold = ("5001" in cur_base)
         markup.add(types.InlineKeyboardButton(f"🤖 KoboldCPP (Port 5001 - Auto-start) {'✓' if is_kobold else ''}", callback_data="cfg_set_llm:kobold"))
 
-        has_qwen = any("qwen" in mname.lower() for _, mname, _ in detected)
-        if not has_qwen:
-            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih Qwen2.5-7B-Abliterated (~4.7 GB • Rekomendasi Utama)", callback_data="cfg_set_llm:qwen_auto"))
+        has_huihui = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
+        if not has_huihui:
+            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih Huihui-Qwythos 9B (~5.5 GB • Default Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
 
         for idx, (source, mname, mpath) in enumerate(detected):
             is_cur = (cur_llm.lower() in mname.lower())
@@ -3428,7 +3437,59 @@ def callback_set_llm(call):
     if not is_authorized(call.from_user.id):
         return
     key = call.data.split(":", 1)[1]
-    if key in ("qwen_auto", "qwen", "qwen25", "qwen2.5", "qwen25_7b"):
+    if key in ("huihui_auto", "huihui", "qwythos", "qwythos_9b"):
+        info_huihui = asset_manager.get_asset_info("qwythos_9b") if asset_manager else None
+        if info_huihui and not info_huihui.get("installed"):
+            bot.answer_callback_query(call.id, "📥 Memulai unduhan Huihui-Qwythos 9B Uncensored...")
+            chat_id = call.message.chat.id
+            mid = call.message.message_id
+            msg_prompt = bot.send_message(
+                chat_id,
+                "⏳ **Sedang Mengunduh Huihui-Qwythos 9B Claude-Mythos (~5.5 GB)**\n\n"
+                "Model roleplay 100% uncensored (bebas penolakan NSFW) sedang diunduh di latar belakang. "
+                "Begitu selesai, model ini akan **otomatis dipilih & diaktifkan** sebagai otak utama waifu! 💕",
+                parse_mode="Markdown"
+            )
+            def _async_dl_huihui():
+                ok = asset_manager.download_asset("qwythos_9b") if asset_manager else False
+                if ok:
+                    asset_manager.download_asset("qwythos_vision")
+                    apply_llm_choice("qwythos_9b")
+                    try:
+                        bot.edit_message_text(
+                            "🎉 **Huihui-Qwythos 9B Berhasil Dipasang & Aktif!** 💕\n\n"
+                            "Model uncensored default aktif. Sekarang waifu bebas berinteraksi mesra dan roleplay NSFW tanpa penolakan! ✨",
+                            chat_id=chat_id,
+                            message_id=msg_prompt.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+                    try:
+                        health_engine.heal_llm()
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        bot.edit_message_text(
+                            "⚠️ **Gagal Mengunduh Huihui-Qwythos 9B**\n\n"
+                            "Koneksi terputus. Silakan coba lagi nanti atau jalankan di terminal:\n"
+                            "`waifu models download qwythos_9b`",
+                            chat_id=chat_id,
+                            message_id=msg_prompt.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+            threading.Thread(target=_async_dl_huihui, daemon=True).start()
+            show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=mid)
+            return
+        else:
+            label = apply_llm_choice("qwythos_9b")
+            bot.answer_callback_query(call.id, f"LLM: {label}")
+            show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+            return
+    elif key in ("qwen_auto", "qwen", "qwen25", "qwen2.5", "qwen25_7b"):
         info_qwen = asset_manager.get_asset_info("qwen25_7b") if asset_manager else None
         if info_qwen and not info_qwen.get("installed"):
             bot.answer_callback_query(call.id, "📥 Memulai unduhan Qwen2.5-7B-Abliterated...")

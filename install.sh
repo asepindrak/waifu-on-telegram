@@ -108,11 +108,12 @@ fi
 GGUF_COUNT=$(ls "$INSTALL_DIR/models/"*.gguf 2>/dev/null | grep -v "mmproj" | wc -l)
 if [ "$GGUF_COUNT" -eq 0 ]; then
     echo "  ℹ No GGUF chat model found in '$INSTALL_DIR/models'."
-    read -p "  Auto-download uncensored 'Qwen2.5-7B-Instruct-Abliterated' model (~4.7 GB • Natural Indonesian)? [Y/n, default: Y]: " DL_MODEL
+    read -p "  Auto-download uncensored 'Huihui-Qwythos-9B' model (~5.5 GB • 100% Uncensored)? [Y/n, default: Y]: " DL_MODEL
     DL_MODEL=${DL_MODEL:-Y}
     if [[ "$DL_MODEL" =~ ^[Yy]$ ]]; then
-        curl -fL -C - -o "$INSTALL_DIR/models/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf" \
-          "https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+        echo "  Downloading Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf (~5.5 GB)..."
+        curl -fL -C - -o "$INSTALL_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" \
+          "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
         echo "  ✓ Model downloaded successfully."
     fi
 else
@@ -123,6 +124,14 @@ fi
 EXISTING_MMPROJ=$(ls "$INSTALL_DIR/models/"*mmproj*.gguf 2>/dev/null | head -n 1)
 if [ -z "$EXISTING_MMPROJ" ]; then
     echo "  ℹ Vision adapter (mmproj) not found in '$INSTALL_DIR/models'."
+    read -p "  Auto-download 'Huihui-Qwythos Vision mmproj' (~879 MB)? [Y/n, default: Y]: " DL_VIS
+    DL_VIS=${DL_VIS:-Y}
+    if [[ "$DL_VIS" =~ ^[Yy]$ ]]; then
+        curl -fL -C - -o "$INSTALL_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf" \
+          "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf"
+        echo "  ✓ Vision adapter downloaded successfully."
+    fi
+fi
     read -p "  Auto-download Huihui-Qwythos Vision Adapter mmproj (~879 MB) so waifu can see photos? [Y/n, default: Y]: " DL_VISION
     DL_VISION=${DL_VISION:-Y}
     if [[ "$DL_VISION" =~ ^[Yy]$ ]]; then

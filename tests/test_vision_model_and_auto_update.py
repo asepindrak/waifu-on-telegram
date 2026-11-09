@@ -102,7 +102,8 @@ class TestVisionModelAndAutoUpdate(unittest.TestCase):
 
         # Check that download_asset was called for core models
         downloaded_keys = [call_args[0][0] for call_args in mock_dl.call_args_list]
-        self.assertIn("qwen25_7b", downloaded_keys)
+        self.assertIn("qwythos_9b", downloaded_keys)
+        self.assertIn("qwythos_vision", downloaded_keys)
         self.assertIn("moondream_text", downloaded_keys)
         self.assertIn("moondream_mmproj", downloaded_keys)
 

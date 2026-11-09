@@ -765,6 +765,11 @@ def get_llm_launch_spec(project_root: Optional[str] = None) -> Optional[Dict[str
     mmproj_path = None
 
     if not model_path:
+        info_qwy = get_asset_info("qwythos_9b")
+        if info_qwy and info_qwy.get("installed") and info_qwy.get("target_path"):
+            model_path = info_qwy["target_path"]
+
+    if not model_path:
         info_qwen = get_asset_info("qwen25_7b")
         if info_qwen and info_qwen.get("installed") and info_qwen.get("target_path"):
             model_path = info_qwen["target_path"]
@@ -773,11 +778,6 @@ def get_llm_launch_spec(project_root: Optional[str] = None) -> Optional[Dict[str
         info_stheno = get_asset_info("stheno_8b")
         if info_stheno and info_stheno.get("installed") and info_stheno.get("target_path"):
             model_path = info_stheno["target_path"]
-
-    if not model_path:
-        info_qwy = get_asset_info("qwythos_9b")
-        if info_qwy and info_qwy.get("installed") and info_qwy.get("target_path"):
-            model_path = info_qwy["target_path"]
 
     for m_dir in models_dirs:
         if not m_dir or not os.path.isdir(m_dir):

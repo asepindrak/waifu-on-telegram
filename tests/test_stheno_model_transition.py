@@ -28,8 +28,8 @@ class TestSthenoModelTransition(unittest.TestCase):
         self.assertIn("bartowski", entry["url"])
         self.assertIn("Llama-3.1-8B-Stheno-v3.4", entry["url"])
 
-    def test_get_llm_launch_spec_prioritizes_qwen25_and_omits_incompatible_mmproj(self):
-        """Ensures get_llm_launch_spec chooses Qwen2.5 when installed and drops Qwythos mmproj."""
+    def test_get_llm_launch_spec_prioritizes_huihui_and_includes_matching_mmproj(self):
+        """Ensures get_llm_launch_spec chooses Huihui-Qwythos 9B when installed and pairs with qwythos_vision."""
         with patch.object(asset_manager, "shutil") as mock_shutil, \
              patch.object(asset_manager, "get_asset_info") as mock_info, \
              patch("os.path.isfile", return_value=True):
@@ -37,10 +37,10 @@ class TestSthenoModelTransition(unittest.TestCase):
             mock_shutil.which.return_value = "/tools/koboldcpp.exe"
 
             def fake_info(key):
-                if key == "qwen25_7b":
+                if key == "qwythos_9b":
                     return {
                         "installed": True,
-                        "target_path": "/models/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+                        "target_path": "/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
                     }
                 if key == "qwythos_vision":
                     return {
@@ -53,9 +53,8 @@ class TestSthenoModelTransition(unittest.TestCase):
 
             spec = asset_manager.get_llm_launch_spec()
             self.assertIsNotNone(spec)
-            self.assertIn("Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf", spec["model"])
-            # mmproj must be omitted for standalone text model to prevent runtime tensor dimension crash
-            self.assertNotIn("--mmproj", spec["cmd"])
+            self.assertIn("Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf", spec["model"])
+            self.assertIn("--mmproj", spec["cmd"])
 
     @patch("subprocess.run")
     @patch.object(asset_manager, "ensure_nodejs", return_value=True)
@@ -66,11 +65,11 @@ class TestSthenoModelTransition(unittest.TestCase):
     @patch.object(asset_manager, "download_asset", return_value=True)
     @patch("setup.read_env")
     @patch("setup.write_env")
-    def test_cmd_update_auto_selects_stheno_only_when_user_was_on_huihui(
+    def test_cmd_update_auto_selects_huihui_when_user_was_on_other(
         self, mock_write_env, mock_read_env, mock_dl, mock_info, mock_detect,
         mock_comfy, mock_kcpp, mock_node, mock_sub
     ):
-        """Validates that cmd_update auto-selects Stheno when previous model is Huihui."""
+        """Validates that cmd_update auto-selects Huihui when previous model was Qwen or Stheno."""
         mock_sub.return_value = MagicMock(returncode=0, stdout="", stderr="")
 
         def fake_info(key):
@@ -84,24 +83,24 @@ class TestSthenoModelTransition(unittest.TestCase):
             }
         mock_info.side_effect = fake_info
 
-        # Case 1: User currently has Huihui active
+        # Case 1: User currently has Qwen active
         mock_read_env.return_value = {
-            "LLM_MODEL": "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf",
-            "LOCAL_LLM_MODEL": "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf",
-            "NSFW_LLM_MODEL": "Huihui-Qwythos-9B"
+            "LLM_MODEL": "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf",
+            "LOCAL_LLM_MODEL": "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf",
+            "NSFW_LLM_MODEL": "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
         }
 
         cmd_update()
 
-        # Download asset should have been called for qwen25_7b
+        # Download asset should have been called for qwythos_9b and qwythos_vision
         downloaded = [call_args[0][0] for call_args in mock_dl.call_args_list]
-        self.assertIn("qwen25_7b", downloaded)
+        self.assertIn("qwythos_9b", downloaded)
 
-        # write_env must have been called with new Qwen 2.5 model
+        # write_env must have been called with Huihui model
         mock_write_env.assert_called()
         saved_env = mock_write_env.call_args[0][0]
-        self.assertEqual(saved_env["LLM_MODEL"], "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf")
-        self.assertEqual(saved_env["LOCAL_LLM_MODEL"], "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf")
+        self.assertEqual(saved_env["LLM_MODEL"], "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
+        self.assertEqual(saved_env["LOCAL_LLM_MODEL"], "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
 
     @patch("subprocess.run")
     @patch.object(asset_manager, "ensure_nodejs", return_value=True)
@@ -141,6 +140,14 @@ class TestSthenoModelTransition(unittest.TestCase):
 
         # write_env should NOT overwrite the user's custom choice
         mock_write_env.assert_not_called()
+
+    @patch("bot.update_env_variable")
+    def test_apply_llm_choice_huihui(self, mock_update_env):
+        """Verifies apply_llm_choice correctly selects Huihui-Qwythos 9B."""
+        label = apply_llm_choice("huihui")
+        self.assertIn("Huihui-Qwythos", label)
+        mock_update_env.assert_any_call("LLM_MODEL", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
+        mock_update_env.assert_any_call("LOCAL_LLM_MODEL", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
 
     @patch("bot.update_env_variable")
     def test_apply_llm_choice_stheno(self, mock_update_env):

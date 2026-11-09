@@ -320,12 +320,16 @@ if ($existingGgufs.Count -eq 0) {
         }
     } else {
         Write-Host "  [INFO] No GGUF chat model found in '$modelsDir'." -ForegroundColor Yellow
-        $dlModel = Read-Host "  Auto-download uncensored 'Qwen2.5-7B-Instruct-Abliterated' model (~4.7 GB • Natural Indonesian)? [Y/n, default: Y]"
+        $dlModel = Read-Host "  Auto-download uncensored 'Huihui-Qwythos-9B' model (~5.5 GB • 100% Uncensored Roleplay)? [Y/n, default: Y]"
         if ($dlModel.Trim().ToLower() -ne "n") {
-            $qwenUrl = "https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
-            $qwenFallback = "https://hf-mirror.com/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
-            $destGguf = "$modelsDir\Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
-            Download-FileWithProgress -Url $qwenUrl -DestinationPath $destGguf -Description "Qwen2.5-7B-Instruct-Abliterated Q4_K_M (~4.7 GB)" -FallbackUrl $qwenFallback -MinExpectedBytes ([long](3800*1024*1024))
+            $huihuiUrl = "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+            $huihuiFallback = "https://hf-mirror.com/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+            $destGguf = "$modelsDir\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+            Download-FileWithProgress -Url $huihuiUrl -DestinationPath $destGguf -Description "Huihui-Qwythos-9B Q4_K (~5.5 GB)" -FallbackUrl $huihuiFallback -MinExpectedBytes ([long](4800*1024*1024))
+            $visUrl = "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf"
+            $visFallback = "https://hf-mirror.com/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf"
+            $destVis = "$modelsDir\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
+            Download-FileWithProgress -Url $visUrl -DestinationPath $destVis -Description "Huihui-Qwythos Vision Adapter (~879 MB)" -FallbackUrl $visFallback -MinExpectedBytes ([long](700*1024*1024))
         }
     }
 } else {

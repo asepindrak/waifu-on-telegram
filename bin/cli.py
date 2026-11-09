@@ -750,6 +750,8 @@ def _execute_models(subcmd=None, target=None):
             target = "stheno_8b"
         if target in ("qwen", "qwen25", "qwen2.5", "qwen-7b", "qwen2.5-7b", "qwen25_7b"):
             target = "qwen25_7b"
+        if target in ("huihui", "qwythos", "qwythos-9b", "huihui-qwythos", "huihui_9b"):
+            target = "qwythos_9b"
         info = asset_manager.get_asset_info(target)
         if not info:
             print(c(RED, f"Unknown asset key: '{target}'. Available: {list(asset_manager.ASSET_REGISTRY.keys())}"))
@@ -910,53 +912,64 @@ def _execute_update():
     # Step 5: Check & Auto-Download Core AI Models (Chat Brain, Vision, and Image Generation)
     print(c(CYAN, "\n📦 [5/5] Checking and auto-downloading AI Models & Vision mmproj..."))
     if asset_manager:
-        # 1. Main Chat Brain: Qwen2.5-7B-Instruct-Abliterated (Natural Indonesian Roleplay LLM)
-        info_qwen = asset_manager.get_asset_info("qwen25_7b")
-        if info_qwen and not info_qwen.get("installed"):
-            print(c(YELLOW, f"  ⏳ Core Brain '{info_qwen['name']}' missing. Auto-downloading (~{info_qwen['size_mb']} MB)..."))
-            ok = asset_manager.download_asset("qwen25_7b")
+        # 1. Main Chat Brain: Huihui-Qwythos 9B (100% Uncensored Claude-Mythos Roleplay LLM)
+        info_huihui = asset_manager.get_asset_info("qwythos_9b")
+        if info_huihui and not info_huihui.get("installed"):
+            print(c(YELLOW, f"  ⏳ Core Brain '{info_huihui['name']}' missing. Auto-downloading (~{info_huihui['size_mb']} MB)..."))
+            ok = asset_manager.download_asset("qwythos_9b")
             if ok:
-                print(c(GREEN, f"  ✓ '{info_qwen['name']}' downloaded successfully!"))
+                print(c(GREEN, f"  ✓ '{info_huihui['name']}' downloaded successfully!"))
             else:
-                print(c(RED, f"  ❌ Download failed for '{info_qwen['name']}'. Run 'waifu models download qwen25_7b'."))
+                print(c(RED, f"  ❌ Download failed for '{info_huihui['name']}'. Run 'waifu models download qwythos_9b'."))
         else:
-            sz = info_qwen.get("current_size_mb", 0) if info_qwen else 0
-            print(c(GREEN, f"  ✓ Core Chat Brain '{info_qwen['name']}' is ready ({sz} MB)."))
+            sz = info_huihui.get("current_size_mb", 0) if info_huihui else 0
+            print(c(GREEN, f"  ✓ Core Chat Brain '{info_huihui['name']}' is ready ({sz} MB)."))
 
-        # Auto-switch to Qwen 2.5 7B if user has previous models (Stheno, Huihui, Qwythos, Llama)
+        # Auto-switch to Huihui if user has other models (Qwen, Stheno, Llama)
         try:
             from setup import read_env, write_env
             env_dict = read_env()
             cur_llm = env_dict.get("LLM_MODEL", "").lower()
             cur_local = env_dict.get("LOCAL_LLM_MODEL", "").lower()
             cur_nsfw = env_dict.get("NSFW_LLM_MODEL", "").lower()
-            qwen_fn = "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
-            is_using_old = any(
-                "stheno" in m or "huihui" in m or "qwythos" in m or "llama" in m
+            huihui_fn = "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+            is_using_other = any(
+                "qwen" in m or "stheno" in m or "llama" in m
                 for m in [cur_llm, cur_local, cur_nsfw]
             )
-            if is_using_old:
-                print(c(CYAN, f"\n🔄 Terdeteksi model lama aktif. Otomatis beralih ke model terbaru yang fasih Bahasa Indonesia: {qwen_fn}..."))
+            if is_using_other:
+                print(c(CYAN, f"\n🔄 Mengaktifkan model default uncensored Huihui (bebas penolakan NSFW): {huihui_fn}..."))
                 changed = False
-                if any(x in cur_llm for x in ("stheno", "huihui", "qwythos", "llama")):
-                    env_dict["LLM_MODEL"] = qwen_fn
-                    os.environ["LLM_MODEL"] = qwen_fn
+                if any(x in cur_llm for x in ("qwen", "stheno", "llama")):
+                    env_dict["LLM_MODEL"] = huihui_fn
+                    os.environ["LLM_MODEL"] = huihui_fn
                     changed = True
-                if any(x in cur_local for x in ("stheno", "huihui", "qwythos", "llama")):
-                    env_dict["LOCAL_LLM_MODEL"] = qwen_fn
-                    os.environ["LOCAL_LLM_MODEL"] = qwen_fn
+                if any(x in cur_local for x in ("qwen", "stheno", "llama")):
+                    env_dict["LOCAL_LLM_MODEL"] = huihui_fn
+                    os.environ["LOCAL_LLM_MODEL"] = huihui_fn
                     changed = True
-                if any(x in cur_nsfw for x in ("stheno", "huihui", "qwythos", "llama")):
-                    env_dict["NSFW_LLM_MODEL"] = qwen_fn
-                    os.environ["NSFW_LLM_MODEL"] = qwen_fn
+                if any(x in cur_nsfw for x in ("qwen", "stheno", "llama")):
+                    env_dict["NSFW_LLM_MODEL"] = huihui_fn
+                    os.environ["NSFW_LLM_MODEL"] = huihui_fn
                     changed = True
                 if changed:
                     write_env(env_dict)
-                    print(c(GREEN, f"  ✓ Auto-select model terbaru ({qwen_fn}) berhasil!"))
+                    print(c(GREEN, f"  ✓ Model default uncensored Huihui ({huihui_fn}) berhasil diaktifkan!"))
         except Exception as e_env:
             logger.debug(f"Auto-select error: {e_env}")
 
-        # 2. Vision Perception Models: Moondream2 (Ultra-lightweight local perception for Telegram photos)
+        # 2. Vision Adapter for Huihui: qwythos_vision mmproj
+        info_vis = asset_manager.get_asset_info("qwythos_vision")
+        if info_vis and not info_vis.get("installed"):
+            print(c(YELLOW, f"  ⏳ Vision Adapter '{info_vis['name']}' missing. Auto-downloading (~{info_vis['size_mb']} MB)..."))
+            ok = asset_manager.download_asset("qwythos_vision")
+            if ok:
+                print(c(GREEN, f"  ✓ '{info_vis['name']}' downloaded successfully!"))
+        else:
+            sz_vis = info_vis.get("current_size_mb", 0) if info_vis else 0
+            print(c(GREEN, f"  ✓ Vision Adapter '{info_vis['name']}' is ready ({sz_vis} MB)."))
+
+        # 3. Vision Perception Models: Moondream2 (Ultra-lightweight local perception for Telegram photos)
         for m_key in ("moondream_text", "moondream_mmproj"):
             info_m = asset_manager.get_asset_info(m_key)
             if info_m and not info_m.get("installed"):
