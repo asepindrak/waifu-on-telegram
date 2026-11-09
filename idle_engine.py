@@ -316,7 +316,7 @@ class IdleEngine:
                 logger.error(f"Error putting ComfyUI to sleep: {e}")
                 return False
 
-    def wake_llm(self, timeout_seconds: int = 40) -> bool:
+    def wake_llm(self, timeout_seconds: int = 50) -> bool:
         """
         Wakes active LLM on-demand (AGY Bridge or KoboldCPP).
         """
@@ -349,9 +349,18 @@ class IdleEngine:
                     if spec:
                         popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
                         kcpp_log = os.path.join(self.project_root, "koboldcpp.log")
-                        with open(kcpp_log, "a", encoding="utf-8") as f_kcpp:
-                            subprocess.Popen(spec["cmd"], cwd=spec["cwd"], stdout=f_kcpp, stderr=f_kcpp, **popen_kwargs)
-                        started = True
+                        try:
+                            with open(kcpp_log, "a", encoding="utf-8") as f_kcpp:
+                                subprocess.Popen(spec["cmd"], cwd=spec["cwd"], stdout=f_kcpp, stderr=f_kcpp, **popen_kwargs)
+                            started = True
+                        except Exception as e_kcpp:
+                            if sys.platform == "win32":
+                                quoted_parts = [f'"{c}"' if (' ' in c or '\\' in c) else c for c in spec["cmd"]]
+                                cmd_line = f'start "" /b {" ".join(quoted_parts)}'
+                                subprocess.Popen(f'cmd.exe /c "{cmd_line}"', cwd=spec["cwd"], shell=True)
+                                started = True
+                            else:
+                                raise e_kcpp
                         logger.info(f"⚡ Smart Idle: Started KoboldCPP fallback process using {spec['cmd'][0]}")
                 except Exception as e:
                     logger.error(f"Failed to launch KoboldCPP on-demand fallback: {e}")
@@ -394,8 +403,16 @@ class IdleEngine:
                     if spec:
                         popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
                         comfy_log = os.path.join(self.project_root, "comfyui.log")
-                        with open(comfy_log, "a", encoding="utf-8") as f_comfy:
-                            subprocess.Popen(spec["cmd"], cwd=spec["cwd"], stdout=f_comfy, stderr=f_comfy, **popen_kwargs)
+                        try:
+                            with open(comfy_log, "a", encoding="utf-8") as f_comfy:
+                                subprocess.Popen(spec["cmd"], cwd=spec["cwd"], stdout=f_comfy, stderr=f_comfy, **popen_kwargs)
+                        except Exception as e_direct:
+                            if sys.platform == "win32":
+                                quoted_parts = [f'"{c}"' if (' ' in c or '\\' in c) else c for c in spec["cmd"]]
+                                cmd_line = f'start "" /b {" ".join(quoted_parts)}'
+                                subprocess.Popen(f'cmd.exe /c "{cmd_line}"', cwd=spec["cwd"], shell=True)
+                            else:
+                                raise e_direct
                 except Exception as e:
                     logger.error(f"Failed to launch ComfyUI on-demand: {e}")
 
@@ -477,7 +494,7 @@ class IdleEngine:
         fb_thread = threading.Thread(target=_feedback_loop, daemon=True)
         fb_thread.start()
         try:
-            ok = self.wake_llm(timeout_seconds=40)
+            ok = self.wake_llm(timeout_seconds=50)
         finally:
             stop_feedback.set()
             fb_thread.join(timeout=1.0)

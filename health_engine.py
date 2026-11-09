@@ -248,6 +248,7 @@ class HealthEngine:
         except Exception as e_spec:
             logger.warning(f"Error querying LLM launch spec: {e_spec}")
 
+        spawn_succeeded = False
         if spec and spec.get("cmd"):
             popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
             try:
@@ -261,8 +262,23 @@ class HealthEngine:
                         stderr=f_log,
                         **popen_kwargs
                     )
-                # Wait up to 35s for model weights to load into VRAM
-                for sec in range(1, 36):
+                spawn_succeeded = True
+            except Exception as e:
+                logger.error(f"Self-healing failed to spawn KoboldCPP via direct spec: {e}")
+                # Windows App Control (SAC / WDAC) or permission fallback via shell launcher
+                if sys.platform == "win32":
+                    try:
+                        logger.info("Self-healing: Retrying KoboldCPP spawn via Windows shell launcher...")
+                        quoted_parts = [f'"{c}"' if (' ' in c or '\\' in c) else c for c in spec["cmd"]]
+                        cmd_line = f'start "" /b {" ".join(quoted_parts)}'
+                        subprocess.Popen(f'cmd.exe /c "{cmd_line}"', cwd=spec["cwd"], shell=True)
+                        spawn_succeeded = True
+                    except Exception as e_shell:
+                        logger.error(f"Self-healing shell launcher fallback also failed: {e_shell}")
+
+            if spawn_succeeded:
+                # Wait up to 45s for model weights to load into VRAM
+                for sec in range(1, 46):
                     time.sleep(1)
                     if is_port_listening(5001):
                         # Give KoboldCPP a brief moment to finish binding endpoint
@@ -270,8 +286,6 @@ class HealthEngine:
                         if stat.get("online"):
                             logger.info(f"Self-healing: KoboldCPP restored successfully in {sec}s.")
                             return True
-            except Exception as e:
-                logger.error(f"Self-healing failed to spawn KoboldCPP via spec: {e}")
 
         # 2. Legacy fallback search
         kcpp_name = "koboldcpp.exe" if sys.platform == "win32" else "koboldcpp"
@@ -295,7 +309,7 @@ class HealthEngine:
                     mmproj_path = os.path.join(models_dir, f)
                     break
 
-        if not spec and os.path.isfile(kcpp_exe) and model_path:
+        if not spawn_succeeded and os.path.isfile(kcpp_exe) and model_path:
             mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
             cmd = [
                 kcpp_exe, "--model", model_path,
@@ -323,7 +337,7 @@ class HealthEngine:
                         stderr=f_log,
                         **popen_kwargs
                     )
-                for sec in range(1, 36):
+                for sec in range(1, 46):
                     time.sleep(1)
                     if is_port_listening(5001):
                         stat = self.llm_client.check_health()
@@ -332,6 +346,21 @@ class HealthEngine:
                             return True
             except Exception as e:
                 logger.error(f"Self-healing failed to spawn KoboldCPP: {e}")
+                if sys.platform == "win32":
+                    try:
+                        logger.info("Self-healing: Retrying fallback spawn via Windows shell launcher...")
+                        quoted_parts = [f'"{c}"' if (' ' in c or '\\' in c) else c for c in cmd]
+                        cmd_line = f'start "" /b {" ".join(quoted_parts)}'
+                        subprocess.Popen(f'cmd.exe /c "{cmd_line}"', cwd=self.project_root, shell=True)
+                        for sec in range(1, 46):
+                            time.sleep(1)
+                            if is_port_listening(5001):
+                                stat = self.llm_client.check_health()
+                                if stat.get("online"):
+                                    logger.info(f"Self-healing: KoboldCPP restored successfully in {sec}s.")
+                                    return True
+                    except Exception as e_sh:
+                        logger.error(f"Self-healing shell launcher fallback also failed: {e_sh}")
 
         # Check if Ollama on port 11434
         if "11434" in self.llm_client.base_url:
@@ -362,20 +391,34 @@ class HealthEngine:
             if not spec:
                 return False
 
+            spawned = False
             popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
             comfy_log = os.path.join(self.project_root, "comfyui.log")
-            with open(comfy_log, "a", encoding="utf-8") as f_comfy:
-                logger.info("Self-healing: Spawning ComfyUI Photo Generator on port 8188...")
-                subprocess.Popen(
-                    spec["cmd"],
-                    cwd=spec["cwd"],
-                    stdout=f_comfy,
-                    stderr=f_comfy,
-                    **popen_kwargs
-                )
+            try:
+                with open(comfy_log, "a", encoding="utf-8") as f_comfy:
+                    logger.info("Self-healing: Spawning ComfyUI Photo Generator on port 8188...")
+                    subprocess.Popen(
+                        spec["cmd"],
+                        cwd=spec["cwd"],
+                        stdout=f_comfy,
+                        stderr=f_comfy,
+                        **popen_kwargs
+                    )
+                spawned = True
+            except Exception as e_direct:
+                logger.error(f"Self-healing direct spawn failed for ComfyUI: {e_direct}")
+                if sys.platform == "win32":
+                    try:
+                        logger.info("Self-healing: Retrying ComfyUI spawn via Windows shell launcher...")
+                        quoted_parts = [f'"{c}"' if (' ' in c or '\\' in c) else c for c in spec["cmd"]]
+                        cmd_line = f'start "" /b {" ".join(quoted_parts)}'
+                        subprocess.Popen(f'cmd.exe /c "{cmd_line}"', cwd=spec["cwd"], shell=True)
+                        spawned = True
+                    except Exception as e_sh:
+                        logger.error(f"Self-healing shell launcher fallback for ComfyUI failed: {e_sh}")
 
-            # Wait up to 15s for port 8188 to respond
-            for _ in range(15):
+            # Wait up to 25s for port 8188 to respond
+            for _ in range(25):
                 time.sleep(1)
                 if is_port_listening(8188):
                     logger.info("Self-healing: ComfyUI generator restored successfully.")
