@@ -2603,12 +2603,13 @@ def build_system_diagnostics_report(user_id: int) -> str:
     persona = persona_mgr.get_active_persona()
 
     spec = asset_manager.get_llm_launch_spec() if asset_manager else None
-    if llm_stat.get("online"):
-        status_icon = "🟢 Online (Load Penuh)"
+    kobold_listening = is_port_listening(5001)
+    if kobold_listening:
+        status_icon = "🟢 Online (Port 5001 - Load Penuh)"
     elif idle_engine.enabled and spec:
         status_icon = "💤 Standby / Tidur (VRAM Bebas • Bangun Otomatis Saat Chat)"
     else:
-        status_icon = "🔴 Offline (Model/Binary belum terpasang)"
+        status_icon = "🔴 Offline (Port 5001 • Belum Terpasang/Aktif)"
 
     comfy_spec = asset_manager.get_comfyui_launch_spec() if asset_manager else None
     if media_stat.get("online"):

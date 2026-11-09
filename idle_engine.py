@@ -494,13 +494,16 @@ class IdleEngine:
                 except Exception:
                     pass
             else:
+                agy_hint = ""
+                if is_port_listening(8001):
+                    agy_hint = "\n• 🌉 *AGY Bridge Aktif:* Ketik `/setup` ➔ `🧠 Model LLM` ➔ pilih `Google Antigravity Bridge` agar langsung aktif!"
                 err_text = (
                     "⚠️ *Waifu belum bisa dibangunkan otomatis!*\n\n"
                     "Engine AI lokal (KoboldCPP) tidak merespons di port 5001.\n"
                     "Kemungkinan model LLM belum terpasang atau file binary belum ditemukan.\n\n"
                     "💡 *Solusi:*\n"
                     "• Ketik `/status` untuk melihat diagnosa lengkap\n"
-                    "• Atau jalankan `start_services.bat` di folder PC kamu."
+                    f"• Atau jalankan `start_services.bat` di folder PC kamu.{agy_hint}"
                 )
                 try:
                     bot.edit_message_text(
