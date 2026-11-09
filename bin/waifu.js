@@ -121,6 +121,11 @@ function main() {
     env: process.env
   });
 
+  process.on('SIGINT', () => {
+    // Graceful exit on Ctrl+C without error message
+    process.exit(0);
+  });
+
   child.on('close', (code) => {
     process.exit(code || 0);
   });

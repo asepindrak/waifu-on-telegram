@@ -717,6 +717,13 @@ def cmd_release(version_arg: str = None):
         print(c(RED, "scripts/release.py not found."))
 
 def cmd_models(subcmd=None, target=None):
+    try:
+        _execute_models(subcmd, target)
+    except KeyboardInterrupt:
+        print(c(YELLOW, "\n\n  🛑 Operasi dibatalkan oleh pengguna (Ctrl+C). File progres tersimpan dan dapat dilanjutkan kapan saja.\n"))
+        return
+
+def _execute_models(subcmd=None, target=None):
     print_banner()
     if not asset_manager:
         print(c(RED, "asset_manager module not found."))
@@ -793,6 +800,13 @@ def cmd_models(subcmd=None, target=None):
     print(c(DIM, "  Example: waifu models download animatediff_v2\n"))
 
 def cmd_update():
+    try:
+        _execute_update()
+    except KeyboardInterrupt:
+        print(c(YELLOW, "\n\n  🛑 Pembaruan dibatalkan oleh pengguna (Ctrl+C). File progres tersimpan dan dapat dilanjutkan kapan saja (resume support aktif).\n"))
+        return
+
+def _execute_update():
     print_banner()
     cur_v = get_version()
     print(c(CYAN, f"🔄 Checking updates and verifying AI models (Current Version: v{cur_v})..."))
@@ -1249,4 +1263,11 @@ def main():
         print_cli_help(unknown_cmd=args.command)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print(c(YELLOW, "\n\n  🛑 Operasi dibatalkan oleh pengguna (Ctrl+C). Keluar dengan aman.\n"))
+        try:
+            sys.exit(0)
+        except SystemExit:
+            os._exit(0)

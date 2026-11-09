@@ -1066,7 +1066,7 @@ def check_all_assets() -> Dict[str, Dict[str, Any]]:
     return results
 
 def _download_file(url: str, target_path: str, fallback_url: Optional[str] = None, mirrors: Optional[list] = None, min_size_mb: Optional[int] = None, progress_callback=None) -> bool:
-    """Helper to download file with resume support via curl or requests across high-speed mirrors."""
+    """Helper to download file with resume support via curl or requests across high-speed mirrors and auto-retry rounds."""
     target_dir = os.path.dirname(target_path)
     if target_dir:
         os.makedirs(target_dir, exist_ok=True)
@@ -1091,59 +1091,85 @@ def _download_file(url: str, target_path: str, fallback_url: Optional[str] = Non
             if m and m not in candidate_urls:
                 candidate_urls.append(m)
 
-    for idx, dl_url in enumerate(candidate_urls, 1):
-        if len(candidate_urls) > 1:
-            logger.info(f"Connecting to download mirror [{idx}/{len(candidate_urls)}]: {dl_url}")
+    max_rounds = 4
+    curl_path = shutil.which("curl")
 
-        curl_path = shutil.which("curl")
-        if curl_path:
-            try:
-                # Robust curl with automatic resume (-C -), retries, and browser User-Agent
-                cmd = [
-                    curl_path, "-fL", "-C", "-",
-                    "--retry", "5",
-                    "--retry-delay", "2",
-                    "--connect-timeout", "30",
-                    "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "--progress-bar",
-                    "-o", target_path,
-                    dl_url
-                ]
-                ret = subprocess.run(cmd)
-                if ret.returncode == 0 and os.path.exists(target_path) and os.path.getsize(target_path) >= min_bytes:
-                    return True
-                if idx < len(candidate_urls):
-                    print(f"\n  ℹ Mirror terputus atau tidak lengkap. Mencoba mirror berkecepatan tinggi berikutnya [{idx + 1}/{len(candidate_urls)}]...")
-            except Exception as e:
-                logger.warning(f"curl download failed on {dl_url}: {e}")
+    for round_num in range(1, max_rounds + 1):
+        for idx, dl_url in enumerate(candidate_urls, 1):
+            if len(candidate_urls) > 1 and round_num == 1:
+                logger.info(f"Connecting to download mirror [{idx}/{len(candidate_urls)}]: {dl_url}")
 
-        # Fallback to requests streaming download
-        try:
-            import requests
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-            initial_pos = 0
-            if os.path.exists(target_path):
-                initial_pos = os.path.getsize(target_path)
-                headers["Range"] = f"bytes={initial_pos}-"
-
-            with requests.get(dl_url, headers=headers, stream=True, timeout=90) as r:
-                if r.status_code in (200, 206):
-                    mode = "ab" if r.status_code == 206 else "wb"
-                    dl = initial_pos if r.status_code == 206 else 0
-                    total_len = int(r.headers.get("content-length", 0)) + dl
-                    with open(target_path, mode) as f:
-                        for chunk in r.iter_content(chunk_size=1024 * 1024):
-                            if chunk:
-                                f.write(chunk)
-                                dl += len(chunk)
-                                if progress_callback and total_len > 0:
-                                    progress_callback(dl, total_len)
-                    if os.path.exists(target_path) and os.path.getsize(target_path) >= min_bytes:
+            if curl_path:
+                try:
+                    # Robust curl with automatic resume (-C -), stall protection, retries, and browser User-Agent
+                    cmd = [
+                        curl_path, "-fL", "-C", "-",
+                        "--speed-limit", "1024",
+                        "--speed-time", "25",
+                        "--connect-timeout", "30",
+                        "--retry", "3",
+                        "--retry-delay", "2",
+                        "--retry-connrefused",
+                        "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "--progress-bar",
+                        "-o", target_path,
+                        dl_url
+                    ]
+                    ret = subprocess.run(cmd)
+                    if ret.returncode == 0 and os.path.exists(target_path) and os.path.getsize(target_path) >= min_bytes:
                         return True
-        except Exception as e:
-            logger.warning(f"Failed to download from {dl_url}: {e}")
+                    # Check if interrupted by Ctrl+C
+                    if ret.returncode in (130, 2):
+                        raise KeyboardInterrupt
+                    if idx < len(candidate_urls):
+                        print(f"\n  ℹ Mirror [{idx}/{len(candidate_urls)}] terputus. Mencoba mirror berkecepatan tinggi berikutnya [{idx + 1}/{len(candidate_urls)}]...")
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    logger.warning(f"curl download failed on {dl_url}: {e}")
+
+            # Fallback to requests streaming download if curl is not installed or returned error
+            if not curl_path:
+                try:
+                    import requests
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    }
+                    initial_pos = 0
+                    if os.path.exists(target_path):
+                        initial_pos = os.path.getsize(target_path)
+                        headers["Range"] = f"bytes={initial_pos}-"
+
+                    with requests.get(dl_url, headers=headers, stream=True, timeout=(15, 30)) as r:
+                        if r.status_code in (200, 206):
+                            mode = "ab" if r.status_code == 206 else "wb"
+                            dl = initial_pos if r.status_code == 206 else 0
+                            total_len = int(r.headers.get("content-length", 0)) + dl
+                            with open(target_path, mode) as f:
+                                for chunk in r.iter_content(chunk_size=1024 * 1024):
+                                    if chunk:
+                                        f.write(chunk)
+                                        dl += len(chunk)
+                                        if progress_callback and total_len > 0:
+                                            progress_callback(dl, total_len)
+                            if os.path.exists(target_path) and os.path.getsize(target_path) >= min_bytes:
+                                return True
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    logger.warning(f"Failed to download from {dl_url}: {e}")
+
+        # If after checking all mirrors in this round the file is still not complete:
+        if round_num < max_rounds:
+            curr_sz = os.path.getsize(target_path) if os.path.exists(target_path) else 0
+            curr_mb = round(curr_sz / (1024 * 1024), 1)
+            pct = round((curr_sz / min_bytes) * 100, 1) if (min_bytes and curr_sz) else 0
+            pct_str = f" ({pct}%)" if pct else ""
+            print(f"\n  ⚠️ Unduhan terputus di {curr_mb} MB{pct_str}. Menyambung kembali (auto-resume) dalam 3 detik... [Putaran {round_num + 1}/{max_rounds}]")
+            try:
+                time.sleep(3)
+            except KeyboardInterrupt:
+                raise
 
     return False
 
