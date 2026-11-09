@@ -439,9 +439,10 @@ class WaifuCLISession:
             f"{calling_guideline}\n"
             "1. ANTI-MEMBEO (SANGAT PENTING): DILARANG KERAS hanya mengulang kata, mengulang frasa, atau menyalin ulang pesan lawan bicaramu!\n"
             "2. RESPONSIF & AKTIF: Berikan tanggapan aktif dan bermakna: ceritakan opinimu, komentar santai, atau tanyakan detail kelanjutannya.\n"
-            "3. GAYA CHAT: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. Hindari gaya teatrikal atau lebay.\n"
-            "4. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu.\n"
-            "5. BAHASA PERCAKAPAN: Kamu WAJIB berbicara langsung dalam Bahasa Indonesia santai & akrab. DILARANG KERAS menuliskan proses berpikir atau monolog batin dalam bahasa Inggris."
+            f"3. FORMAT VISUAL NOVEL: Awali dengan 1 baris aksi panggung atau ekspresi fisik di dalam tanda bintang *...* menggunakan gaya narasi visual novel dengan namamu ({p_name}). Contoh: *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*. DILARANG menggunakan tanda minus/dash '- ... -' atau kata kaku 'kulihatmu'. Pisahkan dengan baris baru ganda sebelum dialog ucapan.\n"
+            "4. GAYA CHAT: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar.\n"
+            "5. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu.\n"
+            "6. BAHASA PERCAKAPAN: Kamu WAJIB berbicara langsung dalam Bahasa Indonesia santai & akrab. DILARANG KERAS menuliskan proses berpikir atau monolog batin dalam bahasa Inggris."
         )
 
         mem_context = self.memory_engine.format_memory_context(self.user_id, query=user_text)

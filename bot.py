@@ -159,38 +159,86 @@ BOT_LANGUAGE = os.environ.get("BOT_LANGUAGE", "id")
 AWAITING_CUSTOM_LANG: dict = {}      # user_id -> bool
 
 
-def format_roleplay_italics(text: str) -> str:
+def format_roleplay_italics(text: str, character_name: Optional[str] = None) -> str:
     """
-    Formats roleplay actions with leading and trailing dashes (- _action_ -),
-    cleanly separated from spoken dialogue by a newline, while preserving
-    double-asterisk bold (**bold**) and inline code blocks.
+    Formats roleplay actions into elegant Visual Novel stage directions (_character_action_),
+    cleanly separated from spoken dialogue by a double newline, without awkward hyphens/dashes,
+    while preserving double-asterisk bold (**bold**) and inline code blocks (`code`).
     Example: "*tersenyum sambil merapikan buku* Ini tugasnya..."
-         -> "- _tersenyum sambil merapikan buku_ -\n\nIni tugasnya..."
+         -> "_Runa tersenyum sambil merapikan buku_\n\nIni tugasnya..."
     """
     if not text:
         return text
 
-    # 1. Normalize existing dashes, third-person tags, or parentheses around action cues
-    text = re.sub(r'[-—~]\s*\*([^*\n]+?)\*\s*[-—~]', r'*\1*', text)
-    text = re.sub(r'(?i)(?:,\s*)?(?:ia|dia)\s+(?:menyebutkan|berkata|menjawab|berbisik|menimpali)\s*:\s*', ' ', text)
+    char_name = character_name
+    if not char_name:
+        try:
+            char_name = persona_mgr.get_active_persona().get("name", "Runa")
+        except Exception:
+            char_name = "Runa"
+
+    # 1. Normalize line-based dash actions like: - kulihatmu dengan senyuman hangat, merapikan rambutku -
+    text = re.sub(r'(?m)^[-—~]\s*([^-\n]+?)\s*[-—~]$', r'*\1*', text)
+
+    # 2. Normalize existing dashes, dialogue attribution tags, or parentheses around action cues
+    text = re.sub(r'[-—~]\s*[*_]([^*_\n]+?)[*_]\s*[-—~]', r'*\1*', text)
+    text = re.sub(r'(?i)(?:,\s*)?(?:ia|dia)\s+(?:menyebutkan|berkata|menjawab|berbisik|menimpali)\s*:\s*[-—~]?', ' ', text)
     text = re.sub(
         r'(?i)\(((?:tersenyum|tersipu|tertawa|merapikan|menatap|menghela|melirik|berbisik|memegang|menggenggam|mengusap|memeluk|duduk|berdiri|sambil)[^)]+)\)',
         r'*\1*',
         text
     )
 
-    # 2. Add visual separation (double newline) around roleplay *action* blocks (strictly single asterisk)
+    # 3. Clean up and format the action into Visual Novel narration
+    def _clean_action(content: str) -> str:
+        content = content.strip(' -—~')
+        # Remove dialogue attribution inside action tags (e.g. *ia menyebutkan: -*)
+        content = re.sub(r'(?i)(?:,\s*)?(?:ia|dia)\s+(?:menyebutkan|berkata|menjawab|berbisik|menimpali)\s*:\s*[-—~]?', '', content)
+        # Convert first-person action verbs to natural verbs
+        content = re.sub(r'\bkulihatmu\b', 'melihat kamu', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bkulihat\s+kamu\b', 'melihat kamu', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bkudekati\b', 'mendekati', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bkupegang\b', 'memegang', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bkugenggam\b', 'menggenggam', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bkupeluk\b', 'memeluk', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bkusentuh\b', 'menyentuh', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bkuelus\b', 'mengelus', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bkutarik\b', 'menarik', content, flags=re.IGNORECASE)
+        # Flow improvement: ", merapikan" -> " sambil merapikan"
+        content = re.sub(r',\s*merapikan\b', ' sambil merapikan', content, flags=re.IGNORECASE)
+        # Convert first-person possessives to third-person for VN narration
+        content = re.sub(r'\brambutku\b', 'rambutnya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\btanganku\b', 'tangannya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bmataku\b', 'matanya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bwajahku\b', 'wajahnya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bbibirku\b', 'bibirnya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bpipiku\b', 'pipinya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bbajuku\b', 'bajunya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\btubuhku\b', 'tubuhnya', content, flags=re.IGNORECASE)
+        # Convert third-person pronouns to character name
+        content = re.sub(r'\b(?:ia|dia)\b', char_name, content, flags=re.IGNORECASE)
+
+        # If not already starting with char_name, check if we should prepend char_name
+        non_char = ['suara', 'angin', 'hujan', 'lampu', 'musik', 'suasana', 'hp', 'ponsel', 'notifikasi', 'pintu', 'gelas', 'waktu', 'hari']
+        first_word = content.split()[0].lower() if content.split() else ''
+        if not re.match(r'^(?:' + re.escape(char_name) + r')\b', content, re.IGNORECASE) and first_word not in non_char:
+            content = f'{char_name} {content}'
+
+        return content.strip(' -—~')
+
+    def _vn_replace(m):
+        c = _clean_action(m.group(1))
+        return f'_{c}_'
+
+    # 4. Add visual separation (double newline) around roleplay *action* blocks (strictly single asterisk)
     text = re.sub(r'(?<!\*)\*([^*\n]+?)\*(?!\*)[ \t]*([^\n*])', r'*\1*\n\n\2', text)
     text = re.sub(r'([^\n*])[ \t]*(?<!\*)\*([^*\n]+?)\*(?!\*)', r'\1\n\n*\2*', text)
     # Normalize excessive newlines to at most 2
     text = re.sub(r'\n{3,}', '\n\n', text).strip()
 
-    # 3. Convert single *action* into Telegram Markdown italic with dash padding: - _action_ -
+    # 5. Convert single *action* into Telegram Markdown italic: _action_
     def _convert_segment(seg: str) -> str:
-        def _dash_replace(m):
-            content = m.group(1).strip(" -—~")
-            return f"- _{content}_ -"
-        return re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', _dash_replace, seg)
+        return re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', _vn_replace, seg)
 
     if "`" in text:
         parts = re.split(r'(`[^`]+`)', text)
@@ -4561,7 +4609,7 @@ def process_photo_request(
                 fallback_caption = "Ini pap spesial buat kamu sayang, suka ga? 🥰"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
             fallback_tag = " _(Fallback Otomatis)_" if fallback_notice else ""
-            full_caption = f"{format_roleplay_italics(clean_caption)}\n\n📷 *Model:* `{source}`{fallback_tag}"
+            full_caption = f"{format_roleplay_italics(clean_caption, character_name=persona.get('name', 'Runa'))}\n\n📷 *Model:* `{source}`{fallback_tag}"
 
             if status_msg and hasattr(status_msg, "message_id"):
                 try:
@@ -6204,39 +6252,41 @@ def is_echo_or_parroting(reply: str, user_text: str) -> bool:
 
 def get_contextual_fallback_reaction(user_text: str, persona_name: str = "Runa") -> str:
     """
-    Generates a natural, warm, and affectionate girlfriend reaction when an echo or empty LLM reply occurs.
+    Generates a natural, warm, and affectionate girlfriend reaction formatted in Visual Novel style
+    when an echo or empty LLM reply occurs.
     """
     u_low = user_text.lower()
+    p_name = persona_name or "Runa"
 
     # Food offering / bringing snacks to kosan / home
     if any(k in u_low for k in ["bawain", "bawa", "martabak", "nasgor", "beliin", "pesenin", "camilan", "snack"]):
-        return "*tersenyum antusias matanya berbinar*\n\nWahh mau banget! Apa aja yang kamu bawa pasti aku makan kok, martabak atau nasgor kedengeran enak banget~ Makasih banyak yaa 💕"
+        return f"*{p_name} tersenyum antusias matanya berbinar*\n\nWahh mau banget! Apa aja yang kamu bawa pasti aku makan kok, martabak atau nasgor kedengeran enak banget~ Makasih banyak yaa 💕"
 
     # Food / eating
     if any(k in u_low for k in ["makan", "lunch", "sarapan", "laper", "kenyang", "restoran", "kuliner", "cafe", "kafe", "food"]):
-        return "*tersenyum senang*\n\nWah enak banget tuh makanannya! Jangan lupa makan yang kenyang yaa biar gak lemes dan tetap semangat hari ini 💕"
+        return f"*{p_name} tersenyum senang menatapmu*\n\nWah enak banget tuh makanannya! Jangan lupa makan yang kenyang yaa biar gak lemes dan tetap semangat hari ini 💕"
 
     # Main ke kosan / rumah / berkunjung
     if any(k in u_low for k in ["kosan", "kos", "rumah", "main", "otw", "sampe", "nyampe", "mampir", "ke sini", "kesini"]):
-        return "*merapikan rambut sambil tersenyum manis*\n\nBoleh banget, pintu kosan selalu terbuka kok buat kamu! Hati-hati di jalan yaa, aku tungguin di sini 🥰"
+        return f"*{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*\n\nBoleh banget, pintu kosan selalu terbuka kok buat kamu! Hati-hati di jalan yaa, aku tungguin di sini 🥰"
 
     # Greeting / halo / sapaan
     if any(k in u_low for k in ["halo", "hai", "pagi", "siang", "sore", "malam", "selamat"]):
-        return "*tersenyum manis menyapamu hangat*\n\nHai juga! Seneng deh kamu nyapa, lagi sibuk apa atau lagi santai nih? 💕"
+        return f"*{p_name} tersenyum manis menyapamu hangat*\n\nHai juga! Seneng deh kamu nyapa, lagi sibuk apa atau lagi santai nih? 💕"
 
     # Office gathering / hangout bareng anak kantor
     if any(k in u_low for k in ["gathering", "kumpul", "nongkrong", "anak-anak", "anak2", "temen", "teman", "kantor"]):
-        return "*mengangguk antusias*\n\nWah seru banget tuh kumpul bareng anak-anak kantor! Pasti rame yaa, have fun dan nikmati acaranya 🥰"
+        return f"*{p_name} mengangguk antusias*\n\nWah seru banget tuh kumpul bareng anak-anak kantor! Pasti rame yaa, have fun dan nikmati acaranya 🥰"
 
     # Kerja / kuliah / lembur / tugas
     if any(k in u_low for k in ["kerja", "lembur", "meeting", "rapat", "proyek", "project", "tugas", "kuliah", "nugas"]):
-        return "*menatapmu lembut memberi semangat*\n\nSemangat yaa buat kerjaannya! Jangan sampai terlalu capek yaa, nanti kabarin kalau udah senggang 💕"
+        return f"*{p_name} menatapmu lembut memberi semangat*\n\nSemangat yaa buat kerjaannya! Jangan sampai terlalu capek yaa, nanti kabarin kalau udah senggang 💕"
 
     # Game / libur / santai / nonton
     if any(k in u_low for k in ["game", "jalan", "libur", "santai", "rebahan", "nonton"]):
-        return "*tersenyum riang*\n\nWah asyik tuh! Selamat santai dan have fun yaa, nanti cerita-cerita lagi sama aku 🥰"
+        return f"*{p_name} tersenyum riang*\n\nWah asyik tuh! Selamat santai dan have fun yaa, nanti cerita-cerita lagi sama aku 🥰"
 
-    return "*tersenyum hangat menatapmu*\n\nHehe iyaa, aku selalu seneng dengerin dan nemenin kamu. Ceritain dong gimana kelanjutannya~ 💕"
+    return f"*{p_name} tersenyum hangat menatapmu*\n\nHehe iyaa, aku selalu seneng dengerin dan nemenin kamu. Ceritain dong gimana kelanjutannya~ 💕"
 
 
 META_REASONING_PATTERNS = [
@@ -6522,7 +6572,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 if story_ctx:
                     system_inst += story_ctx
 
-                hangout_prompt = hangout_engine.format_hangout_prompt(message.from_user.id, persona.get("name", "Akira"))
+                p_name = persona.get("name", "Runa")
+                hangout_prompt = hangout_engine.format_hangout_prompt(message.from_user.id, p_name)
                 if hangout_prompt:
                     system_inst += "\n" + hangout_prompt
 
@@ -6533,14 +6584,20 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     "1. ANTI-MEMBEO (SANGAT PENTING): DILARANG KERAS hanya mengulang kata, mengulang frasa, atau menyalin ulang pesan lawan bicaramu! "
                     "Jika lawan bicaramu menjawab atau bercerita (misal: 'nanti mau makan sambil gathering HO jam 4'), tanggapi ceritanya dengan antusias, hangat, dan komunikatif (misal: 'Wah seru banget tuh gathering di mana? Jangan lupa makan yang banyak yaa!'), BUKAN malah mengulang kata 'gathering' atau menyalin kata-katanya!\n"
                     "2. RESPONSIF & AKTIF: Berikan tanggapan aktif dan bermakna: ceritakan opinimu, berikan komentar santai, atau tanyakan detail kelanjutannya seperti teman/partner mengobrol yang asyik dan perhatian.\n"
-                    "3. EKSPRESI FISIK & EMOSI (ROLEPLAY ACTION & PEMISAH JELAS): Selalu sertakan 1-2 ekspresi fisik, gestur tubuh, reaksi wajah, atau apa yang sedang kamu lakukan menggunakan tanda bintang *...* (contoh: *tersipu malu*, *tersenyum manis menatapmu*, *merapikan helai rambutnya*). "
-                    "PENTING TENTANG PEMISAH: Berikan BARIS BARU (enter ganda / newline) antara aksi emosi *...* dengan kalimat obrolan/dialogmu! DILARANG menyambung aksi fisik dan ucapan langsung tanpa jeda baris. Contoh format yang benar:\n"
-                    "*tersenyum sambil merapikan beberapa buku ke dalam tas*\n\n"
-                    "Ini tugas kelompoknya udah hampir kelar kok, sore ini ada rencana mau jalan keluar?\n"
+                    f"3. FORMAT VISUAL NOVEL (AKSI & DIALOG TERPISAH RAPI): Seperti adegan Visual Novel / Anime Romance yang estetik:\n"
+                    f"   - Awali balasanmu dengan 1 baris aksi panggung, ekspresi wajah, atau gestur fisik alami di dalam tanda bintang *...* menggunakan sudut pandang narasi visual novel dengan namamu ({p_name}). "
+                    f"Contoh: *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya* atau *{p_name} menatapmu lembut sambil memegang cangkir minumannya*.\n"
+                    f"   - DILARANG menggunakan tanda minus/dash '- ... -' atau kata kaku/aneh seperti 'kulihatmu' atau 'ia menyebutkan:'.\n"
+                    f"   - PENTING TENTANG PEMISAH: Berikan BARIS BARU (enter ganda / newline) antara aksi panggung *...* dengan kalimat obrolan/dialog ucapanmu!\n"
+                    f"   - Contoh format Visual Novel yang benar:\n"
+                    f"   *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*\n\n"
+                    f"   Oh sayang, kamu mau ngomong apa nih? Aku belum sempat bikin camilan. Tapi makasih ya, kata-katamu bikin aku merasa spesial~\n"
                     "4. PROAKTIF MENGAJAK JALAN & KENCAN: Jika suasana santai atau di akhir pekan / libur, jangan hanya pasif menunggu. Ajak pasanganmu sesekali untuk ngopi berdua di kafe estetik, nonton film bioskop terbaru, main ke kosan/rumah sambil dimasakin atau santai berdua, atau jalan sore ke taman kota!\n"
                     "5. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat yang santai dan wajar (misal: 'Lagi santai nugas nih, gimana harimu? 💕 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu. Bersikaplah percaya diri, hangat, dan ramah.\n"
                     "6. GAYA CHAT & BAHASA: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. Kamu WAJIB berbicara langsung dalam Bahasa Indonesia sehari-hari yang santai dan akrab. DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin dalam bahasa Inggris.\n"
-                    "7. SUDUT PANDANG ORANG PERTAMA (FIRST-PERSON POV - SANGAT PENTING): Kamu WAJIB berbicara langsung sebagai dirimu sendiri ('aku') kepada pasanganmu ('kamu'). DILARANG KERAS menggunakan sudut pandang narator orang ketiga seperti 'ia menatapmu', 'ia berkata', 'ia menyebutkan', atau menyebut dirimu dari sudut pandang novel! Dalam aksi emosi *...*, gunakan kata kerja langsung (contoh: *tersenyum senang sambil menatapmu*, BUKAN *ia tersenyum*)."
+                    f"7. SUDUT PANDANG DIALOG & VISUAL NOVEL (PENTING): "
+                    f"Dalam DIALOG UCAPAN, kamu WAJIB berbicara langsung sebagai dirimu sendiri ('aku') kepada pasanganmu ('kamu'). DILARANG menggunakan kata perantara kaku seperti 'ia berkata:' atau 'ia menyebutkan:'. "
+                    f"Dalam AKSI PANGGUNG *...*, gunakan narasi visual novel yang alami (*{p_name} tersenyum manis menatapmu* atau *{p_name} melihat kamu dengan senyuman hangat*)."
                 )
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
                 if mem_context:
@@ -6641,7 +6698,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     persona_name=persona.get("name", "Akira")
                 )
 
-                formatted_reply = format_roleplay_italics(clean_reply)
+                formatted_reply = format_roleplay_italics(clean_reply, character_name=persona.get("name", "Runa"))
                 safe_reply_to(message, formatted_reply, parse_mode="Markdown")
 
                 if should_send_conv_photo or should_send_spontaneous:

@@ -29,38 +29,44 @@ class TestHangoutAndRoleplayExpression(unittest.TestCase):
         self.assertTrue(any(k in sun_routine["activity_desc"].lower() for k in ["mall", "bioskop", "jalan", "santai"]))
 
     def test_format_roleplay_italics(self):
-        """Converts *action* to - _action_ - with clean newline separation from speech, while preserving bold and code."""
-        # 1. Action at beginning formatted with dashes and separated from chat with newline
+        """Converts *action* to Visual Novel style _character_action_ with clean newline separation, without dashes."""
+        # 1. Action at beginning formatted in VN style with character name and separated with newline
         raw = "*tersenyum sambil merapikan beberapa buku ke dalam tas* Ini tugas kelompoknya udah hampir kelar kok"
-        formatted = bot.format_roleplay_italics(raw)
-        self.assertEqual(formatted, "- _tersenyum sambil merapikan beberapa buku ke dalam tas_ -\n\nIni tugas kelompoknya udah hampir kelar kok")
+        formatted = bot.format_roleplay_italics(raw, character_name="Akira")
+        self.assertEqual(formatted, "_Akira tersenyum sambil merapikan beberapa buku ke dalam tas_\n\nIni tugas kelompoknya udah hampir kelar kok")
 
-        # 2. Action in middle separated before and after with dashes
+        # 2. Action in middle separated before and after
         raw_mid = "Halo sayang! *tersenyum manis* Gimana harimu?"
-        formatted_mid = bot.format_roleplay_italics(raw_mid)
-        self.assertEqual(formatted_mid, "Halo sayang!\n\n- _tersenyum manis_ -\n\nGimana harimu?")
+        formatted_mid = bot.format_roleplay_italics(raw_mid, character_name="Akira")
+        self.assertEqual(formatted_mid, "Halo sayang!\n\n_Akira tersenyum manis_\n\nGimana harimu?")
 
-        # 3. Parentheses emotion action converted, dashed, and separated
+        # 3. Parentheses emotion action converted and formatted
         raw_paren = "(tersipu malu) ih kamu mah..."
-        formatted_paren = bot.format_roleplay_italics(raw_paren)
-        self.assertEqual(formatted_paren, "- _tersipu malu_ -\n\nih kamu mah...")
+        formatted_paren = bot.format_roleplay_italics(raw_paren, character_name="Akira")
+        self.assertEqual(formatted_paren, "_Akira tersipu malu_\n\nih kamu mah...")
 
-        # 4. Preexisting dashes normalized cleanly without doubling
+        # 4. Preexisting dashes normalized and stripped cleanly
         raw_dash = "- *tersenyum manis* - Halo sayang"
-        formatted_dash = bot.format_roleplay_italics(raw_dash)
-        self.assertEqual(formatted_dash, "- _tersenyum manis_ -\n\nHalo sayang")
+        formatted_dash = bot.format_roleplay_italics(raw_dash, character_name="Akira")
+        self.assertEqual(formatted_dash, "_Akira tersenyum manis_\n\nHalo sayang")
 
-        # 5. Preserves **bold** text
+        # 5. Converts awkward first-person cues into visual novel narration
+        raw_user = "- kulihatmu dengan senyuman hangat, merapikan rambutku -\n\nOh sayang, kan mau ngomong apa aja nih?"
+        formatted_user = bot.format_roleplay_italics(raw_user, character_name="Runa")
+        self.assertEqual(formatted_user, "_Runa melihat kamu dengan senyuman hangat sambil merapikan rambutnya_\n\nOh sayang, kan mau ngomong apa aja nih?")
+
+        # 6. Preserves **bold** text without inserting dashes
         raw_bold = "*tersipu malu* Kamu itu **ganteng banget** hari ini!"
-        formatted_bold = bot.format_roleplay_italics(raw_bold)
+        formatted_bold = bot.format_roleplay_italics(raw_bold, character_name="Akira")
         self.assertIn("**ganteng banget**", formatted_bold)
-        self.assertIn("- _tersipu malu_ -\n\n", formatted_bold)
+        self.assertIn("_Akira tersipu malu_\n\n", formatted_bold)
+        self.assertNotIn("- _", formatted_bold)
 
-        # 6. Code blocks remain untouched
+        # 7. Code blocks remain untouched
         raw_code = "*mengetik cepat* Coba cek `print(*args)` ini ya!"
-        formatted_code = bot.format_roleplay_italics(raw_code)
+        formatted_code = bot.format_roleplay_italics(raw_code, character_name="Akira")
         self.assertIn("`print(*args)`", formatted_code)
-        self.assertIn("- _mengetik cepat_ -\n\n", formatted_code)
+        self.assertIn("_Akira mengetik cepat_\n\n", formatted_code)
 
     def test_hangout_engine_lifecycle(self):
         """Tests starting a date, verifying active state, recording photos, and ending the date."""
