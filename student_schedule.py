@@ -17,7 +17,7 @@ STUDENT_PROFILES = {
         "major": "Teknik Informatika / Game Development (Semester 5)",
         "campus": "Kampus Fakultas Ilmu Komputer",
         "hobbies": "main game, ngoding santai di cafe, nonton anime, jalan-jalan ke mall cari gadget/camilan",
-        "style": "kawaii gamer chic, cute oversized hoodie / trendy casual streetwear, stylish choker",
+        "style": "gothic-kawaii playful girlfriend, oversized off-shoulder black hoodie with cat graphics, delicate white camisole with black lace and pink bow, black choker with silver heart ring",
         "campus_outfit": "(wearing cute pastel college outfit, oversized light jacket over casual white tee, pleated skirt, canvas tote bag:1.35)",
         "mall_outfit": "(wearing trendy modern streetwear, stylish cropped jacket, high-waist pants, small shoulder bag:1.35)",
         "cafe_outfit": "(wearing cozy oversized pastel sweater, cute denim skirt, stylish choker:1.35)",
