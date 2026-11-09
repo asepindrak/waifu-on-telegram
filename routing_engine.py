@@ -284,9 +284,19 @@ class HybridLLMClient:
     def base_url(self) -> str:
         return self.sfw_client.base_url
 
+    @base_url.setter
+    def base_url(self, val: str):
+        if hasattr(self, "sfw_client") and hasattr(self.sfw_client, "base_url"):
+            self.sfw_client.base_url = val
+
     @property
     def model(self) -> str:
         return self.sfw_client.model
+
+    @model.setter
+    def model(self, val: str):
+        if hasattr(self, "sfw_client") and hasattr(self.sfw_client, "model"):
+            self.sfw_client.model = val
 
     def is_split_mode(self) -> bool:
         return self.mode in ("split", "hybrid") and self.sfw_client != self.nsfw_client
@@ -393,12 +403,28 @@ class HybridLLMClient:
         if target_client != self.nsfw_client and self.is_split_mode():
             payload_messages = sanitize_messages_for_sfw(messages)
 
+        # Multimodal Vision Routing (AGY Bridge 0-VRAM vs Local Moondream2)
+        processed_image_bytes = image_bytes
+        if image_bytes:
+            if ":8001" in str(client_url) or getattr(self, "sfw_provider", "") == "agy":
+                logger.info("Routing image to AGY Bridge for 0-VRAM multimodal perception.")
+            else:
+                try:
+                    from vision_engine import vision_engine, inject_visual_context_into_messages
+                    logger.info("Local Stheno 8B is text-only: using Moondream vision engine to analyze image...")
+                    desc = vision_engine.describe_image(image_bytes, user_caption=last_user_txt)
+                    if desc:
+                        payload_messages = inject_visual_context_into_messages(payload_messages, desc)
+                        processed_image_bytes = None
+                except Exception as e_v:
+                    logger.warning(f"Vision engine extraction error: {e_v}")
+
         try:
             return target_client.chat(
                 payload_messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                image_bytes=image_bytes
+                image_bytes=processed_image_bytes
             )
         except Exception as e:
             # Automatic High-Availability Fallback:

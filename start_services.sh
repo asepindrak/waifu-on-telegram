@@ -16,17 +16,21 @@ fi
 # 1. Start KoboldCPP LLM Engine if present & not already active
 if [ -f "$SCRIPT_DIR/tools/koboldcpp" ]; then
     MODEL_PATH=""
-    if [ -f "$SCRIPT_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" ]; then
+    if [ -f "$SCRIPT_DIR/models/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf" ]; then
+        MODEL_PATH="$SCRIPT_DIR/models/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+    elif [ -f "$SCRIPT_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" ]; then
         MODEL_PATH="$SCRIPT_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
     elif [ -d "$SCRIPT_DIR/models" ]; then
         MODEL_PATH=$(ls "$SCRIPT_DIR/models/"*.gguf 2>/dev/null | grep -v "mmproj" | head -n 1)
     fi
 
     MMPROJ_PATH=""
-    if [ -f "$SCRIPT_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf" ]; then
-        MMPROJ_PATH="$SCRIPT_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
-    elif [ -d "$SCRIPT_DIR/models" ]; then
-        MMPROJ_PATH=$(ls "$SCRIPT_DIR/models/"*mmproj*.gguf 2>/dev/null | head -n 1)
+    if ! echo "$MODEL_PATH" | grep -iq "stheno\|llama"; then
+        if [ -f "$SCRIPT_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf" ]; then
+            MMPROJ_PATH="$SCRIPT_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
+        elif [ -d "$SCRIPT_DIR/models" ]; then
+            MMPROJ_PATH=$(ls "$SCRIPT_DIR/models/"*mmproj*.gguf 2>/dev/null | head -n 1)
+        fi
     fi
 
     MMPROJ_ARG=""

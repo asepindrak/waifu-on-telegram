@@ -469,7 +469,13 @@ def start_env_hot_reload_watcher():
 def apply_llm_choice(choice: str) -> str:
     global LLM_BASE_URL
     detected_llms = scan_local_llm_models()
-    if choice == "kobold" or choice == "auto":
+    if choice in ("stheno", "stheno_8b"):
+        new_base = "http://127.0.0.1:5001/v1"
+        new_model = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+        label = "L3-8B-Stheno-v3.4 (KoboldCPP)"
+        update_env_variable("LOCAL_LLM_MODEL", new_model)
+        update_env_variable("NSFW_LLM_MODEL", new_model)
+    elif choice == "kobold" or choice == "auto":
         new_base = "http://127.0.0.1:5001/v1"
         new_model = "default"
         label = "KoboldCPP (Auto-start & Loaded)"
@@ -481,10 +487,18 @@ def apply_llm_choice(choice: str) -> str:
         new_base = "http://127.0.0.1:11434/v1"
         new_model = "default"
         label = "Ollama (Port 11434)"
+    elif choice.endswith(".gguf"):
+        new_base = "http://127.0.0.1:5001/v1"
+        new_model = choice
+        label = f"{choice.replace('.gguf', '')} (KoboldCPP)"
+        update_env_variable("LOCAL_LLM_MODEL", new_model)
+        update_env_variable("NSFW_LLM_MODEL", new_model)
     elif choice.isdigit() and int(choice) < len(detected_llms):
         source, mname, mpath = detected_llms[int(choice)]
         if source == "KoboldCPP":
             new_base = "http://127.0.0.1:5001/v1"
+            update_env_variable("LOCAL_LLM_MODEL", mname)
+            update_env_variable("NSFW_LLM_MODEL", mname)
         elif source == "Locally Uncensored":
             new_base = "http://127.0.0.1:8127/v1"
         elif source == "Ollama":
@@ -497,10 +511,17 @@ def apply_llm_choice(choice: str) -> str:
         return "Unknown"
 
     LLM_BASE_URL = new_base
-    llm_client.base_url = new_base
-    llm_client.model = new_model
+    try:
+        llm_client.base_url = new_base
+        llm_client.model = new_model
+    except Exception:
+        pass
     update_env_variable("LLM_BASE_URL", new_base)
     update_env_variable("LLM_MODEL", new_model)
+    try:
+        get_hybrid_llm_client(force_reload=True)
+    except Exception:
+        pass
     return label
 
 
@@ -2191,10 +2212,17 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
         # NSFW Providers section
         markup.add(types.InlineKeyboardButton("─── 🔞 PROVIDER CHAT NSFW ───", callback_data="noop"))
         markup.add(types.InlineKeyboardButton(f"🔞 Local KoboldCPP Uncensored {'✓' if nsfw_p == 'local' else ''}", callback_data="cfg_set_nsfw_p:local"))
+        has_stheno_split = any("stheno" in mname.lower() for _, mname, _ in detected)
+        if not has_stheno_split:
+            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih L3-8B-Stheno-v3.4 (~4.9 GB)", callback_data="cfg_set_llm:stheno_auto"))
         markup.add(types.InlineKeyboardButton(f"☁️ OpenRouter Uncensored {'✓' if nsfw_p == 'openrouter_uncensored' else ''}", callback_data="cfg_set_nsfw_p:openrouter_uncensored"))
     else:
         is_kobold = ("5001" in cur_base)
         markup.add(types.InlineKeyboardButton(f"🤖 KoboldCPP (Port 5001 - Auto-start) {'✓' if is_kobold else ''}", callback_data="cfg_set_llm:kobold"))
+
+        has_stheno = any("stheno" in mname.lower() for _, mname, _ in detected)
+        if not has_stheno:
+            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih L3-8B-Stheno-v3.4 (~4.9 GB • Rekomendasi)", callback_data="cfg_set_llm:stheno_auto"))
 
         for idx, (source, mname, mpath) in enumerate(detected):
             is_cur = (cur_llm.lower() in mname.lower())
@@ -3345,6 +3373,58 @@ def callback_set_llm(call):
     if not is_authorized(call.from_user.id):
         return
     key = call.data.split(":", 1)[1]
+    if key in ("stheno_auto", "stheno", "stheno_8b"):
+        info_stheno = asset_manager.get_asset_info("stheno_8b") if asset_manager else None
+        if info_stheno and not info_stheno.get("installed"):
+            bot.answer_callback_query(call.id, "📥 Memulai unduhan L3-8B-Stheno-v3.4...")
+            chat_id = call.message.chat.id
+            mid = call.message.message_id
+            msg_prompt = bot.send_message(
+                chat_id,
+                "⏳ **Sedang Mengunduh L3-8B-Stheno-v3.4 (~4.9 GB)**\n\n"
+                "Model roleplay uncensored terbaik sedang diunduh di latar belakang. "
+                "Begitu selesai, model ini akan **otomatis dipilih & diaktifkan** sebagai otak utama waifu! 💕",
+                parse_mode="Markdown"
+            )
+            def _async_dl():
+                ok = asset_manager.download_asset("stheno_8b") if asset_manager else False
+                if ok:
+                    apply_llm_choice("stheno")
+                    try:
+                        bot.edit_message_text(
+                            "🎉 **L3-8B-Stheno-v3.4 Berhasil Dipasang & Aktif!** 💕\n\n"
+                            "Model roleplay uncensored terbaru sudah aktif. Sekarang waifu bisa langsung mengobrol lancar tanpa delay `<think>`! ✨",
+                            chat_id=chat_id,
+                            message_id=msg_prompt.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+                    try:
+                        health_engine.heal_llm()
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        bot.edit_message_text(
+                            "⚠️ **Gagal Mengunduh L3-8B-Stheno-v3.4**\n\n"
+                            "Koneksi terputus. Silakan coba lagi nanti atau jalankan di terminal:\n"
+                            "`waifu models download stheno_8b`",
+                            chat_id=chat_id,
+                            message_id=msg_prompt.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+            threading.Thread(target=_async_dl, daemon=True).start()
+            show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=mid)
+            return
+        else:
+            label = apply_llm_choice("stheno")
+            bot.answer_callback_query(call.id, f"LLM: {label}")
+            show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+            return
+
     label = apply_llm_choice(key)
     bot.answer_callback_query(call.id, f"LLM: {label}")
     show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)

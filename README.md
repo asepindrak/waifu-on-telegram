@@ -71,16 +71,16 @@ Waifu on Telegram is engineered to run locally on consumer gaming PCs and laptop
 
 Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsiveness, and high-fidelity anime aesthetics:
 
-#### 1. 💌 Dialogue & Romance Companion: **Huihui-Qwythos-9B**
-* **Model File:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf` (~5.5 GB)
-* **Vision mmproj Adapter:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf` (~879 MB)
+#### 1. 💌 Dialogue & Romance Companion: **L3-8B-Stheno-v3.4** *(Default & Rekomendasi)*
+* **Model File:** `Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf` (~4.9 GB)
+* **Alternatif Legacy:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf` (~5.5 GB)
 * **Local Backend:** **KoboldCPP Standalone Engine** (Port `5001`) with **Auto-Startup & Auto-Loading directly on Windows Boot**!
 * **Compatible Backends:** KoboldCPP Standalone (bawaan resmi), Ollama (Port `11434`), LM Studio (Port `1234`), atau OpenAI-compatible server.
-* **Download Method:** Otomatis di-download saat menjalankan `install.ps1` / `install.sh`, atau bisa diunduh manual dari [Hugging Face](https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF) ke folder `models/`.
+* **Download Method:** Otomatis di-download saat menjalankan `waifu update` / `install.ps1` / `install.sh`, atau via `waifu models download stheno_8b`.
 * **Key Strengths:**
-  - **Zero Censorship & Refusal-Free:** Fully abliterated with Claude-Mythos roleplay traces. Highly affectionate, playful, caring, and open to romantic roleplay without moralizing preachiness.
-  - **Adaptive Language Mirroring:** Seamlessly switches between Indonesian (*sayang, manja, santai*), English (*sweetheart, darling*), or Japanese.
-  - **Auto Startup & VRAM Pre-loading:** No Electron UI or manual buttons needed. When your computer boots, KoboldCPP silently spins up and loads the weights into VRAM instantly.
+  - **Zero Censorship & Expressive Roleplay:** Model roleplay nomor 1 berbasis Llama-3.1 yang sangat ekspresif, hangat, bermanja-manja, dan bebas sensor.
+  - **Tanpa Delay `<think>`:** Merupakan model instruct murni sehingga langsung membalas seketika tanpa menghabiskan token untuk penalaran batin panjang.
+  - **Adaptive Language Mirroring:** Sangat fasih berbahasa Indonesia santai (*sayang, manja, asik*), English, dan Japanese.
   - **Smart Idle Integration:** Otomatis di-unload dari VRAM saat tidak ada percakapan (idle timeout), membebaskan ~5-6 GB VRAM untuk gaming/kerja.
 
 #### 2. 📷 Anime Photo & Selfie Engine Options (ComfyUI)

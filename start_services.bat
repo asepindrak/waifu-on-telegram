@@ -18,7 +18,9 @@ if "%KOBOLD_STANDBY%"=="1" (
 ) else (
     set KOBOLD_EXE=%~dp0tools\koboldcpp.exe
     set KOBOLD_MODEL=
-    if exist "%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" (
+    if exist "%~dp0models\Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf" (
+        set "KOBOLD_MODEL=%~dp0models\Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+    ) else if exist "%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" (
         set "KOBOLD_MODEL=%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
     ) else (
         for /f "delims=" %%F in ('dir /b /s "%~dp0models\*.gguf" 2^>nul ^| findstr /v /i "mmproj"') do (
@@ -26,15 +28,18 @@ if "%KOBOLD_STANDBY%"=="1" (
         )
     )
 
-    :: Auto-detect mmproj vision adapter
+    :: Auto-detect mmproj vision adapter (only if compatible, skip for Llama/Stheno models)
     set KOBOLD_MMPROJ=
-    if exist "%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf" (
-        set "KOBOLD_MMPROJ=%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
-    ) else if exist "%~dp0models\mmproj-model-bf16.gguf" (
-        set "KOBOLD_MMPROJ=%~dp0models\mmproj-model-bf16.gguf"
-    ) else (
-        for /f "delims=" %%F in ('dir /b /s "%~dp0models\*mmproj*.gguf" 2^>nul') do (
-            if not defined KOBOLD_MMPROJ set "KOBOLD_MMPROJ=%%F"
+    echo "%KOBOLD_MODEL%" | findstr /i "stheno llama" >nul 2>&1
+    if errorlevel 1 (
+        if exist "%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf" (
+            set "KOBOLD_MMPROJ=%~dp0models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
+        ) else if exist "%~dp0models\mmproj-model-bf16.gguf" (
+            set "KOBOLD_MMPROJ=%~dp0models\mmproj-model-bf16.gguf"
+        ) else (
+            for /f "delims=" %%F in ('dir /b /s "%~dp0models\*mmproj*.gguf" 2^>nul') do (
+                if not defined KOBOLD_MMPROJ set "KOBOLD_MMPROJ=%%F"
+            )
         )
     )
 

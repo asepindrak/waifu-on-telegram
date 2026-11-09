@@ -133,7 +133,7 @@ try {
     $nsfwProv = $env:NSFW_LLM_PROVIDER
     if (-not $nsfwProv) { $nsfwProv = "local" }
     $nsfwModel = $env:LOCAL_LLM_MODEL
-    if (-not $nsfwModel) { $nsfwModel = "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" }
+    if (-not $nsfwModel) { $nsfwModel = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf" }
 
     Write-Host "  [AI ARCH] Mode AI: $aiModeLabel" -ForegroundColor Cyan
     Write-Host "            - SFW Engine : $sfwProv ($sfwModel)" -ForegroundColor DarkCyan
@@ -218,7 +218,7 @@ if (-not $llmOnline) {
         (Join-Path $env:APPDATA "Locally Uncensored\models")
     )
     $hasGguf = $false
-    $targetGgufName = "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
+    $targetGgufName = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
     foreach ($md in $modelDirs) {
         if (Test-Path $md) {
             $ggufs = Get-ChildItem -Path $md -Filter "*.gguf" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*mmproj*" }

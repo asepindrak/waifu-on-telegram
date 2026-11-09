@@ -22,6 +22,21 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # Registry of AI Models, Custom Nodes, and Third-Party Dependencies
 ASSET_REGISTRY = {
+    "stheno_8b": {
+        "name": "L3-8B-Stheno-v3.4 (Uncensored Roleplay LLM)",
+        "type": "llm_model",
+        "filename": "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf",
+        "patterns": ["*Stheno*8B*.gguf", "*Stheno*.gguf", "*L3*8B*Stheno*.gguf", "*Llama-3.1-8B-Stheno*.gguf"],
+        "size_mb": 4920,
+        "url": "https://huggingface.co/bartowski/Llama-3.1-8B-Stheno-v3.4-GGUF/resolve/main/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf",
+        "fallback_url": "https://hf-mirror.com/bartowski/Llama-3.1-8B-Stheno-v3.4-GGUF/resolve/main/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf",
+        "mirrors": [
+            "https://huggingface.co/bartowski/Llama-3.1-8B-Stheno-v3.4-GGUF/resolve/main/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf",
+            "https://hf-mirror.com/bartowski/Llama-3.1-8B-Stheno-v3.4-GGUF/resolve/main/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+        ],
+        "description": "Model chat/roleplay uncensored terbaik untuk waifu (L3-8B-Stheno-v3.4, ekspresif, tanpa delay thinking).",
+        "required_for": "Otak Utama Chat & Roleplay Waifu (L3-8B-Stheno-v3.4)"
+    },
     "qwythos_9b": {
         "name": "Huihui-Qwythos 9B Claude-Mythos (Uncensored LLM)",
         "type": "llm_model",
@@ -51,6 +66,36 @@ ASSET_REGISTRY = {
         ],
         "description": "Vision projector agar waifu bisa melihat dan mengomentari foto dari user.",
         "required_for": "Fitur Vision (Melihat Foto dari User)"
+    },
+    "moondream_text": {
+        "name": "Moondream2 Text Model (Q4_K)",
+        "type": "llm_model",
+        "filename": "moondream2-q4_k.gguf",
+        "patterns": ["*moondream*q4*.gguf", "*moondream*text*.gguf", "*moondream*.gguf"],
+        "size_mb": 919,
+        "url": "https://huggingface.co/salivosa/moondream2-gguf/resolve/main/moondream2-q4_k.gguf",
+        "fallback_url": "https://hf-mirror.com/salivosa/moondream2-gguf/resolve/main/moondream2-q4_k.gguf",
+        "mirrors": [
+            "https://huggingface.co/salivosa/moondream2-gguf/resolve/main/moondream2-q4_k.gguf",
+            "https://hf-mirror.com/salivosa/moondream2-gguf/resolve/main/moondream2-q4_k.gguf"
+        ],
+        "description": "Model teks vision Moondream2 ultra-ringan (~919 MB) untuk analisis foto lokal.",
+        "required_for": "Fitur Vision Lokal Moondream (Melihat Foto User tanpa Cloud)"
+    },
+    "moondream_mmproj": {
+        "name": "Moondream2 Vision Adapter (mmproj)",
+        "type": "llm_model",
+        "filename": "moondream2-mmproj-f16.gguf",
+        "patterns": ["*moondream*mmproj*.gguf"],
+        "size_mb": 909,
+        "url": "https://huggingface.co/salivosa/moondream2-gguf/resolve/main/moondream2-mmproj-f16.gguf",
+        "fallback_url": "https://hf-mirror.com/salivosa/moondream2-gguf/resolve/main/moondream2-mmproj-f16.gguf",
+        "mirrors": [
+            "https://huggingface.co/salivosa/moondream2-gguf/resolve/main/moondream2-mmproj-f16.gguf",
+            "https://hf-mirror.com/salivosa/moondream2-gguf/resolve/main/moondream2-mmproj-f16.gguf"
+        ],
+        "description": "Multimodal Projector Moondream2 (~909 MB) untuk membaca gambar pada model lokal.",
+        "required_for": "Fitur Vision Lokal Moondream (Melihat Foto User tanpa Cloud)"
     },
     "meinamix": {
         "name": "MeinaMix Anime SD 1.5 Checkpoint",
@@ -705,6 +750,11 @@ def get_llm_launch_spec(project_root: Optional[str] = None) -> Optional[Dict[str
     mmproj_path = None
 
     if not model_path:
+        info_stheno = get_asset_info("stheno_8b")
+        if info_stheno and info_stheno.get("installed") and info_stheno.get("target_path"):
+            model_path = info_stheno["target_path"]
+
+    if not model_path:
         info_qwy = get_asset_info("qwythos_9b")
         if info_qwy and info_qwy.get("installed") and info_qwy.get("target_path"):
             model_path = info_qwy["target_path"]
@@ -753,6 +803,13 @@ def get_llm_launch_spec(project_root: Optional[str] = None) -> Optional[Dict[str
         info_vis = get_asset_info("qwythos_vision")
         if info_vis and info_vis.get("installed") and info_vis.get("target_path"):
             mmproj_path = info_vis["target_path"]
+
+    # Incompatible mmproj guard: mmproj trained for Qwen/Mythos must not be loaded on Llama/Stheno
+    if model_path and mmproj_path:
+        m_lower = os.path.basename(model_path).lower()
+        mm_lower = os.path.basename(mmproj_path).lower()
+        if ("stheno" in m_lower or "llama" in m_lower) and "llama" not in mm_lower:
+            mmproj_path = None
 
     mm_args = ["--mmproj", mmproj_path] if (mmproj_path and os.path.isfile(mmproj_path)) else []
 

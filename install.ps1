@@ -320,12 +320,12 @@ if ($existingGgufs.Count -eq 0) {
         }
     } else {
         Write-Host "  [INFO] No GGUF chat model found in '$modelsDir'." -ForegroundColor Yellow
-        $dlModel = Read-Host "  Auto-download uncensored 'Huihui-Qwythos-9B-Claude-Mythos-5-1M' Q4_K model (~5.5 GB)? [Y/n, default: Y]"
+        $dlModel = Read-Host "  Auto-download uncensored 'L3-8B-Stheno-v3.4' Q4_K_M model (~4.9 GB)? [Y/n, default: Y]"
         if ($dlModel.Trim().ToLower() -ne "n") {
-            $qwythosUrl = "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
-            $qwythosFallback = "https://hf-mirror.com/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
-            $destGguf = "$modelsDir\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
-            Download-FileWithProgress -Url $qwythosUrl -DestinationPath $destGguf -Description "Huihui-Qwythos 9B Abliterated Q4_K (~5.5 GB)" -FallbackUrl $qwythosFallback -MinExpectedBytes ([long](3800*1024*1024))
+            $sthenoUrl = "https://huggingface.co/bartowski/Llama-3.1-8B-Stheno-v3.4-GGUF/resolve/main/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+            $sthenoFallback = "https://hf-mirror.com/bartowski/Llama-3.1-8B-Stheno-v3.4-GGUF/resolve/main/Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+            $destGguf = "$modelsDir\Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+            Download-FileWithProgress -Url $sthenoUrl -DestinationPath $destGguf -Description "L3-8B-Stheno-v3.4 Q4_K_M (~4.9 GB)" -FallbackUrl $sthenoFallback -MinExpectedBytes ([long](3800*1024*1024))
         }
     }
 } else {

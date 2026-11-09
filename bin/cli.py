@@ -872,20 +872,50 @@ def cmd_update():
     # Step 5: Check & Auto-Download Core AI Models (Chat Brain, Vision, and Image Generation)
     print(c(CYAN, "\n📦 [5/5] Checking and auto-downloading AI Models & Vision mmproj..."))
     if asset_manager:
-        # 1. Main Chat Brain: Huihui-Qwythos-9B
-        info_9b = asset_manager.get_asset_info("qwythos_9b")
-        if info_9b and not info_9b.get("installed"):
-            print(c(YELLOW, f"  ⏳ Core Brain '{info_9b['name']}' missing. Auto-downloading (~{info_9b['size_mb']} MB)..."))
-            ok = asset_manager.download_asset("qwythos_9b")
+        # 1. Main Chat Brain: L3-8B-Stheno-v3.4 (Uncensored Roleplay LLM)
+        info_stheno = asset_manager.get_asset_info("stheno_8b")
+        if info_stheno and not info_stheno.get("installed"):
+            print(c(YELLOW, f"  ⏳ Core Brain '{info_stheno['name']}' missing. Auto-downloading (~{info_stheno['size_mb']} MB)..."))
+            ok = asset_manager.download_asset("stheno_8b")
             if ok:
-                print(c(GREEN, f"  ✓ '{info_9b['name']}' downloaded successfully!"))
+                print(c(GREEN, f"  ✓ '{info_stheno['name']}' downloaded successfully!"))
             else:
-                print(c(RED, f"  ❌ Download failed for '{info_9b['name']}'. Run 'waifu models download qwythos_9b'."))
+                print(c(RED, f"  ❌ Download failed for '{info_stheno['name']}'. Run 'waifu models download stheno_8b'."))
         else:
-            sz = info_9b.get("current_size_mb", 0) if info_9b else 0
-            print(c(GREEN, f"  ✓ Core Chat Brain '{info_9b['name']}' is ready ({sz} MB)."))
+            sz = info_stheno.get("current_size_mb", 0) if info_stheno else 0
+            print(c(GREEN, f"  ✓ Core Chat Brain '{info_stheno['name']}' is ready ({sz} MB)."))
 
-        # 2. Vision Adapter: Huihui-Qwythos Vision mmproj
+        # Auto-switch to Stheno ONLY if user currently has Huihui selected
+        try:
+            from setup import read_env, write_env
+            env_dict = read_env()
+            cur_llm = env_dict.get("LLM_MODEL", "").lower()
+            cur_local = env_dict.get("LOCAL_LLM_MODEL", "").lower()
+            cur_nsfw = env_dict.get("NSFW_LLM_MODEL", "").lower()
+            is_using_huihui = any("huihui" in m or "qwythos" in m for m in [cur_llm, cur_local, cur_nsfw])
+            if is_using_huihui:
+                stheno_fn = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+                print(c(CYAN, f"\n🔄 Terdeteksi model lama (Huihui) aktif. Otomatis beralih ke model terbaru: {stheno_fn}..."))
+                changed = False
+                if "huihui" in cur_llm or "qwythos" in cur_llm:
+                    env_dict["LLM_MODEL"] = stheno_fn
+                    os.environ["LLM_MODEL"] = stheno_fn
+                    changed = True
+                if "huihui" in cur_local or "qwythos" in cur_local:
+                    env_dict["LOCAL_LLM_MODEL"] = stheno_fn
+                    os.environ["LOCAL_LLM_MODEL"] = stheno_fn
+                    changed = True
+                if "huihui" in cur_nsfw or "qwythos" in cur_nsfw:
+                    env_dict["NSFW_LLM_MODEL"] = stheno_fn
+                    os.environ["NSFW_LLM_MODEL"] = stheno_fn
+                    changed = True
+                if changed:
+                    write_env(env_dict)
+                    print(c(GREEN, f"  ✓ Auto-select model terbaru berhasil!"))
+        except Exception as e_env:
+            logger.debug(f"Auto-select error: {e_env}")
+
+        # 2. Vision Adapter: Huihui-Qwythos Vision mmproj & Local Moondream
         info_vis = asset_manager.get_asset_info("qwythos_vision")
         if info_vis and not info_vis.get("installed"):
             print(c(YELLOW, f"  ⏳ Vision Adapter '{info_vis['name']}' missing. Auto-downloading (~{info_vis['size_mb']} MB)..."))
@@ -897,6 +927,17 @@ def cmd_update():
         else:
             sz = info_vis.get("current_size_mb", 0) if info_vis else 0
             print(c(GREEN, f"  ✓ Vision Adapter '{info_vis['name']}' is ready ({sz} MB)."))
+
+        # If user is in local LLM mode (non-AGY), verify Moondream local vision assets
+        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower()
+        if sfw_p != "agy":
+            for m_key in ("moondream_text", "moondream_mmproj"):
+                info_m = asset_manager.get_asset_info(m_key)
+                if info_m and not info_m.get("installed"):
+                    print(c(YELLOW, f"  ⏳ Local Vision '{info_m['name']}' missing. Auto-downloading (~{info_m['size_mb']} MB)..."))
+                    ok = asset_manager.download_asset(m_key)
+                    if ok:
+                        print(c(GREEN, f"  ✓ '{info_m['name']}' downloaded successfully!"))
 
         # 3. ComfyUI Models (if ComfyUI is detected or auto-installed)
         comfy_dir = asset_manager.detect_comfyui_dir()

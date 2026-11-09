@@ -46,7 +46,9 @@ If smartIdleDisabled And FSO.FileExists(ScriptDir & "\tools\koboldcpp.exe") Then
     modelFile = ""
     mmprojFile = ""
     mmprojArg = ""
-    If FSO.FileExists(ScriptDir & "\models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf") Then
+    If FSO.FileExists(ScriptDir & "\models\Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf") Then
+        modelFile = ScriptDir & "\models\Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+    ElseIf FSO.FileExists(ScriptDir & "\models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf") Then
         modelFile = ScriptDir & "\models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
     ElseIf FSO.FolderExists(ScriptDir & "\models") Then
         For Each f In FSO.GetFolder(ScriptDir & "\models").Files
@@ -57,17 +59,19 @@ If smartIdleDisabled And FSO.FileExists(ScriptDir & "\tools\koboldcpp.exe") Then
         Next
     End If
 
-    If FSO.FileExists(ScriptDir & "\models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf") Then
-        mmprojFile = ScriptDir & "\models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
-    ElseIf FSO.FileExists(ScriptDir & "\models\mmproj-model-bf16.gguf") Then
-        mmprojFile = ScriptDir & "\models\mmproj-model-bf16.gguf"
-    ElseIf FSO.FolderExists(ScriptDir & "\models") Then
-        For Each f In FSO.GetFolder(ScriptDir & "\models").Files
-            If LCase(FSO.GetExtensionName(f.Name)) = "gguf" And InStr(LCase(f.Name), "mmproj") > 0 Then
-                mmprojFile = f.Path
-                Exit For
-            End If
-        Next
+    If InStr(LCase(modelFile), "stheno") = 0 And InStr(LCase(modelFile), "llama") = 0 Then
+        If FSO.FileExists(ScriptDir & "\models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf") Then
+            mmprojFile = ScriptDir & "\models\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf"
+        ElseIf FSO.FileExists(ScriptDir & "\models\mmproj-model-bf16.gguf") Then
+            mmprojFile = ScriptDir & "\models\mmproj-model-bf16.gguf"
+        ElseIf FSO.FolderExists(ScriptDir & "\models") Then
+            For Each f In FSO.GetFolder(ScriptDir & "\models").Files
+                If LCase(FSO.GetExtensionName(f.Name)) = "gguf" And InStr(LCase(f.Name), "mmproj") > 0 Then
+                    mmprojFile = f.Path
+                    Exit For
+                End If
+            Next
+        End If
     End If
 
     If mmprojFile <> "" Then
