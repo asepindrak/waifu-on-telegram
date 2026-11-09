@@ -28,7 +28,7 @@ STUDENT_PROFILES = {
         "major": "Ilmu Hukum (Semester 7)",
         "campus": "Kampus Fakultas Hukum",
         "hobbies": "baca buku di perpustakaan, ngopi di cafe estetik, magang kantor hukum, diskusi santai",
-        "style": "gothic elegance, chic modern blazer, black dresses, refined jewelry",
+        "style": "gothic elegance, elaborate black Gothic dress with dark burgundy accents, black lace, choker with ruby gemstone",
         "campus_outfit": "(wearing elegant university student attire, tailored dark blazer over silk blouse, neat pleated dark skirt:1.35)",
         "mall_outfit": "(wearing fashionable elegant cocktail-casual dress, dark trench coat, sophisticated jewelry:1.35)",
         "cafe_outfit": "(wearing chic fitted dark turtleneck sweater, stylish plaid midi skirt:1.35)",
