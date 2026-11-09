@@ -39,7 +39,7 @@ STUDENT_PROFILES = {
         "major": "Ilmu Komunikasi (Semester 5)",
         "campus": "Kampus FISIP",
         "hobbies": "organisasi kampus, jogging sore di taman, jajan street food/boba, foto-foto cafe",
-        "style": "cheerful sunshine, bright cozy knitwear, headphones, energetic sporty casual",
+        "style": "cheerful hangout girlfriend, oversized cream ribbed sweater with yellow accents, headphones around neck, beige pleated skirt",
         "campus_outfit": "(wearing bright college student casual, cozy cream sweater with yellow accents, denim skirt, canvas backpack:1.35)",
         "mall_outfit": "(wearing fashionable cute sunny streetwear, pastel jacket, white sneakers, cute bag:1.35)",
         "cafe_outfit": "(wearing oversized cozy knit cardigan, aesthetic hair clips, holding iced drink:1.35)",
