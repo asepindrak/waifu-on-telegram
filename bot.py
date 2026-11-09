@@ -4818,9 +4818,9 @@ def handle_incoming_photo(message):
                     {"role": "user", "content": caption}
                 ]
 
-                reply, _ = llm_client.chat(messages, image_bytes=downloaded, max_tokens=150)
+                reply, _ = llm_client.chat(messages, image_bytes=downloaded, max_tokens=300)
                 if not reply:
-                    reply = "Fotonya keren! Kelihatan pas banget~"
+                    reply = "*tersenyum melihat fotomu*\n\nFotonya keren banget! Kelihatan pas dan cocok banget di kamu~ 💕"
                 bot.reply_to(message, reply)
 
                 persona_mgr.add_message(message.from_user.id, "user", f"[User sent a photo: {caption}]")
@@ -6146,23 +6146,39 @@ def is_echo_or_parroting(reply: str, user_text: str) -> bool:
 
 def get_contextual_fallback_reaction(user_text: str, persona_name: str = "Runa") -> str:
     """
-    Generates a natural, warm, and affectionate girlfriend reaction when an echo is intercepted.
+    Generates a natural, warm, and affectionate girlfriend reaction when an echo or empty LLM reply occurs.
     """
     u_low = user_text.lower()
 
+    # Food offering / bringing snacks to kosan / home
+    if any(k in u_low for k in ["bawain", "bawa", "martabak", "nasgor", "beliin", "pesenin", "camilan", "snack"]):
+        return "*tersenyum antusias matanya berbinar*\n\nWahh mau banget! Apa aja yang kamu bawa pasti aku makan kok, martabak atau nasgor kedengeran enak banget~ Makasih banyak yaa 💕"
+
+    # Food / eating
     if any(k in u_low for k in ["makan", "lunch", "sarapan", "laper", "kenyang", "restoran", "kuliner", "cafe", "kafe", "food"]):
-        return "Wah asyik banget makan bareng mereka! Jangan lupa makan yang banyak dan kenyang yaa 💕"
+        return "*tersenyum senang*\n\nWah enak banget tuh makanannya! Jangan lupa makan yang kenyang yaa biar gak lemes dan tetap semangat hari ini 💕"
 
+    # Main ke kosan / rumah / berkunjung
+    if any(k in u_low for k in ["kosan", "kos", "rumah", "main", "otw", "sampe", "nyampe", "mampir", "ke sini", "kesini"]):
+        return "*merapikan rambut sambil tersenyum manis*\n\nBoleh banget, pintu kosan selalu terbuka kok buat kamu! Hati-hati di jalan yaa, aku tungguin di sini 🥰"
+
+    # Greeting / halo / sapaan
+    if any(k in u_low for k in ["halo", "hai", "pagi", "siang", "sore", "malam", "selamat"]):
+        return "*tersenyum manis menyapamu hangat*\n\nHai juga! Seneng deh kamu nyapa, lagi sibuk apa atau lagi santai nih? 💕"
+
+    # Office gathering / hangout bareng anak kantor
     if any(k in u_low for k in ["gathering", "kumpul", "nongkrong", "anak-anak", "anak2", "temen", "teman", "kantor"]):
-        return "Wah seru banget tuh kumpul bareng anak-anak kantor! Pasti rame yaa, have fun dan nikmati acaranya 🥰"
+        return "*mengangguk antusias*\n\nWah seru banget tuh kumpul bareng anak-anak kantor! Pasti rame yaa, have fun dan nikmati acaranya 🥰"
 
-    if any(k in u_low for k in ["kerja", "lembur", "kantor", "meeting", "rapat", "proyek", "project", "tugas", "kuliah"]):
-        return "Semangat yaa buat kerjaannya! Jangan sampai terlalu capek yaa, nanti kabarin kalau udah senggang 💕"
+    # Kerja / kuliah / lembur / tugas
+    if any(k in u_low for k in ["kerja", "lembur", "meeting", "rapat", "proyek", "project", "tugas", "kuliah", "nugas"]):
+        return "*menatapmu lembut memberi semangat*\n\nSemangat yaa buat kerjaannya! Jangan sampai terlalu capek yaa, nanti kabarin kalau udah senggang 💕"
 
-    if any(k in u_low for k in ["game", "main", "jalan", "libur", "santai", "rebahan", "nonton"]):
-        return "Wah asyik tuh! Selamat santai dan have fun yaa, nanti cerita-cerita lagi sama aku 🥰"
+    # Game / libur / santai / nonton
+    if any(k in u_low for k in ["game", "jalan", "libur", "santai", "rebahan", "nonton"]):
+        return "*tersenyum riang*\n\nWah asyik tuh! Selamat santai dan have fun yaa, nanti cerita-cerita lagi sama aku 🥰"
 
-    return "Wah asyik tuh! Ceritain dong nanti gimana kelanjutannya, aku seneng banget dengerin cerita kamu 💕"
+    return "*tersenyum hangat menatapmu*\n\nHehe iyaa, aku selalu seneng dengerin dan nemenin kamu. Ceritain dong gimana kelanjutannya~ 💕"
 
 
 META_REASONING_PATTERNS = [
@@ -6502,7 +6518,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
                 try:
                     idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id, is_nsfw=is_nsfw_turn)
-                    reply_text, _ = llm_client.chat(messages, max_tokens=150, is_nsfw=is_nsfw_turn)
+                    reply_text, _ = llm_client.chat(messages, max_tokens=400, is_nsfw=is_nsfw_turn)
                 except Exception as e:
                     logger.error(f"Chat error / LLM timeout: {e}")
                     pending_manager.record_failed_message(message, user_text, is_voice=is_voice, error=str(e))
@@ -6519,7 +6535,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 pending_manager.clear_pending(message.chat.id)
 
                 if not reply_text or not reply_text.strip():
-                    reply_text = "Aku dengerin kok, lagi mikirin apa nih?"
+                    reply_text = get_contextual_fallback_reaction(user_text, persona.get("name", "Runa"))
 
                 # Anti-Parroting & Meta-Leak Guard: Intercept repetition or leaked reasoning thoughts
                 if is_echo_or_parroting(reply_text, user_text) or is_meta_or_reasoning_leak(reply_text):
@@ -6529,7 +6545,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                         retry_messages = [{"role": "system", "content": steer_sys}]
                         retry_messages.extend(history)
                         retry_messages.append({"role": "user", "content": user_text})
-                        steered_reply, _ = llm_client.chat(retry_messages, max_tokens=150, temperature=0.85)
+                        steered_reply, _ = llm_client.chat(retry_messages, max_tokens=400, temperature=0.85)
                         if (steered_reply 
                             and not is_echo_or_parroting(steered_reply, user_text)
                             and not is_meta_or_reasoning_leak(steered_reply)):
@@ -6743,7 +6759,7 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
                 {"role": "user", "content": prompt}
             ]
             try:
-                text, _ = llm_client.chat(messages, max_tokens=150)
+                text, _ = llm_client.chat(messages, max_tokens=350)
             except Exception:
                 text = None
             if not text:

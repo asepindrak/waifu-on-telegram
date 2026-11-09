@@ -732,6 +732,15 @@ def cmd_models(subcmd=None, target=None):
             print("Available keys: " + ", ".join(asset_manager.ASSET_REGISTRY.keys()))
             return
         target = target.lower().strip()
+        if target == "moondream":
+            print(c(CYAN, "⏳ Downloading complete Moondream2 vision suite (Text Model + mmproj)..."))
+            ok1 = asset_manager.download_asset("moondream_text")
+            ok2 = asset_manager.download_asset("moondream_mmproj")
+            if ok1 and ok2:
+                print(c(GREEN, "✓ Moondream2 vision models downloaded and ready!"))
+            return
+        if target in ("stheno", "stheno-8b"):
+            target = "stheno_8b"
         info = asset_manager.get_asset_info(target)
         if not info:
             print(c(RED, f"Unknown asset key: '{target}'. Available: {list(asset_manager.ASSET_REGISTRY.keys())}"))
@@ -797,6 +806,13 @@ def cmd_update():
                 print(c(GREEN, "  ✓ Latest source code pulled successfully from GitHub."))
                 if res.stdout.strip():
                     print(c(DIM, "    " + res.stdout.strip().replace("\n", "\n    ")))
+                # If new commits were fetched, respawn updater to run newly fetched logic
+                if any(k in res.stdout for k in ["Updating ", "Fast-forward", "files changed"]) and not os.environ.get("_WAIFU_UPDATE_RESPAWNED"):
+                    print(c(CYAN, "  ⚡ Source code updated! Reloading updater with latest release..."))
+                    new_env = os.environ.copy()
+                    new_env["_WAIFU_UPDATE_RESPAWNED"] = "1"
+                    ret = subprocess.run([sys.executable, os.path.join(PROJECT_ROOT, "bin", "cli.py"), "update"], env=new_env)
+                    sys.exit(ret.returncode)
             else:
                 notice = res.stderr.strip() or res.stdout.strip()
                 # If git pull is blocked by local changes or untracked conflicts
@@ -807,6 +823,12 @@ def cmd_update():
                     res_reset = subprocess.run(["git", "reset", "--hard", "origin/main"], cwd=PROJECT_ROOT, capture_output=True, text=True)
                     if res_reset.returncode == 0:
                         print(c(GREEN, "  ✓ Source code successfully synchronized with official release!"))
+                        if not os.environ.get("_WAIFU_UPDATE_RESPAWNED"):
+                            print(c(CYAN, "  ⚡ Reloading updater with latest release..."))
+                            new_env = os.environ.copy()
+                            new_env["_WAIFU_UPDATE_RESPAWNED"] = "1"
+                            ret = subprocess.run([sys.executable, os.path.join(PROJECT_ROOT, "bin", "cli.py"), "update"], env=new_env)
+                            sys.exit(ret.returncode)
                     else:
                         print(c(YELLOW, f"  ℹ Git notice: {notice}"))
                 else:
@@ -915,29 +937,19 @@ def cmd_update():
         except Exception as e_env:
             logger.debug(f"Auto-select error: {e_env}")
 
-        # 2. Vision Adapter: Huihui-Qwythos Vision mmproj & Local Moondream
-        info_vis = asset_manager.get_asset_info("qwythos_vision")
-        if info_vis and not info_vis.get("installed"):
-            print(c(YELLOW, f"  ⏳ Vision Adapter '{info_vis['name']}' missing. Auto-downloading (~{info_vis['size_mb']} MB)..."))
-            ok = asset_manager.download_asset("qwythos_vision")
-            if ok:
-                print(c(GREEN, f"  ✓ '{info_vis['name']}' downloaded successfully!"))
+        # 2. Vision Perception Models: Moondream2 (Ultra-lightweight local perception for Telegram photos)
+        for m_key in ("moondream_text", "moondream_mmproj"):
+            info_m = asset_manager.get_asset_info(m_key)
+            if info_m and not info_m.get("installed"):
+                print(c(YELLOW, f"  ⏳ Vision Model '{info_m['name']}' missing. Auto-downloading (~{info_m['size_mb']} MB)..."))
+                ok = asset_manager.download_asset(m_key)
+                if ok:
+                    print(c(GREEN, f"  ✓ '{info_m['name']}' downloaded successfully!"))
+                else:
+                    print(c(RED, f"  ❌ Download failed for '{info_m['name']}'. Run 'waifu models download {m_key}'."))
             else:
-                print(c(RED, f"  ❌ Download failed for '{info_vis['name']}'. Run 'waifu models download qwythos_vision'."))
-        else:
-            sz = info_vis.get("current_size_mb", 0) if info_vis else 0
-            print(c(GREEN, f"  ✓ Vision Adapter '{info_vis['name']}' is ready ({sz} MB)."))
-
-        # If user is in local LLM mode (non-AGY), verify Moondream local vision assets
-        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower()
-        if sfw_p != "agy":
-            for m_key in ("moondream_text", "moondream_mmproj"):
-                info_m = asset_manager.get_asset_info(m_key)
-                if info_m and not info_m.get("installed"):
-                    print(c(YELLOW, f"  ⏳ Local Vision '{info_m['name']}' missing. Auto-downloading (~{info_m['size_mb']} MB)..."))
-                    ok = asset_manager.download_asset(m_key)
-                    if ok:
-                        print(c(GREEN, f"  ✓ '{info_m['name']}' downloaded successfully!"))
+                sz = info_m.get("current_size_mb", 0) if info_m else 0
+                print(c(GREEN, f"  ✓ Vision Model '{info_m['name']}' is ready ({sz} MB)."))
 
         # 3. ComfyUI Models (if ComfyUI is detected or auto-installed)
         comfy_dir = asset_manager.detect_comfyui_dir()

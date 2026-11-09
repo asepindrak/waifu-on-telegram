@@ -465,7 +465,7 @@ class WaifuCLISession:
 
             loader.set_status(f"{p_name} sedang mengetik...", emoji="💋" if is_nsfw_turn else "🌸")
             try:
-                raw_reply, _ = self.llm_client.chat(messages, max_tokens=150, is_nsfw=is_nsfw_turn)
+                raw_reply, _ = self.llm_client.chat(messages, max_tokens=400, is_nsfw=is_nsfw_turn)
             except Exception as e:
                 loader.stop()
                 print(f"⚠️ {c(RED, f'Koneksi ke LLM lokal gagal: {e}')}\n")

@@ -323,13 +323,13 @@ class LocallyUncensoredClient:
 
         # If clean_reply was empty because tokens ended during reasoning or was pure meta-leak:
         if not clean_reply and reasoning:
-            # Look for quoted dialogue inside reasoning: e.g. "Lagi nunggu kamu kok, sayang!"
+            # Look for quoted dialogue or Indonesian sentence inside reasoning
             quotes = re.findall(r'"([^"]{5,120})"', reasoning)
-            if quotes:
-                clean_reply = quotes[-1].strip()
-            else:
-                # Look for Indonesian or affectionate sentence inside reasoning
-                clean_reply = "Hai! Aku lagi di sini kok nemenin kamu. Ada yang mau diobrolin?"
+            for q in reversed(quotes):
+                q_strip = q.strip()
+                if not re.match(r'(?i)^(i need to|i should|i must|respond|user|girlfriend|assistant|character|system)', q_strip):
+                    clean_reply = q_strip
+                    break
 
         return clean_reply, reasoning
 

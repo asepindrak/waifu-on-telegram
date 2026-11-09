@@ -406,7 +406,7 @@ class HybridLLMClient:
         # Multimodal Vision Routing (AGY Bridge 0-VRAM vs Local Moondream2)
         processed_image_bytes = image_bytes
         if image_bytes:
-            if ":8001" in str(client_url) or getattr(self, "sfw_provider", "") == "agy":
+            if ":8001" in str(client_url):
                 logger.info("Routing image to AGY Bridge for 0-VRAM multimodal perception.")
             else:
                 try:
