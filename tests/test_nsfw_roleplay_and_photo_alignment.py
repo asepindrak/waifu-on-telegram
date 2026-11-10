@@ -61,6 +61,12 @@ class TestNSFWRoleplayAndPhotoAlignment(unittest.TestCase):
         self.assertIsNotNone(cue_butt)
         self.assertIn("butt", cue_butt)
 
+        # Crotch / memek / vagina
+        cue_crotch = self.persona_mgr.detect_anatomy_cues("foto close up memek kamu dong")
+        self.assertIsNotNone(cue_crotch)
+        self.assertIn("crotch", cue_crotch)
+        self.assertIn("pussy", cue_crotch)
+
     def test_craft_visual_prompt_full_with_anatomy(self):
         prompt, extra_neg, is_nude, name = self.persona_mgr.craft_visual_prompt_full(
             "foto nenen kamu sambil rebahan telentang", is_nsfw=True
@@ -68,6 +74,16 @@ class TestNSFWRoleplayAndPhotoAlignment(unittest.TestCase):
         self.assertTrue(is_nude)
         self.assertIn("breasts", prompt)
         self.assertIn("lying on back", prompt)
+
+        # Crotch / memek test
+        p_crotch, neg_crotch, is_nude_c, _ = self.persona_mgr.craft_visual_prompt_full(
+            "foto close up vagina", is_nsfw=True
+        )
+        self.assertTrue(is_nude_c)
+        self.assertIn("crotch", p_crotch)
+        self.assertIn("pussy", p_crotch)
+        self.assertIn("lower body", p_crotch)
+        self.assertIn("mosaic", neg_crotch)
 
     def test_detect_nsfw_intent_expanded_keywords(self):
         # Verify routing engine catches all Indonesian adult/intimate phrases

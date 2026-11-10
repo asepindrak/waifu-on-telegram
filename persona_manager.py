@@ -200,6 +200,9 @@ BODY_POSES = [
 ]
 
 ANATOMY_CUES = [
+    # Crotch / Vagina / Memek / Pussy
+    ([r"\b(memek|pepek|vagina|kemaluan|puki|itil|liang|crotch|pussy|vulva|labia)\b"],
+     "close-up on exposed crotch, detailed pussy, uncensored, cameltoe, spread legs, lower body focus, sensual intimate framing"),
     # Breasts / Toket / Nenen
     ([r"\b(nenen|toket|tetek|payudara|dada)\b", r"\b(breasts|boobs|cleavage|nipples|tits)\b"],
      "close-up on natural exposed breasts, detailed nipples, cleavage, bare chest"),
@@ -1055,6 +1058,9 @@ class PersonaManager:
             "candid POV snapshot, gentle blushing expression, looking directly into lens, natural cinematic lighting"
         ]
 
+        # Detect intimate anatomy cues requested by user (e.g. crotch/memek/vagina, breasts/nenen/toket, thighs/paha, butt/pantat)
+        anatomy_cue = self.detect_anatomy_cues(user_text)
+
         # Check explicit camera angle and body pose requested by user
         angle_cue, pose_cue = self.detect_camera_angle_and_pose(user_text)
         if angle_cue or pose_cue:
@@ -1065,18 +1071,30 @@ class PersonaManager:
                 custom_parts.append(pose_cue)
             chosen_angle = ", ".join(custom_parts)
             logger.info(f"Explicit camera angle & pose detected: {chosen_angle}")
+        elif anatomy_cue and any(k in anatomy_cue for k in ["pussy", "crotch"]):
+            # For crotch/vagina requests, prioritize lower body framing, avoid face close-up conflicting signals
+            chosen_angle = "intimate lower body perspective, view from above, looking down at body, sensual spread legs framing"
+            logger.info(f"Lower body framing selected for crotch focus: {chosen_angle}")
+        elif anatomy_cue and any(k in anatomy_cue for k in ["butt"]):
+            # For butt requests, prioritize back view
+            chosen_angle = "view from behind, seductive rear perspective"
+            logger.info(f"Rear framing selected for butt focus: {chosen_angle}")
         else:
             import random
             chosen_angle = random.choice(micro_angles)
 
-        # Detect intimate anatomy cues requested by user (e.g. breasts/nenen/toket, thighs/paha, butt/pantat)
-        anatomy_cue = self.detect_anatomy_cues(user_text)
+        # If lower body anatomy is requested, suppress censor artifacts in negative prompt
+        if anatomy_cue and any(k in anatomy_cue for k in ["pussy", "crotch"]):
+            anti_censor = "censored, mosaic, mosaic censor, bar censor, panties, underwear"
+            extra_neg = f"{extra_neg}, {anti_censor}" if extra_neg else anti_censor
 
         prompt_elements = [base_visual, outfit_prompt, scene, chosen_angle]
         if anatomy_cue:
             prompt_elements.append(anatomy_cue)
             logger.info(f"Intimate anatomy cues injected: {anatomy_cue}")
-        prompt_elements.extend(["detailed eyes", "masterpiece quality"])
+        if not (anatomy_cue and any(k in anatomy_cue for k in ["pussy", "crotch"])):
+            prompt_elements.append("detailed eyes")
+        prompt_elements.extend(["masterpiece quality", "high resolution anime art"])
 
         visual_prompt = ", ".join(p for p in prompt_elements if p)
         return (visual_prompt, extra_neg, is_nude, outfit_name)
