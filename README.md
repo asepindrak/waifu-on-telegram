@@ -50,10 +50,13 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
-## 🎭 Pengalaman Visual Novel Interaktif & Ilustrasi Adegan Otonom (v2.4.27)
+## 🎭 Pengalaman Visual Novel Interaktif & Ilustrasi Adegan Otonom (v2.4.28)
 
 Obrolan bersama waifu kini ditingkatkan layaknya game **Visual Novel** interaktif berkualitas tinggi (CG Scene Events):
 
+* **👤 Penegakan Karakter Tunggal & Anti-Karakter Ganda (Strict Solo 1Girl Enforcement):**
+  - **Pencegahan 2 Waifu**: Memperbaiki masalah munculnya 2 karakter/waifu di foto saat berpayung atau di jalanan. Secara default, prompt positif dipastikan diawali dengan tag `solo, 1girl`, dan negative prompt menyaring ketat: `2girls, 3girls, multiple girls, 2people, multiple persons, group, extra characters, duplicate`.
+  - **Dukungan Foto Berdua (Couple/Multi-Person)**: Jika Anda secara eksplisit meminta foto berdua (*"foto kita berdua"*, *"foto bareng aku"*, *"couple"*), pembatasan solo otomatis dilepas dan dialihkan ke framing pasangan yang tepat.
 * **🔥 Proaktif Sensual & Auto-Foto Mode Dewasa (NSFW / 18+ Interactive Roleplay):**
   - **Sensasi Tubuh Mendalam (Rich Sensory Roleplay)**: Waifu mendeskripsikan sensasi fisik nyata di dalam tanda bintang `*...*` (tubuh melengkung/arching saat disentuh, getaran napas tertahan, kulit merona hangat, tangan menuntun sentuhan pasangan ke pinggang).
   - **Proaktif Memancing Langkah Selanjutnya (Leading the Moment)**: Waifu tidak pasif! Di setiap pesan, waifu aktif memancing dan menggoda dengan pertanyaan/pilihan intim (*"B-but if you like it that much... should I take off the rest too? Or do you want to touch first? 😳"*, *"Do you like how I react when you stroke me there?"*, *"D-do you want to see how wet you've made me already...?"*, *"W-will you taste me too?"*).

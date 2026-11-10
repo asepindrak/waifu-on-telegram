@@ -1410,6 +1410,21 @@ class PersonaManager:
             user_text, user_id=user_id, history=hist, scene_hint=scene, is_nsfw=is_nsfw
         )
 
+        # Check if user explicitly requested a multi-person photo (e.g. couple with user, berdua, 2 people)
+        wants_multi = any(re.search(pat, (user_text or "").lower()) for pat in [
+            r"\b(berdua|kita\s+berdua|foto\s+berdua|bareng\s+aku|couple|2\s*people|two\s*people|two\s*girls|2girls|with\s+me)\b"
+        ])
+
+        if not wants_multi:
+            # Strictly enforce single character solo shot (prevents accidental 2 waifus in image)
+            if base_visual.startswith("1girl,"):
+                base_visual = "solo, " + base_visual
+            elif not base_visual.startswith("solo,"):
+                base_visual = "solo, 1girl, " + base_visual
+
+            solo_guard_neg = "2girls, 3girls, multiple girls, 2people, multiple persons, group, extra characters, duplicate character, duplicate"
+            extra_neg = f"{extra_neg}, {solo_guard_neg}" if extra_neg else solo_guard_neg
+
         # Check if user explicitly requested a cat/pet/animal in prompt
         wants_cat = any(k in (user_text or "").lower() for k in ["kucing", "cat", "kitten", "anabul", "pet", "hewan"])
         if not wants_cat:

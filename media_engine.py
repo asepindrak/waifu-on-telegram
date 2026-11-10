@@ -335,7 +335,7 @@ class MediaEngine:
     def generate_image_comfyui(
         self,
         prompt: str,
-        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, blurry",
+        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, 2girls, 3girls, multiple girls, 2people, multiple persons, group, extra characters, blurry",
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None,
         width: Optional[int] = None,
@@ -363,7 +363,7 @@ class MediaEngine:
     def _execute_generate_image_comfyui(
         self,
         prompt: str,
-        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, blurry",
+        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, 2girls, 3girls, multiple girls, 2people, multiple persons, group, extra characters, blurry",
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None,
         width: Optional[int] = None,
@@ -691,7 +691,7 @@ class MediaEngine:
             if self.comfyui_url:
                 local_img = self.generate_image_comfyui(
                     effective_prompt,
-                    negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, blurry",
+                    negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, 2girls, 3girls, multiple girls, 2people, multiple persons, group, extra characters, blurry",
                     aspect_ratio=aspect_ratio,
                     quality=quality,
                     is_nude=is_nude,

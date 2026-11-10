@@ -133,6 +133,29 @@ class TestVisualNovelSceneAndAnatomy(unittest.TestCase):
         self.assertIn("lakeside wooden pier", scene_prompt)
 
 
+    def test_single_waifu_solo_enforcement(self):
+        """Verifies that normal prompts strictly enforce 1 solo waifu and forbid multiple girls."""
+        prompt, neg, is_nude, name = self.persona_mgr.craft_visual_prompt_full(
+            user_text="lagi neduh di halte bis kehujanan bareng kamu",
+            user_id=12345
+        )
+        # Positive prompt must start with solo
+        self.assertTrue(prompt.startswith("solo, 1girl"), f"Expected prompt to start with 'solo, 1girl', got: {prompt[:30]}")
+        # Negative prompt must strictly forbid 2girls and multiple girls
+        self.assertIn("2girls", neg)
+        self.assertIn("multiple girls", neg)
+        self.assertIn("2people", neg)
+
+    def test_multi_person_explicit_request(self):
+        """When user explicitly asks for a couple/two people photo, solo restriction is lifted."""
+        prompt, neg, is_nude, name = self.persona_mgr.craft_visual_prompt_full(
+            user_text="foto kita berdua dong",
+            user_id=12345
+        )
+        self.assertNotIn("2girls", neg)
+        self.assertNotIn("2people", neg)
+
+
 if __name__ == "__main__":
     unittest.main()
 
