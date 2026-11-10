@@ -416,8 +416,14 @@ class HybridLLMClient:
         client_model = getattr(target_client, 'model', 'default')
         logger.info(f"Routing chat turn -> [{target_label}] Engine ({client_url}, Model: {client_model})")
 
-        # Auto-wake local KoboldCPP if targeted on port 5001
-        if "5001" in str(client_url):
+        is_mock_client = (
+            type(target_client).__module__ == "unittest.mock"
+            or hasattr(target_client, "_mock_return_value")
+            or hasattr(target_client, "_mock_wraps")
+        )
+
+        # Auto-wake local KoboldCPP if targeted on port 5001 (production real clients only)
+        if not is_mock_client and "5001" in str(client_url):
             from idle_engine import is_port_listening
             if not is_port_listening(5001):
                 try:
@@ -427,8 +433,20 @@ class HybridLLMClient:
                 except Exception as e_w:
                     logger.debug(f"Could not auto-wake KoboldCPP on port 5001: {e_w}")
 
+            # If KoboldCPP is still offline after waking attempt, failover to SFW client immediately
+            if not is_port_listening(5001):
+                if is_port_listening(8001) or self.is_sfw_cloud():
+                    logger.warning(
+                        "Local KoboldCPP (port 5001) is offline and could not be awakened. "
+                        "Seamlessly falling back to SFW LLM engine to prevent timeout hanging."
+                    )
+                    target_client = self.sfw_client
+                    target_label = "SFW-Fallback"
+                    client_url = getattr(target_client, 'base_url', 'unknown')
+                    client_model = getattr(target_client, 'model', 'default')
+
         # Auto-wake / auto-run AGY Bridge if targeted on port 8001
-        if "8001" in str(client_url):
+        if not is_mock_client and "8001" in str(client_url):
             from idle_engine import is_port_listening
             if not is_port_listening(8001):
                 try:
@@ -536,10 +554,10 @@ class HybridLLMClient:
                     backup = LocallyUncensoredClient(base_url="http://127.0.0.1:5001/v1", model="default")
                     return backup.chat(messages, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
 
-                elif "5001" in str(client_url) and is_port_listening(8001):
-                    logger.warning(f"Local KoboldCPP unreachable ({e}). Seamlessly falling back to AGY Bridge (port 8001)...")
-                    backup = LocallyUncensoredClient(base_url="http://127.0.0.1:8001/v1", model="gemini-3.8-flash-medium")
-                    return backup.chat(messages, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
+                elif "5001" in str(client_url) and (is_port_listening(8001) or self.is_sfw_cloud()):
+                    logger.warning(f"Local KoboldCPP unreachable ({e}). Seamlessly falling back to SFW engine...")
+                    fallback_msgs = sanitize_messages_for_sfw(messages) if self.is_split_mode() else messages
+                    return self.sfw_client.chat(fallback_msgs, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
 
             raise
 

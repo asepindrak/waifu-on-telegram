@@ -50,6 +50,23 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
+## 🛡️ Circuit Breaker Anti-Flapping LLM, Self-Healing Cooldown & Split-Mode Failover (v2.4.32)
+
+Pembaruan v2.4.32 menuntaskan bug fatal *flapping loop* (siklus berulang online-offline dan notifikasi spam ratusan pesan ke Telegram):
+
+* **🛑 Circuit Breaker Antrean Pesan Gagal (`PendingMessageManager`):**
+  - **Batas Maksimal Retry (Circuit Breaker)**: Pesan yang gagal diproses (karena backend LLM offline/timeout) kini dibatasi maksimal **2 kali percobaan** per pesan. Jika gagal melebihi batas, pesan otomatis di-*drop* secara permanen untuk memutus siklus retry rekursif tak berujung.
+  - **Rate Limiting Notifikasi Pemulihan**: Pemberitahuan transisi `"Server LLM sudah kembali online!"` kini dibatasi maksimal 1 kali per **300 detik** per percakapan, mencegah ledakan bubble chat notifikasi.
+* **⏱️ Anti-Spam Notifikasi Self-Healing (`HealthEngine`):**
+  - **Cooldown Siaran Alarm & Pemulihan (5 Menit Cooldown)**: Siaran alarm *"Service LLM Mati"* dan *"Service LLM Telah Pulih"* dibatasi minimal selang **300 detik** (5 menit). Fluktuasi backend singkat tidak akan lagi membombardir grup atau chat pengguna dengan puluhan pesan alarm.
+  - **Latch Batas Percobaan Self-Healing**: Pesan kegagalan batas maksimal restart (3x) hanya dikirim **1 kali** per jendela pengawasan, menghentikan spam pesan failure setiap 30 detik dari watchdog loop.
+  - **Sanity Check Sebelum Alarm Offline**: `mark_llm_failure` kini memverifikasi status `/models` / health endpoint sebelum mendeklarasikan offline, sehingga error parsial per-prompt atau timeout tunggal tidak memicu false alarm service mati.
+* **🔀 Split Mode High-Availability Failover (`IdleEngine` & `RoutingEngine`):**
+  - **Pencegahan Timeout Menggantung (150s Hang)**: Saat mode *split* aktif (`AI_ENGINE_MODE=split`) dan engine NSFW lokal (port 5001) sedang tidak aktif atau gagal bangun, routing percakapan secara mulus langsung mengalihkan (*failover*) giliran chat ke provider SFW aktif (Google AGY OpenAI Bridge pada port 8001 / Cloud) dengan *prompt sanitization*.
+  - **Deteksi Kesiapan Sadar Konteks**: `is_llm_ready()` dan `wake_llm()` pada `IdleEngine` kini sadar flag `is_nsfw`, memastikan status engine diperiksa sesuai port yang ditargetkan tanpa salah mendeteksi status bridge AGY vs KoboldCPP.
+
+---
+
 ## 🎭 Antrean Chat Anti-Bentrok, Jeda Foto Otomatis & Variasi Komposisi Kamera (v2.4.31)
 
 Pembaruan v2.4.31 menyempurnakan alur percakapan alami, sinkronisasi pesan, dan variasi visual agar interaksi terasa realistis dan sinematik:

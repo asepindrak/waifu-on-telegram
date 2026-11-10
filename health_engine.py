@@ -136,13 +136,23 @@ class HealthEngine:
         self.heal_attempts: Dict[str, List[float]] = {
             "llm": [],
             "comfyui": [],
-            "music": []
+            "music": [],
+            "agy": [],
+            "voicestudio": []
         }
         self.healing_in_progress: Dict[str, bool] = {
             "llm": False,
             "comfyui": False,
-            "music": False
+            "music": False,
+            "agy": False,
+            "voicestudio": False
         }
+        self.heal_limit_alert_sent: Dict[str, bool] = {}
+        self.last_failure_alert_time: Dict[str, float] = {}
+        self.last_recovery_alert_time: Dict[str, float] = {}
+        self.last_recovery_callback_time: Dict[str, float] = {}
+        self.alert_cooldown_seconds: int = 300  # Minimum 5 mins between broadcast alerts to avoid flapping spam
+
         self.max_heal_attempts_per_window: int = 3
         self.heal_window_seconds: int = 900  # 15 minutes
         self.heal_cooldown_seconds: int = 45
@@ -159,7 +169,14 @@ class HealthEngine:
             self.recovery_callbacks.append(callback)
 
     def _notify_recovery(self, service: str, stat: Optional[Dict[str, Any]] = None):
-        """Dispatches recovery notification to registered callbacks."""
+        """Dispatches recovery notification to registered callbacks with cooldown guard."""
+        now = time.time()
+        last_cb = self.last_recovery_callback_time.get(service, 0)
+        if (now - last_cb) < 60.0:
+            logger.info(f"Recovery callback for {service} throttled (already dispatched {int(now - last_cb)}s ago).")
+            return
+        self.last_recovery_callback_time[service] = now
+
         stat_dict = stat or {"online": True, "service": service}
         for cb in list(self.recovery_callbacks):
             try:
@@ -194,7 +211,9 @@ class HealthEngine:
         history = [ts for ts in self.heal_attempts.get(service, []) if now - ts < self.heal_window_seconds]
         self.heal_attempts[service] = history
 
-        if len(history) >= self.max_heal_attempts_per_window:
+        if len(history) < self.max_heal_attempts_per_window:
+            self.heal_limit_alert_sent[service] = False
+        else:
             return False
 
         if history and (now - history[-1]) < self.heal_cooldown_seconds:
@@ -208,12 +227,31 @@ class HealthEngine:
         Guarantees strict singleton execution: prevents multiple KoboldCPP instances from spawning.
         Returns True if service is running and healthy.
         """
-        # If active LLM is AGY OpenAI Bridge (Port 8001)
         base_url = getattr(self.llm_client, "base_url", "")
         sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
+        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "").lower().strip()
+        mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip()
+
+        # In split mode, check whichever engine is offline
+        if mode in ("split", "hybrid"):
+            ok = True
+            if (sfw_p == "agy" or ":8001" in str(base_url)):
+                if not is_port_listening(8001, timeout=1.5):
+                    ok = self.heal_agy() and ok
+            elif not is_port_listening(5001):
+                ok = self._heal_koboldcpp_instance() and ok
+
+            if (nsfw_p == "local" or ":5001" in str(getattr(self.llm_client, "nsfw_client", ""))) and not is_port_listening(5001):
+                ok = self._heal_koboldcpp_instance() and ok
+            return ok
+
+        # If active LLM is AGY OpenAI Bridge (Port 8001)
         if sfw_p == "agy" or ":8001" in str(base_url):
             return self.heal_agy()
 
+        return self._heal_koboldcpp_instance()
+
+    def _heal_koboldcpp_instance(self) -> bool:
         with _KOBOLD_SPAWN_LOCK:
             if is_port_listening(5001):
                 stat = self.llm_client.check_health()
@@ -503,7 +541,7 @@ class HealthEngine:
             logger.error(f"Self-healing failed to spawn AGY Bridge: {e}")
         return False
 
-    def attempt_heal_service(self, service: str, bot, recipients: List[int]) -> bool:
+    def attempt_heal_service(self, service: str, bot, recipients: List[int], is_manual: bool = False) -> bool:
         """
         Executes self-healing for a specific service with proactive Telegram status updates.
         """
@@ -520,37 +558,42 @@ class HealthEngine:
             if not self.can_attempt_heal(service):
                 history = self.heal_attempts.get(service, [])
                 if len(history) >= self.max_heal_attempts_per_window:
-                    limit_text = (
-                        f"🚨 **Self-Healing {disp_name} Gagal!**\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Waifu sudah mencoba me-restart service ini sebanyak {self.max_heal_attempts_per_window}x namun tetap mati / crash.\n\n"
-                        f"👉 **Penyebab Kemungkinan**:\n"
-                        f"• VRAM GPU / RAM PC tidak mencukupi untuk memuat model.\n"
-                        f"• File binary atau model rusak / berpindah.\n\n"
-                        f"Silakan periksa manual di PC kamu atau ketik `waifu start` di terminal."
-                    )
-                    markup = types.InlineKeyboardMarkup(row_width=2)
-                    markup.add(
-                        types.InlineKeyboardButton("🔄 Segarkan Status", callback_data="cfg_action:status"),
-                        types.InlineKeyboardButton("⚙️ Menu Setup", callback_data="open_setup_menu")
-                    )
-                    for uid in recipients:
-                        self.send_safe_message(bot, uid, limit_text, reply_markup=markup)
+                    # Only send failure alert once per heal window to prevent spamming Telegram every 30s
+                    if not self.heal_limit_alert_sent.get(service, False):
+                        self.heal_limit_alert_sent[service] = True
+                        limit_text = (
+                            f"🚨 **Self-Healing {disp_name} Gagal!**\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"Waifu sudah mencoba me-restart service ini sebanyak {self.max_heal_attempts_per_window}x namun tetap mati / crash.\n\n"
+                            f"👉 **Penyebab Kemungkinan**:\n"
+                            f"• VRAM GPU / RAM PC tidak mencukupi untuk memuat model.\n"
+                            f"• File binary atau model rusak / berpindah.\n\n"
+                            f"Silakan periksa manual di PC kamu atau ketik `waifu start` di terminal."
+                        )
+                        markup = types.InlineKeyboardMarkup(row_width=2)
+                        markup.add(
+                            types.InlineKeyboardButton("🔄 Segarkan Status", callback_data="cfg_action:status"),
+                            types.InlineKeyboardButton("⚙️ Menu Setup", callback_data="open_setup_menu")
+                        )
+                        for uid in recipients:
+                            self.send_safe_message(bot, uid, limit_text, reply_markup=markup)
                 return False
 
             self.healing_in_progress[service] = True
             self.heal_attempts.setdefault(service, []).append(time.time())
             attempt_num = len(self.heal_attempts[service])
 
-        # Notify that self-healing has been initiated
-        init_text = (
-            f"🩹 **Self-Healing Otomatis Aktif!**\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Service **{disp_name}** terdeteksi mati!\n"
-            f"Waifu sedang otomatis menghidupkan kembali service ini di latar belakang PC kamu (Percobaan {attempt_num}/{self.max_heal_attempts_per_window})... ⏳"
-        )
-        for uid in recipients:
-            self.send_safe_message(bot, uid, init_text)
+        # Notify that self-healing has been initiated:
+        # Only notify if this is a manual trigger OR attempt 1 to prevent spamming chat
+        if is_manual or attempt_num == 1:
+            init_text = (
+                f"🩹 **Self-Healing Otomatis Aktif!**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"Service **{disp_name}** terdeteksi mati!\n"
+                f"Waifu sedang otomatis menghidupkan kembali service ini di latar belakang PC kamu (Percobaan {attempt_num}/{self.max_heal_attempts_per_window})... ⏳"
+            )
+            for uid in recipients:
+                self.send_safe_message(bot, uid, init_text)
 
         success = False
         try:
@@ -570,6 +613,7 @@ class HealthEngine:
 
         if success:
             with self.lock:
+                self.heal_limit_alert_sent[service] = False
                 if service == "llm":
                     self.last_llm_online = True
                     self.llm_offline_alert_sent = False
@@ -590,6 +634,9 @@ class HealthEngine:
             )
             for uid in recipients:
                 self.send_safe_message(bot, uid, succ_text, reply_markup=markup)
+            logger.info(f"Self-healing successfully restored service: {service}")
+            self._notify_recovery(service, {"online": True, "service": service})
+            return True
             logger.info(f"Self-healing successfully restored service: {service}")
             self._notify_recovery(service, {"online": True, "service": service})
             return True
@@ -763,6 +810,13 @@ class HealthEngine:
 
     def broadcast_failure(self, bot, recipients: List[int], stat: Dict[str, Any]):
         """Alerts all users that the local LLM service has crashed or become unreachable."""
+        now = time.time()
+        last_alert = self.last_failure_alert_time.get("llm", 0)
+        if (now - last_alert) < self.alert_cooldown_seconds:
+            logger.info(f"LLM failure alert suppressed by cooldown ({int(now - last_alert)}s / {self.alert_cooldown_seconds}s)")
+            return
+        self.last_failure_alert_time["llm"] = now
+
         error_info = stat.get("error") or f"Tidak dapat terhubung ke {self.llm_client.base_url}"
         alert_text = (
             f"🚨 **PERINGATAN: SERVICE LLM MATI!** 🚨\n"
@@ -787,6 +841,13 @@ class HealthEngine:
 
     def broadcast_recovery(self, bot, recipients: List[int], stat: Dict[str, Any]):
         """Notifies all users that the local LLM service has recovered and is healthy again."""
+        now = time.time()
+        last_alert = self.last_recovery_alert_time.get("llm", 0)
+        if (now - last_alert) < self.alert_cooldown_seconds:
+            logger.info(f"LLM recovery alert suppressed by cooldown ({int(now - last_alert)}s / {self.alert_cooldown_seconds}s)")
+            return
+        self.last_recovery_alert_time["llm"] = now
+
         backend = stat.get("backend", "KoboldCPP")
         model = stat.get("model", "Active Model")
         rec_text = (
@@ -808,7 +869,17 @@ class HealthEngine:
         logger.info(f"Sent LLM service recovery alert to {len(recipients)} recipient(s).")
 
     def mark_llm_failure(self, bot=None, get_recipients_func=None, error_msg: Optional[str] = None):
-        """Immediately records an LLM failure encountered during conversation and triggers self-healing."""
+        """Immediately records an LLM failure encountered during conversation and triggers self-healing if service is down."""
+        # Sanity check: if LLM server is actually still online and responsive (e.g. error was transient or single turn timeout),
+        # do NOT trigger false offline alarms or flapping self-healing loops!
+        try:
+            stat = self.llm_client.check_health()
+            if isinstance(stat, dict) and stat.get("online") is True:
+                logger.info(f"mark_llm_failure called on chat turn error ('{error_msg}'), but LLM endpoint is healthy. Suppressing offline alarm.")
+                return
+        except Exception:
+            pass
+
         with self.lock:
             self.last_llm_online = False
             self.consecutive_llm_failures += 1
@@ -826,7 +897,7 @@ class HealthEngine:
         if self.self_healing_enabled and bot and recipients:
             threading.Thread(
                 target=self.attempt_heal_service,
-                args=("llm", bot, recipients),
+                args=("llm", bot, recipients, False),
                 daemon=True
             ).start()
 
@@ -856,7 +927,7 @@ class HealthEngine:
                             self._notify_recovery("llm", stat)
                     elif not is_sleeping:
                         self.consecutive_llm_failures += 1
-                        should_alert = (self.consecutive_llm_failures >= 2 or self.last_llm_online is True) and not self.llm_offline_alert_sent
+                        should_alert = (self.consecutive_llm_failures >= 2) and not self.llm_offline_alert_sent
                         if should_alert:
                             self.last_llm_online = False
                             self.llm_offline_alert_sent = True
@@ -864,7 +935,7 @@ class HealthEngine:
 
                 # If LLM is offline, not intentionally sleeping, and self-healing enabled, attempt automatic self-healing
                 if not online and not is_sleeping and self.self_healing_enabled and self.can_attempt_heal("llm"):
-                    self.attempt_heal_service("llm", bot, recipients)
+                    self.attempt_heal_service("llm", bot, recipients, is_manual=False)
 
                 # 2. Auxiliary Check: ComfyUI (Port 8188)
                 is_comfy_ondemand = bool(self.idle_engine and self.idle_engine.enabled and (self.idle_engine.comfyui_on_demand or self.idle_engine.is_comfyui_sleeping))
@@ -872,7 +943,7 @@ class HealthEngine:
                     try:
                         import asset_manager
                         if asset_manager.detect_comfyui_dir():
-                            self.attempt_heal_service("comfyui", bot, recipients)
+                            self.attempt_heal_service("comfyui", bot, recipients, is_manual=False)
                     except Exception:
                         pass
 
@@ -880,7 +951,7 @@ class HealthEngine:
                 music_js = os.path.join(self.project_root, "music_player_server.js")
                 music_feat = os.environ.get("MUSIC_FEATURE_ENABLED", "true").lower() in ("true", "1", "yes")
                 if self.self_healing_enabled and music_feat and os.path.exists(music_js) and not is_port_listening(8002) and self.can_attempt_heal("music"):
-                    self.attempt_heal_service("music", bot, recipients)
+                    self.attempt_heal_service("music", bot, recipients, is_manual=False)
 
                 # 4. Auxiliary Check: AGY OpenAI Bridge (Port 8001 - Keep alive if selected)
                 sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
@@ -889,7 +960,7 @@ class HealthEngine:
                 base_url = getattr(self.llm_client, "base_url", "")
                 is_agy_target = (sfw_p == "agy" or nsfw_p == "agy" or sfw_img == "agy" or ":8001" in str(base_url))
                 if is_agy_target and self.self_healing_enabled and not is_port_listening(8001, timeout=1.5) and self.can_attempt_heal("agy"):
-                    self.attempt_heal_service("agy", bot, recipients)
+                    self.attempt_heal_service("agy", bot, recipients, is_manual=False)
 
             except Exception as e:
                 logger.error(f"Error in health monitor loop: {e}")

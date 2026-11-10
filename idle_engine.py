@@ -138,21 +138,27 @@ class IdleEngine:
             if is_agy:
                 self.last_agy_activity = now
 
-    def is_llm_ready(self) -> bool:
+    def is_llm_ready(self, is_nsfw: bool = False) -> bool:
         """Checks if active LLM service is online and listening."""
+        split_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip() in ("split", "hybrid")
         sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
         sfw_url = os.environ.get("SFW_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", ""))
+        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local").lower().strip()
+        nsfw_url = os.environ.get("NSFW_LLM_BASE_URL", "http://127.0.0.1:5001/v1")
+
+        target_provider = nsfw_p if (split_mode and is_nsfw) else sfw_p
+        target_url = nsfw_url if (split_mode and is_nsfw) else sfw_url
 
         # AGY OpenAI Bridge (Port 8001)
-        if sfw_p == "agy" or ":8001" in sfw_url:
+        if target_provider == "agy" or ":8001" in target_url:
             return is_port_listening(8001)
 
         # Ollama (Port 11434)
-        if ":11434" in sfw_url:
+        if ":11434" in target_url:
             return is_port_listening(11434)
 
         # Remote Cloud (OpenAI, Groq, etc.)
-        if sfw_url and not any(p in sfw_url for p in ["127.0.0.1", "localhost"]):
+        if target_url and not any(p in target_url for p in ["127.0.0.1", "localhost"]):
             return True
 
         if not is_port_listening(5001):
@@ -415,21 +421,34 @@ class IdleEngine:
 
         return results
 
-    def wake_llm(self, timeout_seconds: int = 50) -> bool:
+    def wake_llm(self, timeout_seconds: int = 50, is_nsfw: bool = False) -> bool:
         """
         Wakes active LLM on-demand (AGY Bridge or KoboldCPP).
         """
+        split_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip() in ("split", "hybrid")
         sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
         sfw_url = os.environ.get("SFW_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", ""))
-        if sfw_p == "agy" or ":8001" in sfw_url:
+        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local").lower().strip()
+        nsfw_url = os.environ.get("NSFW_LLM_BASE_URL", "http://127.0.0.1:5001/v1")
+
+        target_provider = nsfw_p if (split_mode and is_nsfw) else sfw_p
+        target_url = nsfw_url if (split_mode and is_nsfw) else sfw_url
+
+        if target_provider == "agy" or ":8001" in target_url:
             ok = self.wake_agy_bridge(timeout_seconds=min(timeout_seconds, 20))
             if ok:
                 self.is_llm_sleeping = False
                 self.record_activity()
             return ok
 
+        # Remote Cloud providers (OpenAI, Groq, etc.)
+        if target_url and not any(p in target_url for p in ["127.0.0.1", "localhost"]):
+            self.is_llm_sleeping = False
+            self.record_activity()
+            return True
+
         with self.wake_lock:
-            if self.is_llm_ready():
+            if self.is_llm_ready(is_nsfw=is_nsfw):
                 self.is_llm_sleeping = False
                 self.record_activity()
                 return True
@@ -471,7 +490,7 @@ class IdleEngine:
             # Wait for port and readiness
             deadline = time.time() + timeout_seconds
             while time.time() < deadline:
-                if self.is_llm_ready():
+                if self.is_llm_ready(is_nsfw=is_nsfw):
                     self.is_llm_sleeping = False
                     self.record_activity()
                     logger.info("✓ Smart Idle: KoboldCPP successfully awakened and ready!")
@@ -547,7 +566,7 @@ class IdleEngine:
             self.record_activity()
             return True
 
-        if self.is_llm_ready():
+        if self.is_llm_ready(is_nsfw=is_nsfw):
             self.is_llm_sleeping = False
             self.record_activity()
             return True
@@ -593,10 +612,17 @@ class IdleEngine:
         fb_thread = threading.Thread(target=_feedback_loop, daemon=True)
         fb_thread.start()
         try:
-            ok = self.wake_llm(timeout_seconds=50)
+            ok = self.wake_llm(timeout_seconds=50, is_nsfw=is_nsfw)
         finally:
             stop_feedback.set()
             fb_thread.join(timeout=1.0)
+
+        # Split mode high-availability fallback:
+        # If NSFW KoboldCPP on port 5001 failed to wake, but SFW engine is ready, proceed with fallback!
+        if not ok and split_mode and is_nsfw:
+            if self.is_llm_ready(is_nsfw=False):
+                logger.warning("⚡ Smart Idle: KoboldCPP (port 5001) could not be awakened, but SFW engine is ready. Seamlessly proceeding via SFW fallback.")
+                ok = True
 
         # Handle feedback message
         if waking_msg and bot and chat_id:

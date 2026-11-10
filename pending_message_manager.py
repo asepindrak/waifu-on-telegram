@@ -23,10 +23,12 @@ class PendingMessageManager:
 
     def __init__(self, storage_path: Optional[str] = None, max_age_seconds: int = 900):
         self.max_age_seconds = max_age_seconds  # Default 15 minutes
+        self.max_retries = 2
         self.storage_path = storage_path or os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "data", "pending_chat_retries.json"
         )
         self._pending: Dict[int, Dict[str, Any]] = {}  # chat_id -> data
+        self._chat_failure_history: Dict[int, Dict[str, Any]] = {}
         self._lock = threading.Lock()
         self._retrying_chats = set()  # prevent duplicate simultaneous retries
         self._load_from_disk()
@@ -80,12 +82,29 @@ class PendingMessageManager:
             return
 
         with self._lock:
-            existing = self._pending.get(chat_id, {})
-            retry_count = existing.get("retry_count", 0)
-            if existing.get("user_text") == user_text:
+            hist = self._chat_failure_history.get(chat_id, {})
+            last_text = hist.get("last_text", "")
+            retry_count = hist.get("retry_count", 0)
+
+            if last_text == user_text:
                 retry_count += 1
             else:
                 retry_count = 0
+
+            hist["last_text"] = user_text
+            hist["retry_count"] = retry_count
+            self._chat_failure_history[chat_id] = hist
+
+            # CIRCUIT BREAKER: If this message has failed max_retries, do not re-enqueue!
+            if retry_count >= self.max_retries:
+                logger.warning(
+                    f"🛑 Pending retry circuit breaker triggered for chat_id={chat_id}: "
+                    f"Message '{user_text[:40]}...' reached max retry limit ({retry_count}). "
+                    f"Dropping permanently to prevent flapping loops."
+                )
+                self._pending.pop(chat_id, None)
+                self._save_to_disk()
+                return
 
             self._pending[chat_id] = {
                 "chat_id": chat_id,
@@ -102,7 +121,7 @@ class PendingMessageManager:
 
         logger.info(
             f"📌 Recorded failed chat to pending retry queue for chat_id={chat_id}, "
-            f"user_id={u_id}: '{user_text[:40]}...' (Reason: {error})"
+            f"user_id={u_id}: '{user_text[:40]}...' (Attempt {retry_count + 1}/{self.max_retries}, Reason: {error})"
         )
 
     def pop_pending_message(self, chat_id: int) -> Optional[Dict[str, Any]]:
@@ -118,7 +137,7 @@ class PendingMessageManager:
                 logger.info(f"Discarding expired pending retry for chat {chat_id} (age: {age:.0f}s)")
                 return None
 
-            if item.get("retry_count", 0) > 2:
+            if item.get("retry_count", 0) >= self.max_retries:
                 logger.warning(f"Discarding pending retry for chat {chat_id} (exceeded max retries: {item.get('retry_count')})")
                 return None
 
@@ -127,9 +146,9 @@ class PendingMessageManager:
     def clear_pending(self, chat_id: int):
         """Clears pending message for chat_id when user resumes normal chat."""
         with self._lock:
-            if chat_id in self._pending:
-                self._pending.pop(chat_id, None)
-                self._save_to_disk()
+            self._pending.pop(chat_id, None)
+            self._chat_failure_history.pop(chat_id, None)
+            self._save_to_disk()
 
     def get_pending_count(self) -> int:
         """Returns the count of active pending messages."""
@@ -189,20 +208,33 @@ class PendingMessageManager:
 
             logger.info(f"🚀 Retrying pending message for chat {chat_id}: '{user_text[:40]}...'")
 
-            # Send a sweet transition ack so the user knows Waifu is replying to their pending question
-            try:
-                if bot and chat_id:
-                    bot.send_message(
-                        chat_id,
-                        "🌸 *Server LLM sudah kembali online!* Aku langsung proses pesan kamu yang tadi yaa~ 🥰💕",
-                        parse_mode="Markdown",
-                        reply_to_message_id=item.get("message_id")
-                    )
-            except Exception as e_ack:
-                logger.debug(f"Could not send retry acknowledgment: {e_ack}")
+            # Rate-limit transition ack: at most once every 300s per chat to prevent alert spam
+            with self._lock:
+                hist = self._chat_failure_history.get(chat_id, {})
+                last_ack = hist.get("last_ack_ts", 0)
+                now = time.time()
+                should_send_ack = (now - last_ack) >= 300.0
+                if should_send_ack:
+                    hist["last_ack_ts"] = now
+                    self._chat_failure_history[chat_id] = hist
 
-            # Invoke main chat processor
-            process_func(msg_obj, user_text, is_voice=is_voice)
+            if should_send_ack:
+                try:
+                    if bot and chat_id:
+                        bot.send_message(
+                            chat_id,
+                            "🌸 *Server LLM sudah kembali online!* Aku langsung proses pesan kamu yang tadi yaa~ 🥰💕",
+                            parse_mode="Markdown",
+                            reply_to_message_id=item.get("message_id")
+                        )
+                except Exception as e_ack:
+                    logger.debug(f"Could not send retry acknowledgment: {e_ack}")
+
+            # Invoke main chat processor with bypass_queue=True
+            try:
+                process_func(msg_obj, user_text, is_voice=is_voice, bypass_queue=True)
+            except TypeError:
+                process_func(msg_obj, user_text, is_voice=is_voice)
 
         except Exception as e:
             logger.error(f"Error during pending chat retry for chat {chat_id}: {e}", exc_info=True)
