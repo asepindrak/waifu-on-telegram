@@ -122,6 +122,51 @@ class TestSequentialUndressingAndProactiveNSFW(unittest.TestCase):
         self.assertTrue(detect_nsfw_intent("buka bh kamu dong"))
         self.assertTrue(detect_nsfw_intent("buka celana dalammu sayang"))
 
+    def test_english_nsfw_phrases_and_undress_progression(self):
+        """Verifies English intimate roleplay phrases and progressive undressing."""
+        # 1. Routing engine detection
+        self.assertTrue(detect_nsfw_intent("I want to touch first, come closer"))
+        self.assertTrue(detect_nsfw_intent("I will take off your clothes slowly"))
+        self.assertTrue(detect_nsfw_intent("sure, I kiss you now while touch your skin"))
+        self.assertTrue(detect_nsfw_intent("let me see how wet you are"))
+        self.assertTrue(detect_nsfw_intent("of course if it is allow to taste you"))
+
+        # 2. English undress progression
+        target_1, _, trans_1 = self.persona_mgr.detect_undress_intent("I will take off your clothes slowly", current_stage=0)
+        self.assertTrue(trans_1)
+        self.assertEqual(target_1, 1)
+
+        target_2, _, trans_2 = self.persona_mgr.detect_undress_intent("take off the rest too", current_stage=1)
+        self.assertTrue(trans_2)
+        self.assertEqual(target_2, 2)
+
+        target_all, _, trans_all = self.persona_mgr.detect_undress_intent("take off everything now", current_stage=0)
+        self.assertTrue(trans_all)
+        self.assertEqual(target_all, 4)
+
+    def test_intimate_nsfw_visual_scene_moments(self):
+        """Verifies automatic visual scene triggering for intimate touch, wetness, and oral moments."""
+        # Touch / caress
+        user_touch = "I want to touch first, come closer"
+        reply_touch = "*trembling steps forward, guiding your hands to my waist* P-please... touch me slowly... so warm..."
+        is_scene_t, prompt_t = self.persona_mgr.detect_visual_scene_moment(user_touch, reply_touch)
+        self.assertTrue(is_scene_t)
+        self.assertIn("sensual", prompt_t)
+
+        # Wetness / parting legs
+        user_wet = "let me see how wet you are"
+        reply_wet = "*shakily lifting my skirt, legs parting just enough* L-look... see how wet I am already? 😳"
+        is_scene_w, prompt_w = self.persona_mgr.detect_visual_scene_moment(user_wet, reply_wet)
+        self.assertTrue(is_scene_w)
+        self.assertIn("panties", prompt_w)
+
+        # Tasting / oral ecstasy
+        user_taste = "of course if it is allow to taste you"
+        reply_taste = "*body arching off the bed as you lower your head* A-ah! Yes, please taste me... don't stop..."
+        is_scene_oral, prompt_oral = self.persona_mgr.detect_visual_scene_moment(user_taste, reply_taste)
+        self.assertTrue(is_scene_oral)
+        self.assertIn("arching body", prompt_oral)
+
 
 if __name__ == "__main__":
     unittest.main()

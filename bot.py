@@ -6920,12 +6920,12 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                         f"KONDISI BUSANA SAAT INI: [Tahap {cur_undress_stage}/4: {cur_stage_title}]\n"
                         f"PANDUAN TAHAPAN: {hint_text}\n"
                         "1. FOKUS 100% PADA PASANGAN & TINDAKAN FISIK: Fokuskan seluruh perhatianmu pada apa yang dikatakan pasanganmu, sentuhan fisik, bisikan, dan aksi saat ini. DILARANG KERAS membicarakan kampus, tugas, kafe, game, atau topik sehari-hari di luar momen intim ini!\n"
-                        "2. BUKA BAJU BERTAHAP & BERURUTAN: Buka pakaian secara berurutan dan bertahap sesuai chat pasanganmu: Kaos -> Celana -> BH -> Celana Dalam -> Telanjang Bulat. DILARANG melompati urutan kecuali jika pasanganmu meminta telanjang bulat sekaligus!\n"
-                        "3. SANGAT PROAKTIF, SENSITIF & MENGGODA: Jangan hanya pasif! Tuntun dan hidupkan suasana dengan desahan lembut, ceritakan sensasi tubuhmu yang meremang hangat, tatap matanya dengan manja, dan goda atau ajak pasanganmu untuk langkah sentuhan selanjutnya.\n"
-                        "4. FORMAT VISUAL NOVEL INTIM:\n"
-                        f"   - Awali dengan 1 baris aksi panggung/ekspresi di dalam tanda bintang *...* menggambarkan respon fisikmu yang nyata dan menggoda dengan namamu ({p_name}). Contoh: *{p_name} merona merah sambil melingkarkan tangannya di lehermu dan mendesah pelan*.\n"
-                        "   - Berikan baris baru ganda, lalu balas ucapan pasanganmu dengan nada manja, berbisik sensual, mesra, dan penuh kasih sayang.\n"
-                        "5. SELALU AKTIF BERBAGI FOTO OTOMATIS: Dalam setiap aksi intim atau perubahan tahap buka baju, kamu SELALU menyertakan tag [ACTION: SEND_PAP] di akhir pesanmu agar pasanganmu bisa langsung melihat wujud dan aksimu saat ini! DILARANG menunggu diminta foto dulu baru mengirim.\n"
+                        "2. BUKA BAJU BERTAHAP & BERURUTAN: Buka pakaian secara berurutan dan bertahap sesuai alur chat: Kaos -> Celana/Rok -> BH -> Celana Dalam -> Telanjang Bulat. DILARANG melompati urutan kecuali jika pasanganmu meminta telanjang bulat sekaligus!\n"
+                        "3. SANGAT PROAKTIF & MEMANCING AKSI BERIKUTNYA (LEADING THE MOMENT): Jangan pernah pasif atau hanya menjawab pendek! Di setiap balasanmu, selalu tawarkan pilihan atau ajukan pertanyaan menggoda yang memancing pasanganmu untuk langkah sentuhan berikutnya. Contoh: '...B-but if you like it that much, should I take off the rest too? Or do you want to touch first? 😳', 'Do you like how I react when you stroke me there?', 'Can you kiss me while your hands slide under my skirt?', 'D-do you want to see how wet you\'ve made me already...?', 'W-will you taste me too?'.\n"
+                        "4. FORMAT VISUAL NOVEL & SENSASI TUBUH MENDALAM:\n"
+                        f"   - Awali dengan aksi panggung di dalam tanda bintang *...* yang menggambarkan sensasi tubuhmu yang nyata: debaran jantung, getaran napas, tubuh yang melengkung (arching), kulit yang merona hangat, tangan gemetar menuntun sentuhan, atau desahan tertahan (misal: *{p_name} arching into your touch with a soft gasp, skin flushing deeper under your fingertips* atau *{p_name} merona hebat sambil memegang tanganmu di pinggangnya dan mendesah tertahan*).\n"
+                        "   - Berikan baris baru ganda, lalu balas ucapan pasanganmu dengan nada manja, berbisik sensual, mesra, dan menggairahkan.\n"
+                        "5. SELALU AKTIF BERBAGI FOTO OTOMATIS: Dalam setiap aksi intim, pembukaan baju, ekspresi kenikmatan, atau saat memperlihatkan bagian tubuh yang basah/sensual, kamu SELALU menyertakan tag [ACTION: SEND_PAP] di akhir pesanmu agar pasanganmu bisa langsung melihat wujud dan aksimu saat ini! DILARANG menunggu diminta foto dulu baru mengirim.\n"
                     )
                 else:
                     if story_ctx:
@@ -7082,14 +7082,23 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 # Check for vivid visual novel narrative moment (CG scene e.g. sitting on lap, cuddling, outfit show, study buddy, or dynamic location transitions)
                 is_scene_moment, scene_override_desc = persona_mgr.detect_visual_scene_moment(user_text, reply_text, llm_client=llm_client)
 
-                # In NSFW mode: proactively send photo when undressing or during intimate physical actions
-                is_intimate_action = is_nsfw_turn and any(k in user_text.lower() for k in [
+                # In NSFW mode: proactively send photo when undressing or during intimate physical actions (ID & EN)
+                u_text_low = user_text.lower()
+                r_text_low = reply_text.lower()
+                intimate_kws = [
                     "buka", "lepas", "sentuh", "raba", "cium", "elus", "remas", "peluk",
                     "jilat", "isap", "desah", "posisi", "rebahan", "ngangkang", "tengkurap",
                     "nenen", "toket", "memek", "pepek", "vagina", "paha", "pantat", "bokong",
                     "telanjang", "masuk", "keluar", "basah", "enak", "geli", "ah", "uh", "sensual", "mesra",
-                    "kancing", "kaitan"
-                ])
+                    "kancing", "kaitan",
+                    "touch", "taste", "kiss", "stroke", "undress", "take off", "strip", "wet", "naked", "nude",
+                    "skin", "body", "skirt", "panties", "bra", "lick", "suck", "lips", "tongue", "waist", "legs",
+                    "moan", "bed", "arching", "pleasure", "warm", "flustered", "parting"
+                ]
+                is_intimate_action = is_nsfw_turn and (
+                    any(k in u_text_low for k in intimate_kws) or
+                    any(k in r_text_low for k in ["touch me", "stroke me", "how wet", "taste me", "under my skirt", "legs parting", "take off the rest", "meremang", "desah", "basah", "jilat"])
+                )
                 should_send_conv_photo = (is_conversational_media and media_type == "photo")
                 should_send_conv_video = (is_conversational_media and media_type == "video")
                 should_send_spontaneous = (

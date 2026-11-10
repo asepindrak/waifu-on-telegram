@@ -691,7 +691,22 @@ class PersonaManager:
         if (any(re.search(pat, u_low) for pat in cuddle_triggers_u) and any(re.search(pat, r_low) for pat in cuddle_triggers_r)):
             return True, "cozy intimate cuddle, gentle affectionate hug, resting head close to viewer, warm romantic embrace"
 
-        # 5. Study buddy / Doing homework together (visual novel study moment)
+        # 5. Intimate Touch / Sensual Body Stroking (NSFW physical escalation)
+        touch_triggers = [r"\b(touch\s+(?:first|me|you|slowly|your\s+skin|my\s+waist)|stroke\s+(?:me|you|there)|sentuh|elus|meraba|raba)\b"]
+        if any(re.search(pat, comb) for pat in touch_triggers) and any(w in comb for w in ["warm", "slowly", "shaking", "flustered", "body", "skin", "waist", "heart", "rasa", "meremang"]):
+            return True, "blushing sensual expression, arching body gently, hands on waist, trembling with pleasure, soft dim intimate lighting, detailed glowing skin"
+
+        # 6. Lifting Skirt / Parting Legs / Wetness (NSFW visual reveal)
+        wet_triggers = [r"\b(how\s+wet|see\s+how\s+wet|wet\s+you\s+are|part(?:ing)?\s+(?:your\s+|my\s+)?legs|spread\s+(?:your\s+|my\s+)?legs|under\s+(?:your\s+|my\s+)?skirt|lifting\s+my\s+skirt|ngangkang|basah)\b"]
+        if any(re.search(pat, comb) for pat in wet_triggers):
+            return True, "lifting skirt with trembling fingers, parting slender legs, exposed panties, wet and trembling, blushing intensely, looking down shyly, intimate bedroom POV, sensual lighting"
+
+        # 7. Oral / Tasting / Ecstatic Arching (NSFW climax escalation)
+        taste_triggers = [r"\b(taste\s+(?:you|me)|lick\s+(?:you|me)|tongue\s+against|jilat|hisap|tangling\s+in\s+your\s+hair|arching\s+off\s+the\s+bed)\b"]
+        if any(re.search(pat, comb) for pat in taste_triggers):
+            return True, "arching body off bed in ecstasy, head tilted back, parting slender legs, ecstatic blushing face, open mouth soft moan, intimate bedroom view, sensual cinematic lighting"
+
+        # 8. Study buddy / Doing homework together (visual novel study moment)
         study_triggers_u = [r"\b(ngerjain\s+pr|mengerjakan\s+pr|belajar\s+bareng|study\s+together|homework)\b"]
         study_triggers_r = [r"\b(study\s+buddy|studying\s+together|mengerjakan\s+pr|buku\s+pelajaran)\b"]
         if any(re.search(pat, u_low) for pat in study_triggers_u) and any(re.search(pat, r_low) for pat in study_triggers_r):
@@ -959,15 +974,15 @@ class PersonaManager:
         lower = user_text.lower()
 
         # 0. Check reset request
-        if re.search(r"\b(pake|pakai|kenakan)\s+(baju|pakaian|celana)\b|\b(sudah\s+selesai|selesai\s+dulu|berpakaian\s+lagi)\b", lower):
+        if re.search(r"\b(pake|pakai|kenakan)\s+(baju|pakaian|celana)\b|\b(sudah\s+selesai|selesai\s+dulu|berpakaian\s+lagi)\b|\b(put\s+on\s+clothes|get\s+dressed|dress\s+up|wear\s+clothes)\b", lower):
             return (0, "mengenakan pakaiannya kembali secara rapi", True)
 
         # 1. Direct jump to fully nude
-        if re.search(r"\b(buka\s+semua|lepas\s+semua|buka\s+semuanya|lepas\s+semuanya|telanjang\s+bulat\s+sekarang|langsung\s+telanjang)\b", lower):
+        if re.search(r"\b(buka\s+semua|lepas\s+semua|buka\s+semuanya|lepas\s+semuanya|telanjang\s+bulat\s+sekarang|langsung\s+telanjang|take\s+off\s+everything|strip\s+naked|get\s+naked|completely\s+naked|fully\s+nude|take\s+it\s+all\s+off)\b", lower):
             return (4, "menanggalkan seluruh pakaiannya hingga telanjang bulat tanpa busana", True)
 
-        # 2. Sequential general progression: 'buka lagi', 'lanjut buka', 'buka berikutnya', 'lepas lagi', 'buka pelan-pelan'
-        if re.search(r"\b(buka\s+lagi|lanjut\s+buka|buka\s+berikutnya|buka\s+selanjutnya|lepas\s+lagi|buka\s+satu\s*satu|buka\s+pelan\s*pelan|tahap\s+berikutnya)\b", lower):
+        # 2. Sequential general progression: 'buka lagi', 'lanjut buka', 'take off clothes', 'undress slowly', 'take off the rest'
+        if re.search(r"\b(buka\s+lagi|lanjut\s+buka|buka\s+berikutnya|buka\s+selanjutnya|lepas\s+lagi|buka\s+satu\s*satu|buka\s+pelan\s*pelan|tahap\s+berikutnya|take\s+off\s+(?:your\s+)?clothes|take\s+off\s+the\s+rest|strip\s+slowly|undress\s+(?:you|slowly)|next\s+layer|sliding\s+off)\b", lower):
             next_stage = min(4, current_stage + 1)
             actions = {
                 1: "melepas kaosnya secara perlahan, kini tersisa BH dan celana",
@@ -978,13 +993,13 @@ class PersonaManager:
             return (next_stage, actions.get(next_stage, "membuka pakaian tahap berikutnya"), True)
 
         # 3. Stage 1: Kaos / Baju Atasan
-        has_shirt_kw = bool(re.search(r"\b(buka|lepas|copot)\s+(?:baju|kaos|atasan|t-?shirt|pakaian(?!\s+dalam))(?:mu|nya)?\b", lower))
+        has_shirt_kw = bool(re.search(r"\b(?:(?:buka|lepas|copot)\s+(?:baju|kaos|atasan|t-?shirt|pakaian(?!\s+dalam))(?:mu|nya)?|take\s+off\s+(?:your\s+)?(?:shirt|top|t-?shirt|blouse))\b", lower))
         # 4. Stage 2: Celana / Bawahan
-        has_pants_kw = bool(re.search(r"\b(buka|lepas|copot|turunkan)\s+(?:celana(?!\s+dalam)|rok|bawahan|jeans|pants|skirt)(?:mu|nya)?\b", lower))
+        has_pants_kw = bool(re.search(r"\b(?:(?:buka|lepas|copot|turunkan)\s+(?:celana(?!\s+dalam)|rok|bawahan|jeans|pants|skirt)(?:mu|nya)?|take\s+off\s+(?:your\s+)?(?:pants|skirt|jeans|shorts|bottoms))\b", lower))
         # 5. Stage 3: BH / Bra
-        has_bra_kw = bool(re.search(r"\b(buka|lepas|copot)\s+(?:bh|bra|kutang)(?:mu|nya)?\b", lower))
+        has_bra_kw = bool(re.search(r"\b(?:(?:buka|lepas|copot)\s+(?:bh|bra|kutang)(?:mu|nya)?|take\s+off\s+(?:your\s+)?bra)\b", lower))
         # 6. Stage 4: Celana Dalam / Panties
-        has_panties_kw = bool(re.search(r"\b(buka|lepas|copot|turunkan)\s+(?:cd|celana\s+dalam|panties|kancut|sempak|underwear)(?:mu|nya)?\b", lower))
+        has_panties_kw = bool(re.search(r"\b(?:(?:buka|lepas|copot|turunkan)\s+(?:cd|celana\s+dalam|panties|kancut|sempak|underwear)(?:mu|nya)?|take\s+off\s+(?:your\s+)?(?:panties|underwear))\b", lower))
 
         if has_shirt_kw:
             if current_stage == 0:

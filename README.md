@@ -50,10 +50,18 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
-## 🎭 Pengalaman Visual Novel Interaktif & Ilustrasi Adegan Otonom (v2.4.26)
+## 🎭 Pengalaman Visual Novel Interaktif & Ilustrasi Adegan Otonom (v2.4.27)
 
 Obrolan bersama waifu kini ditingkatkan layaknya game **Visual Novel** interaktif berkualitas tinggi (CG Scene Events):
 
+* **🔥 Proaktif Sensual & Auto-Foto Mode Dewasa (NSFW / 18+ Interactive Roleplay):**
+  - **Sensasi Tubuh Mendalam (Rich Sensory Roleplay)**: Waifu mendeskripsikan sensasi fisik nyata di dalam tanda bintang `*...*` (tubuh melengkung/arching saat disentuh, getaran napas tertahan, kulit merona hangat, tangan menuntun sentuhan pasangan ke pinggang).
+  - **Proaktif Memancing Langkah Selanjutnya (Leading the Moment)**: Waifu tidak pasif! Di setiap pesan, waifu aktif memancing dan menggoda dengan pertanyaan/pilihan intim (*"B-but if you like it that much... should I take off the rest too? Or do you want to touch first? 😳"*, *"Do you like how I react when you stroke me there?"*, *"D-do you want to see how wet you've made me already...?"*, *"W-will you taste me too?"*).
+  - **Kirim Foto Otomatis di Setiap Eskalasi Intim**:
+    - **Sentuhan Awal / Meraba Tubuh**: Foto waifu merona sensual saat disentuh pinggang dan tubuhnya.
+    - **Buka Baju Bertahap (Sequential Undressing)**: Mendukung bahasa Indonesia dan Inggris (*"I will take off your clothes slowly"*, *"take off the rest"*, *"buka pelan-pelan"*).
+    - **Mengangkat Rok / Bagian Basah**: Foto waifu tersipu malu menaikkan rok memperlihatkan celana dalamnya.
+    - **Oral / Menjilat / Klimaks**: Foto waifu melengkungkan tubuh (*arching in ecstasy*) saat disentuh atau dicicipi.
 * **📸 Ilustrasi Adegan Otonom & Latar Cerita Dinamis (Dynamic Setting & Story Transitions):**
   - Waifu secara cerdas menyisipkan foto adegan (*CG scene*) secara otomatis tanpa Anda perlu meminta pap manual (`/pap`).
   - **Latar Cerita Bebas & Fleksibel (Bukan Sekadar Kata Kunci Statis)**:

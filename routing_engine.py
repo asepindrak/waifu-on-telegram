@@ -108,7 +108,7 @@ PROVIDER_PRESETS = {
 
 # Compiled NSFW / Intimate Regex Patterns
 _NSFW_WORDS = [
-    # Explicit Nudity / Strip / Body Exposure
+    # Explicit Nudity / Strip / Body Exposure (ID & EN)
     r"\b(?:nude|naked|topless|bottomless|unclothed|telanjang|bugil|telanjang\s+bulat|tanpa\s+sehelai\s+benang)\b",
     r"\b(?:(?:buka|lepas|copot|turunkan)\s+(?:baju|kaos|celana|rok|bh|bra|cd|kutang|bawahan|atasan|pakaian|semua|semuanya|celana\s+dalam)(?:mu|nya)?)\b",
     r"\b(?:buka\s+(?:pelan|satu\s*satu|lagi|berikutnya|tahap|dong))\b",
@@ -117,13 +117,15 @@ _NSFW_WORDS = [
     r"\b(?:lepas\s+(?:baju|pakaian|celana|bh|bra|semua))\b",
     r"\b(?:g(?:ak|a|k)\s+pake\s+(?:baju|pakaian|celana|busana))\b",
     r"\b(?:ngga\s+pake\s+(?:baju|pakaian|celana|busana))\b",
+    r"\b(?:take\s+off|remove|strip|slide\s+off)\s+(?:your\s+)?(?:clothes|shirt|top|pants|skirt|bra|panties|underwear|everything|the\s+rest)\b",
+    r"\b(?:take\s+off\s+(?:your\s+)?clothes\s+slowly|undress\s+(?:you|slowly)|get\s+naked|strip\s+for\s+me)\b",
 
-    # Explicit Sexual Anatomy & Organs
-    r"\b(?:titit|kontol|memek|pepek|vagina|penis|clitoris)\b",
+    # Explicit Sexual Anatomy & Organs (ID & EN)
+    r"\b(?:titit|kontol|memek|pepek|vagina|penis|clitoris|clit|pussy|crotch|vulva)\b",
     r"\b(?:nipple|nipples|puting|payudara|tetek|boobs|tits|nenen|toket|dada)\b",
-    r"\b(?:pantat|bokong|pantatmu|bokongmu)\b",
+    r"\b(?:pantat|bokong|pantatmu|bokongmu|butt|buttocks|ass)\b",
 
-    # Sexual Acts & Erotic Activities
+    # Sexual Acts & Erotic Activities (ID & EN)
     r"\b(?:bercinta|ngentot|entot|masturbasi|masturbate|coli|onani)\b",
     r"\b(?:orgasme|orgasm|crot|squirt|ejakulasi)\b",
     r"\b(?:hisap\s+(?:titit|kontol|payudara|puting|nenen|toket))\b",
@@ -131,15 +133,19 @@ _NSFW_WORDS = [
     r"\b(?:jilat\s+(?:memek|pepek|puting|vagina|nenen|toket|leher))\b",
     r"\b(?:oral\s+sex|blowjob|handjob)\b",
     r"\b(?:raba|meraba|remas|meremas|elus\s+paha|peluk\s+erat)\b",
+    r"\b(?:taste\s+(?:you|me)|lick\s+(?:you|me)|kiss\s+your\s+(?:skin|lips|body)|tongue\s+against)\b",
+    r"\b(?:touch\s+(?:first|me|you|slowly|your\s+skin|my\s+waist)|stroke\s+(?:me|you|there))\b",
+    r"\b(?:how\s+wet|see\s+how\s+wet|wet\s+you\s+are|wet\s+already|legs\s+parting|part\s+(?:your\s+|my\s+)?legs|spread\s+(?:your\s+|my\s+)?legs|under\s+(?:your\s+|my\s+)?skirt)\b",
 
-    # Erotic Context & State of Mind
-    r"\b(?:sange|horny|terangsang|desah|mendesah|erotis|erotic)\b",
+    # Erotic Context & State of Mind (ID & EN)
+    r"\b(?:sange|horny|terangsang|desah|mendesah|erotis|erotic|sensual|flustered)\b",
     r"\b(?:erp|nsfw|hentai|ecchi|r18|18\+)\b",
     r"\b(?:sensual\s+(?:touch|kiss|massage|rubbing))\b",
+    r"\b(?:arching\s+into|arching\s+off\s+the\s+bed|trembling\s+with|body\s+burning)\b",
     r"\b(?:pap|foto)\s+(?:nenen|toket|telanjang|bugil|seksi|sexy|nsfw|paha|pantat|bokong)\b",
 
     # Provocative Intimate Clothing Requests
-    r"\b(?:lingerie|g-string|thong|celana\s+dalam|pakaian\s+dalam)\b",
+    r"\b(?:lingerie|g-string|thong|celana\s+dalam|pakaian\s+dalam|panties|underwear)\b",
     r"\b(?:transparan|see-through|baju\s+tidur\s+seksi)\b",
 ]
 
