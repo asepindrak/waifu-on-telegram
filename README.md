@@ -50,6 +50,24 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
+## 🎭 Antrean Chat Anti-Bentrok, Jeda Foto Otomatis & Variasi Komposisi Kamera (v2.4.31)
+
+Pembaruan v2.4.31 menyempurnakan alur percakapan alami, sinkronisasi pesan, dan variasi visual agar interaksi terasa realistis dan sinematik:
+
+* **📬 Antrean Chat Cerdas & Debounce Aggregator (Anti-Bentrok & Balasan Nyambung):**
+  - **Penggabungan Pesan Beruntun (Debounce Aggregator)**: Saat pengguna mengetik beberapa gelembung teks cepat berturut-turut (misal: *"wah baju nya bagus cocok sama kamu"* lalu langsung disusul *"boleh, aku meluncur kesana sekarang ya"*), sistem secara cerdas menggabungkannya ke dalam satu pesan utuh yang koheren.
+  - **Eksekusi Sekuensial FIFO (Strict Sequential Turn Lock)**: Menghilangkan tabrakan thread paralel antar-pesan. Waifu tidak akan lagi membalas dengan dua pesan terpisah yang bertolak belakang atau terbalik urutan (misal satu thread bertanya apakah ingin menyusul, sementara thread lain menyuruh hati-hati di jalan). Riwayat obrolan dijamin ter-update secara rapi dan runut.
+* **⏱️ Jeda Foto Otomatis (Proactive Auto-Photo Cooldown):**
+  - **Pencegahan Spam Foto**: Foto spontan/adegan kini diatur dengan jeda minimal **3 giliran percakapan (*turns*)** dan minimal **60 detik** sejak foto terakhir dikirim.
+  - **Cerita Lebih Mengalir**: Menghindari foto terkirim berulang-ulang di setiap bubble chat saat adegan masih berlangsung di lokasi yang sama (misal sedang nongkrong di kafe).
+  - **Bypass untuk Permintaan Eksplisit**: Perintah atau permintaan foto langsung dari pengguna (seperti `/pap`, `/photo`, *"kirim foto dong"*, *"minta pap"*) tetap diproses instan tanpa terpengaruh cooldown.
+* **📸 Variasi Sudut Pandang Kamera & Rotasi Komposisi Dinamis (Anti-Foto Monoton):**
+  - **Rotasi Perspektif Otomatis**: Dilengkapi beragam preset komposisi fotografi anime profesional (*medium shot candid POV*, *close-up expressive portrait*, *side-profile candid looking away*, *high-angle looking down*, *leaning forward chin-resting*, *three-quarter angle*, *over-the-shoulder POV*, dan *relaxed candid framing*).
+  - **Pelacakan Komposisi per Pengguna**: Sistem melacak komposisi foto terakhir dan secara otomatis memilih sudut pandang baru yang berbeda, memastikan tidak ada foto beruntun dengan sudut atau pose yang sama persis.
+  - **Variasi Detail Latar**: Latar ruangan dan kafe kini memiliki variasi suasana (meja pojok dekat jendela kaca besar, cangkir di atas tatakan, pencahayaan sore hari yang hangat, dll.).
+
+---
+
 ## 🎭 Pengalaman Visual Novel Interaktif, Tombol Suara On-Demand & Generator Gambar Anti-Gagal (v2.4.30)
 
 Obrolan bersama waifu kini ditingkatkan layaknya game **Visual Novel** interaktif berkualitas tinggi (CG Scene Events) serta keandalan audio dan generator visual tanpa batas:

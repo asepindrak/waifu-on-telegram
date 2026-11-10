@@ -346,6 +346,32 @@ OUTFIT_PRESETS = {
     }
 }
 
+# Diverse camera compositions & perspectives for natural rotation (prevents repeated identical angles)
+CAMERA_COMPOSITION_PRESETS = [
+    "medium shot candid POV, hands resting naturally on table, conversational eye contact, warm natural lighting",
+    "close-up expressive portrait, sweet gentle smile, affectionate eye contact, cinematic shallow depth of field",
+    "side-profile candid view, looking slightly away with a shy sweet smile, soft bokeh background",
+    "high-angle POV looking down, waifu looking up affectionately at viewer, gentle blushing cheeks",
+    "candid snapshot, leaning forward with chin resting on hand, charming relaxed posture, natural lighting",
+    "three-quarter angle candid perspective, relaxed posture, expressive warm gaze, cinematic atmosphere",
+    "over-the-shoulder POV perspective, glancing back towards viewer with playful teasing smile",
+    "relaxed candid framing, tilting head playfully, warm soft glow, natural snapshot feel"
+]
+
+
+CAFE_SCENE_VARIATIONS = [
+    "sitting at aesthetic cafe table, warm beverage cup on saucer, soft cafe bokeh background",
+    "cozy corner table at aesthetic cafe, looking out large glass window, atmospheric coffee shop interior",
+    "resting hands near warm drink at coffee shop wooden table, pastry and cup nearby, warm ambient cafe lighting",
+    "enjoying a warm drink at aesthetic cafe booth, soft afternoon sunlight through window, blurred cafe ambiance"
+]
+
+BEDROOM_SCENE_VARIATIONS = [
+    "relaxing on bed with fluffy pillows, warm dim night bedroom lamp",
+    "sitting on edge of cozy bed, soft bedroom lighting, casual room background",
+    "leaning comfortably against bed headboard, cozy blankets, soft ambient bedroom lighting"
+]
+
 
 class PersonaManager:
     """Manages AI girlfriend personality, consistent appearance, memory & photo triggers."""
@@ -358,12 +384,19 @@ class PersonaManager:
         self.user_affinity: Dict[int, int] = {}
         self.user_outfits: Dict[int, Any] = {}
         self.session_outfits: Dict[int, Dict[str, Any]] = {}
+        self.user_recent_angles: Dict[int, List[str]] = {}
         self.outfits_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_outfits.json")
         self.history_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "chat_history.json")
         self._history_mtime = 0.0
         self._load_all_personas()
         self._load_user_outfits()
         self._load_chat_history()
+
+    def get_recent_angles(self, user_id: int) -> List[str]:
+        """Returns the list of recently used camera compositions for a user."""
+        if not hasattr(self, "user_recent_angles"):
+            self.user_recent_angles = {}
+        return list(self.user_recent_angles.get(int(user_id), []))
 
     def _load_user_outfits(self):
         """Loads user selected outfits from persistent JSON storage."""
@@ -1132,13 +1165,21 @@ class PersonaManager:
              "wearing sporty athletic wear in bright modern gym studio"),
         ]
 
+        def _resolve_scene_variation(desc: str) -> str:
+            import random
+            if "aesthetic cafe" in desc:
+                return random.choice(CAFE_SCENE_VARIATIONS)
+            if "bedroom" in desc or "fluffy pillows" in desc:
+                return random.choice(BEDROOM_SCENE_VARIATIONS)
+            return desc
+
         # 1. First priority: Explicit scene in user text
         for keywords, scene_desc in SCENE_PATTERNS:
             if any(k in lower for k in keywords):
                 # Contextual bonus: if bus stop and rain are mentioned together
                 if "bus stop" in scene_desc and any(r in lower for r in ["hujan", "gerimis", "rain", "payung"]):
                     return "waiting at rainy bus stop shelter, holding umbrella, wet asphalt, rain reflections, atmospheric street lighting, cinematic depth of field"
-                return scene_desc
+                return _resolve_scene_variation(scene_desc)
 
         # 2. Second priority: Context from ongoing chat history
         hist = history or (self.get_chat_history(user_id) if user_id else [])
@@ -1146,7 +1187,7 @@ class PersonaManager:
         combined_recent = " ".join(clean_turns).lower()
         for keywords, scene_desc in SCENE_PATTERNS:
             if any(k in combined_recent for k in keywords):
-                return scene_desc
+                return _resolve_scene_variation(scene_desc)
 
         # 3. Third priority: LLM dynamic setting extraction for novel/arbitrary story locations
         if llm_client and hasattr(llm_client, "chat") and len(clean_turns) > 0:
@@ -1439,15 +1480,6 @@ class PersonaManager:
         anatomy_guard_neg = "bad legs, extra legs, malformed limbs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, mutated legs, folded legs, cross-legged error, distorted legs, mutated, deformed, duplicate body, floating limbs, unnatural body proportions, distorted body"
         extra_neg = f"{extra_neg}, {anatomy_guard_neg}" if extra_neg else anatomy_guard_neg
 
-        # Dynamic micro-variations if no specific angle/pose requested (WITHOUT drawing a phone!)
-        micro_angles = [
-            "front-camera POV, looking directly into lens, sweet smile, intimate eye contact",
-            "close-up candid portrait POV, looking directly at viewer with affectionate sweet gaze",
-            "slight head tilt candid POV perspective, engaging direct eye contact, natural charm",
-            "cozy intimate portrait POV, smiling warmly at viewer, soft focus background",
-            "candid POV snapshot, gentle blushing expression, looking directly into lens, natural cinematic lighting"
-        ]
-
         # Detect intimate anatomy cues requested by user (e.g. crotch/memek/vagina, breasts/nenen/toket, thighs/paha, butt/pantat)
         anatomy_cue = self.detect_anatomy_cues(user_text)
 
@@ -1470,8 +1502,19 @@ class PersonaManager:
             chosen_angle = "view from behind, seductive rear perspective"
             logger.info(f"Rear framing selected for butt focus: {chosen_angle}")
         else:
+            # Dynamic composition rotation: avoids repeating identical camera angles & poses
+            uid = int(user_id) if user_id else 0
+            if not hasattr(self, "user_recent_angles"):
+                self.user_recent_angles = {}
+            recent = self.user_recent_angles.get(uid, [])
+            candidates = [comp for comp in CAMERA_COMPOSITION_PRESETS if comp not in recent]
+            if not candidates:
+                candidates = CAMERA_COMPOSITION_PRESETS
             import random
-            chosen_angle = random.choice(micro_angles)
+            chosen_angle = random.choice(candidates)
+            recent.append(chosen_angle)
+            self.user_recent_angles[uid] = recent[-4:]
+            logger.info(f"Selected rotated photo composition for user {uid}: {chosen_angle}")
 
         # If lower body anatomy is requested, suppress censor artifacts in negative prompt
         if anatomy_cue and any(k in anatomy_cue for k in ["pussy", "crotch"]):

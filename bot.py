@@ -10,7 +10,7 @@ import time
 import datetime
 import platform
 import subprocess
-from typing import Optional, Dict, Any, Tuple, List
+from typing import Optional, Dict, Any, Tuple, List, Callable
 
 if sys.platform == "win32":
     try:
@@ -1295,6 +1295,13 @@ def callback_memory_actions(call):
 
 # Context cache for regenerating exact photo/video scenes with pose variations
 USER_LAST_PHOTO_CONTEXT: Dict[int, Dict[str, Any]] = {}
+
+# Auto-photo cooldown tracking per user (prevents repetitive photo spamming)
+USER_LAST_AUTO_PHOTO_TURN: Dict[int, int] = {}
+USER_LAST_AUTO_PHOTO_TIME: Dict[int, float] = {}
+USER_CONVERSATION_TURNS: Dict[int, int] = {}
+MIN_AUTO_PHOTO_TURN_COOLDOWN = 3
+MIN_AUTO_PHOTO_TIME_COOLDOWN = 60.0  # seconds
 
 # Video Generator Engine Configuration (100% Neural AI Video)
 VIDEO_ENGINE = os.environ.get("VIDEO_ENGINE", "wan21").lower().strip()
@@ -4677,6 +4684,8 @@ def process_photo_request(
                 "outfit_label": outfit_label,
                 "is_nude": is_nude
             }
+            USER_LAST_AUTO_PHOTO_TURN[user_id] = USER_CONVERSATION_TURNS.get(user_id, 0)
+            USER_LAST_AUTO_PHOTO_TIME[user_id] = time.time()
 
             with ChatActionLoop(bot, chat_id, "upload_photo"):
                 sfw_img_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
@@ -6679,8 +6688,122 @@ def is_meta_or_reasoning_leak(text: str) -> bool:
     return False
 
 
-def process_text_chat(message, user_text: str, is_voice: bool = False):
-    """Main conversation processor running asynchronously with continuous typing status."""
+class ChatQueueManager:
+    """
+    Manages per-user chat debouncing and strict FIFO sequential execution.
+    - Debounces rapid consecutive text bubbles from the same user (e.g. 2-3 quick messages within 1.2s)
+      into a single aggregated prompt.
+    - Prevents parallel telebot worker thread collisions, race conditions, reversed reply ordering,
+      and duplicate photo generation.
+    - Enforces sequential turn processing so chat history is guaranteed to be updated
+      before the next user turn executes.
+    """
+    def __init__(self, debounce_window: float = 1.2, max_debounce_window: float = 2.5):
+        self.debounce_window = debounce_window
+        self.max_debounce_window = max_debounce_window
+        self.locks: Dict[int, threading.Lock] = {}
+        self.buffers: Dict[int, List[Tuple[Any, str, bool]]] = {}  # user_id -> [(message, text, is_voice)]
+        self.timers: Dict[int, threading.Timer] = {}
+        self.first_message_time: Dict[int, float] = {}
+        self.is_processing: Dict[int, bool] = {}
+        self._global_lock = threading.Lock()
+
+    def _get_user_lock(self, user_id: int) -> threading.Lock:
+        with self._global_lock:
+            if user_id not in self.locks:
+                self.locks[user_id] = threading.Lock()
+            return self.locks[user_id]
+
+    def enqueue(self, message: Any, user_text: str, is_voice: bool = False, execute_fn: Optional[Callable] = None):
+        user_id = getattr(getattr(message, "from_user", None), "id", 0) or 0
+        now = time.time()
+
+        with self._get_user_lock(user_id):
+            if user_id not in self.buffers:
+                self.buffers[user_id] = []
+            self.buffers[user_id].append((message, user_text, is_voice))
+
+            if user_id not in self.first_message_time:
+                self.first_message_time[user_id] = now
+
+            # If worker is currently processing this user, let the buffer accumulate.
+            # When current worker finishes, it will pick up the buffered messages sequentially.
+            if self.is_processing.get(user_id, False):
+                return
+
+            # Reset debounce timer if within window
+            if user_id in self.timers and self.timers[user_id]:
+                try:
+                    self.timers[user_id].cancel()
+                except Exception:
+                    pass
+                self.timers[user_id] = None
+
+            # If user has been typing continuous messages past max_debounce_window, dispatch now
+            elapsed = now - self.first_message_time.get(user_id, now)
+            if elapsed >= self.max_debounce_window:
+                self._dispatch_user_turn(user_id, execute_fn)
+                return
+
+            # Schedule debounce dispatch
+            t = threading.Timer(self.debounce_window, self._dispatch_user_turn, args=[user_id, execute_fn])
+            self.timers[user_id] = t
+            t.daemon = True
+            t.start()
+
+    def _dispatch_user_turn(self, user_id: int, execute_fn: Optional[Callable] = None):
+        with self._get_user_lock(user_id):
+            if self.is_processing.get(user_id, False):
+                return
+            if not self.buffers.get(user_id):
+                return
+
+            if user_id in self.timers and self.timers[user_id]:
+                try:
+                    self.timers[user_id].cancel()
+                except Exception:
+                    pass
+                self.timers[user_id] = None
+            self.first_message_time.pop(user_id, None)
+
+            items = list(self.buffers[user_id])
+            self.buffers[user_id] = []
+            self.is_processing[user_id] = True
+
+        def _worker():
+            try:
+                combined_texts = []
+                last_msg = None
+                has_voice = False
+                for msg_obj, txt, is_v in items:
+                    if txt and txt.strip():
+                        combined_texts.append(txt.strip())
+                    last_msg = msg_obj
+                    if is_v:
+                        has_voice = True
+
+                aggregated_text = "\n".join(combined_texts) if combined_texts else ""
+                target_fn = execute_fn or _execute_text_chat_direct
+                if last_msg and aggregated_text:
+                    target_fn(last_msg, aggregated_text, is_voice=has_voice)
+            except Exception as e:
+                logger.error(f"Error in chat queue worker for user {user_id}: {e}", exc_info=True)
+            finally:
+                with self._get_user_lock(user_id):
+                    self.is_processing[user_id] = False
+                    has_more = bool(self.buffers.get(user_id))
+
+                if has_more:
+                    self._dispatch_user_turn(user_id, execute_fn)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+
+chat_queue_mgr = ChatQueueManager(debounce_window=1.2, max_debounce_window=2.5)
+
+
+def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
+    """Executes a single conversational turn synchronously inside the worker thread."""
     def _execute():
         try:
             # Check Computer Use Intent (screenshot / desktop control)
@@ -7212,10 +7335,36 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 )
                 should_send_conv_photo = (is_conversational_media and media_type == "photo")
                 should_send_conv_video = (is_conversational_media and media_type == "video")
-                should_send_spontaneous = (
+                raw_spontaneous = (
                     (has_action_tag or has_pap_phrase or is_undress_trans or is_intimate_action or is_scene_moment or (is_nsfw_turn and cur_undress_stage > 0))
                     and not (should_send_conv_photo or should_send_conv_video)
                 )
+
+                uid = getattr(getattr(message, "from_user", None), "id", 0) or 0
+                USER_CONVERSATION_TURNS[uid] = USER_CONVERSATION_TURNS.get(uid, 0) + 1
+                cur_turn = USER_CONVERSATION_TURNS[uid]
+                now_ts = time.time()
+                last_turn = USER_LAST_AUTO_PHOTO_TURN.get(uid, -999)
+                last_time = USER_LAST_AUTO_PHOTO_TIME.get(uid, 0.0)
+
+                turn_diff = cur_turn - last_turn
+                time_diff = now_ts - last_time
+
+                if raw_spontaneous:
+                    if turn_diff >= MIN_AUTO_PHOTO_TURN_COOLDOWN and time_diff >= MIN_AUTO_PHOTO_TIME_COOLDOWN:
+                        should_send_spontaneous = True
+                        USER_LAST_AUTO_PHOTO_TURN[uid] = cur_turn
+                        USER_LAST_AUTO_PHOTO_TIME[uid] = now_ts
+                        logger.info(f"Spontaneous photo approved for user {uid} (turn {cur_turn}, diff={turn_diff}, elapsed={time_diff:.1f}s)")
+                    else:
+                        should_send_spontaneous = False
+                        logger.info(f"Spontaneous photo suppressed by cooldown for user {uid}: turn diff={turn_diff}/{MIN_AUTO_PHOTO_TURN_COOLDOWN}, time diff={time_diff:.1f}s/{MIN_AUTO_PHOTO_TIME_COOLDOWN}s")
+                else:
+                    should_send_spontaneous = False
+
+                if should_send_conv_photo:
+                    USER_LAST_AUTO_PHOTO_TURN[uid] = cur_turn
+                    USER_LAST_AUTO_PHOTO_TIME[uid] = now_ts
 
                 # Clean action tag from text so user only sees natural dialogue
                 clean_reply = re.sub(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", "", reply_text, flags=re.IGNORECASE).strip()
@@ -7363,7 +7512,19 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 f"⚠️ *Maaf, ada sedikit gangguan saat memproses pesan:*\n`{e_proc}`\n\nKetik `/status` untuk mengecek status bot."
             )
 
-    threading.Thread(target=_execute, daemon=True).start()
+    _execute()
+
+
+def process_text_chat(message, user_text: str, is_voice: bool = False, bypass_queue: bool = False):
+    """
+    Main conversation processor.
+    Default: routes through ChatQueueManager for per-user debounce & FIFO sequential processing.
+    Pass bypass_queue=True to execute directly in a worker thread.
+    """
+    if bypass_queue or getattr(message, "_bypass_queue", False):
+        threading.Thread(target=_execute_text_chat_direct, args=(message, user_text, is_voice), daemon=True).start()
+    else:
+        chat_queue_mgr.enqueue(message, user_text, is_voice=is_voice, execute_fn=_execute_text_chat_direct)
 
 
 def _handle_service_recovery_callback(service: str, stat: dict):
