@@ -861,6 +861,13 @@ def handle_welcome(message):
         types.InlineKeyboardButton("❓ Buku Panduan (/help)", callback_data="open_help_menu")
     )
 
+    user_prof = memory_engine.get_profile(message.from_user.id)
+    known_name = user_prof.get("call_name") or user_prof.get("name")
+    if known_name:
+        greeting_tail = f"Senang ketemu lagi, {known_name}! Aku siap nemenin kamu ngobrol santai, kirim foto selfie, dan nemenin hari-harimu~ ✨"
+    else:
+        greeting_tail = "Senang kamu datang! Ngomong-ngomong, nama kamu siapa ya? Supaya aku tahu harus manggil kamu siapa~ 🥰✨"
+
     # 1. Send Persona Reference Photo
     img_path = get_persona_image_path(persona)
     photo_sent = False
@@ -871,7 +878,7 @@ def handle_welcome(message):
                 f"💖 **Halo! Aku {name}** 👋🥰\n"
                 f"*({archetype})*\n\n"
                 f"_{desc}_\n\n"
-                f"Senang kamu datang! Aku siap nemenin kamu ngobrol santai, kirim foto selfie, dan nemenin hari-harimu~ ✨"
+                f"{greeting_tail}"
             )
             with open(img_path, "rb") as f:
                 bot.send_photo(message.chat.id, f, caption=caption, parse_mode="Markdown")
@@ -918,7 +925,7 @@ def handle_welcome(message):
     if photo_sent:
         bot.send_message(message.chat.id, guide_text, reply_markup=markup, parse_mode="Markdown")
     else:
-        full_text = f"💖 **Halo! Aku {name}** 👋🥰\n\n" + guide_text
+        full_text = f"💖 **Halo! Aku {name}** 👋🥰\n\n_{greeting_tail}_\n\n" + guide_text
         bot.reply_to(message, full_text, reply_markup=markup, parse_mode="Markdown")
 
 
@@ -6652,7 +6659,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
                 # Record activity for proactive check-ins & learn facts
                 proactive_engine.record_user_activity(message.from_user.id)
-                memory_engine.auto_extract_facts(user_text, message.from_user.id)
+                chat_history = persona_mgr.get_chat_history(message.from_user.id)
+                memory_engine.auto_extract_facts(user_text, message.from_user.id, history=chat_history)
 
                 # Check if user explicitly asked what waifu is doing or invited waifu out
                 user_asked_activity = hangout_engine.detect_activity_query(user_text)
@@ -6666,11 +6674,11 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 
                 # Check user calling preference / pet name request
                 user_prof = memory_engine.get_profile(message.from_user.id)
-                user_call_pref = user_prof.get("call_name")
+                user_call_pref = user_prof.get("call_name") or user_prof.get("name")
                 user_allows_pet = user_prof.get("allow_pet_name", False)
                 u_lower = user_text.lower()
                 user_sent_pet = bool(re.search(r"\b(sayang|ayang|babe|bebe|darling|honey)\b", u_lower))
-                user_asked_pet = bool(re.search(r"\bpanggil\s+(?:aku|saya)\s+(?:sayang|ayang|babe|bebe)\b", u_lower))
+                user_asked_pet = bool(re.search(r"\bpanggil\s+(?:aku|saya|gue|gw|gua)?\s*(?:aja\s+)?(?:sayang|ayang|babe|bebe)\b", u_lower))
 
                 if user_asked_pet or (user_allows_pet and user_call_pref == "sayang") or user_sent_pet:
                     calling_guideline = (
@@ -6679,14 +6687,15 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     )
                 elif user_call_pref:
                     calling_guideline = (
-                        f"ATURAN PANGGILAN & HUBUNGAN: Panggil user dengan nama '{user_call_pref}'. "
-                        "Gunakan kata ganti 'aku' dan 'kamu'. DILARANG memanggil 'sayang' karena user tidak memintanya."
+                        f"ATURAN PANGGILAN & HUBUNGAN: Panggil lawan bicaramu dengan nama '{user_call_pref}'. "
+                        "Gunakan kata ganti 'aku' dan 'kamu'. DILARANG memanggil 'sayang' karena lawan bicaramu belum memintanya."
                     )
                 else:
                     calling_guideline = (
-                        "ATURAN PANGGILAN & HUBUNGAN (SANGAT PENTING): Gunakan kata ganti netral dan akrab 'aku' dan 'kamu'. "
-                        "DILARANG KERAS memanggil 'sayang', 'babe', 'ayang', atau panggilan mesra sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya! "
-                        "Kamu bukan langsung bertindak sebagai pacar jika belum diminta; bersikaplah sebagai teman ngobrol mahasiswi yang ramah, hangat, dan asyik. Biarkan dinamika hubungan berkembang secara alami sesuai kenyamanan user."
+                        "ATURAN PANGGILAN & PERKENALAN (SANGAT PENTING): Kamu BELUM MENGETAHUI NAMA lawan bicaramu!\n"
+                        "1. Gunakan kata ganti netral dan akrab 'aku' dan 'kamu'. DILARANG KERAS memanggil 'sayang', 'babe', atau panggilan mesra sejenisnya karena belum saling kenal dekat.\n"
+                        "2. TANYAKAN NAMANYA: Di akhir balasanmu dengan cara yang ramah, manis, dan natural, tanyakan siapa namanya atau ingin dipanggil apa (misal: 'Ngomong-ngomong, nama kamu siapa ya? Supaya aku tahu harus manggil kamu siapa~ 😊').\n"
+                        "3. Tanggapi dulu pesan obrolan atau salam dari lawan bicaramu dengan hangat dan ekspresif, lalu tanyakan namanya secara santai dan bersahabat."
                     )
 
                 # Inject daily story episode (passive background during active ongoing chats, active after silence/new day or when asked)

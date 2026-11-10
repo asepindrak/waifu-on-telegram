@@ -402,13 +402,16 @@ class WaifuCLISession:
         persona = self.persona_mgr.get_active_persona()
         p_name = persona.get("name", "Waifu")
 
-        # 1. Check user calling preference / pet name request
+        # 1. Learn facts & check user calling preference
+        chat_history = self.persona_mgr.get_chat_history(self.user_id)
+        self.memory_engine.auto_extract_facts(user_text, self.user_id, history=chat_history)
+
         user_prof = self.memory_engine.get_profile(self.user_id)
-        user_call_pref = user_prof.get("call_name")
+        user_call_pref = user_prof.get("call_name") or user_prof.get("name")
         user_allows_pet = user_prof.get("allow_pet_name", False)
         u_lower = user_text.lower()
         user_sent_pet = bool(re.search(r"\b(sayang|ayang|babe|bebe|darling|honey)\b", u_lower))
-        user_asked_pet = bool(re.search(r"\bpanggil\s+(?:aku|saya)\s+(?:sayang|ayang|babe|bebe)\b", u_lower))
+        user_asked_pet = bool(re.search(r"\bpanggil\s+(?:aku|saya|gue|gw|gua)?\s*(?:aja\s+)?(?:sayang|ayang|babe|bebe)\b", u_lower))
 
         if user_asked_pet or (user_allows_pet and user_call_pref == "sayang") or user_sent_pet:
             calling_guideline = (
@@ -422,9 +425,10 @@ class WaifuCLISession:
             )
         else:
             calling_guideline = (
-                "ATURAN PANGGILAN & HUBUNGAN (SANGAT PENTING): Gunakan kata ganti netral dan akrab 'aku' dan 'kamu'. "
-                "DILARANG KERAS memanggil 'sayang', 'babe', 'ayang', atau panggilan mesra sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya! "
-                "Kamu bukan langsung bertindak sebagai pacar jika belum diminta; bersikaplah sebagai teman ngobrol mahasiswi yang ramah, hangat, dan asyik. Biarkan dinamika hubungan berkembang secara alami sesuai kenyamanan user."
+                "ATURAN PANGGILAN & PERKENALAN (SANGAT PENTING): Kamu BELUM MENGETAHUI NAMA lawan bicaramu!\n"
+                "1. Gunakan kata ganti netral dan akrab 'aku' dan 'kamu'. DILARANG KERAS memanggil 'sayang', 'babe', atau panggilan mesra sejenisnya karena belum saling kenal dekat.\n"
+                "2. TANYAKAN NAMANYA: Di akhir balasanmu dengan cara yang ramah, manis, dan natural, tanyakan siapa namanya atau ingin dipanggil apa (misal: 'Ngomong-ngomong, nama kamu siapa ya? Supaya aku tahu harus manggil kamu siapa~ 😊').\n"
+                "3. Tanggapi dulu pesan obrolan atau salam dari lawan bicaramu dengan hangat dan ekspresif, lalu tanyakan namanya secara santai dan bersahabat."
             )
 
         # 2. Hourly routine, Story Arc & Activity Awareness
