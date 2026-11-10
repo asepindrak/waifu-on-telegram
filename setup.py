@@ -80,7 +80,7 @@ def write_env(env_vars):
     if "SMART_IDLE_ENABLED" not in env_vars:
         env_vars["SMART_IDLE_ENABLED"] = "true"
     if "IDLE_TIMEOUT_MINUTES" not in env_vars:
-        env_vars["IDLE_TIMEOUT_MINUTES"] = "10"
+        env_vars["IDLE_TIMEOUT_MINUTES"] = "120"
     if "COMFYUI_ON_DEMAND" not in env_vars:
         env_vars["COMFYUI_ON_DEMAND"] = "true"
 

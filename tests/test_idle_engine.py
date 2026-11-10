@@ -32,11 +32,14 @@ class TestIdleEngine(unittest.TestCase):
         self.idle_engine.stop()
 
     def test_default_configuration(self):
-        """Verify smart idle defaults to enabled, 10 minutes timeout, and ComfyUI on-demand."""
-        engine = IdleEngine()
-        self.assertTrue(engine.enabled)
-        self.assertEqual(engine.idle_timeout_minutes, 10)
-        self.assertTrue(engine.comfyui_on_demand)
+        """Verify smart idle defaults to enabled, 120 minutes (2 hours) timeout, and ComfyUI on-demand."""
+        env_copy = dict(os.environ)
+        env_copy.pop("IDLE_TIMEOUT_MINUTES", None)
+        with patch.dict(os.environ, env_copy, clear=True):
+            engine = IdleEngine()
+            self.assertTrue(engine.enabled)
+            self.assertEqual(engine.idle_timeout_minutes, 120)
+            self.assertTrue(engine.comfyui_on_demand)
 
     def test_record_activity_updates_timestamp(self):
         """Verify record_activity updates last_llm_activity timestamp."""
@@ -135,6 +138,66 @@ class TestIdleEngine(unittest.TestCase):
             ok = self.idle_engine.ensure_comfyui_active(bot=mock_bot, chat_id=123, is_nude=True)
             self.assertTrue(ok)
             mock_wake.assert_called_once()
+
+    def test_manual_idle_puts_local_services_to_sleep(self):
+        """Verify manual_idle puts listening local services (KoboldCPP, ComfyUI) to sleep."""
+        with patch("idle_engine.is_port_listening", return_value=True), \
+             patch.object(self.idle_engine, "sleep_llm", return_value=True) as mock_sleep_llm, \
+             patch.object(self.idle_engine, "sleep_comfyui", return_value=True) as mock_sleep_comfy, \
+             patch.object(self.idle_engine, "sleep_voicestudio", return_value=True) as mock_sleep_vs, \
+             patch.dict(os.environ, {"SFW_LLM_PROVIDER": "local", "LLM_BASE_URL": "http://127.0.0.1:5001/v1", "SFW_LLM_BASE_URL": "http://127.0.0.1:5001/v1"}):
+            results = self.idle_engine.manual_idle()
+            self.assertTrue(results["freed_any"])
+            mock_sleep_llm.assert_called_once()
+            mock_sleep_comfy.assert_called_once()
+            self.assertEqual(results["llm"], "slept")
+            self.assertEqual(results["comfyui"], "slept")
+
+    def test_manual_idle_exempts_cloud_llm_and_agy(self):
+        """Verify manual_idle does NOT put AGY/cloud LLMs to sleep because they consume 0 local VRAM."""
+        with patch("idle_engine.is_port_listening", side_effect=lambda port: port in (8001, 8188)), \
+             patch.object(self.idle_engine, "sleep_comfyui", return_value=True) as mock_sleep_comfy, \
+             patch.object(self.idle_engine, "sleep_llm") as mock_sleep_llm, \
+             patch.dict(os.environ, {"SFW_LLM_PROVIDER": "agy"}):
+            results = self.idle_engine.manual_idle()
+            self.assertEqual(results["llm"], "cloud_exempt")
+            self.assertEqual(results["agy"], "cloud_exempt")
+            # Local LLM should NOT be called to sleep if not listening
+            mock_sleep_llm.assert_not_called()
+            # ComfyUI is local, so it should still be put to sleep
+            mock_sleep_comfy.assert_called_once()
+            self.assertIn("0 VRAM overhead", "".join(results["details"]))
+
+    def test_bot_handle_idle_command(self):
+        """Verify Telegram bot /idle command dispatches manual_idle and replies with friendly message."""
+        import bot
+        mock_msg = MagicMock()
+        mock_msg.from_user.id = 12345
+        mock_msg.chat.id = 12345
+
+        with patch.object(bot, "is_authorized", return_value=True), \
+             patch.object(bot.idle_engine, "manual_idle", return_value={"freed_any": True, "details": ["VRAM bebas!"]}), \
+             patch.object(bot, "persona_mgr") as mock_pm, \
+             patch.object(bot.bot, "reply_to") as mock_reply:
+            mock_pm.get_active_persona.return_value = {"name": "Runa"}
+            bot.handle_idle_command(mock_msg)
+            mock_reply.assert_called_once()
+            args = mock_reply.call_args[0]
+            self.assertIn("Mode Idle Berhasil Diaktifkan", args[1])
+            self.assertIn("Runa", args[1])
+
+    def test_bot_text_waifu_idle_triggers_idle(self):
+        """Verify natural text 'waifu idle' routes to handle_idle_command."""
+        import bot
+        mock_msg = MagicMock()
+        mock_msg.from_user.id = 12345
+        mock_msg.chat.id = 12345
+        mock_msg.text = "waifu idle"
+
+        with patch.object(bot, "is_authorized", return_value=True), \
+             patch.object(bot, "handle_idle_command") as mock_handle_idle:
+            bot.handle_text_messages(mock_msg)
+            mock_handle_idle.assert_called_once_with(mock_msg)
 
 
 if __name__ == "__main__":

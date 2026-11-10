@@ -143,9 +143,11 @@ Waifu on Telegram mendukung sintesis suara melalui dua pilihan backend canggih:
 #### 5. 💤 Smart Idle Engine (Manajemen VRAM & Daya Otomatis)
 
 Seringkali pengguna AI mengeluhkan RAM dan VRAM VGA selalu penuh meskipun bot sedang tidak digunakan. Waifu on Telegram dilengkapi **Smart Idle Engine**:
-* **Auto-Sleep:** Saat bot tidak menerima interaksi selama waktu tertentu (default: 10 menit), engine KoboldCPP LLM otomatis dinonaktifkan sementara dari memori.
-* **VRAM Recovery:** Seketika membebaskan **5.0 GB – 6.0 GB VRAM GPU** dan beberapa gigabyte RAM sistem, memungkinkan Anda bermain game berat atau editing video tanpa stutter.
-* **Instant Wake-up:** Begitu Anda mengirim pesan atau menekan tombol di Telegram, Smart Idle secara transparan membangkitkan engine kembali dalam waktu <1-2 detik!
+* **Auto-Sleep:** Saat bot tidak menerima interaksi selama waktu tertentu (default: **2 jam / 120 menit**, dapat diatur di `.env`), engine lokal (KoboldCPP LLM & ComfyUI) otomatis dinonaktifkan sementara dari memori.
+* **Manual Idle:** Ingin langsung membebaskan VRAM? Cukup kirim perintah `/idle` atau ketik `waifu idle` di Telegram atau jalankan `waifu idle` di CLI!
+* **Cloud LLM Exemption:** Pengguna model chat Cloud seperti **Google Antigravity (AGY)** atau provider cloud lainnya dibebaskan dari auto-idle karena berjalan di cloud dan 0 VRAM overhead di PC lokal.
+* **VRAM Recovery:** Seketika membebaskan **5.0 GB – 8.0 GB VRAM GPU** dan RAM sistem untuk bermain game berat atau rendering.
+* **Instant Wake-up:** Begitu Anda mengirim pesan atau chat baru di Telegram, Smart Idle secara transparan membangkitkan engine kembali dalam waktu beberapa detik!
 
 ---
 
@@ -591,7 +593,7 @@ Gunakan tabel acuan berikut untuk memilih kombinasi model yang paling pas dengan
 ## 💬 Frequently Asked Questions (Knowledge Base)
 
 1. **Kenapa RAM & VRAM GPU saya tidak lagi penuh saat waifu menganggur?**
-   - Waifu on Telegram kini dilengkapi **Smart Idle Engine**. Jika bot tidak menerima pesan selama waktu tertentu (default: 10 menit), engine KoboldCPP LLM otomatis dinonaktifkan sementara dari VRAM (~5-6 GB VRAM kembali kosong untuk gaming / kerja). Begitu Anda chat kembali, engine langsung bangun dalam waktu <1-2 detik secara transparan!
+   - Waifu on Telegram kini dilengkapi **Smart Idle Engine**. Jika bot tidak menerima pesan selama waktu tertentu (default: **2 jam / 120 menit**), engine KoboldCPP LLM & ComfyUI otomatis dinonaktifkan sementara dari VRAM (~6-8 GB VRAM kembali kosong untuk gaming / kerja). Anda juga bisa mengaktifkan mode idle secara instan kapan saja dengan perintah `/idle` atau chat `waifu idle` di Telegram dan terminal. Begitu Anda chat kembali, engine langsung bangun otomatis secara transparan! Cloud LLM seperti Google Antigravity (AGY) tidak membebani VRAM lokal sehingga tetap siap sedia tanpa perlu ditidurkan.
 
 2. **Apa perbedaan antara AbyssOrangeMix3 (AOM3), MeinaMix v12, dan Anything XL?**
    - **AbyssOrangeMix3 / AOM3A1B (SD 1.5, ~2.0 GB - Default Local Model):** Model anime klasik legendaris dari CivArchive/Civitai #9942 dengan sifat *uncensored* penuh. Memiliki saturasi warna cerah (*vibrant*), pencahayaan lembut (*soft lighting*), shading mata/rambut yang artistik, serta fleksibel untuk pose SFW hingga NSFW intim.

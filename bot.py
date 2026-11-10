@@ -131,7 +131,7 @@ health_engine = HealthEngine(
     self_healing_enabled=SELF_HEALING_ENABLED
 )
 SMART_IDLE_ENABLED = os.environ.get("SMART_IDLE_ENABLED", "true").lower() in ("true", "1", "yes")
-IDLE_TIMEOUT_MINUTES = int(os.environ.get("IDLE_TIMEOUT_MINUTES", "10"))
+IDLE_TIMEOUT_MINUTES = int(os.environ.get("IDLE_TIMEOUT_MINUTES", "120"))
 COMFYUI_ON_DEMAND = os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")
 
 idle_engine = IdleEngine(
@@ -2050,6 +2050,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"`/love` - Cek skor cinta dan level kedekatan\n"
             f"`/greetings` - Toggle sapaan pagi, siang & malam otomatis\n"
             f"`/status` - Cek koneksi server GPU, LLM & ComfyUI\n"
+            f"`/idle` - Tidurkan AI lokal & bebaskan 100% VRAM (atau ketik 'waifu idle')\n"
             f"`/reset` - Hapus memori obrolan (topik baru)"
         )
         markup.add(
@@ -2946,6 +2947,23 @@ def handle_servers_command(message):
         bot.reply_to(message, msg_text, reply_markup=markup, parse_mode="Markdown")
     except Exception as e:
         bot.reply_to(message, f"⚠️ Gagal membaca daftar server: {e}")
+
+
+@bot.message_handler(commands=['idle', 'sleep'])
+def handle_idle_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    res = idle_engine.manual_idle()
+    persona = persona_mgr.get_active_persona(message.from_user.id)
+    p_name = persona.get("name", "Waifu") if persona else "Waifu"
+
+    details_str = "\n".join([f"• {d}" for d in res.get("details", [])])
+    reply_text = (
+        "💤 *Mode Idle Berhasil Diaktifkan!* ✨\n\n"
+        f"{details_str}\n\n"
+        f"🌸 *{p_name}:* \"Aku istirahat dulu yaa~ Kalau kamu mau ngobrol lagi, tinggal kirim chat aja, nanti aku langsung bangun! 🥰💤\""
+    )
+    bot.reply_to(message, reply_text, parse_mode="Markdown")
 
 
 @bot.message_handler(commands=['stop_server'])
@@ -6235,11 +6253,19 @@ def handle_text_messages(message):
 
     # Direct robust fallback dispatch for all bot commands (handles leading spaces, case, bot username suffix)
     raw_text = (message.text or "").strip()
+    clean_lower = raw_text.lower().strip()
+    if clean_lower in ('waifu idle', 'waifu sleep', 'waifu tidur', 'idle waifu', 'idle') or clean_lower.startswith('waifu idle'):
+        handle_idle_command(message)
+        return
+
     first_token = raw_text.split()[0].lower() if raw_text else ""
     if "@" in first_token:
         first_token = first_token.split("@")[0]
 
-    if first_token in ('/projects', '/project', '/workspace'):
+    if first_token in ('/idle', '/sleep'):
+        handle_idle_command(message)
+        return
+    elif first_token in ('/projects', '/project', '/workspace'):
         handle_projects_command(message)
         return
     elif first_token in ('/spawn',):

@@ -58,9 +58,9 @@ class IdleEngine:
             self.idle_timeout_minutes = max(1, idle_timeout_minutes)
         else:
             try:
-                self.idle_timeout_minutes = max(1, int(os.environ.get("IDLE_TIMEOUT_MINUTES", "10")))
+                self.idle_timeout_minutes = max(1, int(os.environ.get("IDLE_TIMEOUT_MINUTES", "120")))
             except Exception:
-                self.idle_timeout_minutes = 10
+                self.idle_timeout_minutes = 120
 
         if comfyui_on_demand is not None:
             self.comfyui_on_demand = comfyui_on_demand
@@ -99,6 +99,32 @@ class IdleEngine:
             ":8001" in llm_url or ":8001" in sfw_url or
             sfw_img == "agy" or nsfw_img == "agy"
         )
+
+    def is_cloud_llm_active(self) -> bool:
+        """
+        Determines if the active chat LLM is a cloud/remote provider (AGY, Gemini, OpenAI, Claude, Groq)
+        that does not consume local GPU VRAM and therefore should never be put to sleep or idled.
+        """
+        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
+        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "").lower().strip()
+        llm_url = os.environ.get("LLM_BASE_URL", "").lower().strip()
+        sfw_url = os.environ.get("SFW_LLM_BASE_URL", "").lower().strip()
+
+        if sfw_p in ("local", "kobold", "ollama", "locally-uncensored"):
+            return False
+        if sfw_p == "agy" or nsfw_p == "agy":
+            return True
+        if sfw_p in ("openai", "gemini", "groq", "openrouter", "anthropic", "claude", "cloud"):
+            return True
+        if ":8001" in sfw_url:
+            return True
+        if sfw_url and not any(p in sfw_url for p in ["127.0.0.1", "localhost", "0.0.0.0"]):
+            return True
+        if ":8001" in llm_url:
+            return True
+        if llm_url and not any(p in llm_url for p in ["127.0.0.1", "localhost", "0.0.0.0", ":5001", ":11434", ":1234"]):
+            return True
+        return False
 
     def record_activity(self, is_media: bool = False, is_voice: bool = False, is_agy: bool = False):
         """Records user interaction timestamp to reset idle countdown."""
@@ -315,6 +341,76 @@ class IdleEngine:
             except Exception as e:
                 logger.error(f"Error putting ComfyUI to sleep: {e}")
                 return False
+
+    def manual_idle(self) -> Dict[str, Any]:
+        """
+        Manually triggers idle mode: immediately frees local GPU VRAM & RAM
+        by putting local services (KoboldCPP, ComfyUI, VoiceStudio) to sleep.
+        Cloud LLMs like AGY/OpenAI/Gemini are exempted because they run in the cloud (0 VRAM).
+        """
+        results = {
+            "llm": "unknown",
+            "comfyui": "unknown",
+            "voicestudio": "unknown",
+            "agy": "unknown",
+            "freed_any": False,
+            "details": []
+        }
+
+        # 1. ComfyUI (Local Image/Video Generator)
+        if is_port_listening(8188):
+            ok = self.sleep_comfyui()
+            results["comfyui"] = "slept" if ok else "failed"
+            if ok:
+                results["freed_any"] = True
+                results["details"].append("🎨 Studio Foto (ComfyUI) ditidurkan ➔ VRAM bebas!")
+        else:
+            self.is_comfyui_sleeping = True
+            results["comfyui"] = "already_sleeping"
+            results["details"].append("🎨 Studio Foto (ComfyUI) sudah standby.")
+
+        # 2. LLM Chat Engine
+        if self.is_cloud_llm_active():
+            results["llm"] = "cloud_exempt"
+            results["details"].append("☁️ LLM Chat (Cloud/AGY) tetap aktif (0 VRAM overhead, tidak membebani PC).")
+            # If local KoboldCPP was also left lingering on port 5001, sleep it to reclaim VRAM
+            if is_port_listening(5001):
+                self.sleep_llm()
+                results["freed_any"] = True
+                results["details"].append("🧠 Background KoboldCPP ditidurkan ➔ VRAM bebas!")
+        else:
+            if is_port_listening(5001):
+                ok = self.sleep_llm()
+                results["llm"] = "slept" if ok else "failed"
+                if ok:
+                    results["freed_any"] = True
+                    results["details"].append("🧠 Local LLM (KoboldCPP) ditidurkan ➔ 6-8 GB VRAM berhasil dibebaskan!")
+            else:
+                self.is_llm_sleeping = True
+                results["llm"] = "already_sleeping"
+                results["details"].append("🧠 Local LLM sudah dalam kondisi tidur.")
+
+        # 3. VoiceStudio (Local Audio)
+        if is_port_listening(3900):
+            ok = self.sleep_voicestudio()
+            results["voicestudio"] = "slept" if ok else "failed"
+            if ok:
+                results["freed_any"] = True
+                results["details"].append("🎙️ VoiceStudio ditidurkan ➔ RAM & VRAM bebas!")
+        else:
+            self.is_voicestudio_sleeping = True
+            results["voicestudio"] = "already_sleeping"
+
+        # 4. AGY Bridge
+        if self.is_agy_active_provider():
+            results["agy"] = "cloud_exempt"
+            results["details"].append("🌉 Google AGY Bridge tetap aktif (0 VRAM).")
+        elif is_port_listening(8001):
+            self.sleep_agy_bridge()
+            results["agy"] = "slept"
+            results["details"].append("🌉 AGY Bridge ditidurkan.")
+
+        return results
 
     def wake_llm(self, timeout_seconds: int = 50) -> bool:
         """
@@ -654,13 +750,15 @@ class IdleEngine:
                 comfyui_idle_sec = self.comfyui_timeout_minutes * 60
 
                 # 1. Check KoboldCPP LLM idle
-                if (now - self.last_llm_activity) >= llm_idle_sec:
-                    if is_port_listening(5001) and not self.is_llm_sleeping:
-                        logger.info(
-                            f"💤 Smart Idle: No chat activity for {self.idle_timeout_minutes}m. "
-                            f"Putting KoboldCPP to sleep..."
-                        )
-                        self.sleep_llm()
+                # Cloud LLMs like AGY do not use local VRAM, so they are exempted from idle sleeping
+                if not self.is_cloud_llm_active():
+                    if (now - self.last_llm_activity) >= llm_idle_sec:
+                        if is_port_listening(5001) and not self.is_llm_sleeping:
+                            logger.info(
+                                f"💤 Smart Idle: No chat activity for {self.idle_timeout_minutes}m. "
+                                f"Putting KoboldCPP to sleep..."
+                            )
+                            self.sleep_llm()
 
                 # 2. Check ComfyUI on-demand idle
                 if self.comfyui_on_demand:
@@ -719,7 +817,10 @@ class IdleEngine:
         """Returns diagnostic string for /status and setup reports."""
         if not self.enabled:
             return "⚪ Nonaktif"
-        llm_state = "💤 Tidur (VRAM Bebas)" if self.is_llm_sleeping else ("🟢 Online" if is_port_listening(5001) else "💤 Standby")
+        if self.is_cloud_llm_active():
+            llm_state = "☁️ Online Cloud (0 VRAM)"
+        else:
+            llm_state = "💤 Tidur (VRAM Bebas)" if self.is_llm_sleeping else ("🟢 Online" if is_port_listening(5001) else "💤 Standby")
         comfy_state = "💤 Standby On-Demand" if self.comfyui_on_demand else ("🟢 Online" if is_port_listening(8188) else "🔴 Offline")
         vs_state = "🟢 Online" if is_port_listening(3900) else "💤 Standby"
         if self.is_agy_active_provider():

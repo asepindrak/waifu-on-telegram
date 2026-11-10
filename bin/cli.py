@@ -1201,12 +1201,26 @@ def cmd_chat():
     except Exception as e:
         print(c(RED, f"\n❌ Error starting CLI chat session: {e}\n"))
 
+def cmd_idle():
+    """Manually puts local AI engines (KoboldCPP, ComfyUI, VoiceStudio) to sleep to free VRAM & RAM."""
+    print(c(BOLD + CYAN, "\n💤 Mengaktifkan Mode Idle Secara Manual..."))
+    try:
+        from idle_engine import IdleEngine
+        engine = IdleEngine(project_root=PROJECT_ROOT)
+        results = engine.manual_idle()
+        for d in results.get("details", []):
+            print(f"  • {d}")
+        print(c(BOLD + GREEN, "\n✓ Mode idle berhasil diaktifkan. VRAM & RAM telah dibebaskan untuk gaming/kerja!"))
+        print(c(DIM, "  (Waifu akan otomatis bangun saat kamu mengirim pesan atau chat baru)\n"))
+    except Exception as e:
+        print(c(RED, f"\n❌ Gagal mengaktifkan mode idle: {e}\n"))
+
 def print_cli_help(unknown_cmd: str = None):
     print_banner()
     if unknown_cmd:
         import difflib
         valid_cmds = [
-            "start", "stop", "restart", "status", "setup", "config",
+            "start", "stop", "restart", "status", "idle", "setup", "config",
             "update", "models", "persona", "language", "autorun",
             "logs", "version", "uninstall", "help"
         ]
@@ -1225,6 +1239,7 @@ def print_cli_help(unknown_cmd: str = None):
     print(f"    {c(GREEN, 'waifu start')} [--daemon]       Mulai bot & AI engines (foreground / background)")
     print(f"    {c(GREEN, 'waifu stop')}                  Hentikan bot & semua background services")
     print(f"    {c(GREEN, 'waifu restart')}               Restart bot & daemon secara bersih")
+    print(f"    {c(GREEN, 'waifu idle')}                  Tidurkan AI lokal & bebaskan 100% VRAM secara manual")
     print(f"    {c(GREEN, 'waifu status')}                Diagnostik kesehatan LLM, ComfyUI, Music & RAM/VRAM")
     print(f"    {c(GREEN, 'waifu logs')}                  Pantau log aktivitas bot secara real-time")
     print(f"    {c(GREEN, 'waifu bridge')} [start|stop|status]  Kelola Google Antigravity CLI OpenAI-compatible Bridge")
@@ -1278,6 +1293,8 @@ def main():
         cmd_stop()
     elif cmd == "restart":
         cmd_restart(daemon=True)
+    elif cmd in ("idle", "sleep", "tidur"):
+        cmd_idle()
     elif cmd in ("voicestudio", "voice_service"):
         action = args.arg or "status"
         cmd_voicestudio(action)

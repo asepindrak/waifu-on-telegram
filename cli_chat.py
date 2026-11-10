@@ -206,7 +206,7 @@ class WaifuCLISession:
             health_engine=self.health_engine,
             project_root=PROJECT_ROOT,
             enabled=os.environ.get("SMART_IDLE_ENABLED", "true").lower() in ("true", "1", "yes"),
-            idle_timeout_minutes=int(os.environ.get("IDLE_TIMEOUT_MINUTES", "10")),
+            idle_timeout_minutes=int(os.environ.get("IDLE_TIMEOUT_MINUTES", "120")),
             comfyui_on_demand=os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")
         )
         self.health_engine.idle_engine = self.idle_engine
@@ -627,6 +627,7 @@ class WaifuCLISession:
             if low in ("/help", "/h", "help", "bantuan"):
                 print(f"\n{c(BOLD + CYAN, '📖 PANDUAN CHAT CLI:')}")
                 print("  • Ketik apa saja untuk mengobrol santai.")
+                print("  • /idle atau 'waifu idle' ➔ Tidurkan AI lokal & bebaskan 100% VRAM secara manual.")
                 print("  • /pap atau minta foto ➔ Foto digenerate dan otomatis terbuka di layar!")
                 print("  • /video atau minta video ➔ Video digenerate dan otomatis terbuka!")
                 print("  • /story ➔ Melihat cerita & episode hidup waifu hari ini.")
@@ -637,6 +638,17 @@ class WaifuCLISession:
                 print("  • /persona [nama] ➔ Ganti karakter (runa, akira, hina, shiro, yume).")
                 print("  • /clear ➔ Menghapus riwayat percakapan sesi ini.")
                 print("  • /exit atau /quit ➔ Keluar dari sesi chat CLI.\n")
+                continue
+
+            if low in ("/idle", "/sleep", "idle", "sleep", "waifu idle", "waifu sleep", "waifu tidur", "idle waifu"):
+                with CLILoader("Mengaktifkan mode hemat daya & membebaskan VRAM...", emoji="💤"):
+                    res = self.idle_engine.manual_idle()
+                persona = self.persona_mgr.get_active_persona()
+                p_name = persona.get("name", "Waifu")
+                print(f"\n{c(BOLD + CYAN, '💤 Mode Idle Berhasil Diaktifkan:')}")
+                for d in res.get("details", []):
+                    print(f"  • {d}")
+                print(f"\n🌸 {c(BOLD + MAGENTA, p_name)}: Aku istirahat dulu yaa~ Kalau kamu butuh aku lagi, tinggal chat aja seperti biasa, nanti aku langsung bangun! 🥰💤\n")
                 continue
 
             if low in ("/story", "/cerita", "/arc", "/episode"):
