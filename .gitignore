@@ -71,6 +71,7 @@ Thumbs.db
 !personas/brief/**
 
 # User Memory & Private Data
+.waifu/
 data/*.json
 data/photo_vault/
 !data/.gitkeep

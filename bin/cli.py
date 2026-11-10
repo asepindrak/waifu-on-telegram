@@ -1215,12 +1215,34 @@ def cmd_idle():
     except Exception as e:
         print(c(RED, f"\n❌ Gagal mengaktifkan mode idle: {e}\n"))
 
+def cmd_code(prompt: str):
+    """Executes a coding task directly in active workspace via CLI."""
+    if not prompt:
+        print(c(YELLOW, "\n💡 Penggunaan: waifu code \"<instruksi coding>\""))
+        print("   Contoh: waifu code \"buatkan navbar responsive\"\n")
+        return
+    print(c(BOLD + CYAN, f"\n👩‍💻 Menjalankan tugas coding di workspace aktif..."))
+    try:
+        from coding_engine import get_coding_engine
+        from project_manager import get_project_manager
+        pm = get_project_manager()
+        active_p = pm.get_active_project(0)
+        active_path = pm.get_active_project_path(0)
+        print(f"  • Project: {c(GREEN, active_p)}")
+        print(f"  • Folder:  {c(DIM, active_path)}\n")
+        engine = get_coding_engine()
+        res, _ = engine.execute_coding_task(user_id=0, prompt=prompt, persona={"name": "Waifu"})
+        print(res)
+        print(c(BOLD + GREEN, "\n✓ Selesai!\n"))
+    except Exception as e:
+        print(c(RED, f"\n❌ Gagal menjalankan tugas coding: {e}\n"))
+
 def print_cli_help(unknown_cmd: str = None):
     print_banner()
     if unknown_cmd:
         import difflib
         valid_cmds = [
-            "start", "stop", "restart", "status", "idle", "setup", "config",
+            "start", "stop", "restart", "status", "idle", "code", "setup", "config",
             "update", "models", "persona", "language", "autorun",
             "logs", "version", "uninstall", "help"
         ]
@@ -1234,6 +1256,7 @@ def print_cli_help(unknown_cmd: str = None):
     print(c(DIM, "─" * 70))
     print(c(BOLD + MAGENTA, "  💬 Obrolan Langsung & Interaksi:"))
     print(f"    {c(GREEN, 'waifu')} (atau {c(GREEN, 'waifu chat')})      Sesi chat CLI interaktif langsung (Auto-open foto & video!)")
+    print(f"    {c(GREEN, 'waifu code')} \"<tugas>\"        Jalankan coding otonom langsung di workspace aktif")
 
     print(c(BOLD + MAGENTA, "\n  🚀 Kontrol Layanan & Status:"))
     print(f"    {c(GREEN, 'waifu start')} [--daemon]       Mulai bot & AI engines (foreground / background)")
@@ -1295,6 +1318,12 @@ def main():
         cmd_restart(daemon=True)
     elif cmd in ("idle", "sleep", "tidur"):
         cmd_idle()
+    elif cmd in ("code", "dev", "ngoding", "coding"):
+        prompt_parts = [args.arg] if args.arg else []
+        if args.extra_args:
+            prompt_parts.extend(args.extra_args)
+        full_code_prompt = " ".join(prompt_parts).strip()
+        cmd_code(full_code_prompt)
     elif cmd in ("voicestudio", "voice_service"):
         action = args.arg or "status"
         cmd_voicestudio(action)

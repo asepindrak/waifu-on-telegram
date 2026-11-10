@@ -118,9 +118,10 @@ class ProjectIntentRouter:
             if re.search(pat, lower):
                 return ProjectIntentResult(intent_type="STATUS", target_project=active_proj)
 
-        # 7. Check Cross-Project Relation (ERP Dependencies)
-        rel_pattern = r'\b(?:project|modul)\s+([a-zA-Z0-9_\-]+)\s+(?:ada\s+relasi\s+ke|butuh\s+api\s+dari|konek\s+ke|bergantung\s+pada)\s+([a-zA-Z0-9_\-]+)\b'
-        m_rel = re.search(rel_pattern, lower)
+        # 7. Check Cross-Project Relation (ERP Dependencies & Interconnected Modules)
+        rel_pattern1 = r'\b(?:project|modul)\s+([a-zA-Z0-9_\-]+)\s+(?:ada\s+relasi\s+ke|butuh\s+api\s+dari|konek\s+ke|bergantung\s+pada|terhubung\s+ke)\s+([a-zA-Z0-9_\-]+)\b'
+        rel_pattern2 = r'\b(?:hubungkan|koneksikan|link|relasikan)\s+(?:project\s+)?(?:([a-zA-Z0-9_\-]+)\s+)?(?:ke|dengan)\s+([a-zA-Z0-9_\-]+)\b'
+        m_rel = re.search(rel_pattern1, lower)
         if m_rel:
             source_p = m_rel.group(1).strip()
             target_p = m_rel.group(2).strip()
@@ -130,6 +131,17 @@ class ProjectIntentRouter:
                 relation_target=target_p,
                 relation_type="dependency"
             )
+        m_rel2 = re.search(rel_pattern2, lower)
+        if m_rel2:
+            src = m_rel2.group(1).strip() if m_rel2.group(1) else active_proj
+            tgt = m_rel2.group(2).strip()
+            if tgt and tgt != "ini" and tgt != "itu":
+                return ProjectIntentResult(
+                    intent_type="ADD_RELATION",
+                    target_project=src,
+                    relation_target=tgt,
+                    relation_type="dependency"
+                )
 
         # 8. Check Add To-Do / Pending Task
         todo_pattern = r'\b(?:catat\s+to\s*do|tambah\s+to\s*do|tambah\s+task|nanti\s+tolong)\s*[:\-]?\s*(.+)$'

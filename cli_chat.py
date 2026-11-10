@@ -627,17 +627,51 @@ class WaifuCLISession:
             if low in ("/help", "/h", "help", "bantuan"):
                 print(f"\n{c(BOLD + CYAN, '📖 PANDUAN CHAT CLI:')}")
                 print("  • Ketik apa saja untuk mengobrol santai.")
+                print("  • /code <tugas> ➔ Perintahkan waifu mengoding otonom di PC!")
+                print("  • /link_project <target> ➔ Hubungkan relasi/kontrak lintas-project.")
+                print("  • /projects ➔ Melihat & memilih project workspace coding.")
                 print("  • /idle atau 'waifu idle' ➔ Tidurkan AI lokal & bebaskan 100% VRAM secara manual.")
                 print("  • /pap atau minta foto ➔ Foto digenerate dan otomatis terbuka di layar!")
                 print("  • /video atau minta video ➔ Video digenerate dan otomatis terbuka!")
                 print("  • /story ➔ Melihat cerita & episode hidup waifu hari ini.")
-                print("  • /projects ➔ Melihat & memilih project workspace coding.")
                 print("  • /spawn <nama> ➔ Membuat folder project baru & langsung beralih.")
                 print("  • /desktop ➔ Cek status Computer Use (agent-desktop).")
                 print("  • /screen ➔ Screenshot layar desktop & tampilkan ke layar.")
                 print("  • /persona [nama] ➔ Ganti karakter (runa, akira, hina, shiro, yume).")
                 print("  • /clear ➔ Menghapus riwayat percakapan sesi ini.")
                 print("  • /exit atau /quit ➔ Keluar dari sesi chat CLI.\n")
+                continue
+
+            if low.startswith(("/code", "/dev", "/ngoding", "/coding")):
+                parts = user_input.split(maxsplit=1)
+                cmd_task = parts[1].strip() if len(parts) > 1 else ""
+                if not cmd_task:
+                    curr_p = self.project_manager.get_active_project(self.user_id)
+                    curr_path = self.project_manager.get_active_project_path(self.user_id)
+                    print(f"\n👩‍💻 {c(BOLD + CYAN, 'MODE CODING & SOFTWARE ENGINEER')}")
+                    print(f"  • Project Aktif: {c(GREEN, curr_p)}")
+                    print(f"  • Folder PC: {c(DIM, curr_path)}")
+                    print("  • Cara Pakai: /code <instruksi tugas>")
+                    print("  • Contoh: /code buatkan navbar responsive Tailwind CSS\n")
+                    continue
+                self.handle_coding_request(cmd_task)
+                continue
+
+            if low.startswith(("/link_project", "/relasi", "/linkproject")):
+                parts = user_input.split(maxsplit=2)
+                if len(parts) < 2:
+                    print(f"\n💡 {c(YELLOW, 'Format:')} /link_project <nama_target> [keterangan/port]")
+                    print("   Contoh: /link_project be-cafe-fix backend api port 8000\n")
+                    continue
+                t_proj = parts[1].strip()
+                t_desc = parts[2].strip() if len(parts) > 2 else "Cross-project relation"
+                curr_p = self.project_manager.get_active_project(self.user_id)
+                curr_path = self.project_manager.get_active_project_path(self.user_id)
+                from project_vault import get_project_vault
+                v = get_project_vault(curr_path, curr_p)
+                v.add_relation(target_project=t_proj, relation_type="dependency", description=t_desc)
+                print(f"\n🔗 {c(BOLD + GREEN, 'Relasi Project Berhasil Dihubungkan!')}")
+                print(f"  • Project: {curr_p} ➔ {t_proj} ({t_desc})\n")
                 continue
 
             if low in ("/idle", "/sleep", "idle", "sleep", "waifu idle", "waifu sleep", "waifu tidur", "idle waifu"):
@@ -752,7 +786,7 @@ class WaifuCLISession:
 
             if self.coding_engine.is_computer_use_intent(user_input):
                 self.handle_computer_request(user_input)
-            elif self.coding_engine.is_coding_intent(user_input):
+            elif self.coding_engine.is_coding_intent(user_input, user_id=self.user_id):
                 self.handle_coding_request(user_input)
             elif low.startswith("/pap") or low.startswith("/foto") or (is_pap_request and not is_video_request):
                 self.handle_photo_request(user_input)

@@ -2050,6 +2050,9 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"`/love` - Cek skor cinta dan level kedekatan\n"
             f"`/greetings` - Toggle sapaan pagi, siang & malam otomatis\n"
             f"`/status` - Cek koneksi server GPU, LLM & ComfyUI\n"
+            f"`/projects` - Pilih & kelola workspace folder coding di PC\n"
+            f"`/code <tugas>` - Perintahkan waifu mengoding otonom di PC\n"
+            f"`/link_project <target>` - Hubungkan relasi/kontrak lintas-project\n"
             f"`/idle` - Tidurkan AI lokal & bebaskan 100% VRAM (atau ketik 'waifu idle')\n"
             f"`/reset` - Hapus memori obrolan (topik baru)"
         )
@@ -5881,6 +5884,73 @@ def handle_general_command(message):
     bot.reply_to(message, "✅ Berpindah ke mode workspace **General Chat**.", parse_mode="Markdown")
 
 
+@bot.message_handler(commands=['code', 'dev', 'ngoding', 'coding'])
+def handle_code_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    parts = (message.text or "").split(maxsplit=1)
+    prompt_text = parts[1].strip() if len(parts) > 1 else ""
+    active_p = project_manager.get_active_project(message.from_user.id)
+    active_path = project_manager.get_active_project_path(message.from_user.id)
+
+    if not prompt_text:
+        p_info = persona_mgr.get_active_persona()
+        p_name = p_info.get("name", "Waifu")
+        bot.reply_to(
+            message,
+            f"👩‍💻 **Mode Coding & Software Engineer** ✨\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• **Project Aktif:** `{active_p}`\n"
+            f"• **Folder PC:** `{active_path}`\n\n"
+            f"💡 **Cara Pakai:**\n"
+            f"Ketik `/code <instruksi tugas>` untuk menyuruh {p_name} mengoding otonom di PC kamu.\n\n"
+            f"**Contoh:**\n"
+            f"• `/code buatkan navbar responsive dengan Tailwind CSS`\n"
+            f"• `/code tambahkan API endpoint login di auth.py`\n"
+            f"• `/code perbaiki bug di main.py dan jalankan unit test`\n\n"
+            f"*(Gunakan `/projects` untuk berganti ke folder project lain!)*",
+            parse_mode="Markdown"
+        )
+        return
+
+    process_coding_request(message, prompt_text, is_voice=False)
+
+
+@bot.message_handler(commands=['link_project', 'relasi', 'linkproject'])
+def handle_link_project_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    parts = (message.text or "").split(maxsplit=2)
+    if len(parts) < 2:
+        bot.reply_to(
+            message,
+            "💡 **Format Relasi Lintas-Project:**\n"
+            "`/link_project <nama_project_target> [keterangan/port]`\n\n"
+            "**Contoh:**\n"
+            "• `/link_project be-cafe-fix backend api port 8000`\n"
+            "• `/link_project mcp-server-erp modul database & grpc`",
+            parse_mode="Markdown"
+        )
+        return
+    target_p = parts[1].strip()
+    desc = parts[2].strip() if len(parts) > 2 else "Cross-project relation"
+    active_p = project_manager.get_active_project(message.from_user.id)
+    active_path = project_manager.get_active_project_path(message.from_user.id)
+
+    from project_vault import get_project_vault
+    vault = get_project_vault(active_path, active_p)
+    vault.add_relation(target_project=target_p, relation_type="dependency", description=desc)
+    bot.reply_to(
+        message,
+        f"🔗 **Relasi Project Berhasil Dihubungkan!** ✨\n\n"
+        f"• **Project Utama:** `{active_p}`\n"
+        f"• **Terhubung Ke:** `{target_p}`\n"
+        f"• **Keterangan:** {desc}\n\n"
+        f"Saat mengoding di `{active_p}`, waifu otomatis membaca arsitektur dan spesifikasi dari `{target_p}`!",
+        parse_mode="Markdown"
+    )
+
+
 @bot.message_handler(commands=['setprojectsdir'])
 def handle_set_projects_dir_command(message):
     if not is_authorized(message.from_user.id):
@@ -6265,6 +6335,12 @@ def handle_text_messages(message):
     if first_token in ('/idle', '/sleep'):
         handle_idle_command(message)
         return
+    elif first_token in ('/code', '/dev', '/ngoding', '/coding'):
+        handle_code_command(message)
+        return
+    elif first_token in ('/link_project', '/relasi', '/linkproject'):
+        handle_link_project_command(message)
+        return
     elif first_token in ('/projects', '/project', '/workspace'):
         handle_projects_command(message)
         return
@@ -6514,12 +6590,12 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 if ok:
                     safe_reply_to(message, reply_msg)
                     # If this was switch/create AND the user also gave a coding prompt, continue to coding!
-                    if p_intent.intent_type in ("SWITCH", "CREATE") and coding_engine.is_coding_intent(user_text):
+                    if p_intent.intent_type in ("SWITCH", "CREATE") and coding_engine.is_coding_intent(user_text, user_id=message.from_user.id):
                         process_coding_request(message, user_text, is_voice=is_voice)
                     return
 
             # Check Coding Intent (programming / workspace tasks)
-            if coding_engine.is_coding_intent(user_text):
+            if coding_engine.is_coding_intent(user_text, user_id=message.from_user.id):
                 process_coding_request(message, user_text, is_voice=is_voice)
                 return
 

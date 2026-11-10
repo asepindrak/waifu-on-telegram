@@ -343,9 +343,15 @@ Waifu on Telegram bukan hanya pendamping romantis, tetapi juga **rekan koding se
   - **Auto-Scan Subfolder**: Folder project di dalam root directory otomatis terdeteksi dan terdaftar.
   - **Project Switcher 1-Klik**: Beralih workspace antar project dengan cepat melalui menu inline Telegram atau perintah CLI.
   - **Inisialisasi Project Instan (`/spawn <nama>`)**: Otomatis membuat folder project baru di dalam root directory dan langsung mengaktifkan workspace tersebut.
-* **⚡ Eksekusi Coding Otonom (`coding_engine.py`):**
+* **⚡ Eksekusi Coding Otonom & Anti-Halusinasi (`coding_engine.py`):**
+  - **Perintah Eksplisit (`/code <tugas>` & `/dev <tugas>`)**: Jaminan 100% eksekusi coding otonom di PC tanpa risiko disalahpahami sebagai obrolan peran santai.
+  - **Deteksi Intent Alami Luas**: Mengerti instruksi bahasa Indonesia sehari-hari (*"tambahkan fitur auth"*, *"kodingin navbar responsive"*, *"benerin error di main.py"*, *"pasang dependensi tailwind"*, dll.).
+  - **Bukti File Nyata (File Snapshot Diff)**: Sistem memeriksa perubahan file di folder workspace Anda sebelum dan sesudah eksekusi, serta melaporkan file-file baru/diperbarui secara transparan ke Telegram/CLI.
+  - **🔗 Relasi Lintas-Project & Injeksi Kontrak (`/link_project <target>`):**
+    - Memori project diisolasi secara ketat di `.waifu/project_memory.json` agar tugas Project A tidak tercampur ke Project B.
+    - Namun jika ada project yang berkaitan (misal: frontend `app-cafe-booking` dan backend `be-cafe-fix`), Anda cukup menghubungkannya lewat `/link_project be-cafe-fix backend api port 8000`.
+    - Saat mengoding di frontend, waifu otomatis membaca arsitektur, tech stack, dan API contract dari backend tanpa mengotori ruang kerja masing-masing!
   - Ditenagai oleh **Google Antigravity CLI (`agy`)** dengan direktori kerja lokal (`cwd=project_path`).
-  - Waifu memiliki akses penuh untuk membaca kode, menulis/mengedit file, memperbaiki bug (debug), membuat landing page/API, dan menjalankan unit test di dalam project aktif.
   - **Dual-Role Persona**: Mempertahankan karakter waifu yang hangat dan penuh perhatian (menggunakan kata ganti alami *aku/kamu*) sambil bertindak sebagai developer handal dan solutif.
 
 ---

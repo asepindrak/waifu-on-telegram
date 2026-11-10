@@ -309,9 +309,36 @@ class ProjectVault:
         ]
 
         if relations:
-            lines.append("\n[CROSS-PROJECT RELATIONS & ERP DEPENDENCIES]:")
+            lines.append("\n[CROSS-PROJECT RELATIONS & INTERCONNECTED CONTRACTS]:")
             for r in relations:
-                lines.append(f"  - Modul '{r.get('target_project')}': {r.get('relation_type')} ({r.get('description') or 'No note'})")
+                t_name = r.get("target_project", "")
+                t_type = r.get("relation_type", "dependency")
+                t_desc = r.get("description", "")
+                lines.append(f"  • Modul/Project '{t_name}' ({t_type}): {t_desc or 'Terkoneksi'}")
+                # Enriched Contract Injection from target project vault
+                try:
+                    from project_manager import get_project_manager
+                    pm = get_project_manager()
+                    projs = pm.list_projects()
+                    if t_name in projs and t_name != self.project_name:
+                        target_path = projs[t_name]
+                        target_vault = get_project_vault(target_path, t_name)
+                        target_data = target_vault.load_memory()
+                        t_arch = target_data.get("architecture", {})
+                        t_stack = ", ".join(t_arch.get("tech_stack", [])) or t_arch.get("framework", "")
+                        t_db = t_arch.get("database", "")
+                        details = []
+                        if t_stack:
+                            details.append(f"Stack: {t_stack}")
+                        if t_db and t_db != "N/A":
+                            details.append(f"DB: {t_db}")
+                        if details:
+                            lines.append(f"    - Workspace: {target_path} ({' | '.join(details)})")
+                        t_summary = t_arch.get("summary", "")
+                        if t_summary and t_summary != "Belum ada analisis arsitektur.":
+                            lines.append(f"    - Shared Contract/Spec: {t_summary[:300]}")
+                except Exception as e_rel:
+                    logger.debug(f"Could not load relation detail for {t_name}: {e_rel}")
 
         if milestones:
             lines.append("\n[HISTORICAL COMPACTED MILESTONES]:")

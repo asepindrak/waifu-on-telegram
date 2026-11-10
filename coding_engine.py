@@ -23,19 +23,26 @@ from architecture_generator import ensure_project_architecture
 logger = logging.getLogger(__name__)
 
 CODING_TRIGGERS = [
-    r'\b(bikin|buat|buatkan|tulis)\s+([\w\-\.]+\.(?:html|css|js|jsx|ts|tsx|py|json|md|sql)|kode|code|program|script|aplikasi|app|web|website|landing page|endpoint|api|database|fitur|feature|fungsi|function|komponen|component|backend|frontend|html|css|javascript|python)\b',
-    r'\b(buat file|baca file|edit file|tambah file|hapus file)\b',
-    r'\b(coding|programmer|ngoding|scripting|source\s*code|pull\s*request)\b',
-    r'\b(debug|fix|perbaiki)\s+(kode|code|script|bug|error|issue|program|web|app)\b',
-    r'\b(refactor|optimize|analisa code|review code)\b',
-    r'\b(git\s+(status|diff|add|commit|push|pull|log|branch))\b',
-    r'\b(npm|pip|cargo|python|node|bash|powershell)\s+',
-    r'\b(bikin web|bikin app|landing page|endpoint|api|database)\b',
-    r'\b(run test|unit test|pytest|unittest|benchmark)\b',
+    # 1. Action verbs with programming nouns / file types
+    r'\b(bikin|buat|buatkan|tulis|tambah|tambahkan|tambahin|pasang|pasangkan|install|integrasikan|implementasikan|kembangkan|kerjakan|selesaikan|koding|kodingin|ngoding|coding|ubah|ganti|update|edit|refactor|fix|perbaiki|benerin|debug|analisa|review|rapikan|desain|design|styling)\s+([\w\-\.]+\.(?:html|css|js|jsx|ts|tsx|py|json|md|sql|vue|svelte|php|go|rs|java|sh|bat|ps1)|kode|code|program|script|file|aplikasi|app|web|website|halaman|page|landing page|navbar|header|footer|sidebar|button|tombol|form|modal|card|ui|ux|tampilan|endpoint|api|route|router|database|db|tabel|table|model|controller|service|fitur|feature|fungsi|function|komponen|component|backend|frontend|auth|login|register|crud|middleware|migration|query|layout|view|handler|html|css|javascript|python|dependensi|dependency|dependencies|library|lib|package|paket|modul|module|tailwind|tailwindcss|bootstrap)\b',
+    # 2. File and coding activity phrases
+    r'\b(buat file|baca file|edit file|tambah file|hapus file|update file|bikin file|save file)\b',
+    r'\b(coding|programmer|ngoding|scripting|kodingin|tolong ngoding|tolong koding|bantu koding|bantu ngoding|kerjain kodingan|lanjutin kodingan|lanjutkan kodingan|source\s*code|pull\s*request)\b',
+    # 3. Debugging & fixing
+    r'\b(debug|fix|perbaiki|benerin)\s+(kode|code|script|bug|error|issue|program|web|app|tampilan|layout|halaman|fungsi|endpoint|api)\b',
+    r'\b(refactor|optimize|analisa code|review code|code review)\b',
+    # 4. Git and terminal dev operations
+    r'\b(git\s+(status|diff|add|commit|push|pull|log|branch|checkout|merge))\b',
+    r'\b(npm|pnpm|yarn|bun|pip|cargo|python|node|bash|powershell|docker)\s+',
+    r'\b(bikin web|bikin app|landing page|endpoint|api|database|bikin backend|bikin frontend)\b',
+    r'\b(run test|unit test|pytest|unittest|benchmark|test suite)\b',
+    # 5. Project running and live preview
     r'\b(run|jalankan|start|nyalakan|preview|tes)\s+(project|proyek|web|server|app|aplikasi)\b',
     r'\b(coba\s+run|coba\s+preview)\b',
     r'\b(coba\s+jalankan|coba\s+start)\s+(project|proyek|web|server|app|aplikasi)?\b',
-    r'\b(live\s+preview|link\s+preview)\b'
+    r'\b(live\s+preview|link\s+preview)\b',
+    # 6. Specific project scope targeting
+    r'\bdi\s+project\s+[\w\-\.]+\s+(tolong|coba|buat|bikin|tambah|kerjakan|update|fix)\b'
 ]
 
 # Conversational expressions that should NEVER falsely trigger coding tasks
@@ -53,6 +60,43 @@ COMPUTER_USE_TRIGGERS = [
 ]
 
 
+def snapshot_project_files(project_path: str, max_depth: int = 4) -> Dict[str, float]:
+    """Takes a lightweight snapshot of file modification times in workspace."""
+    snapshot: Dict[str, float] = {}
+    try:
+        root_abs = os.path.abspath(project_path)
+        for root, dirs, files in os.walk(root_abs):
+            dirs[:] = [d for d in dirs if d not in ("node_modules", ".git", "__pycache__", ".waifu", "dist", "build", ".venv", "venv", ".idea", ".vscode")]
+            rel_root = os.path.relpath(root, root_abs)
+            depth = 0 if rel_root == "." else rel_root.count(os.sep) + 1
+            if depth > max_depth:
+                continue
+            for f in files:
+                if f in (".DS_Store", "thumbs.db", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"):
+                    continue
+                full_p = os.path.join(root, f)
+                try:
+                    rel_p = os.path.relpath(full_p, root_abs).replace("\\", "/")
+                    snapshot[rel_p] = os.path.getmtime(full_p)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return snapshot
+
+
+def diff_project_snapshots(before: Dict[str, float], after: Dict[str, float]) -> Tuple[List[str], List[str]]:
+    """Returns (created_files, modified_files)."""
+    created: List[str] = []
+    modified: List[str] = []
+    for f, mtime in after.items():
+        if f not in before:
+            created.append(f)
+        elif mtime > before[f] + 0.1:
+            modified.append(f)
+    return created, modified
+
+
 class CodingEngine:
     """Handles autonomous coding tasks, project execution, and desktop assistance."""
 
@@ -60,18 +104,38 @@ class CodingEngine:
         self.project_manager = project_manager or get_project_manager()
         self.computer_engine = computer_use_engine or get_computer_use_engine()
 
-    def is_coding_intent(self, text: str) -> bool:
+    def is_coding_intent(self, text: str, user_id: Optional[int] = None) -> bool:
         """Determines if user input is asking for programming, coding, or workspace file work."""
         lower = text.lower().strip()
 
+        # Explicit commands or prefixes are 100% coding intents
+        if re.match(r'^/(?:code|dev|ngoding|coding)\b', lower) or re.match(r'^(?:code|dev|coding):\s*', lower):
+            return True
+
         # Guard against conversational / romantic / selfie false-positives
         for excl in CONVERSATIONAL_EXCLUSIONS:
-            if re.search(excl, lower) and not re.search(r'\b(kode|code|script|project|proyek|html|website|aplikasi|program|terminal)\b', lower):
+            if re.search(excl, lower) and not re.search(r'\b(kode|code|script|project|proyek|html|website|aplikasi|program|terminal|file|navbar|tombol|button|api|database|bug|error)\b', lower):
                 return False
 
         for pattern in CODING_TRIGGERS:
             if re.search(pattern, lower):
                 return True
+
+        # If user has an active dedicated project (not 'general'), detect broader contextual programming instructions
+        if user_id:
+            try:
+                active_p = self.project_manager.get_active_project(user_id)
+                if active_p and active_p != "general":
+                    contextual_triggers = [
+                        r'\b(tambah|tambahkan|ganti|ubah|rapikan|perbaiki|buatkan|bikin|benerin)\s+.*(halaman|warna|tampilan|teks|judul|isi|layout|style|css|desain|design|font|icon|data)\b',
+                        r'\b(lanjutkan|lanjutin|kerjakan|selesaikan)\s+(task|tugas|kodingan|projek|project|fitur)\b'
+                    ]
+                    for c_pat in contextual_triggers:
+                        if re.search(c_pat, lower):
+                            return True
+            except Exception:
+                pass
+
         return False
 
     def is_computer_use_intent(self, text: str) -> bool:
@@ -175,6 +239,7 @@ class CodingEngine:
                 exec_prompt = full_prompt
 
             cmd = [agy_bin, "-p", exec_prompt, "--dangerously-skip-permissions"]
+            before_snap = snapshot_project_files(project_path)
             try:
                 proc = subprocess.run(
                     cmd,
@@ -185,9 +250,13 @@ class CodingEngine:
                     errors="replace",
                     timeout=timeout
                 )
+                after_snap = snapshot_project_files(project_path)
+                created_files, modified_files = diff_project_snapshots(before_snap, after_snap)
+                all_touched = created_files + modified_files
+
                 raw_output = proc.stdout.strip()
                 if not raw_output and proc.stderr:
-                    raw_output = f"⚠️ Ada catatan eksekusi: {proc.stderr.strip()}"
+                    raw_output = f"⚠️ Catatan eksekusi: {proc.stderr.strip()}"
 
                 # Clean up buffer file if created
                 if temp_task_file and os.path.exists(temp_task_file):
@@ -204,14 +273,25 @@ class CodingEngine:
                         voice_text = m.group(1).strip()
                         raw_output = re.sub(r'<<<VOICE_REPLY>>>.*?<<<END_VOICE_REPLY>>>', '', raw_output, flags=re.DOTALL).strip()
 
-                # Automatically record task completion in Project Memory Vault
+                # Automatically record task completion in Project Memory Vault with real touched files
                 clean_summary = prompt[:100] + ("..." if len(prompt) > 100 else "")
                 try:
-                    vault.add_completed_task(f"Coding task: {clean_summary}")
+                    vault.add_completed_task(f"Coding task: {clean_summary}", files_touched=all_touched)
                 except Exception as e_mem:
                     logger.warning(f"Failed to record completed task to vault: {e_mem}")
 
-                final_text = raw_output or "Tugas coding selesai tanpa catatan output."
+                final_text = raw_output or ("Tugas coding selesai diproses di project." if all_touched else "⚠️ Tugas telah dijalankan namun belum ada perubahan file di workspace.")
+
+                # Append real files changed as proof of work
+                if all_touched:
+                    file_lines = []
+                    if created_files:
+                        for cf in created_files[:8]:
+                            file_lines.append(f"• `{cf}` *(baru)*")
+                    if modified_files:
+                        for mf in modified_files[:8]:
+                            file_lines.append(f"• `{mf}` *(diperbarui)*")
+                    final_text += "\n\n📁 **File yang Berhasil Dikerjakan:**\n" + "\n".join(file_lines)
                 if applied_design_style:
                     final_text += f"\n\n🎨 *Design System:* `Open-Design ({applied_design_style.title()})`"
 
