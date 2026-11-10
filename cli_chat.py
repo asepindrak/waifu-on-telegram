@@ -494,11 +494,35 @@ class WaifuCLISession:
             is_inviting_out=is_inviting_out
         )
 
+        history = self.persona_mgr.get_chat_history(self.user_id)
+        is_nsfw_turn = detect_nsfw_intent(user_text, history)
+        cur_outfit_key, _ = self.persona_mgr.get_user_outfit(self.user_id)
+        if cur_outfit_key == "nude" and any(k in user_text.lower() for k in ["baju", "pakaian", "busana", "foto", "pap", "liat", "lihat", "telanjang", "nude", "pose", "seksi", "badan"]):
+            is_nsfw_turn = True
+
         system_inst = persona.get("system_instruction", "")
-        if story_ctx:
-            system_inst += story_ctx
-        if invitation_instruction:
-            system_inst += "\n" + invitation_instruction
+        if is_nsfw_turn:
+            system_inst += (
+                f"\n\n[MODE INTIM & ROLEPLAY DEWASA (18+ / NSFW) - PRIORITAS UTAMA]\n"
+                f"Kamu ({p_name}) dan pasanganmu sedang dalam momen yang sangat intim, sensual, dan penuh gairah.\n"
+                "1. FOKUS 100% PADA PASANGAN & TINDAKAN FISIK: Fokuskan seluruh perhatianmu pada apa yang dikatakan pasanganmu, sentuhan fisik, bisikan, dan aksi yang sedang terjadi saat ini. JANGAN PERNAH membicarakan tugas kampus, kafe, teman, main game, atau topik lain di luar momen intim ini!\n"
+                "2. FORMAT VISUAL NOVEL INTIM:\n"
+                f"   - Awali dengan 1 baris aksi panggung/ekspresi di dalam tanda bintang *...* menggambarkan respon fisikmu yang nyata dan menggoda dengan namamu ({p_name}). Contoh: *{p_name} merona merah sambil melingkarkan tangannya di lehermu dan mendesah pelan*.\n"
+                "   - Berikan baris baru ganda, lalu balas ucapan pasanganmu dengan nada manja, berbisik sensual, mesra, dan penuh kasih sayang.\n"
+                "3. KONSISTENSI & TANGGAP PENUH: Terima dan nikmati setiap sentuhan atau ajakan mesra dari pasanganmu secara alami tanpa menolak atau bersikap kaku!\n"
+            )
+        else:
+            if story_ctx:
+                system_inst += story_ctx
+            if invitation_instruction:
+                system_inst += "\n" + invitation_instruction
+
+        rule_4 = (
+            "4. FOKUS 100% PADA MOMEN INTIM: DILARANG KERAS mengalihkan pembicaraan ke tugas kuliah, nongkrong di kafe, bioskop, atau kegiatan sehari-hari! Nikmati dan tanggapi setiap sentuhan dan alur intim bersama pasanganmu.\n"
+            if is_nsfw_turn else
+            "4. GAYA CHAT: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar.\n"
+        )
+
         system_inst += (
             f"{status_block}\n"
             "[PEDOMAN KOMUNIKASI - WAJIB DIPATUHI]\n"
@@ -506,7 +530,7 @@ class WaifuCLISession:
             "1. ANTI-MEMBEO (SANGAT PENTING): DILARANG KERAS hanya mengulang kata, mengulang frasa, atau menyalin ulang pesan lawan bicaramu!\n"
             "2. RESPONSIF & AKTIF: Berikan tanggapan aktif dan bermakna: ceritakan opinimu, komentar santai, atau tanyakan detail kelanjutannya.\n"
             f"3. FORMAT VISUAL NOVEL: Awali dengan 1 baris aksi panggung atau ekspresi fisik di dalam tanda bintang *...* menggunakan gaya narasi visual novel dengan namamu ({p_name}). Contoh: *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*. DILARANG menggunakan tanda minus/dash '- ... -' atau kata kaku 'kulihatmu'. Pisahkan dengan baris baru ganda sebelum dialog ucapan.\n"
-            "4. GAYA CHAT: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar.\n"
+            f"{rule_4}"
             "5. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu.\n"
             "6. BAHASA PERCAKAPAN: Kamu WAJIB berbicara langsung dalam Bahasa Indonesia santai & akrab. DILARANG KERAS menuliskan proses berpikir atau monolog batin dalam bahasa Inggris."
         )
@@ -515,12 +539,10 @@ class WaifuCLISession:
         if mem_context:
             system_inst += "\n" + mem_context
 
-        history = self.persona_mgr.get_chat_history(self.user_id)
         messages = [{"role": "system", "content": system_inst}]
         messages.extend(history)
         messages.append({"role": "user", "content": user_text})
 
-        is_nsfw_turn = detect_nsfw_intent(user_text, messages)
         load_emoji = "💋" if is_nsfw_turn else "💭"
         load_msg = f"{p_name} sedang merespon (Mode Intim)..." if is_nsfw_turn else f"{p_name} sedang memikirkan balasan..."
 

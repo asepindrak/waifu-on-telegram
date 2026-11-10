@@ -199,6 +199,21 @@ BODY_POSES = [
     )
 ]
 
+ANATOMY_CUES = [
+    # Breasts / Toket / Nenen
+    ([r"\b(nenen|toket|tetek|payudara|dada)\b", r"\b(breasts|boobs|cleavage|nipples|tits)\b"],
+     "close-up on natural exposed breasts, detailed nipples, cleavage, bare chest"),
+    # Thighs / Paha
+    ([r"\b(paha|kaki)\b", r"\b(thighs|legs)\b"],
+     "close-up on smooth bare thighs, slender legs, alluring leg pose"),
+    # Butt / Pantat / Bokong
+    ([r"\b(pantat|bokong)\b", r"\b(butt|ass|buttocks)\b"],
+     "from behind, back view, arched back, shapely bare butt, seductive buttocks focus"),
+    # Stomach / Perut / Pinggang
+    ([r"\b(perut|pinggang|pusar)\b", r"\b(stomach|belly|navel|waist)\b"],
+     "bare midriff, exposed navel, slender waist, smooth stomach"),
+]
+
 VIDEO_INTENT_KEYWORDS = [
     r"send\s*(a\s*)?video",
     r"make\s*(a\s*)?video",
@@ -575,6 +590,21 @@ class PersonaManager:
 
         return detected_angle, detected_pose
 
+    def detect_anatomy_cues(self, text: str) -> Optional[str]:
+        """
+        Detects specific intimate anatomy parts requested in the user prompt
+        (e.g. breasts/nenen/toket, thighs/paha, butt/pantat, stomach/perut).
+        Returns: Danbooru prompt segment or None.
+        """
+        if not text:
+            return None
+        low = text.lower()
+        parts = []
+        for patterns, cue_prompt in ANATOMY_CUES:
+            if any(re.search(pat, low) for pat in patterns):
+                parts.append(cue_prompt)
+        return ", ".join(parts) if parts else None
+
     def list_outfits(self) -> List[Tuple[str, str]]:
         """Returns list of (key, name) for all outfit presets."""
         return [(k, v["name"]) for k, v in OUTFIT_PRESETS.items()]
@@ -814,7 +844,8 @@ class PersonaManager:
         user_text: str,
         user_id: Optional[int] = None,
         history: Optional[List[Dict[str, str]]] = None,
-        scene_hint: Optional[str] = None
+        scene_hint: Optional[str] = None,
+        is_nsfw: bool = False
     ) -> Tuple[str, str, bool, str]:
         """
         Dynamically analyzes user request text & recent conversation for clothing intent.
@@ -822,13 +853,16 @@ class PersonaManager:
         """
         lower = user_text.lower()
 
-        # 1. Explicit Full Nude / Tanpa Busana
+        # 1. Explicit Full Nude / Tanpa Busana / Intimate Anatomy
         NUDE_KEYWORDS = [
             "tanpa busana", "tanpa baju", "tanpa pakaian", "telanjang", "bugil",
             "nude", "naked", "completely naked", "unclothed", "topless",
             "bottomless", "no clothes", "lepas baju", "buka baju", "buka pakaian",
             "gak pake baju", "ngga pake baju", "ga pake baju", "ga pake busana",
-            "gak pake pakaian", "ga pake pakaian", "uncensored", "nsfw"
+            "gak pake pakaian", "ga pake pakaian", "uncensored", "nsfw",
+            "nenen", "toket", "tetek", "payudara", "telanjang bulat", "tanpa sehelai benang",
+            "buka celana", "buka semua", "lepas semua", "foto nenen", "pap nenen",
+            "foto toket", "pap toket", "foto telanjang", "pap telanjang", "foto bugil", "pap bugil"
         ]
         if any(k in lower for k in NUDE_KEYWORDS):
             return (
@@ -898,6 +932,15 @@ class PersonaManager:
                 if user_id:
                     self.set_user_outfit(user_id, key, is_locked=False, duration_seconds=1800)
                 return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
+
+        # 4.5. NSFW Mode Fallback (if turn is NSFW and no clothed preset requested, default to nude)
+        if is_nsfw:
+            return (
+                OUTFIT_PRESETS["nude"]["prompt"],
+                OUTFIT_PRESETS["nude"]["negative"],
+                True,
+                OUTFIT_PRESETS["nude"]["name"]
+            )
 
         # 5. Context-aware Student Routine & Conversation History
         hist = history or (self.get_chat_history(user_id) if user_id else [])
@@ -975,7 +1018,8 @@ class PersonaManager:
         user_text: str,
         user_id: Optional[int] = None,
         scene_override: Optional[str] = None,
-        history: Optional[List[Dict[str, str]]] = None
+        history: Optional[List[Dict[str, str]]] = None,
+        is_nsfw: bool = False
     ) -> Tuple[str, str, bool, str]:
         """
         Builds visual prompt dynamically with student routine & clothing coherence.
@@ -987,7 +1031,7 @@ class PersonaManager:
         hist = history or (self.get_chat_history(user_id) if user_id else [])
         scene = scene_override or self.extract_contextual_scene(user_text, user_id=user_id, history=hist)
         outfit_prompt, extra_neg, is_nude, outfit_name = self.detect_clothing_intent(
-            user_text, user_id=user_id, history=hist, scene_hint=scene
+            user_text, user_id=user_id, history=hist, scene_hint=scene, is_nsfw=is_nsfw
         )
 
         # Check if user explicitly requested a cat/pet/animal in prompt
@@ -1025,7 +1069,16 @@ class PersonaManager:
             import random
             chosen_angle = random.choice(micro_angles)
 
-        visual_prompt = f"{base_visual}, {outfit_prompt}, {scene}, {chosen_angle}, detailed eyes, masterpiece quality"
+        # Detect intimate anatomy cues requested by user (e.g. breasts/nenen/toket, thighs/paha, butt/pantat)
+        anatomy_cue = self.detect_anatomy_cues(user_text)
+
+        prompt_elements = [base_visual, outfit_prompt, scene, chosen_angle]
+        if anatomy_cue:
+            prompt_elements.append(anatomy_cue)
+            logger.info(f"Intimate anatomy cues injected: {anatomy_cue}")
+        prompt_elements.extend(["detailed eyes", "masterpiece quality"])
+
+        visual_prompt = ", ".join(p for p in prompt_elements if p)
         return (visual_prompt, extra_neg, is_nude, outfit_name)
 
     def craft_visual_prompt(

@@ -109,29 +109,32 @@ PROVIDER_PRESETS = {
 # Compiled NSFW / Intimate Regex Patterns
 _NSFW_WORDS = [
     # Explicit Nudity / Strip / Body Exposure
-    r"\b(?:nude|naked|topless|bottomless|unclothed|telanjang|bugil)\b",
+    r"\b(?:nude|naked|topless|bottomless|unclothed|telanjang|bugil|telanjang\s+bulat|tanpa\s+sehelai\s+benang)\b",
     r"\b(?:tanpa\s+(?:busana|baju|pakaian|celana))\b",
-    r"\b(?:buka\s+(?:baju|pakaian|celana|bh|bra|rok))\b",
-    r"\b(?:lepas\s+(?:baju|pakaian|celana|bh|bra))\b",
+    r"\b(?:buka\s+(?:baju|pakaian|celana|bh|bra|rok|semua))\b",
+    r"\b(?:lepas\s+(?:baju|pakaian|celana|bh|bra|semua))\b",
     r"\b(?:g(?:ak|a|k)\s+pake\s+(?:baju|pakaian|celana|busana))\b",
     r"\b(?:ngga\s+pake\s+(?:baju|pakaian|celana|busana))\b",
 
     # Explicit Sexual Anatomy & Organs
     r"\b(?:titit|kontol|memek|pepek|vagina|penis|clitoris)\b",
-    r"\b(?:nipple|nipples|puting|payudara|tetek|boobs|tits)\b",
+    r"\b(?:nipple|nipples|puting|payudara|tetek|boobs|tits|nenen|toket|dada)\b",
+    r"\b(?:pantat|bokong|pantatmu|bokongmu)\b",
 
     # Sexual Acts & Erotic Activities
     r"\b(?:bercinta|ngentot|entot|masturbasi|masturbate|coli|onani)\b",
     r"\b(?:orgasme|orgasm|crot|squirt|ejakulasi)\b",
-    r"\b(?:hisap\s+(?:titit|kontol|payudara|puting))\b",
-    r"\b(?:remas\s+(?:payudara|pantat|tetek))\b",
-    r"\b(?:jilat\s+(?:memek|pepek|puting|vagina))\b",
+    r"\b(?:hisap\s+(?:titit|kontol|payudara|puting|nenen|toket))\b",
+    r"\b(?:remas\s+(?:payudara|pantat|tetek|nenen|toket|bokong))\b",
+    r"\b(?:jilat\s+(?:memek|pepek|puting|vagina|nenen|toket|leher))\b",
     r"\b(?:oral\s+sex|blowjob|handjob)\b",
+    r"\b(?:raba|meraba|remas|meremas|elus\s+paha|peluk\s+erat)\b",
 
     # Erotic Context & State of Mind
     r"\b(?:sange|horny|terangsang|desah|mendesah|erotis|erotic)\b",
     r"\b(?:erp|nsfw|hentai|ecchi|r18|18\+)\b",
     r"\b(?:sensual\s+(?:touch|kiss|massage|rubbing))\b",
+    r"\b(?:pap|foto)\s+(?:nenen|toket|telanjang|bugil|seksi|sexy|nsfw|paha|pantat|bokong)\b",
 
     # Provocative Intimate Clothing Requests
     r"\b(?:lingerie|g-string|thong|celana\s+dalam|pakaian\s+dalam)\b",

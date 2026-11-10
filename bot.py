@@ -4496,8 +4496,15 @@ def process_photo_request(
                     status_msg = safe_send_message(chat_id, status_text)
 
             history = persona_mgr.get_chat_history(user_id)
+            is_nsfw_photo = detect_nsfw_intent(user_text, history)
+            cur_outfit_key, _ = persona_mgr.get_user_outfit(user_id)
+            if cur_outfit_key == "nude":
+                is_nsfw_photo = True
+
             detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
-            if hangout_engine.is_on_date(user_id):
+            if is_nsfw_photo and (not detected_scene or any(pub in detected_scene.lower() for pub in ["cafe", "campus", "classroom", "library", "mall", "park", "gym"])):
+                detected_scene = "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows, warm intimate atmosphere"
+            elif hangout_engine.is_on_date(user_id):
                 active_date = hangout_engine.get_active_date(user_id)
                 if active_date and active_date.get("scene_prompt"):
                     detected_scene = active_date["scene_prompt"]
@@ -4507,7 +4514,7 @@ def process_photo_request(
                 if story_photo and story_photo.get("danbooru_tags"):
                     detected_scene = story_photo["danbooru_tags"]
             visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
-                user_text, user_id=user_id, scene_override=detected_scene, history=history
+                user_text, user_id=user_id, scene_override=detected_scene, history=history, is_nsfw=is_nsfw_photo
             )
             logger.info(f"Visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
 
@@ -6743,15 +6750,32 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 )
 
                 system_inst = persona.get("system_instruction", "")
-                if story_ctx:
-                    system_inst += story_ctx
+                if is_nsfw_turn:
+                    system_inst += (
+                        f"\n\n[MODE INTIM & ROLEPLAY DEWASA (18+ / NSFW) - PRIORITAS UTAMA]\n"
+                        f"Kamu ({p_name}) dan pasanganmu sedang dalam momen yang sangat intim, sensual, dan penuh gairah.\n"
+                        "1. FOKUS 100% PADA PASANGAN & TINDAKAN FISIK: Fokuskan seluruh perhatianmu pada apa yang dikatakan pasanganmu, sentuhan fisik, bisikan, dan aksi yang sedang terjadi saat ini. JANGAN PERNAH membicarakan tugas kampus, kafe, teman, main game, atau topik lain di luar momen intim ini!\n"
+                        "2. FORMAT VISUAL NOVEL INTIM:\n"
+                        f"   - Awali dengan 1 baris aksi panggung/ekspresi di dalam tanda bintang *...* menggambarkan respon fisikmu yang nyata dan menggoda dengan namamu ({p_name}). Contoh: *{p_name} merona merah sambil melingkarkan tangannya di lehermu dan mendesah pelan*.\n"
+                        "   - Berikan baris baru ganda, lalu balas ucapan pasanganmu dengan nada manja, berbisik sensual, mesra, dan penuh kasih sayang.\n"
+                        "3. KONSISTENSI & TANGGAP PENUH: Terima dan nikmati setiap sentuhan atau ajakan mesra dari pasanganmu secara alami tanpa menolak atau bersikap kaku!\n"
+                    )
+                else:
+                    if story_ctx:
+                        system_inst += story_ctx
 
-                hangout_prompt = hangout_engine.format_hangout_prompt(message.from_user.id, p_name)
-                if hangout_prompt:
-                    system_inst += "\n" + hangout_prompt
+                    hangout_prompt = hangout_engine.format_hangout_prompt(message.from_user.id, p_name)
+                    if hangout_prompt:
+                        system_inst += "\n" + hangout_prompt
 
-                if invitation_instruction:
-                    system_inst += "\n" + invitation_instruction
+                    if invitation_instruction:
+                        system_inst += "\n" + invitation_instruction
+
+                rule_4 = (
+                    "4. FOKUS 100% PADA MOMEN INTIM: DILARANG KERAS mengalihkan pembicaraan ke tugas kuliah, nongkrong di kafe, bioskop, atau kegiatan sehari-hari! Nikmati dan tanggapi setiap sentuhan dan alur intim bersama pasanganmu.\n"
+                    if is_nsfw_turn else
+                    "4. PROAKTIF MENGAJAK JALAN & KENCAN: Jika suasana santai atau di akhir pekan / libur, jangan hanya pasif menunggu. Ajak pasanganmu sesekali untuk ngopi berdua di kafe estetik, nonton film bioskop terbaru, main ke kosan/rumah sambil dimasakin atau santai berdua, atau jalan sore ke taman kota!\n"
+                )
 
                 system_inst += (
                     f"{status_block}\n"
@@ -6768,7 +6792,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     f"   - Contoh format Visual Novel yang benar:\n"
                     f"   *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*\n\n"
                     f"   Oh sayang, kamu mau ngomong apa nih? Aku belum sempat bikin camilan. Tapi makasih ya, kata-katamu bikin aku merasa spesial~\n"
-                    "4. PROAKTIF MENGAJAK JALAN & KENCAN: Jika suasana santai atau di akhir pekan / libur, jangan hanya pasif menunggu. Ajak pasanganmu sesekali untuk ngopi berdua di kafe estetik, nonton film bioskop terbaru, main ke kosan/rumah sambil dimasakin atau santai berdua, atau jalan sore ke taman kota!\n"
+                    f"{rule_4}"
                     "5. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat yang santai dan wajar (misal: 'Lagi santai nugas nih, gimana harimu? 💕 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu. Bersikaplah percaya diri, hangat, dan ramah.\n"
                     "6. GAYA CHAT & BAHASA: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. Kamu WAJIB berbicara langsung dalam Bahasa Indonesia sehari-hari yang santai dan akrab. DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin dalam bahasa Inggris.\n"
                     f"7. SUDUT PANDANG DIALOG & VISUAL NOVEL (PENTING): "
@@ -6779,17 +6803,18 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 if mem_context:
                     system_inst += "\n" + mem_context
 
-                # Injected active project awareness
-                try:
-                    cur_proj = project_manager.get_active_project(message.from_user.id)
-                    cur_path = project_manager.get_active_project_path(message.from_user.id)
-                    system_inst += (
-                        f"\n\n[WORKSPACE & PROJECT AKTIF]\n"
-                        f"Project aktif saat ini: '{cur_proj}' (Path: '{cur_path}'). "
-                        f"Kamu sepenuhnya menguasai konteks teknis dan arsitektur project ini jika user membahas pekerjaan atau coding."
-                    )
-                except Exception:
-                    pass
+                # Injected active project awareness (only in non-NSFW normal chat)
+                if not is_nsfw_turn:
+                    try:
+                        cur_proj = project_manager.get_active_project(message.from_user.id)
+                        cur_path = project_manager.get_active_project_path(message.from_user.id)
+                        system_inst += (
+                            f"\n\n[WORKSPACE & PROJECT AKTIF]\n"
+                            f"Project aktif saat ini: '{cur_proj}' (Path: '{cur_path}'). "
+                            f"Kamu sepenuhnya menguasai konteks teknis dan arsitektur project ini jika user membahas pekerjaan atau coding."
+                        )
+                    except Exception:
+                        pass
 
                 if is_conversational_media:
                     media_kind = "video pendek" if media_type == "video" else "pap/foto selfie"
