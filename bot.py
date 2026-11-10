@@ -2361,11 +2361,13 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
         # SFW Section
         markup.add(types.InlineKeyboardButton("─── 🌸 ENGINE FOTO SFW (Santai/Normal) ───", callback_data="noop"))
         is_sfw_agy = (sfw_img == "agy")
+        is_sfw_aom = (sfw_img == "comfyui" and any(k in sfw_ckpt.lower() for k in ["aom", "orange"]))
         is_sfw_anything = (sfw_img == "comfyui" and ("anything" in sfw_ckpt.lower() or "xl" in sfw_ckpt.lower()))
         is_sfw_meina = (sfw_img == "comfyui" and "meina" in sfw_ckpt.lower())
         is_sfw_cloud = (sfw_img == "cloud")
 
         markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity (AGY Generator) {'✓' if is_sfw_agy else ''}", callback_data="cfg_set_sfw_img:agy"))
+        markup.add(types.InlineKeyboardButton(f"🍊 AbyssOrangeMix3 (AOM3A1B SD 1.5 - ComfyUI) {'✓' if is_sfw_aom else ''}", callback_data="cfg_set_sfw_img:aom3"))
         markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - ComfyUI) {'✓' if is_sfw_anything else ''}", callback_data="cfg_set_sfw_img:anything_xl"))
         markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - ComfyUI) {'✓' if is_sfw_meina else ''}", callback_data="cfg_set_sfw_img:meinamix"))
         markup.add(types.InlineKeyboardButton(f"☁️ Cloud Engine (Pollinations GPU) {'✓' if is_sfw_cloud else ''}", callback_data="cfg_set_sfw_img:cloud"))
@@ -2387,8 +2389,8 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
         is_agy = (os.environ.get("SFW_IMAGE_ENGINE", "").lower() == "agy")
 
         markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity (AGY Subagent) {'✓' if is_agy else ''}", callback_data="cfg_set_ckpt:agy"))
-        markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - Cepat & Hemat VRAM) {'✓' if is_meina and not is_agy else ''}", callback_data="cfg_set_ckpt:meinamix"))
-        markup.add(types.InlineKeyboardButton(f"🍊 AbyssOrangeMix3 (AOM3A1B SD 1.5 - Civitai #9942) {'✓' if is_aom else ''}", callback_data="cfg_set_ckpt:aom3"))
+        markup.add(types.InlineKeyboardButton(f"🍊 AbyssOrangeMix3 (AOM3A1B SD 1.5 - Uncensored) {'✓' if is_aom and not is_agy else ''}", callback_data="cfg_set_ckpt:aom3"))
+        markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - Cepat & Hemat VRAM) {'✓' if is_meina and not is_agy and not is_aom else ''}", callback_data="cfg_set_ckpt:meinamix"))
         markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - Ultra Jernih) {'✓' if is_anything else ''}", callback_data="cfg_set_ckpt:anything_xl"))
         markup.add(types.InlineKeyboardButton(f"🎯 Auto-detect ComfyUI {'✓' if is_auto else ''}", callback_data="cfg_set_ckpt:auto"))
 
@@ -3808,6 +3810,12 @@ def callback_set_sfw_img(call):
         os.environ["SFW_IMAGE_ENGINE"] = "agy"
         update_env_variable("SFW_IMAGE_ENGINE", "agy")
         label = "Google Antigravity (AGY)"
+    elif key == "aom3":
+        os.environ["SFW_IMAGE_ENGINE"] = "comfyui"
+        os.environ["SFW_COMFYUI_CHECKPOINT"] = "AOM3A1B_orangemixs.safetensors"
+        update_env_variable("SFW_IMAGE_ENGINE", "comfyui")
+        update_env_variable("SFW_COMFYUI_CHECKPOINT", "AOM3A1B_orangemixs.safetensors")
+        label = "AbyssOrangeMix3 (AOM3A1B)"
     elif key == "cloud":
         os.environ["SFW_IMAGE_ENGINE"] = "cloud"
         update_env_variable("SFW_IMAGE_ENGINE", "cloud")

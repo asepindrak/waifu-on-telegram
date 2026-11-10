@@ -530,6 +530,7 @@ def config_image_model(env_vars):
         agy_ready = bool(shutil.which("agy") or shutil.which("agy.cmd"))
         sfw_options = [
             (f"🌉 Google Antigravity Image Generator (AGY Subagent) {'[TERPASANG - 0 VRAM]' if agy_ready else '[Bebas VRAM]'}", "agy", "agy", "agy"),
+            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Uncensored, Cepat & Halus)", "comfyui", "AOM3A1B_orangemixs.safetensors", "aom3"),
             ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Jernih 1024px)", "comfyui", "AnythingXL_xl.safetensors", "anything_xl"),
             ("✨ MeinaMix v12 (Anime SD 1.5 - Cepat & Hemat VRAM)", "comfyui", "meinamix_v12Final.safetensors", "meinamix"),
             ("🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif)", "comfyui", "", "auto"),
@@ -551,7 +552,7 @@ def config_image_model(env_vars):
         print(c(GREEN, f"  ✓ SFW Image Engine: {s_mode.upper()} ({s_ckpt or 'Default'})"))
 
         # Download check for SFW model if ComfyUI
-        if s_mode == "comfyui" and s_key in ("anything_xl", "meinamix") and asset_manager:
+        if s_mode == "comfyui" and s_key in ("aom3", "anything_xl", "meinamix") and asset_manager:
             s_info = asset_manager.get_asset_info(s_key)
             if s_info and not s_info.get("installed", False):
                 print(c(YELLOW, f"  ℹ Model '{s_info.get('name')}' belum terpasang di ComfyUI."))
@@ -590,8 +591,8 @@ def config_image_model(env_vars):
     else:
         env_vars["IMAGE_ENGINE_MODE"] = "unified"
         options = [
+            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Civitai #9942, Rekomendasi Uncensored & Ringan)", "aom3", "AOM3A1B_orangemixs.safetensors"),
             ("✨ MeinaMix v12 (Anime SD 1.5 - Cepat & Hemat VRAM)", "meinamix", "meinamix_v12Final.safetensors"),
-            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Civitai #9942)", "aom3", "AOM3A1B_orangemixs.safetensors"),
             ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Jernih 1024px)", "anything_xl", "AnythingXL_xl.safetensors"),
             ("🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif)", "auto", ""),
             ("🌉 Google Antigravity Image Generator (AGY Subagent)", "agy", "agy"),
@@ -625,6 +626,14 @@ def config_image_model(env_vars):
             env_vars["COMFYUI_URL"] = "http://127.0.0.1:8188"
             env_vars["MEDIA_FALLBACK_CLOUD"] = "false"
         print(c(GREEN, f"  ✓ Model Foto Unified: {chosen_mode.upper()} {chosen_val}\n"))
+
+        # Download check for local checkpoint in Unified mode
+        if chosen_mode in ("aom3", "meinamix", "anything_xl") and asset_manager:
+            u_info = asset_manager.get_asset_info(chosen_mode)
+            if u_info and not u_info.get("installed", False):
+                print(c(YELLOW, f"  ℹ Model '{u_info.get('name')}' belum terpasang di ComfyUI."))
+                if input(f"  Download sekarang (~{u_info.get('size_mb', 0)} MB)? [Y/n, default: Y]: ").strip().lower() != "n":
+                    asset_manager.download_asset(chosen_mode)
 
 
 def config_persona(env_vars):

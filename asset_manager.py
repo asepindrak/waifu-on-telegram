@@ -2,6 +2,7 @@ import os
 import sys
 import glob
 import shutil
+import time
 import logging
 import subprocess
 import platform
@@ -274,7 +275,7 @@ def detect_hardware_profile(refresh: bool = False) -> Dict[str, Any]:
     Classifies the system into hardware tiers and returns optimal AI model defaults:
       - 'high' (>=8GB VRAM): Anything XL (SDXL 1024px), Wan 2.1 Video, full GPU offload.
       - 'mid' (6GB to <8GB VRAM): Anything XL (SDXL) or MeinaMix, Wan 2.1 / AnimateDiff.
-      - 'compact' (2GB to <6GB VRAM): MeinaMix v12 (SD 1.5 ~2GB), AnimateDiff, balanced layers.
+      - 'compact' (2GB to <6GB VRAM): AbyssOrangeMix3 AOM3A1B (SD 1.5 ~2GB), AnimateDiff, balanced layers.
       - 'entry' (<2GB VRAM / iGPU / Office PC): Cloud Fallback Engine (0 VRAM), Motion 2.5D, CPU mode.
     """
     global _HARDWARE_PROFILE_CACHE
@@ -364,12 +365,12 @@ def detect_hardware_profile(refresh: bool = False) -> Dict[str, Any]:
         recommendation_text = f"VRAM kamu {vram_gb} GB ({gpu_name}). Mumpuni untuk Anything XL (SDXL) dan Wan 2.1 Video secara lancar."
     elif vram_mb >= 2000:
         tier = "compact"
-        rec_image = "meinamix"
-        rec_image_file = "meinamix_v12Final.safetensors"
+        rec_image = "aom3"
+        rec_image_file = "AOM3A1B_orangemixs.safetensors"
         rec_video = "animatediff"
         rec_layers = 20
         tier_label = "Compact Dedicated GPU (2GB - 5GB VRAM)"
-        recommendation_text = f"VRAM kamu {vram_gb} GB ({gpu_name}). Direkomendasikan MeinaMix v12 (SD 1.5) & AnimateDiff agar cepat, konsisten, dan bebas OOM."
+        recommendation_text = f"VRAM kamu {vram_gb} GB ({gpu_name}). Direkomendasikan AbyssOrangeMix3 AOM3A1B (SD 1.5 Uncensored) & AnimateDiff agar cepat, konsisten, dan bebas OOM."
     else:
         tier = "entry"
         rec_image = "cloud"

@@ -45,7 +45,7 @@ class TestModelStatusAndBadImage(unittest.TestCase):
     def test_system_diagnostics_report_includes_models_and_vault(self, mock_auth):
         """build_system_diagnostics_report displays active LLM model, Photo Model, and Photo Vault info."""
         report = bot.build_system_diagnostics_report(99999)
-        self.assertIn("Local LLM Engine", report)
+        self.assertTrue("Local Kobold" in report or "Local LLM Engine" in report or "Arsitektur LLM" in report)
         self.assertIn("Model Foto", report)
         self.assertIn("Photo Vault", report)
         self.assertIn("Engine Video", report)

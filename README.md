@@ -88,17 +88,17 @@ Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsive
 
 Anda dapat memilih model ilustrasi anime sesuai dengan spesifikasi GPU dan preferensi estetika Anda melalui `waifu setup` (Menu `[3]`) atau perintah `/setup` langsung di Telegram:
 
-* **Pilihan 1: MeinaMix v12 (Anime SD 1.5 - Hemat VRAM & Cepat)**
-  - **File:** `meinamix_v12Final.safetensors` (~2.0 GB)
-  - **Download:** [Civitai - MeinaMix v12](https://civitai.com/models/7240/meinamix) atau via `waifu models download meinamix`
-  - **Rekomendasi GPU:** 4GB - 8GB VRAM (Resolusi default 3:4 portrait: `576x768`, Sampler: `DPM++ 2M Karras`)
-  - **Kelebihan:** Sangat cepat (~3-5 detik), hemat resource, konsistensi wajah anime sangat tinggi.
-
-* **Pilihan 2: AbyssOrangeMix3 / AOM3A1B (Anime SD 1.5 - Legendaris CivArchive #9942)**
+* **Pilihan 1: AbyssOrangeMix3 / AOM3A1B (Anime SD 1.5 - Default Local Engine Uncensored Civitai #9942)**
   - **File:** `AOM3A1B_orangemixs.safetensors` (~2.0 GB)
   - **Download:** [CivArchive #9942](https://civarchive.com/models/9942?modelVersionId=17233) / [Civitai #9942](https://civitai.com/models/9942/abyssorangemix3-aom3) atau via `waifu models download aom3`
   - **Rekomendasi GPU:** 4GB - 8GB VRAM (Resolusi default 3:4 portrait: `576x768`, Sampler: `DPM++ 2M Karras`, CFG `7.5`)
-  - **Kelebihan:** Estetika anime klasik yang kaya, warna tajam dan cerah (*vibrant*), shading rambut & mata memukau, rendering ringan dan halus.
+  - **Kelebihan:** **Default local image model**. Uncensored murni (bebas blokir NSFW/anatomis intim), estetika anime klasik yang kaya, warna tajam dan cerah (*vibrant*), rendering ringan dan halus (~3-5 detik).
+
+* **Pilihan 2: MeinaMix v12 (Anime SD 1.5 - Hemat VRAM & Cepat)**
+  - **File:** `meinamix_v12Final.safetensors` (~2.0 GB)
+  - **Download:** [Civitai - MeinaMix v12](https://civitai.com/models/7240/meinamix) atau via `waifu models download meinamix`
+  - **Rekomendasi GPU:** 4GB - 8GB VRAM (Resolusi default 3:4 portrait: `576x768`, Sampler: `DPM++ 2M Karras`)
+  - **Kelebihan:** Sangat cepat (~3-5 detik), hemat resource, konsistensi wajah anime imut (*kawaii*).
 
 * **Pilihan 3: 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Detail)**
   - **File:** `AnythingXL_xl.safetensors` (~6.6 GB)
@@ -501,7 +501,7 @@ Menu interaktif 10-opsi akan terbuka:
   • Bot Token   : 123456...abcd
   • Allowed UID : 987654321
   • Chat LLM    : Huihui-Qwythos-9B-Uncensored (http://127.0.0.1:5001/v1)
-  • Photo Model : MeinaMix v12 (SD 1.5) (http://127.0.0.1:8188)
+  • Photo Model : AbyssOrangeMix3 (AOM3A1B SD 1.5) (http://127.0.0.1:8188)
   • Persona     : Runa | Voice: en-US-AnaNeural
   • Language    : id
 ----------------------------------------------------------------------
@@ -593,9 +593,9 @@ Gunakan tabel acuan berikut untuk memilih kombinasi model yang paling pas dengan
 1. **Kenapa RAM & VRAM GPU saya tidak lagi penuh saat waifu menganggur?**
    - Waifu on Telegram kini dilengkapi **Smart Idle Engine**. Jika bot tidak menerima pesan selama waktu tertentu (default: 10 menit), engine KoboldCPP LLM otomatis dinonaktifkan sementara dari VRAM (~5-6 GB VRAM kembali kosong untuk gaming / kerja). Begitu Anda chat kembali, engine langsung bangun dalam waktu <1-2 detik secara transparan!
 
-2. **Apa perbedaan antara MeinaMix v12, AbyssOrangeMix3 (AOM3), dan Anything XL?**
+2. **Apa perbedaan antara AbyssOrangeMix3 (AOM3), MeinaMix v12, dan Anything XL?**
+   - **AbyssOrangeMix3 / AOM3A1B (SD 1.5, ~2.0 GB - Default Local Model):** Model anime klasik legendaris dari CivArchive/Civitai #9942 dengan sifat *uncensored* penuh. Memiliki saturasi warna cerah (*vibrant*), pencahayaan lembut (*soft lighting*), shading mata/rambut yang artistik, serta fleksibel untuk pose SFW hingga NSFW intim.
    - **MeinaMix v12 (SD 1.5, ~2.0 GB):** Paling cepat (3-5 detik) dan hemat VRAM. Karakter waifu tampak imut (*kawaii*), proporsional, dan sangat konsisten.
-   - **AbyssOrangeMix3 / AOM3A1B (SD 1.5, ~2.0 GB):** Model anime klasik legendaris dari CivArchive/Civitai #9942. Memiliki saturasi warna yang cerah (*vibrant*), pencahayaan lembut (*soft lighting*), dan shading mata/rambut yang artistik.
    - **万象熔炉 | Anything XL (SDXL, ~6.6 GB):** Model resolusi native 1024px super tajam. Memiliki pemahaman prompt yang mendalam untuk latar belakang kompleks, kostum mendetail, dan efek sinematik (memerlukan GPU 8GB+ VRAM).
 
 3. **Kenapa unduhan model sempat terputus atau tidak selesai?**

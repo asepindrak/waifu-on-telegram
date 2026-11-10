@@ -131,23 +131,23 @@ class MediaEngine:
         if ckpts:
             valid_ckpts = [c for c in ckpts if not ("basnsfw" in c.lower() and "base" in c.lower())] or ckpts
             for c in valid_ckpts:
+                if any(k in c.lower() for k in ["aom", "orange"]):
+                    return c
+            for c in valid_ckpts:
                 if "meina" in c.lower():
                     return c
             for c in valid_ckpts:
                 if any(k in c.lower() for k in ["anything", "xl"]):
-                    return c
-            for c in valid_ckpts:
-                if any(k in c.lower() for k in ["aom", "orange"]):
                     return c
             return valid_ckpts[0]
         if env_ckpt:
             return env_ckpt
         try:
             import asset_manager
-            info = asset_manager.get_asset_info("anything_xl")
+            info = asset_manager.get_asset_info("aom3")
             if info and info.get("installed") and info.get("target_path"):
                 return os.path.basename(info["target_path"])
-            info = asset_manager.get_asset_info("aom3")
+            info = asset_manager.get_asset_info("anything_xl")
             if info and info.get("installed") and info.get("target_path"):
                 return os.path.basename(info["target_path"])
             info = asset_manager.get_asset_info("meinamix")
@@ -155,7 +155,7 @@ class MediaEngine:
                 return os.path.basename(info["target_path"])
         except Exception:
             pass
-        return "meinamix_v12Final.safetensors"
+        return "AOM3A1B_orangemixs.safetensors"
 
     def get_available_checkpoints(self) -> list:
         """Queries ComfyUI for available checkpoint models."""
@@ -390,24 +390,24 @@ class MediaEngine:
         if not valid_ckpts:
             valid_ckpts = ckpts
 
-        # 2. Prefer MeinaMix if present in folder (SD 1.5 anime model with CLIP & VAE, handles SFW & NSFW)
+        # 2. Prefer AbyssOrangeMix3 (AOM3 / OrangeMix) if present (Default SD 1.5 anime uncensored model)
+        if not chosen_ckpt:
+            for c in valid_ckpts:
+                if any(k in c.lower() for k in ["aom", "orange"]):
+                    chosen_ckpt = c
+                    break
+
+        # 3. Prefer MeinaMix if present in folder (SD 1.5 anime model with CLIP & VAE, handles SFW & NSFW)
         if not chosen_ckpt:
             for c in valid_ckpts:
                 if "meina" in c.lower():
                     chosen_ckpt = c
                     break
 
-        # 3. Prefer Anything XL if present
+        # 4. Prefer Anything XL if present
         if not chosen_ckpt:
             for c in valid_ckpts:
                 if any(k in c.lower() for k in ["anything", "xl"]):
-                    chosen_ckpt = c
-                    break
-
-        # 4. Prefer AOM3 / OrangeMix if present
-        if not chosen_ckpt:
-            for c in valid_ckpts:
-                if any(k in c.lower() for k in ["aom", "orange"]):
                     chosen_ckpt = c
                     break
 
@@ -531,7 +531,7 @@ class MediaEngine:
                 self.last_error = "ComfyUI tidak mengembalikan prompt_id."
                 return None
 
-            m_label = "Anything XL (SDXL)" if is_sdxl else "MeinaMix (SD 1.5)"
+            m_label = "Anything XL (SDXL)" if is_sdxl else ("AbyssOrangeMix3 (SD 1.5)" if any(k in chosen_ckpt.lower() for k in ["aom", "orange"]) else "MeinaMix (SD 1.5)")
             start_poll = time.time()
             last_cb_time = 0.0
 
@@ -1101,7 +1101,7 @@ class MediaEngine:
             chosen_ckpt = ckpts[0]
 
         if not chosen_ckpt:
-            self.last_error = "Checkpoint anime MeinaMix tidak ditemukan di ComfyUI."
+            self.last_error = "Checkpoint anime (AOM3 / MeinaMix) tidak ditemukan di ComfyUI."
             return None
 
         seed = random.randint(1000000, 99999999)

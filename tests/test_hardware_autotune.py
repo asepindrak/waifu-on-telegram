@@ -25,19 +25,19 @@ class TestHardwareAutoTune(unittest.TestCase):
             self.assertEqual(profile["tier"], "mid")
             self.assertEqual(profile["recommended_image_model"], "anything_xl")
             self.assertEqual(profile["recommended_video_engine"], "wan21")
-            self.assertEqual(profile["recommended_llm_layers"], 99)
+            self.assertEqual(profile["recommended_llm_layers"], 24)
             self.assertGreaterEqual(profile["vram_gb"], 6.0)
 
-    def test_tier_compact_vram_recommends_meinamix_and_animatediff(self):
-        """When GPU has 4GB VRAM (e.g. GTX 1050 Ti 4GB / GTX 1650), MeinaMix and AnimateDiff are recommended."""
+    def test_tier_compact_vram_recommends_aom3_and_animatediff(self):
+        """When GPU has 4GB VRAM (e.g. GTX 1050 Ti 4GB / GTX 1650), AbyssOrangeMix3 and AnimateDiff are recommended."""
         mock_output = b"NVIDIA GeForce GTX 1050 Ti, 4096\n"
         with patch("subprocess.check_output", return_value=mock_output):
             profile = asset_manager.detect_hardware_profile(refresh=True)
             self.assertEqual(profile["tier"], "compact")
-            self.assertEqual(profile["recommended_image_model"], "meinamix")
+            self.assertEqual(profile["recommended_image_model"], "aom3")
             self.assertEqual(profile["recommended_video_engine"], "animatediff")
             self.assertEqual(profile["recommended_llm_layers"], 20)
-            self.assertEqual(profile["recommended_image_file"], "meinamix_v12Final.safetensors")
+            self.assertEqual(profile["recommended_image_file"], "AOM3A1B_orangemixs.safetensors")
 
     def test_tier_entry_or_igpu_recommends_cloud_and_motion(self):
         """When GPU has < 2GB VRAM or no dedicated GPU (iGPU / Office PC), Cloud and Motion 2.5D are recommended."""

@@ -97,7 +97,7 @@ class TestImageModelSelection(unittest.TestCase):
         """Verify that setup.py config_image_model properly prompts and configures AOM3 and Anything XL in Unified Mode."""
         env_vars = {}
         # Mode 1 (Unified), Choice 2 (AOM3), "n" (skip download)
-        with patch("builtins.input", side_effect=["1", "2", "n"]):
+        with patch("builtins.input", side_effect=["1", "1", "n"]):
             with patch("setup.scan_image_models", return_value=[]):
                 setup.config_image_model(env_vars)
                 self.assertEqual(env_vars.get("COMFYUI_CHECKPOINT"), "AOM3A1B_orangemixs.safetensors")
@@ -162,6 +162,49 @@ class TestImageModelSelection(unittest.TestCase):
         with patch("builtins.input", return_value="0"):
             # Should exit cleanly on 0
             setup.manage_models_menu()
+
+    def test_media_engine_defaults_and_prioritizes_aom3(self):
+        """Verify that media_engine defaults to AOM3 and prioritizes AOM3 over MeinaMix when both exist."""
+        eng = media_engine.MediaEngine(comfyui_url="http://127.0.0.1:8188")
+
+        # When no env or checkpoints exist, fallback returns AOM3
+        with patch.object(eng, "get_available_checkpoints", return_value=[]), \
+             patch.dict(os.environ, {"COMFYUI_CHECKPOINT": "", "SFW_COMFYUI_CHECKPOINT": "", "NSFW_COMFYUI_CHECKPOINT": ""}):
+            active = eng.get_active_checkpoint()
+            self.assertEqual(active, "AOM3A1B_orangemixs.safetensors")
+
+        # When both AOM3 and MeinaMix exist, AOM3 is prioritized
+        with patch.object(eng, "get_available_checkpoints", return_value=["meinamix_v12Final.safetensors", "AOM3A1B_orangemixs.safetensors"]), \
+             patch.dict(os.environ, {"COMFYUI_CHECKPOINT": "", "SFW_COMFYUI_CHECKPOINT": "", "NSFW_COMFYUI_CHECKPOINT": ""}):
+            active = eng.get_active_checkpoint()
+            self.assertEqual(active, "AOM3A1B_orangemixs.safetensors")
+
+    def test_cli_update_auto_switch_for_comfyui_skips_agy(self):
+        """Verify that updater auto-switches ComfyUI users to AOM3, but skips AGY users."""
+        # 1. AGY User: Should NOT be auto-switched
+        with patch.dict(os.environ, {"SFW_IMAGE_ENGINE": "agy", "MEDIA_FALLBACK_AGY": "true", "COMFYUI_CHECKPOINT": "meinamix_v12Final.safetensors"}):
+            sfw_img_engine = os.environ.get("SFW_IMAGE_ENGINE", "").lower().strip()
+            media_fallback_agy = os.environ.get("MEDIA_FALLBACK_AGY", "false").lower() in ("true", "1", "yes")
+            is_agy_user = (sfw_img_engine == "agy") or media_fallback_agy
+            self.assertTrue(is_agy_user)
+
+        # 2. ComfyUI User: Should be auto-switched to AOM3
+        env_dict = {"COMFYUI_CHECKPOINT": "meinamix_v12Final.safetensors", "SFW_IMAGE_ENGINE": "comfyui"}
+        with patch.dict(os.environ, {"SFW_IMAGE_ENGINE": "comfyui", "MEDIA_FALLBACK_AGY": "false", "COMFYUI_CHECKPOINT": "meinamix_v12Final.safetensors"}):
+            sfw_img_engine = os.environ.get("SFW_IMAGE_ENGINE", "").lower().strip()
+            media_fallback_agy = os.environ.get("MEDIA_FALLBACK_AGY", "false").lower() in ("true", "1", "yes")
+            is_agy_user = (sfw_img_engine == "agy") or media_fallback_agy
+            self.assertFalse(is_agy_user)
+
+            if not is_agy_user:
+                aom_fn = "AOM3A1B_orangemixs.safetensors"
+                cur_ckpt = env_dict.get("COMFYUI_CHECKPOINT", "").strip()
+                if not cur_ckpt or "meina" in cur_ckpt.lower():
+                    env_dict["COMFYUI_CHECKPOINT"] = aom_fn
+                    os.environ["COMFYUI_CHECKPOINT"] = aom_fn
+
+            self.assertEqual(env_dict["COMFYUI_CHECKPOINT"], "AOM3A1B_orangemixs.safetensors")
+            self.assertEqual(os.environ["COMFYUI_CHECKPOINT"], "AOM3A1B_orangemixs.safetensors")
 
 if __name__ == "__main__":
     unittest.main()

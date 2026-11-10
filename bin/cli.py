@@ -984,6 +984,44 @@ def _execute_update():
                 print(c(GREEN, f"  ✓ Vision Model '{info_m['name']}' is ready ({sz} MB)."))
 
         # 3. ComfyUI Models (if ComfyUI is detected or auto-installed)
+        sfw_img_engine = os.environ.get("SFW_IMAGE_ENGINE", "").lower().strip()
+        media_fallback_agy = os.environ.get("MEDIA_FALLBACK_AGY", "false").lower() in ("true", "1", "yes")
+        is_agy_user = (sfw_img_engine == "agy") or media_fallback_agy
+
+        if not is_agy_user:
+            # Auto-switch local image default to AOM3A1B_orangemixs.safetensors
+            aom_fn = "AOM3A1B_orangemixs.safetensors"
+            try:
+                from setup import read_env, write_env
+                env_dict = read_env()
+                cur_ckpt = env_dict.get("COMFYUI_CHECKPOINT", "").strip()
+                cur_sfw_ckpt = env_dict.get("SFW_COMFYUI_CHECKPOINT", "").strip()
+                cur_nsfw_ckpt = env_dict.get("NSFW_COMFYUI_CHECKPOINT", "").strip()
+                changed_ckpt = False
+
+                if not cur_ckpt or "meina" in cur_ckpt.lower():
+                    env_dict["COMFYUI_CHECKPOINT"] = aom_fn
+                    os.environ["COMFYUI_CHECKPOINT"] = aom_fn
+                    changed_ckpt = True
+
+                if not cur_nsfw_ckpt or "meina" in cur_nsfw_ckpt.lower():
+                    env_dict["NSFW_COMFYUI_CHECKPOINT"] = aom_fn
+                    os.environ["NSFW_COMFYUI_CHECKPOINT"] = aom_fn
+                    changed_ckpt = True
+
+                if sfw_img_engine == "comfyui" and (not cur_sfw_ckpt or "meina" in cur_sfw_ckpt.lower()):
+                    env_dict["SFW_COMFYUI_CHECKPOINT"] = aom_fn
+                    os.environ["SFW_COMFYUI_CHECKPOINT"] = aom_fn
+                    changed_ckpt = True
+
+                if changed_ckpt:
+                    write_env(env_dict)
+                    print(c(GREEN, f"  🔄 Auto-switch default local image checkpoint ke AbyssOrangeMix3 ({aom_fn})"))
+            except Exception as e_ckpt:
+                logger.debug(f"Auto-switch checkpoint error: {e_ckpt}")
+        else:
+            print(c(CYAN, "  🌉 User terkonfigurasi menggunakan Google Antigravity (AGY) Engine. Melewati auto-switch ComfyUI."))
+
         comfy_dir = asset_manager.detect_comfyui_dir()
         if not comfy_dir and platform.system() == "Windows":
             print(c(YELLOW, "  ⏳ ComfyUI not detected locally. Auto-installing official ComfyUI Portable (~1.4 GB)..."))
@@ -993,18 +1031,21 @@ def _execute_update():
 
         if comfy_dir:
             print(c(CYAN, f"  🧩 ComfyUI detected at: {comfy_dir}"))
-            configured_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "").lower()
-            target_asset = "anything_xl" if "anything" in configured_ckpt else "meinamix"
-            info_target = asset_manager.get_asset_info(target_asset)
-            if info_target and not info_target.get("installed"):
-                print(c(YELLOW, f"  ⏳ Anime Checkpoint '{info_target['name']}' missing. Auto-downloading (~{info_target['size_mb']} MB)..."))
-                ok = asset_manager.download_asset(target_asset)
-                if ok:
-                    print(c(GREEN, f"  ✓ '{info_target['name']}' downloaded successfully!"))
+            if is_agy_user:
+                print(c(CYAN, "  ℹ Mode AGY aktif, mempertahankan checkpoint ComfyUI yang ada."))
             else:
-                sz = info_target.get("current_size_mb", 0) if info_target else 0
-                name = info_target.get("name", target_asset) if info_target else target_asset
-                print(c(GREEN, f"  ✓ Anime Checkpoint '{name}' is ready ({sz} MB)."))
+                configured_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "").lower()
+                target_asset = "anything_xl" if ("anything" in configured_ckpt and "aom" not in configured_ckpt) else "aom3"
+                info_target = asset_manager.get_asset_info(target_asset)
+                if info_target and not info_target.get("installed"):
+                    print(c(YELLOW, f"  ⏳ Anime Checkpoint '{info_target['name']}' missing. Auto-downloading (~{info_target['size_mb']} MB)..."))
+                    ok = asset_manager.download_asset(target_asset)
+                    if ok:
+                        print(c(GREEN, f"  ✓ '{info_target['name']}' downloaded successfully!"))
+                else:
+                    sz = info_target.get("current_size_mb", 0) if info_target else 0
+                    name = info_target.get("name", target_asset) if info_target else target_asset
+                    print(c(GREEN, f"  ✓ Anime Checkpoint '{name}' is ready ({sz} MB)."))
         else:
             print(c(DIM, "  ℹ ComfyUI not detected locally. Photo Vault album will be used for photos."))
 

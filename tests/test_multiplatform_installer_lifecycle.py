@@ -128,12 +128,16 @@ class TestMultiplatformInstallerLifecycle(unittest.TestCase):
 
         diff_dir = os.path.join(mock_comfy, "models", "diffusion_models")
         vae_dir = os.path.join(mock_comfy, "models", "vae")
+        clip_dir = os.path.join(mock_comfy, "models", "text_encoders")
         os.makedirs(diff_dir, exist_ok=True)
         os.makedirs(vae_dir, exist_ok=True)
+        os.makedirs(clip_dir, exist_ok=True)
         with open(os.path.join(diff_dir, "wan2.1_t2v_1.3B_bf16.safetensors"), "wb") as f:
             f.write(b"W" * (12 * 1024 * 1024))
         with open(os.path.join(vae_dir, "wan_2.1_vae.safetensors"), "wb") as f:
             f.write(b"V" * (12 * 1024 * 1024))
+        with open(os.path.join(clip_dir, "umt5_xxl_fp8_e4m3fn_scaled.safetensors"), "wb") as f:
+            f.write(b"C" * (12 * 1024 * 1024))
 
         with patch.dict(os.environ, {"COMFYUI_DIR": mock_comfy}):
             self.assertEqual(asset_manager.detect_comfyui_dir(), os.path.abspath(mock_comfy))
@@ -177,15 +181,19 @@ class TestMultiplatformInstallerLifecycle(unittest.TestCase):
         ckpt_dir = os.path.join(mock_comfy, "models", "checkpoints")
         diff_dir = os.path.join(mock_comfy, "models", "diffusion_models")
         vae_dir = os.path.join(mock_comfy, "models", "vae")
+        clip_dir = os.path.join(mock_comfy, "models", "text_encoders")
         os.makedirs(ckpt_dir, exist_ok=True)
         os.makedirs(diff_dir, exist_ok=True)
         os.makedirs(vae_dir, exist_ok=True)
+        os.makedirs(clip_dir, exist_ok=True)
 
         # Pre-seed Wan 2.1 models
         with open(os.path.join(diff_dir, "wan2.1_t2v_1.3B_bf16.safetensors"), "wb") as f:
             f.write(b"W" * (12 * 1024 * 1024))
         with open(os.path.join(vae_dir, "wan_2.1_vae.safetensors"), "wb") as f:
             f.write(b"V" * (12 * 1024 * 1024))
+        with open(os.path.join(clip_dir, "umt5_xxl_fp8_e4m3fn_scaled.safetensors"), "wb") as f:
+            f.write(b"C" * (12 * 1024 * 1024))
 
         with patch.dict(os.environ, {"COMFYUI_DIR": mock_comfy}):
             ready, missing = asset_manager.ensure_video_engine_assets("wan21")

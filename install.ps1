@@ -459,7 +459,7 @@ function Select-And-Download-AnimeCheckpoint {
     $vramGB = [math]::Round($vramMB / 1024, 1)
 
     $defaultChoice = "1"
-    $defaultLabel = "MeinaMix v12 (SD 1.5)"
+    $defaultLabel = "AbyssOrangeMix3 AOM3A1B (SD 1.5 Uncensored)"
     $recVideo = "animatediff"
     if ($vramMB -ge 5800) {
         $defaultChoice = "3"
@@ -467,7 +467,7 @@ function Select-And-Download-AnimeCheckpoint {
         $recVideo = "wan21"
     } elseif ($vramMB -ge 2000) {
         $defaultChoice = "1"
-        $defaultLabel = "MeinaMix v12 (SD 1.5 Cepat & Hemat VRAM)"
+        $defaultLabel = "AbyssOrangeMix3 AOM3A1B (SD 1.5 Cepat & Uncensored)"
         $recVideo = "animatediff"
     } else {
         $defaultChoice = "4"
@@ -479,21 +479,27 @@ function Select-And-Download-AnimeCheckpoint {
     Write-Host "  💡 Rekomendasi Auto-Tuning: [$defaultChoice] $defaultLabel (Video: $recVideo)" -ForegroundColor Green
 
     Write-Host "`n  🎨 Pilih Model Ilustrasi Anime untuk Generasi Foto Waifu (ComfyUI):" -ForegroundColor Cyan
-    Write-Host "    [1] ✨ MeinaMix v12 (Anime SD 1.5 - ~2.0 GB) [Rekomendasi GPU 4GB VRAM: Cepat & Ringan]" -ForegroundColor White
-    Write-Host "    [2] 🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - ~2.0 GB) [Civitai #9942: Cepat, Halus & Dinamis]" -ForegroundColor White
+    Write-Host "    [1] 🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - ~2.0 GB) [Civitai #9942: Cepat, Uncensored, Halus & Dinamis]" -ForegroundColor White
+    Write-Host "    [2] ✨ MeinaMix v12 (Anime SD 1.5 - ~2.0 GB) [Rekomendasi GPU 4GB VRAM: Cepat & Ringan]" -ForegroundColor White
     Write-Host "    [3] 🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - ~6.6 GB) [Rekomendasi GPU 6GB - 8GB+ VRAM: 1024px Ultra Jernih]" -ForegroundColor White
     Write-Host "    [4] ☁️ Lewati download model sekarang (Gunakan Cloud Fallback Engine / Unduh nanti)" -ForegroundColor White
     $imgChoice = Read-Host "  Pilih model foto [1/2/3/4, default: $defaultChoice]"
     $imgChoice = $imgChoice.Trim()
     if (-not $imgChoice) { $imgChoice = $defaultChoice }
 
-    $selectedCkpt = "meinamix_v12Final.safetensors"
-    if ($imgChoice -eq "2") {
+    $selectedCkpt = "AOM3A1B_orangemixs.safetensors"
+    if ($imgChoice -eq "1") {
         $aomUrl = "https://huggingface.co/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors"
         $aomFallback = "https://hf-mirror.com/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors"
         $aomDest = "$ckptDir\AOM3A1B_orangemixs.safetensors"
         Download-FileWithProgress -Url $aomUrl -DestinationPath $aomDest -Description "AbyssOrangeMix3 AOM3A1B SD 1.5 (~2.0 GB)" -FallbackUrl $aomFallback -MinExpectedBytes ([long](1500*1024*1024))
         $selectedCkpt = "AOM3A1B_orangemixs.safetensors"
+    } elseif ($imgChoice -eq "2") {
+        $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
+        $meinaDest = "$ckptDir\meinamix_v12Final.safetensors"
+        $meinaFallback = "https://hf-mirror.com/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
+        Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11/v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback -MinExpectedBytes ([long](1500*1024*1024))
+        $selectedCkpt = "meinamix_v12Final.safetensors"
     } elseif ($imgChoice -eq "3") {
         $xlUrl = "https://huggingface.co/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors"
         $xlFallback = "https://hf-mirror.com/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors"
@@ -504,11 +510,11 @@ function Select-And-Download-AnimeCheckpoint {
         Write-Host "  [INFO] Melewati unduhan model lokal. Foto waifu dapat menggunakan Cloud Fallback Engine." -ForegroundColor DarkGray
         $selectedCkpt = ""
     } else {
-        $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
-        $meinaDest = "$ckptDir\meinamix_v12Final.safetensors"
-        $meinaFallback = "https://hf-mirror.com/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
-        Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11/v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback -MinExpectedBytes ([long](1500*1024*1024))
-        $selectedCkpt = "meinamix_v12Final.safetensors"
+        $aomUrl = "https://huggingface.co/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors"
+        $aomFallback = "https://hf-mirror.com/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors"
+        $aomDest = "$ckptDir\AOM3A1B_orangemixs.safetensors"
+        Download-FileWithProgress -Url $aomUrl -DestinationPath $aomDest -Description "AbyssOrangeMix3 AOM3A1B SD 1.5 (~2.0 GB)" -FallbackUrl $aomFallback -MinExpectedBytes ([long](1500*1024*1024))
+        $selectedCkpt = "AOM3A1B_orangemixs.safetensors"
     }
 
     $envFile = "$installDir\.env"
@@ -519,6 +525,11 @@ function Select-And-Download-AnimeCheckpoint {
                 $content = $content -replace "COMFYUI_CHECKPOINT=.*", "COMFYUI_CHECKPOINT=$selectedCkpt"
             } else {
                 $content += "`nCOMFYUI_CHECKPOINT=$selectedCkpt"
+            }
+            if ($content -match "NSFW_COMFYUI_CHECKPOINT=") {
+                $content = $content -replace "NSFW_COMFYUI_CHECKPOINT=.*", "NSFW_COMFYUI_CHECKPOINT=$selectedCkpt"
+            } else {
+                $content += "`nNSFW_COMFYUI_CHECKPOINT=$selectedCkpt"
             }
         }
         if (-not ($content -match "VIDEO_ENGINE=")) {
