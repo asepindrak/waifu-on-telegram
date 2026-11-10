@@ -31,7 +31,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from lu_llm_client import LocallyUncensoredClient
-from routing_engine import get_hybrid_llm_client, detect_nsfw_intent
+from routing_engine import get_hybrid_llm_client, detect_nsfw_intent, is_ai_refusal
 from persona_manager import PersonaManager
 from memory_engine import MemoryEngine
 from story_engine import StoryEngine
@@ -315,8 +315,10 @@ class WaifuCLISession:
                     "content": f"User asked: '{user_text}'. Give a cute caption for the photo."
                 }
             ]
-            caption, _ = self.llm_client.chat(cap_prompt, max_tokens=60)
-            caption = caption.strip('"\n ') if caption else "Ini foto buat kamu, gimana menurutmu? 💕"
+            caption, _ = self.llm_client.chat(cap_prompt, max_tokens=60, is_nsfw=is_nude)
+            caption = caption.strip('"\n ') if caption else None
+            if is_ai_refusal(caption) or not caption:
+                caption = "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕" if is_nude else "Ini foto buat kamu, gimana menurutmu? 💕"
 
         print(f"✨ {c(GREEN, 'Foto berhasil dibuat & dibuka:')} {c(BOLD, save_path)}")
         print(f"🌸 {c(BOLD + MAGENTA, p_name)}: {caption}\n")

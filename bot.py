@@ -24,7 +24,7 @@ import telebot
 from telebot import types
 
 from lu_llm_client import LocallyUncensoredClient
-from routing_engine import get_hybrid_llm_client, detect_nsfw_intent
+from routing_engine import get_hybrid_llm_client, detect_nsfw_intent, is_ai_refusal
 from persona_manager import PersonaManager, build_custom_persona
 from media_engine import MediaEngine
 from voice_engine import VoiceEngine
@@ -4435,12 +4435,18 @@ def is_user_expressing_doubt(text: str) -> bool:
 
 
 def sanitize_chat_caption(text: Optional[str], fallback: str) -> str:
-    """Cleans up influencer, YouTuber, vlogger, and cringe artifacts from LLM captions."""
+    """Cleans up influencer, YouTuber, vlogger, and AI refusal artifacts from LLM captions."""
     if not text:
         return fallback
     clean = text.strip()
+    if is_ai_refusal(clean):
+        logger.warning(f"AI refusal detected in caption ('{clean[:60]}...'). Reverting to sweet fallback.")
+        return fallback
     if (clean.startswith('"') and clean.endswith('"')) or (clean.startswith("'") and clean.endswith("'")):
         clean = clean[1:-1].strip()
+    if is_ai_refusal(clean):
+        logger.warning(f"AI refusal detected in unquoted caption ('{clean[:60]}...'). Reverting to sweet fallback.")
+        return fallback
     # Strip social media greetings & broadcast phrases
     clean = re.sub(r'^(?:sori\s+gaes|halo\s+gaes|hai\s+gaes|gaes|guys|temen-temen|teman-teman)[,\s!.]*', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'\b(?:intip\s+aja\s+yuk|intip\s+yuk|stay\s+tuned|pantau\s+terus)\b[,\s!.]*', '', clean, flags=re.IGNORECASE)
@@ -4666,6 +4672,8 @@ def process_photo_request(
                 })
 
             try:
+                if is_nude:
+                    idle_engine.ensure_llm_active(bot=bot, chat_id=chat_id, is_nsfw=True)
                 caption, _ = llm_client.chat(caption_prompt, max_tokens=120, is_nsfw=is_nude)
             except Exception as e_cap:
                 logger.warning(f"Could not generate dynamic photo caption from LLM: {e_cap}")
@@ -6429,11 +6437,13 @@ META_REASONING_PATTERNS = [
 def is_meta_or_reasoning_leak(text: str) -> bool:
     """
     Detects if the AI generated internal prompt-engineering thoughts / reasoning
-    out loud in English instead of real in-character girlfriend dialogue.
+    or safety policy refusal instead of real in-character girlfriend dialogue.
     """
     if not text:
         return False
     clean = text.strip()
+    if is_ai_refusal(clean):
+        return True
     for pat in META_REASONING_PATTERNS:
         if pat.search(clean):
             return True

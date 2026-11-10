@@ -143,6 +143,30 @@ _NSFW_WORDS = [
 
 _NSFW_REGEX = re.compile("|".join(_NSFW_WORDS), re.IGNORECASE)
 
+# AI Safety Policy Refusal Patterns (e.g. Gemini, ChatGPT, Claude)
+_REFUSAL_WORDS = [
+    r"tidak dapat memenuhi permintaan",
+    r"tidak dapat membuat konten",
+    r"bersifat eksplisit secara seksual",
+    r"i cannot fulfill this request",
+    r"i am unable to (?:fulfill|generate|create)",
+    r"as an ai (?:language model)?, i (?:cannot|can't|must not)",
+    r"sebagai (?:seorang )?model ai, saya (?:tidak|belum)",
+    r"kebijakan keselamatan",
+    r"safety policy",
+    r"content policy",
+    r"sexually explicit",
+    r"against my safety guidelines"
+]
+_REFUSAL_REGEX = re.compile("|".join(_REFUSAL_WORDS), re.IGNORECASE)
+
+
+def is_ai_refusal(text: Optional[str]) -> bool:
+    """Detects whether an LLM output is an AI safety policy refusal message."""
+    if not text or not isinstance(text, str):
+        return False
+    return bool(_REFUSAL_REGEX.search(text.strip()))
+
 
 def detect_nsfw_intent(text: str, messages: Optional[List[Dict[str, Any]]] = None) -> bool:
     """
@@ -275,12 +299,17 @@ class HybridLLMClient:
         if nsfw_client:
             self.nsfw_client = nsfw_client
         else:
-            if self.mode == "unified":
+            nsfw_base = os.environ.get("NSFW_LLM_BASE_URL", "http://127.0.0.1:5001/v1")
+            nsfw_key = os.environ.get("NSFW_LLM_API_KEY", "auto")
+            nsfw_model = os.environ.get("NSFW_LLM_MODEL", os.environ.get("LOCAL_LLM_MODEL", "default"))
+
+            # If mode is unified BUT SFW client is AGY (port 8001) or Cloud API,
+            # we MUST initialize a dedicated uncensored NSFW client (port 5001 KoboldCPP)
+            # so that intimate/NSFW turns are never routed to Gemini/Cloud!
+            sfw_is_cloud_or_agy = (":8001" in str(self.sfw_client.base_url)) or self.is_sfw_cloud()
+            if self.mode == "unified" and not sfw_is_cloud_or_agy:
                 self.nsfw_client = self.sfw_client
             else:
-                nsfw_base = os.environ.get("NSFW_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1"))
-                nsfw_key = os.environ.get("NSFW_LLM_API_KEY", os.environ.get("LLM_API_KEY", "auto"))
-                nsfw_model = os.environ.get("NSFW_LLM_MODEL", os.environ.get("LLM_MODEL", "default"))
                 self.nsfw_client = LocallyUncensoredClient(base_url=nsfw_base, api_key=nsfw_key, model=nsfw_model)
 
     @property
@@ -364,12 +393,31 @@ class HybridLLMClient:
                     break
             is_nsfw = detect_nsfw_intent(last_user_txt, messages)
 
-        target_client = self.nsfw_client if (self.is_split_mode() and is_nsfw) else self.sfw_client
+        use_nsfw_client = False
+        if is_nsfw:
+            if self.is_split_mode():
+                use_nsfw_client = True
+            elif (":8001" in str(getattr(self.sfw_client, 'base_url', ''))) or self.is_sfw_cloud():
+                # SFW client is AGY Bridge or Cloud provider: MUST use uncensored NSFW client for NSFW turns!
+                use_nsfw_client = True
+
+        target_client = self.nsfw_client if use_nsfw_client else self.sfw_client
         target_label = "NSFW" if is_nsfw else "SFW"
 
         client_url = getattr(target_client, 'base_url', 'unknown')
         client_model = getattr(target_client, 'model', 'default')
         logger.info(f"Routing chat turn -> [{target_label}] Engine ({client_url}, Model: {client_model})")
+
+        # Auto-wake local KoboldCPP if targeted on port 5001
+        if "5001" in str(client_url):
+            from idle_engine import is_port_listening
+            if not is_port_listening(5001):
+                try:
+                    import bot
+                    if hasattr(bot, "idle_engine") and bot.idle_engine:
+                        bot.idle_engine.ensure_llm_active(is_nsfw=is_nsfw)
+                except Exception as e_w:
+                    logger.debug(f"Could not auto-wake KoboldCPP on port 5001: {e_w}")
 
         # Auto-wake / auto-run AGY Bridge if targeted on port 8001
         if "8001" in str(client_url):
@@ -423,12 +471,37 @@ class HybridLLMClient:
                     logger.warning(f"Vision engine extraction error: {e_v}")
 
         try:
-            return target_client.chat(
+            reply_tuple = target_client.chat(
                 payload_messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 image_bytes=processed_image_bytes
             )
+            reply_text, reasoning = reply_tuple if isinstance(reply_tuple, tuple) else (reply_tuple, "")
+
+            # Check if LLM returned an AI safety refusal message
+            if is_ai_refusal(reply_text):
+                logger.warning(f"Safety refusal returned by {target_label} engine: '{reply_text[:60]}...'")
+                if target_client != self.nsfw_client:
+                    logger.info("Auto-redirecting refusal turn to NSFW Uncensored Engine...")
+                    try:
+                        import bot
+                        if hasattr(bot, "idle_engine") and bot.idle_engine:
+                            bot.idle_engine.ensure_llm_active(is_nsfw=True)
+                    except Exception:
+                        pass
+                    backup_tuple = self.nsfw_client.chat(
+                        messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        image_bytes=image_bytes
+                    )
+                    backup_text, backup_reasoning = backup_tuple if isinstance(backup_tuple, tuple) else (backup_tuple, "")
+                    if not is_ai_refusal(backup_text):
+                        return backup_text, backup_reasoning
+                raise ValueError(f"AI content refusal: {reply_text}")
+
+            return reply_text, reasoning
         except Exception as e:
             # Automatic High-Availability Fallback:
             # If primary provider rejected prompt or is unreachable, seamlessly retry with backup engine!
