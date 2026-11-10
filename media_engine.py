@@ -305,8 +305,8 @@ class MediaEngine:
             table = {
                 "3:4": (576, 768),   # 3:4 portrait (576/768 = 0.75)
                 "4:3": (768, 576),   # 4:3 landscape
-                "9:16": (512, 910),  # Smartphone story/wallpaper
-                "16:9": (910, 512),  # Widescreen
+                "9:16": (448, 768),  # Smartphone story/wallpaper (Height <= 768 prevents leg/body duplication in SD 1.5)
+                "16:9": (768, 448),  # Widescreen
                 "1:1": (512, 512)    # Square avatar
             }
             return table.get(ar, (576, 768))
@@ -335,7 +335,7 @@ class MediaEngine:
     def generate_image_comfyui(
         self,
         prompt: str,
-        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
+        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, blurry",
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None,
         width: Optional[int] = None,
@@ -363,7 +363,7 @@ class MediaEngine:
     def _execute_generate_image_comfyui(
         self,
         prompt: str,
-        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
+        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, blurry",
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None,
         width: Optional[int] = None,
@@ -691,7 +691,7 @@ class MediaEngine:
             if self.comfyui_url:
                 local_img = self.generate_image_comfyui(
                     effective_prompt,
-                    negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, blurry",
+                    negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, blurry",
                     aspect_ratio=aspect_ratio,
                     quality=quality,
                     is_nude=is_nude,

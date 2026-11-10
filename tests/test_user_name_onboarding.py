@@ -15,7 +15,8 @@ class TestUserNameOnboarding(unittest.TestCase):
     def setUp(self):
         self.memory_engine = MemoryEngine()
         self.test_user_id = 99887766
-        # Reset profile for test user
+        # Reset profile & facts for test user
+        self.memory_engine.data["facts"][str(self.test_user_id)] = []
         self.memory_engine.update_profile(
             self.test_user_id,
             name="",
@@ -44,6 +45,24 @@ class TestUserNameOnboarding(unittest.TestCase):
         self.memory_engine.auto_extract_facts("Kenalin aku Sandra salam kenal", self.test_user_id)
         prof = self.memory_engine.get_profile(self.test_user_id)
         self.assertEqual(prof.get("call_name"), "Sandra")
+
+        # 4. Correction clause with trailing action: "bukan alex, aku adens, ayo kita mengerjakan PR"
+        self.memory_engine.update_profile(self.test_user_id, name="", call_name="")
+        self.memory_engine.auto_extract_facts("bukan alex, aku adens, ayo kita mengerjakan PR", self.test_user_id)
+        prof = self.memory_engine.get_profile(self.test_user_id)
+        self.assertEqual(prof.get("name"), "Adens")
+        self.assertEqual(prof.get("call_name"), "Adens")
+
+        # Verify context explicitly forbids asking name again once known
+        ctx = self.memory_engine.format_memory_context(self.test_user_id)
+        self.assertIn("DILARANG KERAS menanyakan namanya lagi", ctx)
+
+        # 5. English correction & introduction: "Not Alex, I'm Aden, let's study together"
+        self.memory_engine.update_profile(self.test_user_id, name="", call_name="")
+        self.memory_engine.auto_extract_facts("Not Alex, I'm Aden, let's study together", self.test_user_id)
+        prof = self.memory_engine.get_profile(self.test_user_id)
+        self.assertEqual(prof.get("name"), "Aden")
+        self.assertEqual(prof.get("call_name"), "Aden")
 
     def test_extract_name_from_previous_question(self):
         history = [

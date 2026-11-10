@@ -174,6 +174,21 @@ BODY_POSES = [
          r"\b(standing|full\s+body|standing\s+upright)\b"],
         "standing pose, full body shot, standing upright, graceful posture"
     ),
+    # Sitting on Lap / Duduk di Paha / Pangku
+    (
+        [r"\b(duduk\s+di\s+paha|di\s+pangkuan|pangku|dipangku|sit\s+on\s+(?:my\s+)?lap|sitting\s+on\s+lap)\b"],
+        "sitting on viewer lap, sitting closely on lap, intimate POV, smiling warmly up at viewer, affectionate cuddle posture"
+    ),
+    # Hugging / Cuddling / Pelukan
+    (
+        [r"\b(peluk|berpelukan|dekapan|sambil\s+peluk|cuddle|hug|snuggle|embracing)\b"],
+        "cozy intimate cuddle, gentle affectionate hug, resting head on chest or shoulder, warm romantic embrace"
+    ),
+    # Study Buddy / Mengerjakan PR / Belajar Bareng
+    (
+        [r"\b(ngerjain\s+pr|mengerjakan\s+pr|tugas|nugas|belajar\s+bareng|study\s+together|homework)\b"],
+        "sitting next to viewer at study desk, studying together, open textbook and notebooks on table, cute study buddy pose, gentle smile"
+    ),
     # Sitting / Duduk
     (
         [r"\b(duduk|lagi\s+duduk|posisi\s+duduk|lagi\s+kursi)\b",
@@ -621,7 +636,60 @@ class PersonaManager:
         for patterns, cue_prompt in ANATOMY_CUES:
             if any(re.search(pat, low) for pat in patterns):
                 parts.append(cue_prompt)
+
+        # If user is asking for lap sitting / sitting on lap, do not treat as an isolated thigh anatomy close-up
+        if any(re.search(pat, low) for pat in [r"\b(duduk\s+di\s+paha|pangku|dipangku|sit\s+on\s+(?:my\s+)?lap|on\s+my\s+lap)\b"]):
+            parts = [p for p in parts if "thighs" not in p]
+
         return ", ".join(parts) if parts else None
+
+    def detect_visual_scene_moment(self, user_text: str, reply_text: str = "") -> Tuple[bool, Optional[str]]:
+        """
+        Detects vivid narrative / visual novel moments (CG scenes) where waifu proactively
+        generates and sends an accompanying photo without user needing to manually ask for pap.
+        Returns: (is_scene_moment, scene_prompt_override)
+        """
+        u_low = (user_text or "").lower()
+        r_low = (reply_text or "").lower()
+
+        # 1. Action Tag or explicit photo phrases emitted in reply
+        if re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE):
+            return True, None
+        if any(p in r_low for p in ["aku fotoin ya", "aku kirim foto ya", "nih foto spesial buat kamu", "aku pap buat kamu", "foto ini buat kamu", "here is a photo for you"]):
+            return True, None
+
+        # 2. Lap sitting scene: user invites / waifu sits on lap
+        lap_triggers_u = [r"\b(duduk\s+di\s+paha|di\s+pangkuan|pangku|dipangku|sit\s+on\s+(?:my\s+)?lap|on\s+my\s+lap)\b"]
+        lap_triggers_r = [r"\b(moves\s+to\s+sit\s+on\s+your\s+lap|sits\s+on\s+your\s+lap|duduk\s+di\s+paha|duduk\s+di\s+pangkuan|sitting\s+on\s+your\s+lap)\b"]
+        if any(re.search(pat, u_low) for pat in lap_triggers_u) or any(re.search(pat, r_low) for pat in lap_triggers_r):
+            return True, "sitting on viewer lap, sitting closely on lap, intimate POV perspective, smiling warmly up at viewer, affectionate cozy cuddle posture"
+
+        # 3. Outfit appreciation & teasing: user compliments outfit or body, waifu flaunts clothes
+        outfit_triggers_u = [
+            r"\b(baju\s+kamu|outfit\s+kamu|pakaian\s+kamu|baju\s+yang\s+kamu\s+pake)\b",
+            r"\b(cantik\s+dan\s+seksi|seksi\s+banget|sangat\s+cantik|sangat\s+seksi)\b",
+            r"\b(cute\s+outfit|nice\s+dress|looks\s+sexy|great\s+outfit)\b"
+        ]
+        outfit_triggers_r = [
+            r"\b(glances\s+down\s+at\s+her\s+own\s+clothes|tugs\s+at\s+her\s+skirt|usual\s+outfit|show\s+a\s+bit\s+more\s+skin|bajuku|outfitku)\b"
+        ]
+        if (any(re.search(pat, u_low) for pat in outfit_triggers_u) and any(re.search(pat, r_low) for pat in outfit_triggers_r)) or \
+           (any(re.search(pat, u_low) for pat in outfit_triggers_u) and any(w in u_low for w in ["cantik", "seksi", "sexy", "gorgeous"])):
+            return True, "standing and showing cute outfit, tugging skirt playfully, blushing sweet smile, charming pose, admiring her clothes"
+
+        # 4. Intimate Cuddling / Hugging
+        cuddle_triggers_u = [r"\b(sambil\s+peluk|hangat\s+sambil\s+peluk|peluk\s+kamu|boleh\s+peluk|cuddle|hug\s+you|snuggle\s+together)\b"]
+        cuddle_triggers_r = [r"\b(moves\s+closer|places\s+her\s+hand\s+on\s+your\s+arm|cozying\s+up|snuggles\s+closer|memeluk|merapatkan\s+tubuh)\b"]
+        if (any(re.search(pat, u_low) for pat in cuddle_triggers_u) and any(re.search(pat, r_low) for pat in cuddle_triggers_r)):
+            return True, "cozy intimate cuddle, gentle affectionate hug, resting head close to viewer, warm romantic embrace"
+
+        # 5. Study buddy / Doing homework together (visual novel study moment)
+        study_triggers_u = [r"\b(ngerjain\s+pr|mengerjakan\s+pr|belajar\s+bareng|study\s+together|homework)\b"]
+        study_triggers_r = [r"\b(study\s+buddy|studying\s+together|mengerjakan\s+pr|buku\s+pelajaran)\b"]
+        if any(re.search(pat, u_low) for pat in study_triggers_u) and any(re.search(pat, r_low) for pat in study_triggers_r):
+            return True, "sitting next to viewer at study desk, studying together, open textbook and notebooks on table, cute study buddy pose, gentle smile"
+
+        return False, None
 
     def list_outfits(self) -> List[Tuple[str, str]]:
         """Returns list of (key, name) for all outfit presets."""
@@ -1217,6 +1285,10 @@ class PersonaManager:
         if not wants_device:
             device_neg = "phone, smartphone, cellphone, camera, holding phone, holding camera, mirror selfie, mirror, hands holding device, selfie stick"
             extra_neg = f"{extra_neg}, {device_neg}" if extra_neg else device_neg
+
+        # Anatomy & limb defect guardrails (strictly prevents elongated, mutated, duplicated, or folded spider legs)
+        anatomy_guard_neg = "bad legs, extra legs, malformed limbs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, mutated legs, folded legs, cross-legged error, distorted legs, mutated, deformed, duplicate body, floating limbs, unnatural body proportions, distorted body"
+        extra_neg = f"{extra_neg}, {anatomy_guard_neg}" if extra_neg else anatomy_guard_neg
 
         # Dynamic micro-variations if no specific angle/pose requested (WITHOUT drawing a phone!)
         micro_angles = [

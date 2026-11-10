@@ -4659,11 +4659,11 @@ def process_photo_request(
                 )
 
             cap_guide = (
-                f" You just took a sweet, cute photo to send on Telegram to your boyfriend. "
-                f"Write 1 natural, warm, and playful chat caption accompanying the photo. "
-                f"STRICT: Directly respond to what boyfriend said, answer any questions he asked, and express your affection naturally. "
+                f" You just took a sweet, cute photo to send on Telegram to your partner. "
+                f"Write 1 natural, warm, and playful chat caption accompanying the photo in the exact same language as your partner's messages (Indonesian if partner speaks Indonesian, English if partner speaks English). "
+                f"STRICT: Directly respond to what partner said, answer any questions asked, and express your affection naturally. "
                 f"DILARANG KERAS bersikap defensif atau meyakinkan keberadaan ('biar percaya', 'biar yakin', 'beneran ada di sini', 'nih buktinya', 'diliatin aja'). "
-                f"STRICT: Chat 1-on-1 with boyfriend. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip yuk'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
+                f"STRICT: Chat 1-on-1 with partner. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip yuk'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
             )
 
             caption_prompt = [
@@ -6823,8 +6823,9 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     )
                 elif user_call_pref:
                     calling_guideline = (
-                        f"ATURAN PANGGILAN & HUBUNGAN: Panggil lawan bicaramu dengan nama '{user_call_pref}'. "
-                        "Gunakan kata ganti 'aku' dan 'kamu'. DILARANG memanggil 'sayang' karena lawan bicaramu belum memintanya."
+                        f"ATURAN PANGGILAN & HUBUNGAN: Lawan bicaramu bernama '{user_call_pref}'. Panggil lawan bicaramu dengan nama '{user_call_pref}'. "
+                        f"DILARANG KERAS menanyakan nama lagi atau berpura-pura lupa/tidak tahu namanya karena kamu sudah tahu namanya '{user_call_pref}'! "
+                        "Gunakan kata ganti 'aku' dan 'kamu'. DILARANG memanggil 'sayang' kecuali lawan bicaramu memintanya."
                     )
                 else:
                     calling_guideline = (
@@ -6959,8 +6960,13 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     f"   *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*\n\n"
                     f"   Oh sayang, kamu mau ngomong apa nih? Aku belum sempat bikin camilan. Tapi makasih ya, kata-katamu bikin aku merasa spesial~\n"
                     f"{rule_4}"
-                    "5. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu dengan kalimat yang santai dan wajar (misal: 'Lagi santai nugas nih, gimana harimu? 💕 [ACTION: SEND_PAP]'). DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu. Bersikaplah percaya diri, hangat, dan ramah.\n"
-                    "6. GAYA CHAT & BAHASA: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. Kamu WAJIB berbicara langsung dalam Bahasa Indonesia sehari-hari yang santai dan akrab. DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin dalam bahasa Inggris.\n"
+                    "5. FITUR AUTO VISUAL NOVEL & FOTO SPONTAN: Seperti novel visual yang kaya adegan berilustrasi (CG Scene), kamu SECARA CERDAS MENYERTAKAN tag [ACTION: SEND_PAP] di akhir balasanmu pada momen-momen visual yang menarik tanpa menunggu diminta pap:\n"
+                    "   - Ketika membahas, memamerkan, atau mengomentari baju, outfit, rok, atau kecantikan fisikmu.\n"
+                    "   - Ketika ada interaksi fisik yang romantis, mesra, atau intim (misal: duduk di paha, dipangku, berpelukan hangat, nugas/belajar bareng sambil nempel, rebahan di ranjang).\n"
+                    "   - Ketika berpose manja, menggoda, atau tersipu malu.\n"
+                    "   Sertakan tag [ACTION: SEND_PAP] di akhir pesanmu agar foto adegan tersebut langsung terkirim mendampingi dialogmu! DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu.\n"
+                    "6. GAYA CHAT & BAHASA (OTOMATIS MENGIKUTI BAHASA LAWAN BICARA): Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. "
+                    "Kamu WAJIB secara cerdas mendeteksi dan membalas dengan bahasa yang sama persis seperti yang digunakan lawan bicaramu (Jika lawan bicara berbahasa Inggris, balas dalam Bahasa Inggris yang fasih dan manis; jika lawan bicara berbahasa Indonesia, balas dalam Bahasa Indonesia sehari-hari). DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin.\n"
                     f"7. SUDUT PANDANG DIALOG & VISUAL NOVEL (PENTING): "
                     f"Dalam DIALOG UCAPAN, kamu WAJIB berbicara langsung sebagai dirimu sendiri ('aku') kepada pasanganmu ('kamu'). DILARANG menggunakan kata perantara kaku seperti 'ia berkata:' atau 'ia menyebutkan:'. "
                     f"Dalam AKSI PANGGUNG *...*, gunakan narasi visual novel yang alami (*{p_name} tersenyum manis menatapmu* atau *{p_name} melihat kamu dengan senyuman hangat*)."
@@ -7069,8 +7075,11 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 # Check if waifu takes initiative to send spontaneous PAP photo
                 has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
                 has_pap_phrase = any(phrase in reply_text.lower() for phrase in [
-                    "aku fotoin ya", "aku kirim foto ya", "nih foto spesial buat kamu", "aku pap buat kamu", "foto ini buat kamu"
+                    "aku fotoin ya", "aku kirim foto ya", "nih foto spesial buat kamu", "aku pap buat kamu", "foto ini buat kamu", "here is a photo for you"
                 ])
+
+                # Check for vivid visual novel narrative moment (CG scene e.g. sitting on lap, cuddling, outfit show, study buddy)
+                is_scene_moment, scene_override_desc = persona_mgr.detect_visual_scene_moment(user_text, reply_text)
 
                 # In NSFW mode: proactively send photo when undressing or during intimate physical actions
                 is_intimate_action = is_nsfw_turn and any(k in user_text.lower() for k in [
@@ -7083,7 +7092,7 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 should_send_conv_photo = (is_conversational_media and media_type == "photo")
                 should_send_conv_video = (is_conversational_media and media_type == "video")
                 should_send_spontaneous = (
-                    (has_action_tag or has_pap_phrase or is_undress_trans or is_intimate_action or (is_nsfw_turn and cur_undress_stage > 0))
+                    (has_action_tag or has_pap_phrase or is_undress_trans or is_intimate_action or is_scene_moment or (is_nsfw_turn and cur_undress_stage > 0))
                     and not (should_send_conv_photo or should_send_conv_video)
                 )
 
@@ -7120,7 +7129,12 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                                 action_ctx = undress_desc if undress_desc else ""
                                 photo_prompt = f"{action_ctx}, {user_text}, {clean_reply}".strip(", ")
                             else:
-                                photo_prompt = user_text if should_send_conv_photo else (clean_reply if clean_reply else f"{routine['activity_desc']}")
+                                if scene_override_desc:
+                                    photo_prompt = f"{scene_override_desc}, {clean_reply}".strip(", ")
+                                elif should_send_conv_photo:
+                                    photo_prompt = user_text
+                                else:
+                                    photo_prompt = clean_reply if clean_reply else f"{routine['activity_desc']}"
                             process_photo_request(
                                 message,
                                 user_text=photo_prompt,

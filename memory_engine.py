@@ -445,7 +445,7 @@ class MemoryEngine:
         # Panggilan / Pet name directive based on user preference
         call_name = prof.get("call_name") or prof.get("name")
         if call_name:
-            lines.append(f"• User's Calling Preference: Panggil user '{call_name}'.")
+            lines.append(f"• User's Calling Preference: Panggil user '{call_name}'. Kamu sudah mengetahui namanya, DILARANG KERAS menanyakan namanya lagi!")
         else:
             lines.append("• Panggilan & Perkenalan: Kamu belum tahu nama user. Tanyakan siapa namanya dengan ramah di akhir pesanmu agar kamu tahu harus memanggilnya apa. Gunakan kata ganti netral/akrab 'kamu' dan DILARANG memanggil 'sayang'.")
 
@@ -476,18 +476,23 @@ class MemoryEngine:
             self.update_profile(user_id, call_name="sayang", allow_pet_name=True)
             learned.append("Panggilan: sayang")
         else:
-            # 1. Name detection (only if not preceded by negative 'jangan')
+            # 1. Name detection (handles self-introductions, corrections e.g. 'bukan alex, aku adens, ayo...', and English 'not alex, i am...')
+            intro_stopwords = {
+                "lagi", "mau", "udah", "sudah", "sedang", "bisa", "suka", "gak", "nggak", "tidak", "senang", "capek",
+                "bingung", "pengen", "tadi", "ke", "di", "dari", "sama", "baru", "bukan", "paling", "kurang", "banget",
+                "selalu", "siap", "punya", "lapar", "haus", "ngantuk", "tidur", "kerja", "kuliah", "sekolah", "main",
+                "ada", "juga", "cuma", "hanya", "tahu", "tau", "beneran", "masih", "belum", "paham", "ngerti", "baper",
+                "penasaran", "excited", "happy", "sad", "tired", "hungry", "sleepy", "fine", "okay", "good", "bad", "busy",
+                "here", "there", "back", "sorry", "makan", "minum", "nugas", "belajar", "rebahan", "santai"
+            }
+
             name_patterns = [
-                # "Nama aku/saya/gua/gue/gw Rama", "Namaku Rama", "Nama ku Rama"
-                r"\b(?:nama\s+(?:saya|aku|gua|gue|gw)|namaku|nama\s+ku)\s*(?:adalah|=|:)?\s*([A-Za-z][A-Za-z0-9_'\s-]{1,30})",
-                # "Panggil aku/saya/gue/gw/aja Rama", "Panggil Rama aja", "Panggil Rama"
-                r"\b(?:panggil(?:\s+kan)?\s+(?:aku|saya|gue|gua|gw)|panggil\s+aja|panggil)\s+([A-Za-z][A-Za-z0-9_'\s-]{1,30})",
+                # Correction + introduction: "bukan alex, aku adens, ayo...", "not alex, i'm aden, let's..."
+                r"(?:\b(?:bukan|not)\s+[A-Za-z0-9_'-]+[,\s]+)?\b(?:nama\s+(?:saya|aku|gua|gue|gw)|namaku|nama\s+ku|panggil(?:\s+kan)?\s+(?:aku|saya|gue|gua|gw)|panggil\s+aja|panggil|aku|saya|gue|gua|gw|my\s+name\s+is|call\s+me|i'm|i\s+am)\s*(?:adalah|=|:)?\s*([A-Za-z][A-Za-z0-9_'-]*(?:\s+[A-Za-z][A-Za-z0-9_'-]*)?)(?=[,\.\?!~;]|\s+(?:ayo|mari|yuk|kita|dan|salam|senang|mau|udah|lagi|ya|nih|dong|kok|deh|kak|bang|bro|sis|let's|lets|and|nice|ready)\b|$)",
                 # "Kenalin, aku Rama", "Salam kenal, namaku Rama", "Kenalkan nama saya Rama"
-                r"\b(?:kenalin|salam\s+kenal|kenalkan)[,\s]+(?:aku|nama(?:ku)?|saya|gue|gw)\s+([A-Za-z][A-Za-z0-9_'\s-]{1,30})",
-                # "Halo, aku Rama", "Hai, aku Rama"
-                r"\b(?:halo|hai|hi|hey)[,\s]+(?:aku|saya|gue|gw)\s+([A-Za-z][A-Za-z0-9_'\s-]{1,30})",
-                # English "my name is Rama", "call me Rama", "i'm Rama"
-                r"\b(?:my\s+name\s+is|call\s+me|i'm|i\s+am)\s+([A-Za-z][A-Za-z0-9_'\s-]{1,30})"
+                r"\b(?:kenalin|salam\s+kenal|kenalkan)[,\s]+(?:aku|nama(?:ku)?|saya|gue|gw)\s+([A-Za-z][A-Za-z0-9_'-]+(?:\s+[A-Za-z][A-Za-z0-9_'-]+)?)",
+                # "Halo, aku Rama", "Hai, aku Rama", "Hi, I'm Rama"
+                r"\b(?:halo|hai|hi|hey)[,\s]+(?:aku|saya|gue|gw|i'm|i\s+am)\s+([A-Za-z][A-Za-z0-9_'-]+(?:\s+[A-Za-z][A-Za-z0-9_'-]+)?)"
             ]
 
             detected_name = None
@@ -495,20 +500,21 @@ class MemoryEngine:
                 m = re.search(pat, user_text, re.IGNORECASE)
                 if m:
                     raw_val = m.group(1).strip()
-                    # Strip multiple trailing filler words like "aja", "ya", "dong", "deh", "nih"
+                    # Strip multiple trailing filler words
                     while True:
-                        cleaned = re.sub(r"\s+(?:aja|ya|dong|deh|nih|kok|sih|salam\s+kenal|hehe|kak|bang)[.!?~]*$", "", raw_val, flags=re.IGNORECASE).strip().rstrip(".,!?~")
+                        cleaned = re.sub(r"\s+(?:aja|ya|dong|deh|nih|kok|sih|salam\s+kenal|hehe|kak|bang|bro|sis)[.!?~]*$", "", raw_val, flags=re.IGNORECASE).strip().rstrip(".,!?~")
                         if cleaned == raw_val:
                             break
                         raw_val = cleaned
-                    if raw_val:
+                    words = raw_val.split()
+                    if raw_val and not any(w.lower() in intro_stopwords for w in words):
                         detected_name = raw_val
                         break
 
             # Check if user directly answers waifu's previous name question with a standalone name
             if not detected_name and history:
                 last_asst = next((m.get("content", "") for m in reversed(history) if m.get("role") == "assistant"), "")
-                if any(q in last_asst.lower() for q in ["nama kamu siapa", "namamu siapa", "siapa nama kamu", "manggil kamu siapa", "panggil kamu siapa", "siapa namamu", "siapa nama"]):
+                if any(q in last_asst.lower() for q in ["nama kamu siapa", "namamu siapa", "siapa nama kamu", "manggil kamu siapa", "panggil kamu siapa", "siapa namamu", "siapa nama", "what's your name", "what is your name"]):
                     clean_short = user_text.strip().rstrip(".,!?~")
                     words = clean_short.split()
                     if 1 <= len(words) <= 3:
@@ -526,23 +532,22 @@ class MemoryEngine:
                 m_intro = re.match(r"^(?:aku|saya|gue|gua|gw)\s+([A-Za-z][A-Za-z0-9_'-]+(?:\s+[A-Za-z][A-Za-z0-9_'-]+)?)(?:\s+(?:aja|ya|nih|dong|salam\s+kenal|kok))?[.!?~]*$", user_text.strip(), re.IGNORECASE)
                 if m_intro:
                     cand = m_intro.group(1).strip()
-                    stopwords = {
-                        "lagi", "mau", "udah", "sudah", "sedang", "bisa", "suka", "gak", "nggak", "tidak", "senang", "capek", "bingung", "pengen",
-                        "tadi", "ke", "di", "dari", "sama", "baru", "bukan", "paling", "kurang", "banget", "selalu", "siap", "punya"
-                    }
-                    if not any(w.lower() in stopwords for w in cand.split()):
+                    if not any(w.lower() in intro_stopwords for w in cand.split()):
                         detected_name = cand
 
             if detected_name:
                 low_name = detected_name.lower()
-                invalid_names = ("siapa", "ya", "dong", "deh", "bukan", "what", "aja", "dulu", "kamu", "aku", "saya", "gue", "gua")
+                invalid_names = ("siapa", "ya", "dong", "deh", "bukan", "what", "aja", "dulu", "kamu", "aku", "saya", "gue", "gua", "not", "no")
                 if len(detected_name) >= 2 and low_name not in invalid_names:
+                    # Proper title casing for name (e.g. "adens" -> "Adens")
+                    formatted_name = " ".join(w[0].upper() + w[1:] if len(w) > 1 else w.upper() for w in detected_name.split())
                     if low_name in ("sayang", "ayang", "babe", "bebe"):
                         self.update_profile(user_id, call_name=detected_name, allow_pet_name=True)
                         learned.append(f"Panggilan: {detected_name}")
                     else:
-                        self.update_profile(user_id, name=detected_name, call_name=detected_name)
-                        learned.append(f"Nama: {detected_name}")
+                        self.update_profile(user_id, name=formatted_name, call_name=formatted_name)
+                        self.add_fact(user_id, f"Nama: {formatted_name}", category="identity")
+                        learned.append(f"Nama: {formatted_name}")
 
         # 2. Favorite / Likes
         like_patterns = [

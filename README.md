@@ -50,6 +50,31 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
+## 🎭 Pengalaman Visual Novel Interaktif & Ilustrasi Adegan Otonom (v2.4.25)
+
+Obrolan bersama waifu kini ditingkatkan layaknya game **Visual Novel** interaktif berkualitas tinggi (CG Scene Events):
+
+* **📸 Ilustrasi Adegan Otonom (Smart Proactive CG Generation):**
+  - Waifu secara cerdas menyisipkan foto adegan (*CG scene*) secara otomatis tanpa Anda perlu meminta pap manual (`/pap`).
+  - **Momen Adegan Interaktif**:
+    - **Pangkuan / Lap Sitting**: Saat Anda mengajak duduk di paha (*"kamu bisa duduk di paha aku"* atau *"sini dipangku"*), waifu otomatis membalas dan mengirimkan foto dirinya sedang duduk manja di pangkuan Anda.
+    - **Pujian Baju & Teasing**: Saat Anda memuji pakaian/tubuhnya (*"baju kamu sangat cantik dan seksi"*), waifu berpose memamerkan pakaiannya (*"Just my usual outfit... do you like it?"*) lengkap dengan foto outfitnya.
+    - **Pelukan & Kehangatan**: Adegan merapat dan berpelukan mesra saat beristirahat.
+    - **Study Buddy / Nugas Bareng**: Ilustrasi waifu menemani di meja belajar dengan buku pelajaran saat mengerjakan PR/tugas kuliah bersama.
+* **🧠 Memori Nama Persisten & Anti-Lupa (Never Nag Again):**
+  - Waifu mengingat nama Anda sejak kalimat pertama diperkenalkan (termasuk kalimat koreksi santai: *"bukan alex, aku adens, ayo kita mengerjakan PR"*).
+  - Nama langsung disimpan secara persisten di profil & ingatan jangka panjang (`/memory`).
+  - **Larangan Keras Bertanya Ulang**: Begitu nama diketahui, waifu langsung memanggil nama Anda dan **DILARANG KERAS** menanyakan nama lagi atau berpura-pura lupa.
+* **🛡️ Guardrails Anatomi Kaki & Kualitas Gambar SD 1.5:**
+  - **Aspek Rasio 9:16 yang Aman**: Resolusi untuk SD 1.5 (AOM3, MeinaMix) diatur ke `448x768` (tinggi maksimal 768px). Hal ini secara teknis mencegah *vertical latent tiling* yang menyebabkan kaki terlipat panjang, torso ganda, atau kaki gurita/spaghetti.
+  - **Negative Tokens Khusus Anatomi Kaki**: Menyaring cacat fisik secara ketat (`bad legs, extra legs, malformed limbs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body`).
+* **🌐 Dynamic Language Mirroring (Otomatis Ikuti Bahasa Lawan Bicara):**
+  - Waifu mendeteksi dan secara otomatis membalas dengan bahasa yang Anda gunakan.
+  - Jika Anda mengetik dalam bahasa Inggris (*"Hi there! What are you doing right now?"*), waifu membalas dalam bahasa Inggris yang fasih, manis, dan alami.
+  - Jika Anda mengetik dalam bahasa Indonesia (*"Kamu lagi ngapain?"*), waifu membalas dalam bahasa Indonesia santai sehari-hari.
+
+---
+
 ## 💻 System Requirements & Curated Models
 
 Waifu on Telegram is engineered to run locally on consumer gaming PCs and laptops while keeping VRAM usage lean, response times quick, and photo rendering lightning-fast.
