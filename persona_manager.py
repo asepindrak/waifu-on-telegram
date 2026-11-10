@@ -103,18 +103,100 @@ DEFAULT_PERSONAS = {
 
 PHOTO_INTENT_KEYWORDS = [
     r"\bpap\b",
-    r"send\s*(a\s*)?(photo|picture|pic|selfie|image)",
-    r"take\s*(a\s*)?selfie",
-    r"show\s*(me\s*)?(your\s*)?(face|photo|pic|selfie)",
-    r"kirim\s*(foto|gambar|selfie|pap|pic)",
-    r"minta\s*(foto|gambar|selfie|pap)",
-    r"liat\s*(foto|muka|wajah|kamu|selfie)",
-    r"foto\s*kamu",
-    r"selfie\s*dong",
-    r"pose\s*dong",
-    r"can\s*i\s*see\s*you",
-    r"let\s*me\s*see\s*you",
-    r"what\s*are\s*you\s*wearing",
+    r"\b(foto|fotonya|fotoin)\s*(dong|donk|ya|yaa|deh|in|nya|kamu|diri|mu)?\b",
+    r"\b(minta|kirim|kirimin|bagi|spill|kasih|coba|pengen|mau)\s*(liat|lihat)?\s*(foto|fotonya|gambar|selfie|pap|pic)\b",
+    r"\b(liat|lihat|tunjukkin|tunjukkan)\s*(foto|fotonya|muka|wajah|kamu|selfie|pap)\b",
+    r"\b(foto|pap)\s+(lagi|sambil|dari|pas|di|waktu)\b",
+    r"\b(mana\s+)?(fotonya|foto\s+kamu|pap\s+kamu|papnya)\b",
+    r"\b(send|take|show|give)\s*(me\s*)?(a\s*)?(photo|picture|pic|selfie|image|snapshot)\b",
+    r"\b(can\s*i\s*see|let\s*me\s*see)\s*(you|your\s*photo|your\s*face|your\s*outfit)\b",
+    r"\bwhat\s*are\s*you\s*wearing\b",
+    r"\bselfie\s*dong\b",
+    r"\bpose\s*dong\b",
+    r"\b(ambilin|ambilkan)\s*foto\b"
+]
+
+CAMERA_ANGLES = [
+    # Top-down / From Above / Bird's eye
+    (
+        [r"\b(dari\s+atas|view\s+dari\s+atas|angle\s+dari\s+atas|ambil\s+dari\s+atas)\b",
+         r"\b(from\s+above|high\s+angle|top\s*down|bird\s*eye|overhead)\b"],
+        "from above, high angle perspective, looking up at camera, overhead camera angle"
+    ),
+    # Low Angle / From Below / Worm's eye
+    (
+        [r"\b(dari\s+bawah|view\s+dari\s+bawah|angle\s+dari\s+bawah|ambil\s+dari\s+bawah)\b",
+         r"\b(from\s+below|low\s+angle|worm\s*eye|upward\s+angle)\b"],
+        "from below, low angle perspective, upward camera angle, looking down at camera"
+    ),
+    # Side View / Profile Angle
+    (
+        [r"\b(dari\s+samping|view\s+samping|angle\s+samping|pose\s+samping)\b",
+         r"\b(from\s+side|side\s+view|profile\s+view|profile\s+angle|turned\s+sideways)\b"],
+        "from side, side profile view, turned sideways, side view perspective"
+    ),
+    # From Behind / Back View
+    (
+        [r"\b(dari\s+belakang|view\s+belakang|tampak\s+belakang|pose\s+belakang)\b",
+         r"\b(from\s+behind|back\s+view|looking\s+back\s+over\s+shoulder)\b"],
+        "from behind, back view, looking back over shoulder towards camera"
+    ),
+    # Frontal / Direct
+    (
+        [r"\b(dari\s+depan|tampak\s+depan|lurus)\b",
+         r"\b(front\s+view|front-facing|straight-on)\b"],
+        "front view, eye-level perspective, direct eye contact with camera"
+    ),
+]
+
+BODY_POSES = [
+    # Lying on back / Telentang
+    (
+        [r"\b(te[lr]entang|lagi\s+te[lr]entang|rebahan\s+te[lr]entang|posisi\s+te[lr]entang)\b",
+         r"\b(lying\s+on\s+back|on\s+back|supine)\b"],
+        "lying on back, supine pose, head resting on soft pillow, looking up at camera"
+    ),
+    # Lying on stomach / Tengkurap
+    (
+        [r"\b(tengkurap|te[lr]ungkup|lagi\s+tengkurap|posisi\s+tengkurap)\b",
+         r"\b(lying\s+on\s+stomach|prone\s+pose|on\s+stomach)\b"],
+        "lying on stomach, prone pose, resting chin on hands, looking at camera"
+    ),
+    # Lying down / Rebahan (general)
+    (
+        [r"\b(rebahan|tiduran|di\s+kasur|di\s+ranjang|tempat\s+tidur)\b",
+         r"\b(lying\s+down|reclining|in\s+bed|on\s+bed)\b"],
+        "lying down comfortably, relaxing on cozy bed, reclining pose"
+    ),
+    # Standing / Berdiri
+    (
+        [r"\b(berdiri|lagi\s+berdiri|posisi\s+berdiri|seluruh\s+badan|full\s+body)\b",
+         r"\b(standing|full\s+body|standing\s+upright)\b"],
+        "standing pose, full body shot, standing upright, graceful posture"
+    ),
+    # Sitting / Duduk
+    (
+        [r"\b(duduk|lagi\s+duduk|posisi\s+duduk|lagi\s+kursi)\b",
+         r"\b(sitting|seated)\b"],
+        "sitting pose, seated comfortably, graceful sitting posture"
+    ),
+    # Sitting on floor / Duduk di lantai
+    (
+        [r"\b(duduk\s+di\s+lantai|di\s+karpet|di\s+bawah)\b",
+         r"\b(sitting\s+on\s+floor|on\s+carpet)\b"],
+        "sitting on floor, floor sitting pose, legs tucked or knees up"
+    ),
+    # Leaning forward
+    (
+        [r"\b(condong\s+ke\s+depan|mendekat|pose\s+manja)\b",
+         r"\b(leaning\s+forward)\b"],
+        "leaning forward towards camera, intimate close perspective"
+    ),
+    # Close-up / Framing
+    (
+        [r"\b(close\s*up|zoom\s*(muka|wajah)|fokus\s*(muka|wajah))\b"],
+        "close-up portrait shot, detailed face and expressive eyes framing"
+    )
 ]
 
 VIDEO_INTENT_KEYWORDS = [
@@ -470,6 +552,29 @@ class PersonaManager:
         # If user asked a question, or has >= 2 words or >= 8 characters of conversation remaining
         return has_question or len(words) >= 2 or len(cleaned) >= 8
 
+    def detect_camera_angle_and_pose(self, text: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Detects camera angle/perspective and body pose requested in the user prompt.
+        Returns: (angle_danbooru_prompt, pose_danbooru_prompt)
+        """
+        if not text:
+            return None, None
+        low = text.lower()
+
+        detected_angle = None
+        for patterns, angle_prompt in CAMERA_ANGLES:
+            if any(re.search(pat, low) for pat in patterns):
+                detected_angle = angle_prompt
+                break
+
+        detected_pose = None
+        for patterns, pose_prompt in BODY_POSES:
+            if any(re.search(pat, low) for pat in patterns):
+                detected_pose = pose_prompt
+                break
+
+        return detected_angle, detected_pose
+
     def list_outfits(self) -> List[Tuple[str, str]]:
         """Returns list of (key, name) for all outfit presets."""
         return [(k, v["name"]) for k, v in OUTFIT_PRESETS.items()]
@@ -668,7 +773,7 @@ class PersonaManager:
              "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer"),
             (["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath"],
              "standing in modern bathroom with soft steam, post-shower glow, bathroom mirror"),
-            (["bed", "sleep", "night", "tidur", "kasur", "pajamas", "rebahan", "bangun", "selimut", "bantal"],
+            (["bed", "sleep", "night", "tidur", "kasur", "pajamas", "rebahan", "bangun", "selimut", "bantal", "telentang", "terlentang", "tengkurap"],
              "relaxing on bed with fluffy pillows, warm dim night bedroom lamp"),
             (["cafe", "coffee", "tea", "kafe", "kopi", "boba", "matcha", "nongkrong", "starbucks"],
              "sitting at aesthetic cafe table holding a warm beverage, beautiful bokeh background"),
@@ -897,7 +1002,7 @@ class PersonaManager:
             device_neg = "phone, smartphone, cellphone, camera, holding phone, holding camera, mirror selfie, mirror, hands holding device, selfie stick"
             extra_neg = f"{extra_neg}, {device_neg}" if extra_neg else device_neg
 
-        # Dynamic micro-variations to ensure every generated image has unique POV framing & mood (WITHOUT drawing a phone!)
+        # Dynamic micro-variations if no specific angle/pose requested (WITHOUT drawing a phone!)
         micro_angles = [
             "front-camera POV, looking directly into lens, sweet smile, intimate eye contact",
             "close-up candid portrait POV, looking directly at viewer with affectionate sweet gaze",
@@ -905,8 +1010,20 @@ class PersonaManager:
             "cozy intimate portrait POV, smiling warmly at viewer, soft focus background",
             "candid POV snapshot, gentle blushing expression, looking directly into lens, natural cinematic lighting"
         ]
-        import random
-        chosen_angle = random.choice(micro_angles)
+
+        # Check explicit camera angle and body pose requested by user
+        angle_cue, pose_cue = self.detect_camera_angle_and_pose(user_text)
+        if angle_cue or pose_cue:
+            custom_parts = []
+            if angle_cue:
+                custom_parts.append(angle_cue)
+            if pose_cue:
+                custom_parts.append(pose_cue)
+            chosen_angle = ", ".join(custom_parts)
+            logger.info(f"Explicit camera angle & pose detected: {chosen_angle}")
+        else:
+            import random
+            chosen_angle = random.choice(micro_angles)
 
         visual_prompt = f"{base_visual}, {outfit_prompt}, {scene}, {chosen_angle}, detailed eyes, masterpiece quality"
         return (visual_prompt, extra_neg, is_nude, outfit_name)
