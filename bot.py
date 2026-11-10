@@ -2684,7 +2684,7 @@ def is_agy_bridge_online() -> bool:
     """Quick socket check if AGY OpenAI bridge is responding on port 8001."""
     import socket
     try:
-        with socket.create_connection(("127.0.0.1", 8001), timeout=0.5):
+        with socket.create_connection(("127.0.0.1", 8001), timeout=1.5):
             return True
     except Exception:
         return False

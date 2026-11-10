@@ -175,7 +175,7 @@ class IdleEngine:
 
     def is_agy_bridge_ready(self) -> bool:
         """Checks if AGY OpenAI Bridge is online and listening on port 8001."""
-        return is_port_listening(8001)
+        return is_port_listening(8001, timeout=1.5)
 
     def sleep_voicestudio(self) -> bool:
         """Puts VoiceStudio to sleep, freeing model RAM & VRAM."""
@@ -269,8 +269,11 @@ class IdleEngine:
             try:
                 popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
                 log_path = os.path.join(self.project_root, "agy_bridge.log")
+                spawn_env = os.environ.copy()
+                spawn_env["PYTHONIOENCODING"] = "utf-8"
+                spawn_env["PYTHONUTF8"] = "1"
                 with open(log_path, "a", encoding="utf-8") as f_log:
-                    subprocess.Popen([sys.executable, agy_script], cwd=self.project_root, stdout=f_log, stderr=f_log, **popen_kwargs)
+                    subprocess.Popen([sys.executable, agy_script], cwd=self.project_root, stdout=f_log, stderr=f_log, env=spawn_env, **popen_kwargs)
                 for _ in range(timeout_seconds * 2):
                     time.sleep(0.5)
                     if self.is_agy_bridge_ready():

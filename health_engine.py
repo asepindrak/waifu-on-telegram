@@ -480,7 +480,7 @@ class HealthEngine:
 
     def heal_agy(self) -> bool:
         """Attempts to start or resurrect Google Antigravity (AGY) OpenAI Bridge (Port 8001)."""
-        if is_port_listening(8001):
+        if is_port_listening(8001, timeout=1.5):
             return True
         agy_script = os.path.join(self.project_root, "agy_bridge.py")
         if not os.path.exists(agy_script):
@@ -489,11 +489,14 @@ class HealthEngine:
             popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
             logger.info("Self-healing: Spawning AGY OpenAI Bridge on port 8001...")
             log_path = os.path.join(self.project_root, "agy_bridge.log")
+            spawn_env = os.environ.copy()
+            spawn_env["PYTHONIOENCODING"] = "utf-8"
+            spawn_env["PYTHONUTF8"] = "1"
             with open(log_path, "a", encoding="utf-8") as f_log:
-                subprocess.Popen([sys.executable, agy_script], cwd=self.project_root, stdout=f_log, stderr=f_log, **popen_kwargs)
+                subprocess.Popen([sys.executable, agy_script], cwd=self.project_root, stdout=f_log, stderr=f_log, env=spawn_env, **popen_kwargs)
             for _ in range(30):
                 time.sleep(0.5)
-                if is_port_listening(8001):
+                if is_port_listening(8001, timeout=1.5):
                     logger.info("Self-healing: AGY Bridge restored successfully on port 8001.")
                     return True
         except Exception as e:
@@ -885,7 +888,7 @@ class HealthEngine:
                 sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "").lower().strip()
                 base_url = getattr(self.llm_client, "base_url", "")
                 is_agy_target = (sfw_p == "agy" or nsfw_p == "agy" or sfw_img == "agy" or ":8001" in str(base_url))
-                if is_agy_target and self.self_healing_enabled and not is_port_listening(8001) and self.can_attempt_heal("agy"):
+                if is_agy_target and self.self_healing_enabled and not is_port_listening(8001, timeout=1.5) and self.can_attempt_heal("agy"):
                     self.attempt_heal_service("agy", bot, recipients)
 
             except Exception as e:

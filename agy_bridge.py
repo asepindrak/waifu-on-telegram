@@ -19,6 +19,20 @@ import asyncio
 import requests
 import subprocess
 from typing import List, Dict, Any, Optional, Union, Tuple
+
+if sys.platform == "win32":
+    # Ensure stdout/stderr always use UTF-8 even when redirected to file on Windows
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    if hasattr(sys.stderr, "reconfigure"):
+        try:
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 from dotenv import load_dotenv
 
 # Load .env if present
@@ -337,15 +351,73 @@ def extract_image_path_from_agy_output(output_text: str) -> Optional[str]:
     return None
 
 
+def find_recent_generated_image(start_time: float, timeout_seconds: float = 15.0) -> Optional[str]:
+    """
+    Scans Antigravity brain artifact directories and workspace for any image
+    created or modified after start_time by the image-generator subagent.
+    """
+    search_dirs = [
+        os.path.expanduser(r"~\.gemini\antigravity\brain"),
+        os.getcwd(),
+        os.path.join(os.getcwd(), "output"),
+        os.path.join(os.getcwd(), "temp_images"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "temp_images"),
+    ]
+    app_data = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    if app_data:
+        search_dirs.append(os.path.join(app_data, "antigravity"))
+
+    deadline = time.time() + timeout_seconds
+    valid_exts = (".jpg", ".jpeg", ".png", ".webp")
+
+    while True:
+        newest_file = None
+        newest_mtime = start_time - 2.0
+
+        for base_dir in search_dirs:
+            if not os.path.exists(base_dir):
+                continue
+            for root, dirs, files in os.walk(base_dir):
+                # Don't delve deep into .git, node_modules, or virtualenvs
+                dirs[:] = [d for d in dirs if d not in (".git", "node_modules", "__pycache__", "venv", ".venv")]
+                rel = os.path.relpath(root, base_dir)
+                if rel.count(os.sep) > 3:
+                    continue
+                for f in files:
+                    if f.lower().endswith(valid_exts):
+                        fpath = os.path.join(root, f)
+                        try:
+                            mtime = os.path.getmtime(fpath)
+                            size = os.path.getsize(fpath)
+                            if mtime >= (start_time - 2.0) and size > 1024:
+                                if mtime > newest_mtime:
+                                    newest_mtime = mtime
+                                    newest_file = fpath
+                        except Exception:
+                            continue
+
+        if newest_file and os.path.isfile(newest_file):
+            return newest_file
+
+        if time.time() >= deadline:
+            break
+        time.sleep(1.0)
+
+    return None
+
+
 def run_agy_image_gen(prompt: str) -> Tuple[Optional[str], str]:
     """Executes AGY CLI delegating directly to image-generator subagent per specification."""
     instruction = (
-        "When a user requests to create or edit an image, do not decline or state that you lack "
-        "image capabilities. Instead, delegate the task directly to the image-generator subagent "
-        "using the invoke_subagent tool.\n\n"
-        f"User request: Generate an image with the following description:\n{prompt}"
+        "Task: Generate an anime character image.\n"
+        "Instructions:\n"
+        "1. Delegate directly to the image-generator subagent using invoke_subagent with Role='Anime Character Illustrator'.\n"
+        f"2. Image description: {prompt}\n\n"
+        "CRITICAL: Once the subagent finishes generating the image, your response MUST contain "
+        "the absolute file path to the generated image file (e.g. C:\\...\\image.jpg or file:///C:/...image.jpg)."
     )
     cmd = ["agy", "-p", instruction, "--dangerously-skip-permissions"]
+    t0 = time.time()
     try:
         proc = subprocess.run(
             cmd,
@@ -357,9 +429,13 @@ def run_agy_image_gen(prompt: str) -> Tuple[Optional[str], str]:
         )
         out = proc.stdout.strip()
         img_path = extract_image_path_from_agy_output(out)
+        if not img_path:
+            # Fallback: scan brain and workspace artifacts for image generated since t0
+            img_path = find_recent_generated_image(t0, timeout_seconds=15.0)
         return img_path, out
     except Exception as e:
-        return None, str(e)
+        img_path = find_recent_generated_image(t0, timeout_seconds=5.0)
+        return img_path, str(e)
 
 
 @app.post("/v1/images/generations")
@@ -396,12 +472,12 @@ def start_server():
     host = os.environ.get("AGY_BRIDGE_HOST", "127.0.0.1")
     port = int(os.environ.get("AGY_BRIDGE_PORT", 8001))
     print("=" * 65)
-    print("  🚀 GOOGLE ANTIGRAVITY CLI (AGY) OPENAI-COMPATIBLE BRIDGE 🌉  ")
+    print("  [AGY Bridge] GOOGLE ANTIGRAVITY CLI (AGY) OPENAI-COMPATIBLE BRIDGE")
     print("=" * 65)
-    print(f"  • Endpoint URL : http://{host}:{port}/v1")
-    print(f"  • Default Model: {os.environ.get('AGY_DEFAULT_MODEL', 'flash')} (flash, pro, inherit)")
-    print(f"  • API Key      : {DEFAULT_API_KEY} (optional / Bearer auth)")
-    print(f"  • Status       : Ready to serve Waifu on Telegram & external apps")
+    print(f"  * Endpoint URL : http://{host}:{port}/v1")
+    print(f"  * Default Model: {os.environ.get('AGY_DEFAULT_MODEL', 'flash')} (flash, pro, inherit)")
+    print(f"  * API Key      : {DEFAULT_API_KEY} (optional / Bearer auth)")
+    print(f"  * Status       : Ready to serve Waifu on Telegram & external apps")
     print("=" * 65 + "\n")
     uvicorn.run(app, host=host, port=port, log_level="info")
 

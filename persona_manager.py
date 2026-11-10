@@ -1417,12 +1417,10 @@ class PersonaManager:
 
         if not wants_multi:
             # Strictly enforce single character solo shot (prevents accidental 2 waifus in image)
-            if base_visual.startswith("1girl,"):
-                base_visual = "solo, " + base_visual
-            elif not base_visual.startswith("solo,"):
-                base_visual = "solo, 1girl, " + base_visual
+            cleaned_base = re.sub(r'^(?:solo,\s*)*(?:1girl,\s*)*', '', base_visual, flags=re.IGNORECASE).strip()
+            base_visual = f"solo, 1girl, (solo:1.4), (1girl:1.4), {cleaned_base}"
 
-            solo_guard_neg = "2girls, 3girls, multiple girls, 2people, multiple persons, group, extra characters, duplicate character, duplicate"
+            solo_guard_neg = "(2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate character:1.4), (duplicate:1.4), (split screen:1.3)"
             extra_neg = f"{extra_neg}, {solo_guard_neg}" if extra_neg else solo_guard_neg
 
         # Check if user explicitly requested a cat/pet/animal in prompt

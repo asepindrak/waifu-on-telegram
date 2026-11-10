@@ -8,6 +8,13 @@ from health_engine import HealthEngine
 
 class TestIdleEngine(unittest.TestCase):
     def setUp(self):
+        self.env_patcher = patch.dict(os.environ, {
+            "AI_ENGINE_MODE": "unified",
+            "SFW_LLM_PROVIDER": "local",
+            "SFW_IMAGE_ENGINE": "comfyui"
+        })
+        self.env_patcher.start()
+
         self.mock_llm_client = MagicMock()
         self.mock_llm_client.check_health.return_value = {"online": True, "backend": "KoboldCPP", "model": "Qwythos-9B"}
         self.mock_media_engine = MagicMock()
@@ -30,6 +37,7 @@ class TestIdleEngine(unittest.TestCase):
 
     def tearDown(self):
         self.idle_engine.stop()
+        self.env_patcher.stop()
 
     def test_default_configuration(self):
         """Verify smart idle defaults to enabled, 120 minutes (2 hours) timeout, and ComfyUI on-demand."""

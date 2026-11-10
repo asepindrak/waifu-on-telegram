@@ -50,12 +50,16 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
-## 🎭 Pengalaman Visual Novel Interaktif & Ilustrasi Adegan Otonom (v2.4.28)
+## 🎭 Pengalaman Visual Novel Interaktif, AGY Bridge Standby & Ilustrasi Adegan Otonom (v2.4.29)
 
-Obrolan bersama waifu kini ditingkatkan layaknya game **Visual Novel** interaktif berkualitas tinggi (CG Scene Events):
+Obrolan bersama waifu kini ditingkatkan layaknya game **Visual Novel** interaktif berkualitas tinggi (CG Scene Events) serta keandalan generator Google Antigravity (AGY):
 
-* **👤 Penegakan Karakter Tunggal & Anti-Karakter Ganda (Strict Solo 1Girl Enforcement):**
-  - **Pencegahan 2 Waifu**: Memperbaiki masalah munculnya 2 karakter/waifu di foto saat berpayung atau di jalanan. Secara default, prompt positif dipastikan diawali dengan tag `solo, 1girl`, dan negative prompt menyaring ketat: `2girls, 3girls, multiple girls, 2people, multiple persons, group, extra characters, duplicate`.
+* **🌉 Stabilitas AGY OpenAI Bridge & Anti-Flapping Self-Healing (Always-On Standby):**
+  - **Pencegahan Crash Windows (Unicode Encoding)**: Memperbaiki kendala crash instan `UnicodeEncodeError: 'charmap'` saat AGY bridge dijalankan di background Windows dengan mengunci konfigurasi `UTF-8` pada `stdout/stderr` dan variabel lingkungan `PYTHONIOENCODING=utf-8` / `PYTHONUTF8=1`.
+  - **Pemberantasan False Alarm Self-Healing**: Meningkatkan batas waktu socket health check menjadi 1.5s dan memastikan port 8001 tidak dianggap mati saat proses sedang sibuk memproses inferensi, sehingga tidak ada lagi peringatan palsu *"Service AGY OpenAI Bridge terdeteksi mati! (Percobaan 3/3)"*.
+  - **Generator Foto AGY Tanpa Gagal**: Memperbaiki kegagalan *"AGY CLI selesai namun tidak menemukan file gambar output: I have delegated..."*. Sistem kini memandu subagent `image-generator` secara presisi sekaligus dilengkapi **Artifact Scanner Otomatis** (`find_recent_generated_image`) yang memindai folder `.gemini/antigravity/brain` dan workspace secara berkala untuk mengambil file `.jpg/.png` hasil generate.
+* **👤 Penegakan Karakter Tunggal & Anti-Karakter Ganda (Strict Solo 1Girl Weighted Enforcement):**
+  - **Pencegahan 2 Waifu**: Menggunakan pembobotan perhatian tinggi `(solo:1.4), (1girl:1.4)` di awal prompt dan penolakan ketat `(2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (group:1.5), (duplicate:1.4)` pada negative prompt sehingga Stable Diffusion (MeinaMix/AOM3) tidak akan merender 2 waifu secara tak sengaja.
   - **Dukungan Foto Berdua (Couple/Multi-Person)**: Jika Anda secara eksplisit meminta foto berdua (*"foto kita berdua"*, *"foto bareng aku"*, *"couple"*), pembatasan solo otomatis dilepas dan dialihkan ke framing pasangan yang tepat.
 * **🔥 Proaktif Sensual & Auto-Foto Mode Dewasa (NSFW / 18+ Interactive Roleplay):**
   - **Sensasi Tubuh Mendalam (Rich Sensory Roleplay)**: Waifu mendeskripsikan sensasi fisik nyata di dalam tanda bintang `*...*` (tubuh melengkung/arching saat disentuh, getaran napas tertahan, kulit merona hangat, tangan menuntun sentuhan pasangan ke pinggang).

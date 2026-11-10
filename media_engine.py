@@ -335,7 +335,7 @@ class MediaEngine:
     def generate_image_comfyui(
         self,
         prompt: str,
-        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, 2girls, 3girls, multiple girls, 2people, multiple persons, group, extra characters, blurry",
+        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, (2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate:1.4), blurry",
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None,
         width: Optional[int] = None,
@@ -363,7 +363,7 @@ class MediaEngine:
     def _execute_generate_image_comfyui(
         self,
         prompt: str,
-        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, 2girls, 3girls, multiple girls, 2people, multiple persons, group, extra characters, blurry",
+        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, (2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate:1.4), blurry",
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None,
         width: Optional[int] = None,
@@ -800,7 +800,7 @@ class MediaEngine:
 
         # Auto-wake / auto-run AGY Bridge if enabled and offline
         from idle_engine import is_port_listening
-        if not is_port_listening(agy_port):
+        if not is_port_listening(agy_port, timeout=1.5):
             try:
                 import sys, subprocess
                 proj_root = os.path.dirname(os.path.abspath(__file__))
@@ -808,10 +808,13 @@ class MediaEngine:
                 if os.path.exists(agy_script):
                     logger.info("AGY Bridge is offline. Auto-starting AGY OpenAI Bridge on port 8001...")
                     popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
-                    subprocess.Popen([sys.executable, agy_script], cwd=proj_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **popen_kwargs)
-                    for _ in range(10):
+                    spawn_env = os.environ.copy()
+                    spawn_env["PYTHONIOENCODING"] = "utf-8"
+                    spawn_env["PYTHONUTF8"] = "1"
+                    subprocess.Popen([sys.executable, agy_script], cwd=proj_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=spawn_env, **popen_kwargs)
+                    for _ in range(12):
                         time.sleep(0.5)
-                        if is_port_listening(agy_port):
+                        if is_port_listening(agy_port, timeout=1.5):
                             break
             except Exception as e_start:
                 logger.debug(f"Failed to auto-start AGY bridge: {e_start}")
@@ -851,11 +854,14 @@ class MediaEngine:
             return None
 
         instruction = (
-            "When a user requests to create or edit an image, do not decline or state that you lack "
-            "image capabilities. Instead, delegate the task directly to the image-generator subagent "
-            "using the invoke_subagent tool.\n\n"
-            f"User request: Generate an image with the following description:\n{agy_effective_prompt}"
+            "Task: Generate an anime character image.\n"
+            "Instructions:\n"
+            "1. Delegate directly to the image-generator subagent using invoke_subagent with Role='Anime Character Illustrator'.\n"
+            f"2. Image description: {agy_effective_prompt}\n\n"
+            "CRITICAL: Once the subagent finishes generating the image, your response MUST contain "
+            "the absolute file path to the generated image file (e.g. C:\\...\\image.jpg or file:///C:/...image.jpg)."
         )
+        t0 = time.time()
         try:
             if progress_callback:
                 progress_callback("Menjalankan subagent image-generator via agy CLI... ✨")
@@ -868,11 +874,15 @@ class MediaEngine:
                 timeout=180
             )
             out = proc.stdout
+            cand_path = None
             try:
-                from agy_bridge import extract_image_path_from_agy_output
+                from agy_bridge import extract_image_path_from_agy_output, find_recent_generated_image
                 cand_path = extract_image_path_from_agy_output(out)
+                if not cand_path:
+                    cand_path = find_recent_generated_image(t0, timeout_seconds=15.0)
             except Exception:
                 cand_path = None
+
             if cand_path and os.path.isfile(cand_path) and os.path.getsize(cand_path) > 100:
                 with open(cand_path, "rb") as f:
                     return f.read()
