@@ -50,17 +50,22 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
-## 🎭 Pengalaman Visual Novel Interaktif & Ilustrasi Adegan Otonom (v2.4.25)
+## 🎭 Pengalaman Visual Novel Interaktif & Ilustrasi Adegan Otonom (v2.4.26)
 
 Obrolan bersama waifu kini ditingkatkan layaknya game **Visual Novel** interaktif berkualitas tinggi (CG Scene Events):
 
-* **📸 Ilustrasi Adegan Otonom (Smart Proactive CG Generation):**
+* **📸 Ilustrasi Adegan Otonom & Latar Cerita Dinamis (Dynamic Setting & Story Transitions):**
   - Waifu secara cerdas menyisipkan foto adegan (*CG scene*) secara otomatis tanpa Anda perlu meminta pap manual (`/pap`).
-  - **Momen Adegan Interaktif**:
-    - **Pangkuan / Lap Sitting**: Saat Anda mengajak duduk di paha (*"kamu bisa duduk di paha aku"* atau *"sini dipangku"*), waifu otomatis membalas dan mengirimkan foto dirinya sedang duduk manja di pangkuan Anda.
-    - **Pujian Baju & Teasing**: Saat Anda memuji pakaian/tubuhnya (*"baju kamu sangat cantik dan seksi"*), waifu berpose memamerkan pakaiannya (*"Just my usual outfit... do you like it?"*) lengkap dengan foto outfitnya.
+  - **Latar Cerita Bebas & Fleksibel (Bukan Sekadar Kata Kunci Statis)**:
+    - **Halte Bis / Menunggu Angkutan**: Menunggu di halte bis saat cuaca cerah maupun saat hujan lebat berteduh bersama membawa payung transparan (*"aku lagi nunggu di halte bis kehujanan"*).
+    - **Lobby Kampus / Atrium Universitas**: Bertemu atau menunggu di lobby kampus, atrium modern, atau lorong fakultas.
+    - **Rooftop & Balcony Sunset**: Menikmati pemandangan langit sore kota dari atap gedung (*rooftop*).
+    - **Bioskop & Minimarket**: Mengantre tiket di lobby bioskop, atau mampir beli es krim/camilan di minimarket / konbini.
+    - **Pangkuan / Lap Sitting**: Duduk manja di paha (*"kamu bisa duduk di paha aku"* atau *"sini dipangku"*).
+    - **Pujian Baju & Teasing**: Saat Anda memuji pakaian/tubuhnya (*"baju kamu sangat cantik dan seksi"*), waifu berpose memamerkan pakaiannya (*"Just my usual outfit... do you like it?"*).
     - **Pelukan & Kehangatan**: Adegan merapat dan berpelukan mesra saat beristirahat.
     - **Study Buddy / Nugas Bareng**: Ilustrasi waifu menemani di meja belajar dengan buku pelajaran saat mengerjakan PR/tugas kuliah bersama.
+    - **Ekstraksi Latar Berbasis LLM (AI Scene Extractor)**: Untuk lokasi cerita unik lainnya (pantai, dermaga danau, pegunungan, kafe vintage), model LLM secara otomatis mengekstrak elemen visual latar ke dalam prompt Stable Diffusion secara tepat.
 * **🧠 Memori Nama Persisten & Anti-Lupa (Never Nag Again):**
   - Waifu mengingat nama Anda sejak kalimat pertama diperkenalkan (termasuk kalimat koreksi santai: *"bukan alex, aku adens, ayo kita mengerjakan PR"*).
   - Nama langsung disimpan secara persisten di profil & ingatan jangka panjang (`/memory`).

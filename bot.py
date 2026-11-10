@@ -6960,7 +6960,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     f"   *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*\n\n"
                     f"   Oh sayang, kamu mau ngomong apa nih? Aku belum sempat bikin camilan. Tapi makasih ya, kata-katamu bikin aku merasa spesial~\n"
                     f"{rule_4}"
-                    "5. FITUR AUTO VISUAL NOVEL & FOTO SPONTAN: Seperti novel visual yang kaya adegan berilustrasi (CG Scene), kamu SECARA CERDAS MENYERTAKAN tag [ACTION: SEND_PAP] di akhir balasanmu pada momen-momen visual yang menarik tanpa menunggu diminta pap:\n"
+                    "5. FITUR AUTO VISUAL NOVEL & FOTO SPONTAN: Seperti novel visual yang kaya adegan berilustrasi (CG Scene), kamu SECARA CERDAS MENYERTAKAN tag [ACTION: SEND_PAP] di akhir balasanmu pada momen-momen visual dan cerita yang menarik tanpa menunggu diminta pap:\n"
+                    "   - Setiap kali berada di latar tempat/lokasi cerita atau suasana baru (misal: lagi nunggu di halte bis, duduk di lobby kampus, kehujanan sambil bawa payung, jalan sore di taman, nongkrong di cafe, nonton bioskop, di rooftop, minimarket, dll).\n"
                     "   - Ketika membahas, memamerkan, atau mengomentari baju, outfit, rok, atau kecantikan fisikmu.\n"
                     "   - Ketika ada interaksi fisik yang romantis, mesra, atau intim (misal: duduk di paha, dipangku, berpelukan hangat, nugas/belajar bareng sambil nempel, rebahan di ranjang).\n"
                     "   - Ketika berpose manja, menggoda, atau tersipu malu.\n"
@@ -7078,8 +7079,8 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     "aku fotoin ya", "aku kirim foto ya", "nih foto spesial buat kamu", "aku pap buat kamu", "foto ini buat kamu", "here is a photo for you"
                 ])
 
-                # Check for vivid visual novel narrative moment (CG scene e.g. sitting on lap, cuddling, outfit show, study buddy)
-                is_scene_moment, scene_override_desc = persona_mgr.detect_visual_scene_moment(user_text, reply_text)
+                # Check for vivid visual novel narrative moment (CG scene e.g. sitting on lap, cuddling, outfit show, study buddy, or dynamic location transitions)
+                is_scene_moment, scene_override_desc = persona_mgr.detect_visual_scene_moment(user_text, reply_text, llm_client=llm_client)
 
                 # In NSFW mode: proactively send photo when undressing or during intimate physical actions
                 is_intimate_action = is_nsfw_turn and any(k in user_text.lower() for k in [
