@@ -309,6 +309,21 @@ OUTFIT_PRESETS = {
         "prompt": "(wearing alluring romantic silk slip dress with delicate lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
         "negative": "campus, backpack, casual college clothes, classroom, hoodie, outdoor clothes, jeans, winter clothes"
     },
+    "shirt_off": {
+        "name": "👙 Kaos Terlepas (Tersisa BH & Celana)",
+        "prompt": "(wearing only a delicate lace bra and casual jeans:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "negative": "shirt, t-shirt, top, hoodie, sweater, jacket, coat, fully clothed, topless, naked, panties only"
+    },
+    "bottoms_off": {
+        "name": "💋 Celana Terlepas (Set Pakaian Dalam: BH & Celana Dalam)",
+        "prompt": "(wearing only matching sheer lace bra and panties:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
+        "negative": "shirt, t-shirt, pants, jeans, shorts, skirt, dress, hoodie, coat, naked, topless"
+    },
+    "bra_off": {
+        "name": "🔞 BH Terlepas (Topless & Celana Dalam)",
+        "prompt": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny lace panties:1.35, sensual blush, intimate bedroom atmosphere",
+        "negative": "bra, shirt, top, clothes, dress, pants, skirt, jacket, fully naked"
+    },
     "nude": {
         "name": "🔞 Tanpa Busana (Full Nude)",
         "prompt": "(completely nude:1.45), (bare body:1.4), full body nude, detailed nipples, natural breasts, navel, bare stomach, thighs, intimate bedroom atmosphere, seductive erotic styling",
@@ -752,6 +767,127 @@ class PersonaManager:
             return True
         return False
 
+    def get_undress_stage(self, user_id: Optional[int] = None) -> int:
+        """Returns the sequential undress stage (0=clothed, 1=shirt_off, 2=bottoms_off, 3=bra_off, 4=nude)."""
+        if not user_id:
+            return 0
+        rec = self.user_outfits.get(int(user_id), {})
+        return rec.get("undress_stage", 0)
+
+    def set_undress_stage(self, user_id: int, stage: int) -> int:
+        """Updates and persists sequential undress stage (0 to 4) for user."""
+        uid = int(user_id)
+        stage = max(0, min(4, int(stage)))
+        rec = self.user_outfits.get(uid, {"mode": "auto"})
+        rec["undress_stage"] = stage
+        rec["updated_at"] = time.time()
+
+        stage_outfit_map = {
+            0: "default",
+            1: "shirt_off",
+            2: "bottoms_off",
+            3: "bra_off",
+            4: "nude"
+        }
+        rec["key"] = stage_outfit_map.get(stage, "default")
+        self.user_outfits[uid] = rec
+        self._save_user_outfits()
+        stage_names = {
+            0: "Pakaian Masih Lengkap (Kaos & Celana)",
+            1: "Kaos Terlepas (Hanya mengenakan BH & Celana)",
+            2: "Celana Terlepas (Set Pakaian Dalam Lengkap: BH & Celana Dalam)",
+            3: "BH Terlepas (Topless bertelanjang dada & Celana Dalam)",
+            4: "Telanjang Bulat (Tanpa Busana Sepenuhnya / Full Nude)"
+        }
+        logger.info(f"User {uid} undress stage updated -> Stage {stage} ({stage_names.get(stage)})")
+        return stage
+
+    def reset_undress_stage(self, user_id: int):
+        """Resets sequential undress stage back to 0 (clothed)."""
+        self.set_undress_stage(user_id, 0)
+
+    def detect_undress_intent(self, user_text: str, current_stage: int = 0) -> Tuple[int, str, bool]:
+        """
+        Analyzes user message to determine sequential undressing progression:
+        Stage 0: Clothed -> Stage 1: Kaos/baju -> Stage 2: Celana -> Stage 3: BH -> Stage 4: Celana Dalam/Nude.
+        Returns: (target_stage, action_description, is_transition)
+        """
+        if not user_text:
+            return (current_stage, "", False)
+
+        lower = user_text.lower()
+
+        # 0. Check reset request
+        if re.search(r"\b(pake|pakai|kenakan)\s+(baju|pakaian|celana)\b|\b(sudah\s+selesai|selesai\s+dulu|berpakaian\s+lagi)\b", lower):
+            return (0, "mengenakan pakaiannya kembali secara rapi", True)
+
+        # 1. Direct jump to fully nude
+        if re.search(r"\b(buka\s+semua|lepas\s+semua|buka\s+semuanya|lepas\s+semuanya|telanjang\s+bulat\s+sekarang|langsung\s+telanjang)\b", lower):
+            return (4, "menanggalkan seluruh pakaiannya hingga telanjang bulat tanpa busana", True)
+
+        # 2. Sequential general progression: 'buka lagi', 'lanjut buka', 'buka berikutnya', 'lepas lagi', 'buka pelan-pelan'
+        if re.search(r"\b(buka\s+lagi|lanjut\s+buka|buka\s+berikutnya|buka\s+selanjutnya|lepas\s+lagi|buka\s+satu\s*satu|buka\s+pelan\s*pelan|tahap\s+berikutnya)\b", lower):
+            next_stage = min(4, current_stage + 1)
+            actions = {
+                1: "melepas kaosnya secara perlahan, kini tersisa BH dan celana",
+                2: "menurunkan dan melepas celananya, menyisakan set pakaian dalam (BH dan celana dalam)",
+                3: "membuka kaitan BH-nya dan melepaskannya, kini topless dengan celana dalam",
+                4: "menurunkan celana dalamnya hingga terlepas, kini sepenuhnya telanjang bulat tanpa busana"
+            }
+            return (next_stage, actions.get(next_stage, "membuka pakaian tahap berikutnya"), True)
+
+        # 3. Stage 1: Kaos / Baju Atasan
+        has_shirt_kw = bool(re.search(r"\b(buka|lepas|copot)\s+(?:baju|kaos|atasan|t-?shirt|pakaian(?!\s+dalam))(?:mu|nya)?\b", lower))
+        # 4. Stage 2: Celana / Bawahan
+        has_pants_kw = bool(re.search(r"\b(buka|lepas|copot|turunkan)\s+(?:celana(?!\s+dalam)|rok|bawahan|jeans|pants|skirt)(?:mu|nya)?\b", lower))
+        # 5. Stage 3: BH / Bra
+        has_bra_kw = bool(re.search(r"\b(buka|lepas|copot)\s+(?:bh|bra|kutang)(?:mu|nya)?\b", lower))
+        # 6. Stage 4: Celana Dalam / Panties
+        has_panties_kw = bool(re.search(r"\b(buka|lepas|copot|turunkan)\s+(?:cd|celana\s+dalam|panties|kancut|sempak|underwear)(?:mu|nya)?\b", lower))
+
+        if has_shirt_kw:
+            if current_stage == 0:
+                return (1, "melepas kaosnya perlahan, kini tersisa BH dan celana", True)
+            else:
+                return (current_stage, "kaos sudah terlepas sebelumnya", False)
+
+        if has_pants_kw:
+            if current_stage == 0:
+                # Sequential enforcement: Must start with shirt first!
+                return (1, "membuka kaos terlebih dahulu sebelum celana secara berurutan", True)
+            elif current_stage == 1:
+                return (2, "menurunkan dan melepas celananya, kini hanya mengenakan set pakaian dalam (BH dan celana dalam)", True)
+            else:
+                return (current_stage, "celana sudah terlepas sebelumnya", False)
+
+        if has_bra_kw:
+            if current_stage < 2:
+                # Sequential progression toward bra
+                next_st = current_stage + 1
+                return (next_st, "melepas pakaian tahap sebelumnya secara berurutan", True)
+            elif current_stage == 2:
+                return (3, "membuka kaitan BH-nya dan melepaskannya, topless bertelanjang dada dengan celana dalam", True)
+            else:
+                return (current_stage, "BH sudah terlepas sebelumnya", False)
+
+        if has_panties_kw:
+            if current_stage < 3:
+                # Sequential progression toward panties
+                next_st = current_stage + 1
+                return (next_st, "melepas pakaian tahap sebelumnya secara berurutan", True)
+            elif current_stage == 3:
+                return (4, "menurunkan celana dalamnya hingga terlepas, kini sepenuhnya telanjang bulat tanpa busana", True)
+            else:
+                return (current_stage, "celana dalam sudah terlepas sebelumnya", False)
+
+        # General undress trigger without specific part (e.g. 'buka dong', 'ayo buka')
+        if re.search(r"\b(buka|lepas|copot)\s+(?:dong|sayang|ya|sekarang|pelan)\b", lower):
+            if current_stage < 4:
+                next_st = current_stage + 1
+                return (next_st, "melepas pakaian tahap berikutnya secara berurutan", True)
+
+        return (current_stage, "", False)
+
     def notify_photo_delivered(self, user_id: int):
         """Notifies persona manager that a photo was delivered with current outfit."""
         uid = int(user_id) if user_id else 0
@@ -856,6 +992,26 @@ class PersonaManager:
         """
         lower = user_text.lower()
 
+        # Check sequential undress state progression for user
+        if user_id:
+            cur_stage = self.get_undress_stage(user_id)
+            target_stage, action_desc, is_trans = self.detect_undress_intent(user_text, current_stage=cur_stage)
+            if is_trans and target_stage != cur_stage:
+                self.set_undress_stage(user_id, target_stage)
+                cur_stage = target_stage
+
+            if cur_stage > 0:
+                stage_map = {
+                    1: ("shirt_off", False),
+                    2: ("bottoms_off", False),
+                    3: ("bra_off", True),
+                    4: ("nude", True)
+                }
+                if cur_stage in stage_map:
+                    k, is_n = stage_map[cur_stage]
+                    preset = OUTFIT_PRESETS[k]
+                    return (preset["prompt"], preset["negative"], is_n, preset["name"])
+
         # 1. Explicit Full Nude / Tanpa Busana / Intimate Anatomy
         NUDE_KEYWORDS = [
             "tanpa busana", "tanpa baju", "tanpa pakaian", "telanjang", "bugil",
@@ -936,8 +1092,21 @@ class PersonaManager:
                     self.set_user_outfit(user_id, key, is_locked=False, duration_seconds=1800)
                 return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
 
-        # 4.5. NSFW Mode Fallback (if turn is NSFW and no clothed preset requested, default to nude)
+        # 4.5. NSFW Mode Fallback (if turn is NSFW and no clothed preset requested, default to current stage or nude)
         if is_nsfw:
+            if user_id:
+                stage = self.get_undress_stage(user_id)
+                if stage > 0:
+                    stage_map = {
+                        1: ("shirt_off", False),
+                        2: ("bottoms_off", False),
+                        3: ("bra_off", True),
+                        4: ("nude", True)
+                    }
+                    if stage in stage_map:
+                        k, is_n = stage_map[stage]
+                        preset = OUTFIT_PRESETS[k]
+                        return (preset["prompt"], preset["negative"], is_n, preset["name"])
             return (
                 OUTFIT_PRESETS["nude"]["prompt"],
                 OUTFIT_PRESETS["nude"]["negative"],

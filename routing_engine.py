@@ -110,6 +110,8 @@ PROVIDER_PRESETS = {
 _NSFW_WORDS = [
     # Explicit Nudity / Strip / Body Exposure
     r"\b(?:nude|naked|topless|bottomless|unclothed|telanjang|bugil|telanjang\s+bulat|tanpa\s+sehelai\s+benang)\b",
+    r"\b(?:(?:buka|lepas|copot|turunkan)\s+(?:baju|kaos|celana|rok|bh|bra|cd|kutang|bawahan|atasan|pakaian|semua|semuanya|celana\s+dalam)(?:mu|nya)?)\b",
+    r"\b(?:buka\s+(?:pelan|satu\s*satu|lagi|berikutnya|tahap|dong))\b",
     r"\b(?:tanpa\s+(?:busana|baju|pakaian|celana))\b",
     r"\b(?:buka\s+(?:baju|pakaian|celana|bh|bra|rok|semua))\b",
     r"\b(?:lepas\s+(?:baju|pakaian|celana|bh|bra|semua))\b",

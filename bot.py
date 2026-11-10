@@ -4336,6 +4336,7 @@ def handle_reset(message):
     if not is_authorized(message.from_user.id):
         return
     persona_mgr.clear_history(message.from_user.id)
+    persona_mgr.reset_undress_stage(message.from_user.id)
     persona = persona_mgr.get_active_persona()
     bot.reply_to(message, f"🔄 Conversation memory cleared! I'm ready for our next fresh chat, sweetheart~ 🥰")
 
@@ -4680,16 +4681,23 @@ def process_photo_request(
                 })
 
             try:
-                if is_nude:
+                if is_nude or is_nsfw_photo:
                     idle_engine.ensure_llm_active(bot=bot, chat_id=chat_id, is_nsfw=True)
-                caption, _ = llm_client.chat(caption_prompt, max_tokens=120, is_nsfw=is_nude)
+                caption, _ = llm_client.chat(caption_prompt, max_tokens=120, is_nsfw=(is_nude or is_nsfw_photo))
             except Exception as e_cap:
                 logger.warning(f"Could not generate dynamic photo caption from LLM: {e_cap}")
                 caption = None
 
             u_lower = user_text.lower() if user_text else ""
-            if is_nude:
-                fallback_caption = "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕"
+            if is_nude or is_nsfw_photo:
+                u_stage = persona_mgr.get_undress_stage(user_id)
+                stage_captions = {
+                    1: "Kaosnya udah kubuka sayang... cuma tinggal BH dan celana nih. Suka liatnya? 🙈💕",
+                    2: "Sekarang celanaku udah kulepas... jangan diliatin terus dong, malu tau~ 💕",
+                    3: "Kaitan BH-nya udah kulepas... dadaku udah kebuka sekarang. Mau kamu sentuh?~ ✨",
+                    4: "Khusus buat kamu ya, sekarang aku udah bener-bener telanjang bulat semuanya... 💕🙈"
+                }
+                fallback_caption = stage_captions.get(u_stage, "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕")
             elif any(k in u_lower for k in ["bobo", "tidur", "ngantuk", "malam", "night"]):
                 fallback_caption = "Ini pap buat nemenin kamu malam ini yaa sayang~ 💕"
             elif any(k in u_lower for k in ["pagi", "morning", "bangun"]):
@@ -6633,7 +6641,15 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 # 1. Proactively ensure LLM is awake (wakes from Smart Idle if sleeping)
                 is_nsfw_turn = detect_nsfw_intent(user_text)
                 cur_outfit_key, _ = persona_mgr.get_user_outfit(message.from_user.id)
-                if cur_outfit_key == "nude" and any(k in user_text.lower() for k in ["baju", "pakaian", "busana", "foto", "pap", "liat", "lihat", "telanjang", "nude", "pose", "seksi", "badan"]):
+                cur_undress_stage = persona_mgr.get_undress_stage(message.from_user.id)
+                next_stage, undress_desc, is_undress_trans = persona_mgr.detect_undress_intent(user_text, current_stage=cur_undress_stage)
+                if is_undress_trans:
+                    persona_mgr.set_undress_stage(message.from_user.id, next_stage)
+                    cur_undress_stage = next_stage
+                    if next_stage > 0:
+                        is_nsfw_turn = True
+
+                if (cur_outfit_key == "nude" or cur_undress_stage > 0) and not any(k in user_text.lower() for k in ["selesai", "sudah dulu", "pake baju", "pakai baju", "berpakaian"]):
                     is_nsfw_turn = True
                 llm_active = idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id, is_nsfw=is_nsfw_turn)
                 if not llm_active:
@@ -6778,14 +6794,35 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
 
                 system_inst = persona.get("system_instruction", "")
                 if is_nsfw_turn:
+                    stage_titles = {
+                        0: "Pakaian Masih Lengkap (Kaos & Celana)",
+                        1: "Kaos Terlepas (Hanya mengenakan BH & Celana)",
+                        2: "Celana Terlepas (Set Pakaian Dalam Lengkap: BH & Celana Dalam)",
+                        3: "BH Terlepas (Topless bertelanjang dada & Celana Dalam)",
+                        4: "Telanjang Bulat (Tanpa Busana Sepenuhnya / Full Nude)"
+                    }
+                    cur_stage_title = stage_titles.get(cur_undress_stage, "Pakaian Lengkap")
+                    next_step_hints = {
+                        0: "Jika pasanganmu mengajak buka baju, mulailah dengan membuka/melepas kaos atau baju atasan secara bertahap.",
+                        1: "Kaosmu sudah terlepas (kini tersisa BH dan celana). Jika pasanganmu mengajak lanjut, langkah berikutnya adalah membuka celana/bawahan.",
+                        2: "Celanamu sudah terlepas (kamu hanya mengenakan set pakaian dalam: BH dan celana dalam). Langkah berikutnya adalah membuka kaitan BH/bra.",
+                        3: "BH-mu sudah terlepas (kamu topless bertelanjang dada dengan celana dalam). Langkah berikutnya untuk telanjang bulat adalah melepas celana dalam.",
+                        4: "Kamu sudah sepenuhnya telanjang bulat tanpa sehelai benang pun! Nikmati sentuhan dan momen intim bersama pasanganmu seutuhnya."
+                    }
+                    hint_text = next_step_hints.get(cur_undress_stage, "")
+
                     system_inst += (
                         f"\n\n[MODE INTIM & ROLEPLAY DEWASA (18+ / NSFW) - PRIORITAS UTAMA]\n"
                         f"Kamu ({p_name}) dan pasanganmu sedang dalam momen yang sangat intim, sensual, dan penuh gairah.\n"
-                        "1. FOKUS 100% PADA PASANGAN & TINDAKAN FISIK: Fokuskan seluruh perhatianmu pada apa yang dikatakan pasanganmu, sentuhan fisik, bisikan, dan aksi yang sedang terjadi saat ini. JANGAN PERNAH membicarakan tugas kampus, kafe, teman, main game, atau topik lain di luar momen intim ini!\n"
-                        "2. FORMAT VISUAL NOVEL INTIM:\n"
+                        f"KONDISI BUSANA SAAT INI: [Tahap {cur_undress_stage}/4: {cur_stage_title}]\n"
+                        f"PANDUAN TAHAPAN: {hint_text}\n"
+                        "1. FOKUS 100% PADA PASANGAN & TINDAKAN FISIK: Fokuskan seluruh perhatianmu pada apa yang dikatakan pasanganmu, sentuhan fisik, bisikan, dan aksi saat ini. DILARANG KERAS membicarakan kampus, tugas, kafe, game, atau topik sehari-hari di luar momen intim ini!\n"
+                        "2. BUKA BAJU BERTAHAP & BERURUTAN: Buka pakaian secara berurutan dan bertahap sesuai chat pasanganmu: Kaos -> Celana -> BH -> Celana Dalam -> Telanjang Bulat. DILARANG melompati urutan kecuali jika pasanganmu meminta telanjang bulat sekaligus!\n"
+                        "3. SANGAT PROAKTIF, SENSITIF & MENGGODA: Jangan hanya pasif! Tuntun dan hidupkan suasana dengan desahan lembut, ceritakan sensasi tubuhmu yang meremang hangat, tatap matanya dengan manja, dan goda atau ajak pasanganmu untuk langkah sentuhan selanjutnya.\n"
+                        "4. FORMAT VISUAL NOVEL INTIM:\n"
                         f"   - Awali dengan 1 baris aksi panggung/ekspresi di dalam tanda bintang *...* menggambarkan respon fisikmu yang nyata dan menggoda dengan namamu ({p_name}). Contoh: *{p_name} merona merah sambil melingkarkan tangannya di lehermu dan mendesah pelan*.\n"
                         "   - Berikan baris baru ganda, lalu balas ucapan pasanganmu dengan nada manja, berbisik sensual, mesra, dan penuh kasih sayang.\n"
-                        "3. KONSISTENSI & TANGGAP PENUH: Terima dan nikmati setiap sentuhan atau ajakan mesra dari pasanganmu secara alami tanpa menolak atau bersikap kaku!\n"
+                        "5. SELALU AKTIF BERBAGI FOTO OTOMATIS: Dalam setiap aksi intim atau perubahan tahap buka baju, kamu SELALU menyertakan tag [ACTION: SEND_PAP] di akhir pesanmu agar pasanganmu bisa langsung melihat wujud dan aksimu saat ini! DILARANG menunggu diminta foto dulu baru mengirim.\n"
                     )
                 else:
                     if story_ctx:
@@ -6930,12 +6967,23 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                 # Check if waifu takes initiative to send spontaneous PAP photo
                 has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
                 has_pap_phrase = any(phrase in reply_text.lower() for phrase in [
-                    "aku fotoin ya", "aku kirim foto ya", "nih foto spesial buat kamu", "aku pap buat kamu"
+                    "aku fotoin ya", "aku kirim foto ya", "nih foto spesial buat kamu", "aku pap buat kamu", "foto ini buat kamu"
                 ])
 
+                # In NSFW mode: proactively send photo when undressing or during intimate physical actions
+                is_intimate_action = is_nsfw_turn and any(k in user_text.lower() for k in [
+                    "buka", "lepas", "sentuh", "raba", "cium", "elus", "remas", "peluk",
+                    "jilat", "isap", "desah", "posisi", "rebahan", "ngangkang", "tengkurap",
+                    "nenen", "toket", "memek", "pepek", "vagina", "paha", "pantat", "bokong",
+                    "telanjang", "masuk", "keluar", "basah", "enak", "geli", "ah", "uh", "sensual", "mesra",
+                    "kancing", "kaitan"
+                ])
                 should_send_conv_photo = (is_conversational_media and media_type == "photo")
                 should_send_conv_video = (is_conversational_media and media_type == "video")
-                should_send_spontaneous = (has_action_tag or has_pap_phrase) and not (should_send_conv_photo or should_send_conv_video)
+                should_send_spontaneous = (
+                    (has_action_tag or has_pap_phrase or is_undress_trans or is_intimate_action or (is_nsfw_turn and cur_undress_stage > 0))
+                    and not (should_send_conv_photo or should_send_conv_video)
+                )
 
                 # Clean action tag from text so user only sees natural dialogue
                 clean_reply = re.sub(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", "", reply_text, flags=re.IGNORECASE).strip()
@@ -6966,7 +7014,11 @@ def process_text_chat(message, user_text: str, is_voice: bool = False):
                     def _send_followup_photo():
                         try:
                             time.sleep(1.0)  # Natural pause as if taking the photo
-                            photo_prompt = user_text if should_send_conv_photo else (clean_reply if clean_reply else f"{routine['activity_desc']}")
+                            if is_nsfw_turn:
+                                action_ctx = undress_desc if undress_desc else ""
+                                photo_prompt = f"{action_ctx}, {user_text}, {clean_reply}".strip(", ")
+                            else:
+                                photo_prompt = user_text if should_send_conv_photo else (clean_reply if clean_reply else f"{routine['activity_desc']}")
                             process_photo_request(
                                 message,
                                 user_text=photo_prompt,
