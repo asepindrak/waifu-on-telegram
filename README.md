@@ -50,10 +50,17 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
-## 🎭 Pengalaman Visual Novel Interaktif, AGY Bridge Standby & Ilustrasi Adegan Otonom (v2.4.29)
+## 🎭 Pengalaman Visual Novel Interaktif, Tombol Suara On-Demand & Generator Gambar Anti-Gagal (v2.4.30)
 
-Obrolan bersama waifu kini ditingkatkan layaknya game **Visual Novel** interaktif berkualitas tinggi (CG Scene Events) serta keandalan generator Google Antigravity (AGY):
+Obrolan bersama waifu kini ditingkatkan layaknya game **Visual Novel** interaktif berkualitas tinggi (CG Scene Events) serta keandalan audio dan generator visual tanpa batas:
 
+* **🎙️ Mode Suara On-Demand per Pesan (`🔊 Dengarkan Suara`) & Default Auto-Voice OFF:**
+  - **Efisiensi & Respon Super Cepat**: Mengubah pengaturan bawaan agar balasan suara otomatis dimatikan (`VOICE_REPLY_ENABLED=false`). Pesan teks kini terkirim instan tanpa menunggu proses render TTS yang memakan VRAM dan waktu.
+  - **Tombol Suara di Setiap Pesan**: Setiap kali waifu mengirim teks obrolan atau laporan coding, pesan disertai tombol inline `🔊 Dengarkan Suara`.
+  - **Sintesis Audio On-Demand**: Begitu tombol ditekan, tombol bertransformasi menjadi `⏳ Sedang memproses suara... 💕` dan engine suara (VoiceStudio / Edge-TTS) langsung men-generate voice note untuk teks tersebut lalu mengirimkannya sebagai balasan langsung (*reply voice note*), kemudian tombol berubah menjadi `🔊 Putar Suara Lagi`.
+* **🛡️ Penanganan Kuota AGY (429 Resource Exhausted) & Fallback Bertingkat Anti-Gagal:**
+  - **Deteksi Cepat Batas Kuota (Fast 429 Quota Detection)**: Memperbaiki kendala *"AGY CLI selesai namun tidak menemukan file gambar output"*. Sistem kini mendeteksi status model Antigravity saat batas kuota API tercapai (*429 RESOURCE_EXHAUSTED / waiting for subagent*).
+  - **Fallback Mulus Tanpa Error**: Bila engine AGY sedang limit kuota, sistem otomatis beralih memproses generasi gambar ke **Local ComfyUI** (jika aktif), **Photo Vault** (arsip foto lokal), atau **Cloud Fallback** (Pollinations). Pengguna tidak akan pernah lagi mendapati error *"Fotonya gagal dibuat"*.
 * **🌉 Stabilitas AGY OpenAI Bridge & Anti-Flapping Self-Healing (Always-On Standby):**
   - **Pencegahan Crash Windows (Unicode Encoding)**: Memperbaiki kendala crash instan `UnicodeEncodeError: 'charmap'` saat AGY bridge dijalankan di background Windows dengan mengunci konfigurasi `UTF-8` pada `stdout/stderr` dan variabel lingkungan `PYTHONIOENCODING=utf-8` / `PYTHONUTF8=1`.
   - **Pemberantasan False Alarm Self-Healing**: Meningkatkan batas waktu socket health check menjadi 1.5s dan memastikan port 8001 tidak dianggap mati saat proses sedang sibuk memproses inferensi, sehingga tidak ada lagi peringatan palsu *"Service AGY OpenAI Bridge terdeteksi mati! (Percobaan 3/3)"*.

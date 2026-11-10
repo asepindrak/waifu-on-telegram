@@ -428,6 +428,8 @@ def run_agy_image_gen(prompt: str) -> Tuple[Optional[str], str]:
             timeout=180
         )
         out = proc.stdout.strip()
+        if any(k in out.lower() for k in ["429", "resource_exhausted", "quota limit", "capacity on the underlying image"]):
+            return None, out
         img_path = extract_image_path_from_agy_output(out)
         if not img_path:
             # Fallback: scan brain and workspace artifacts for image generated since t0

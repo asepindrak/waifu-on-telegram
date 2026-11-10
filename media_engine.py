@@ -56,8 +56,10 @@ def format_agy_error(raw_err: Optional[str]) -> str:
     if not raw_err:
         return "Layanan Google Antigravity (AGY) tidak memberikan respon gambar."
     raw_lower = raw_err.lower()
-    if "429" in raw_err or "quota exhausted" in raw_lower or "resource_exhausted" in raw_lower:
+    if "429" in raw_err or "quota exhausted" in raw_lower or "resource_exhausted" in raw_lower or "capacity on the underlying" in raw_lower:
         return "Batas kuota model gambar Google Antigravity habis (429 RESOURCE_EXHAUSTED). Model sedang cooldown."
+    if "dispatched the generation request" in raw_lower or "waiting for the image" in raw_lower or "delegated the image generation" in raw_lower:
+        return "Subagent AGY sedang dalam antrean atau kuota API gambar sedang cooldown. Mengalihkan otomatis ke generator cadangan..."
     if "connection refused" in raw_lower or "10061" in raw_err or "failed to establish a new connection" in raw_lower:
         return "Koneksi ke AGY Bridge (port 8001) terputus atau service sedang offline."
     if "timeout" in raw_lower or "timed out" in raw_lower:
@@ -686,12 +688,12 @@ class MediaEngine:
                     "error": self.last_error or "Layanan cloud Pollinations tidak merespons."
                 }
 
-        # Local ComfyUI (Used for NSFW and for SFW when engine is comfyui)
-        if is_nude or sfw_engine == "comfyui":
+        # Local ComfyUI (Used for NSFW and for SFW when engine is comfyui or as fallback when primary fails)
+        if is_nude or sfw_engine == "comfyui" or self.last_fallback_notice:
             if self.comfyui_url:
                 local_img = self.generate_image_comfyui(
                     effective_prompt,
-                    negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, 2girls, 3girls, multiple girls, 2people, multiple persons, group, extra characters, blurry",
+                    negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, (2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate:1.4), blurry",
                     aspect_ratio=aspect_ratio,
                     quality=quality,
                     is_nude=is_nude,
@@ -753,7 +755,8 @@ class MediaEngine:
                 logger.warning(f"Error querying photo vault: {e_find}")
 
         # 3. Live Cloud Fallback (Ensures photos are ALWAYS unique even when AGY / ComfyUI / Vault are exhausted)
-        if not is_nude and os.environ.get("MEDIA_FALLBACK_CLOUD", "true").lower() in ("true", "1", "yes"):
+        allow_cloud = (os.environ.get("MEDIA_FALLBACK_CLOUD", "true").lower() in ("true", "1", "yes")) or (self.last_fallback_notice is not None)
+        if not is_nude and allow_cloud:
             cloud_img = self.generate_image_cloud_fallback(effective_prompt, negative_prompt=negative_prompt)
             if cloud_img:
                 if photo_vault:
@@ -873,7 +876,11 @@ class MediaEngine:
                 errors="replace",
                 timeout=180
             )
-            out = proc.stdout
+            out = proc.stdout or ""
+            if any(k in out.lower() for k in ["429", "resource_exhausted", "quota limit", "capacity on the underlying image"]):
+                self.last_error = "Batas kuota model gambar Google Antigravity habis (429 RESOURCE_EXHAUSTED). Model sedang cooldown."
+                return None
+
             cand_path = None
             try:
                 from agy_bridge import extract_image_path_from_agy_output, find_recent_generated_image
