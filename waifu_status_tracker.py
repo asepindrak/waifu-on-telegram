@@ -171,6 +171,21 @@ class WaifuStatusTracker:
             self._save_to_disk()
         logger.info(f"✨ Waifu status updated for user {user_id}: Location='{location}', Activity='{activity}'")
 
+    def sync_manual_outfit(self, user_id: int, outfit_name: Optional[str] = None, persona_name: str = "Waifu"):
+        """Updates stored outfit and clears stale photo captions/clothing mentions when user picks /outfit."""
+        with self._lock:
+            cur = self._statuses.get(str(user_id))
+            if not isinstance(cur, dict):
+                return
+            cur["outfit"] = outfit_name or ""
+            cur["photo_caption"] = ""
+            if outfit_name:
+                cur["activity"] = f"Baru saja berganti pakaian mengenakan {outfit_name}"
+            cur["persona_name"] = persona_name or cur.get("persona_name", "Waifu")
+            cur["updated_at"] = time.time()
+            self._statuses[str(user_id)] = cur
+            self._save_to_disk()
+
     def get_current_status(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Returns the active status if updated within expiration window."""
         with self._lock:

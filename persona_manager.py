@@ -846,6 +846,7 @@ class PersonaManager:
                 "name": f"{preset_name} 🔒",
                 "raw_name": preset_name,
                 "mode": "locked",
+                "source": rec.get("source", "manual"),
                 "is_locked": True,
                 "is_session": False,
                 "expires_at": None,
@@ -864,6 +865,7 @@ class PersonaManager:
                     "name": f"{preset_name} (Sesi Aktif)",
                     "raw_name": preset_name,
                     "mode": "session",
+                    "source": sess.get("source", "auto"),
                     "is_locked": False,
                     "is_session": True,
                     "expires_at": exp,
@@ -873,7 +875,7 @@ class PersonaManager:
                 logger.info(f"Session outfit '{sess.get('key')}' expired for user {uid}.")
                 self.session_outfits.pop(uid, None)
                 if isinstance(rec, dict) and rec.get("mode") == "session":
-                    self.user_outfits[uid] = {"key": "default", "mode": "auto"}
+                    self.user_outfits[uid] = {"key": "default", "mode": "auto", "undress_stage": 0}
                     self._save_user_outfits()
 
         # 3. Default: Auto Dynamic Mode
@@ -882,6 +884,7 @@ class PersonaManager:
             "name": f"🌟 Otomatis ({dynamic_name})",
             "raw_name": dynamic_name,
             "mode": "auto",
+            "source": "auto",
             "is_locked": False,
             "is_session": False,
             "expires_at": None,
@@ -901,7 +904,8 @@ class PersonaManager:
         user_id: int,
         key: str,
         is_locked: bool = False,
-        duration_seconds: int = 3600
+        duration_seconds: int = 3600,
+        source: str = "auto"
     ) -> bool:
         """
         Sets chosen outfit preset for user.
@@ -914,31 +918,36 @@ class PersonaManager:
 
         if key in ("default", "auto"):
             self.session_outfits.pop(uid, None)
-            self.user_outfits[uid] = {"key": "default", "mode": "auto", "updated_at": now}
+            self.user_outfits[uid] = {"key": "default", "mode": "auto", "undress_stage": 0, "updated_at": now}
             self._save_user_outfits()
             logger.info(f"User {uid} outfit reset to dynamic auto mode.")
             return True
 
         if key in OUTFIT_PRESETS:
+            stage = 4 if key == "nude" else 0
             if is_locked:
                 self.session_outfits.pop(uid, None)
                 self.user_outfits[uid] = {
                     "key": key,
                     "mode": "locked",
+                    "source": source,
+                    "undress_stage": stage,
                     "updated_at": now
                 }
-                logger.info(f"User {uid} outfit locked to '{key}'.")
+                logger.info(f"User {uid} outfit locked to '{key}' (source={source}).")
             else:
                 sess = {
                     "key": key,
                     "mode": "session",
+                    "source": source,
+                    "undress_stage": stage,
                     "set_at": now,
                     "expires_at": now + duration_seconds,
                     "photos_count": 0
                 }
                 self.session_outfits[uid] = sess
                 self.user_outfits[uid] = sess
-                logger.info(f"User {uid} session outfit set: '{key}' (Expires in {duration_seconds}s).")
+                logger.info(f"User {uid} session outfit set: '{key}' (source={source}, expires in {duration_seconds}s).")
             self._save_user_outfits()
             return True
 
@@ -950,7 +959,7 @@ class PersonaManager:
         details = self.get_user_outfit_details(uid)
         if details.get("is_session"):
             self.session_outfits.pop(uid, None)
-            self.user_outfits[uid] = {"key": "default", "mode": "auto", "updated_at": time.time()}
+            self.user_outfits[uid] = {"key": "default", "mode": "auto", "undress_stage": 0, "updated_at": time.time()}
             self._save_user_outfits()
             logger.info(f"Session outfit cleared for user {uid}, reverted to dynamic auto mode.")
             return True
@@ -1387,19 +1396,24 @@ class PersonaManager:
     def sync_outfit_from_chat(self, user_id: int, user_text: str = "", reply_text: str = "") -> Optional[str]:
         """
         Synchronizes stored outfit/undress state with the newest explicit outfit described
-        in either the waifu's reply or the user's message (unless outfit is locked).
+        in either the waifu's reply or the user's message (unless outfit is locked or manual /outfit).
         """
         if not user_id:
             return None
         details = self.get_user_outfit_details(user_id)
         if details.get("is_locked"):
             return None
+        is_manual = details.get("source") == "manual"
 
-        # Waifu's latest statement reflects final state in the turn; check reply first, then user_text
-        matched = (
-            self._match_explicit_outfit_text(reply_text, allow_romantic=False, allow_ambiguous_undress=False)
-            or self._match_explicit_outfit_text(user_text, allow_romantic=False, allow_ambiguous_undress=False)
-        )
+        # If user explicitly picked an outfit via /outfit, never let stale/hallucinated reply_text overwrite it.
+        if is_manual:
+            matched = self._match_explicit_outfit_text(user_text, allow_romantic=False, allow_ambiguous_undress=False)
+        else:
+            # Waifu's latest statement reflects final state in the turn; check reply first, then user_text
+            matched = (
+                self._match_explicit_outfit_text(reply_text, allow_romantic=False, allow_ambiguous_undress=False)
+                or self._match_explicit_outfit_text(user_text, allow_romantic=False, allow_ambiguous_undress=False)
+            )
         if not matched:
             return None
 
@@ -1414,12 +1428,13 @@ class PersonaManager:
                 rec = self.user_outfits.get(uid, {})
                 rec["key"] = "lingerie"
                 rec["mode"] = "session"
+                rec["source"] = "chat_sync"
                 self.user_outfits[uid] = rec
                 self._save_user_outfits()
         else:
             if self.get_undress_stage(user_id) != 0:
                 self.reset_undress_stage(user_id)
-            self.set_user_outfit(user_id, key, is_locked=False, duration_seconds=1800)
+            self.set_user_outfit(user_id, key, is_locked=False, duration_seconds=1800, source="chat_sync")
         return key
 
     def detect_clothing_intent(
@@ -1438,18 +1453,32 @@ class PersonaManager:
         hist = history or (self.get_chat_history(user_id) if user_id else [])
         clean_turns = [m.get("content", "") for m in hist[-6:] if not m.get("content", "").startswith("[")]
         outfit_details = self.get_user_outfit_details(user_id) if user_id else {
-            "key": "default", "mode": "auto", "is_locked": False, "is_session": False
+            "key": "default", "mode": "auto", "source": "auto", "is_locked": False, "is_session": False
         }
         outfit_mode = outfit_details.get("mode", "auto")
+        outfit_key = outfit_details.get("key", "default")
         is_locked = bool(outfit_details.get("is_locked"))
+        is_manual = (outfit_details.get("source") == "manual")
 
         cur_stage = self.get_undress_stage(user_id) if user_id else 0
 
+        # 0. Locked outfit takes absolute priority (except public-space safety guard)
+        if is_locked and outfit_key != "default" and outfit_key in OUTFIT_PRESETS:
+            current_ctx = detect_contextual_activity_and_outfit(user_text, [], persona_key=self.active_key)
+            is_public_now = bool(current_ctx.get("is_public", False))
+            if scene_hint and any(k in scene_hint.lower() for k in ["mall", "campus", "classroom", "library", "cafe", "park", "street", "store"]):
+                is_public_now = True
+            if is_public_now and outfit_key in ("nude", "lingerie"):
+                logger.info(f"Safety guard: Overriding locked {outfit_key} with {current_ctx['outfit_name']} for public location.")
+                return (current_ctx["outfit_prompt"], current_ctx["outfit_negative"], False, current_ctx["outfit_name"])
+            preset = OUTFIT_PRESETS[outfit_key]
+            return (preset["prompt"], preset.get("negative", ""), outfit_key == "nude", preset["name"])
+
         # 1. Check explicit clothing description in current user_text first (e.g. 'cuma pake BH sama celana dalam', 'piyama')
-        # Keep romantic keywords disabled when sequential undress stage > 0 so 'seksi banget' stays at active stage.
+        # Keep romantic keywords disabled when sequential undress stage > 0 or session outfit is active (so 'pose romantis' keeps chosen outfit).
         explicit_current = self._match_explicit_outfit_text(
             user_text,
-            allow_romantic=(cur_stage == 0),
+            allow_romantic=(cur_stage == 0 and outfit_mode == "auto"),
             allow_ambiguous_undress=(user_id is None),
         )
         if explicit_current:
@@ -1463,7 +1492,7 @@ class PersonaManager:
                 elif exp_key not in ("romantic",):
                     if cur_stage > 0:
                         self.reset_undress_stage(user_id)
-                    self.set_user_outfit(user_id, exp_key, is_locked=False, duration_seconds=1800)
+                    self.set_user_outfit(user_id, exp_key, is_locked=False, duration_seconds=1800, source="chat_sync")
             return (preset["prompt"], preset.get("negative", ""), exp_nude, preset["name"])
 
         # 2. Check sequential undress state progression for user (e.g. 'buka baju', 'buka lagi')
@@ -1474,11 +1503,11 @@ class PersonaManager:
                     self.set_undress_stage(user_id, target_stage)
                     cur_stage = target_stage
 
-        # 3. Scan recent conversation history (newest-first!) BEFORE falling back to stale stage/session
-        #    Skip only when user explicitly changed location/routine in current user_text (e.g. 'pap di mall').
+        # 3. Scan recent conversation history (newest-first!) ONLY in auto mode (not when session/manual outfit is active)
+        #    Skip when user explicitly changed location/routine in current user_text (e.g. 'pap di mall').
         current_loc_ctx = detect_contextual_activity_and_outfit(user_text, [], persona_key=self.active_key)
         has_new_location_in_user_text = bool(current_loc_ctx.get("is_explicit"))
-        if not is_locked and not has_new_location_in_user_text and cur_stage == 0:
+        if outfit_mode == "auto" and not has_new_location_in_user_text and cur_stage == 0:
             for turn in reversed(clean_turns):
                 hist_match = self._match_explicit_outfit_text(
                     turn, allow_romantic=False, allow_ambiguous_undress=False
@@ -1488,9 +1517,8 @@ class PersonaManager:
                     preset = OUTFIT_PRESETS.get(h_key, OUTFIT_PRESETS["default"])
                     return (preset["prompt"], preset.get("negative", ""), h_nude, preset["name"])
 
-        # Also: if cur_stage == 1 ('shirt_off') was active but newest chat turn explicitly switched to
-        # underwear ('BH sama celana dalam' / 'bottoms_off' / 'lingerie' / 'bra_off' / 'pajamas'), sync immediately!
-        if not is_locked and cur_stage > 0 and clean_turns:
+        # Also: if cur_stage == 1 ('shirt_off') was active in auto/chat-sync mode and newest turn switched to underwear/pajamas, sync immediately!
+        if not is_locked and not is_manual and cur_stage > 0 and clean_turns:
             latest_match = self._match_explicit_outfit_text(
                 clean_turns[-1], allow_romantic=False, allow_ambiguous_undress=False
             )
@@ -1502,7 +1530,7 @@ class PersonaManager:
                     return (preset["prompt"], preset.get("negative", ""), l_nude, preset["name"])
 
         # 4. Active sequential undress stage (Stage 1..4)
-        if user_id and cur_stage > 0:
+        if user_id and cur_stage > 0 and not is_manual:
             stage_map = {
                 1: ("shirt_off", False),
                 2: ("bottoms_off", False),
@@ -1514,8 +1542,8 @@ class PersonaManager:
                 preset = OUTFIT_PRESETS[k]
                 return (preset["prompt"], preset["negative"], is_n, preset["name"])
 
-        # 5. NSFW Mode Fallback (if turn is NSFW and no clothed preset requested, default to nude)
-        if is_nsfw:
+        # 5. NSFW Mode Fallback (if turn is NSFW and no manual/clothed preset active, default to nude)
+        if is_nsfw and not (is_manual and outfit_key != "default"):
             return (
                 OUTFIT_PRESETS["nude"]["prompt"],
                 OUTFIT_PRESETS["nude"]["negative"],
@@ -1524,49 +1552,52 @@ class PersonaManager:
             )
 
         # 6. Context-aware Student Routine & Conversation History
+        # When an active session outfit is set, check activity shifts/public guards against current user_text only
+        # so stale chat history (e.g., earlier "piyama" / "tidur") does NOT cancel user's newly selected /outfit!
+        current_ctx = current_loc_ctx
         ctx = detect_contextual_activity_and_outfit(user_text, clean_turns, persona_key=self.active_key)
 
         # Determine if current venue is public (mall, campus, cafe, etc.)
-        is_public = ctx.get("is_public", False)
+        is_public = bool(current_ctx.get("is_public", False)) if outfit_mode != "auto" else bool(ctx.get("is_public", False))
         if scene_hint:
             lower_s = scene_hint.lower()
             if any(k in lower_s for k in ["mall", "campus", "classroom", "library", "cafe", "park", "street", "store"]):
                 is_public = True
 
-        outfit_key = outfit_details.get("key", "default")
-
-        # Check if conversation has an explicit active scenario that conflicts with current session outfit
-        is_explicit = bool(ctx.get("is_explicit", False))
-        activity_str = ctx.get("activity", "").lower()
+        # Check if current user request has an explicit active scenario that conflicts with current session outfit
+        is_explicit_now = bool(current_ctx.get("is_explicit", False))
+        activity_now = current_ctx.get("activity", "").lower()
         intimate_outfits = ("nude", "lingerie", "romantic", "pajamas", "towel")
 
         is_conflicting = False
-        if is_explicit and outfit_mode == "session":
-            if "mandi" in activity_str and outfit_key not in ("towel", "nude"):
+        if is_explicit_now and outfit_mode == "session":
+            if "mandi" in activity_now and outfit_key not in ("towel", "nude"):
                 is_conflicting = True
-            elif any(s in activity_str for s in ["tidur", "bobo", "ngantuk"]) and outfit_key not in intimate_outfits:
+            elif any(s in activity_now for s in ["tidur", "bobo", "ngantuk"]) and outfit_key not in intimate_outfits:
                 is_conflicting = True
             elif is_public and outfit_key in ("nude", "lingerie", "pajamas", "towel"):
                 is_conflicting = True
-            elif any(c in activity_str for c in ["kampus", "kuliah", "perpus"]) and outfit_key in ("maid", "kimono", "bikini", "lingerie", "nude"):
+            elif any(c in activity_now for c in ["kampus", "kuliah", "perpus"]) and outfit_key in ("maid", "kimono", "bikini", "lingerie", "nude"):
                 is_conflicting = True
 
-        # If user had a temporary session outfit, but current context explicitly shifted to a conflicting routine,
+        # If user had a temporary session outfit, but current request explicitly shifted to a conflicting routine,
         # the session outfit gracefully yields and returns to dynamic auto mode!
         if is_conflicting and outfit_mode == "session":
-            logger.info(f"Context shift: Session outfit '{outfit_key}' yielded to active routine '{activity_str}'.")
+            logger.info(f"Context shift: Session outfit '{outfit_key}' yielded to active routine '{activity_now}'.")
             if user_id:
                 self.clear_session_outfit(user_id)
             outfit_mode = "auto"
             outfit_key = "default"
+            ctx = current_ctx
 
         # COHERENCE SAFETY GUARD: NEVER allow lingerie or nude in public spaces (e.g. mall, campus)!
         if is_public and outfit_key in ("nude", "lingerie"):
-            logger.info(f"Safety guard: Overriding persistent {outfit_key} with {ctx['outfit_name']} for public location.")
-            return (ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
+            fallback_ctx = current_ctx if is_explicit_now else ctx
+            logger.info(f"Safety guard: Overriding persistent {outfit_key} with {fallback_ctx['outfit_name']} for public location.")
+            return (fallback_ctx["outfit_prompt"], fallback_ctx["outfit_negative"], False, fallback_ctx["outfit_name"])
 
-        # Guard: If scene_hint is private bedroom/bath/intimate, do not let old campus/mall history override it!
-        if scene_hint and any(priv in scene_hint.lower() for priv in ["bed", "bedroom", "bath", "bathroom", "steam", "intimate", "kasur", "sensual"]):
+        # Guard (auto mode only): If scene_hint is private bedroom/bath/intimate, do not let old campus/mall history override it!
+        if outfit_mode == "auto" and scene_hint and any(priv in scene_hint.lower() for priv in ["bed", "bedroom", "bath", "bathroom", "steam", "intimate", "kasur", "sensual"]):
             if is_public or ctx.get("is_public"):
                 if any(b in scene_hint.lower() for b in ["bath", "bathroom", "steam", "mandi"]):
                     preset = OUTFIT_PRESETS["towel"]
@@ -1576,8 +1607,8 @@ class PersonaManager:
                     preset = OUTFIT_PRESETS["pajamas"]
                 return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
 
-        # If there is a specific active conversational scenario and no locked outfit, prioritize the activity's realistic attire!
-        if is_explicit and outfit_mode == "auto":
+        # If there is a specific active conversational scenario and no locked/session outfit, prioritize the activity's realistic attire!
+        if bool(ctx.get("is_explicit", False)) and outfit_mode == "auto":
             return (ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
 
         if outfit_key != "default" and outfit_key in OUTFIT_PRESETS:
@@ -1615,7 +1646,7 @@ class PersonaManager:
         )
 
         # Prevent hardcoded uniform/cardigan clauses in persona traits (e.g. Shiro/Yume) from clashing with dynamic outfits
-        if outfit_prompt and any(k in outfit_prompt.lower() for k in ("nude", "topless", "bra", "lingerie", "bikini", "towel", "pajama", "camisole", "slip dress", "maid", "kimono", "gym")):
+        if outfit_prompt:
             base_visual = re.sub(
                 r"(?:dark navy jacket over crisp white collared blouse, royal blue ribbon tie with silver star crystal brooch at collar,?\s*|"
                 r"cozy oversized lavender cardigan over white pleated camisole dress with delicate lace trim,?\s*)",

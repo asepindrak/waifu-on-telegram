@@ -4257,8 +4257,17 @@ def callback_set_outfit(call):
     if not is_authorized(call.from_user.id):
         return
     key = call.data.split(":", 1)[1]
-    if persona_mgr.set_user_outfit(call.from_user.id, key):
+    if persona_mgr.set_user_outfit(call.from_user.id, key, source="manual"):
         details = persona_mgr.get_user_outfit_details(call.from_user.id)
+        try:
+            p_name = persona_mgr.get_active_persona().get("name", "Waifu")
+            waifu_status_tracker.sync_manual_outfit(
+                call.from_user.id,
+                outfit_name=None if key in ("default", "auto") else details.get("raw_name", ""),
+                persona_name=p_name,
+            )
+        except Exception:
+            pass
         if key in ("default", "auto"):
             bot.answer_callback_query(call.id, "🌟 Mode Otomatis Aktif!")
             markup = types.InlineKeyboardMarkup(row_width=2)
@@ -4309,9 +4318,18 @@ def callback_lock_outfit(call):
     if not is_authorized(call.from_user.id):
         return
     key = call.data.split(":", 1)[1]
-    if persona_mgr.set_user_outfit(call.from_user.id, key, is_locked=True):
+    if persona_mgr.set_user_outfit(call.from_user.id, key, is_locked=True, source="manual"):
         details = persona_mgr.get_user_outfit_details(call.from_user.id)
         name = details['raw_name']
+        try:
+            p_name = persona_mgr.get_active_persona().get("name", "Waifu")
+            waifu_status_tracker.sync_manual_outfit(
+                call.from_user.id,
+                outfit_name=name,
+                persona_name=p_name,
+            )
+        except Exception:
+            pass
         bot.answer_callback_query(call.id, f"🔒 Pakaian dikunci: {name}")
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
@@ -4813,7 +4831,17 @@ def process_photo_request(
                 if story_photo and story_photo.get("danbooru_tags"):
                     detected_scene = story_photo["danbooru_tags"]
 
-            prompt_source_text = f"{actual_user_msg} {conversational_reply}".strip() if conversational_reply else user_text
+            cur_out_det = persona_mgr.get_user_outfit_details(user_id) if user_id else {}
+            has_explicit_outfit = (
+                bool(cur_out_det)
+                and cur_out_det.get("key", "default") != "default"
+                and (cur_out_det.get("is_locked") or cur_out_det.get("source") == "manual")
+            )
+            prompt_source_text = (
+                (actual_user_msg or user_text)
+                if (conversational_reply and has_explicit_outfit)
+                else (f"{actual_user_msg} {conversational_reply}".strip() if conversational_reply else user_text)
+            )
             visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
                 prompt_source_text,
                 user_id=user_id,
@@ -7481,6 +7509,17 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     cur_outfit=cur_outfit_details.get("raw_name"),
                     is_inviting_out=is_inviting_out
                 )
+                if (
+                    cur_outfit_details.get("key", "default") != "default"
+                    and (cur_outfit_details.get("is_locked") or cur_outfit_details.get("source") == "manual")
+                ):
+                    chosen_outfit_name = cur_outfit_details.get("raw_name", cur_outfit_details.get("key"))
+                    status_block += (
+                        f"\n[OUTFIT PILIHAN PASANGAN SAAT INI: {chosen_outfit_name}]\n"
+                        f"Pasanganmu baru saja meminta/memilihkanmu memakai {chosen_outfit_name}. "
+                        f"Saat ini kamu SUDAH berganti dan SEDANG memakai {chosen_outfit_name}. "
+                        f"Abaikan pakaian lama (seperti piyama/baju sebelumnya) di riwayat chat!\n"
+                    )
 
                 system_inst = persona.get("system_instruction", "")
                 if is_nsfw_turn:

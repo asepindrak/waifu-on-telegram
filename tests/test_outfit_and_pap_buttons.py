@@ -83,6 +83,117 @@ class TestOutfitAndPapButtons(unittest.TestCase):
 
         self.assertTrue(mock_safe_edit.called)
 
+    def test_manual_outfit_from_menu_overrides_chat_history_pajamas(self):
+        """Selecting an outfit via /outfit (session or locked) must NOT be overridden by stale 'piyama'/'tidur' chat history or reply hallucinations."""
+        from persona_manager import PersonaManager
+        pm = PersonaManager(active_key="hina")
+        uid = 884422
+        pm.set_user_outfit(uid, "default")
+
+        pajama_history = [
+            {"role": "assistant", "content": "Aku lagi ngantuk dan rebahan pakai piyama tidur nih."},
+            {"role": "user", "content": "Piyamanya lucu banget, mau tidur ya?"},
+        ]
+
+        # Simulate picking bikini from /outfit (manual session mode, not even locked)
+        pm.set_user_outfit(uid, "bikini", source="manual")
+
+        # 1. Generic PAP request still uses Summer Bikini, NOT stale pajamas
+        prompt, neg, is_nude, label = pm.craft_visual_prompt_full(
+            "coba pap dong", user_id=uid, history=pajama_history
+        )
+        self.assertIn("bikini", prompt.lower())
+        self.assertNotIn("camisole", prompt.lower())
+        self.assertIn("Summer Bikini", label)
+        self.assertFalse(is_nude)
+
+        # 2. Clicking 'Pose Romantis' (/pap scenario 'sensual') preserves chosen /outfit instead of overriding with slip dress
+        sensual_prompt = bot.SCENARIO_PROMPTS["sensual"]
+        prompt2, _, _, label2 = pm.craft_visual_prompt_full(
+            sensual_prompt, user_id=uid, history=pajama_history
+        )
+        self.assertIn("bikini", prompt2.lower())
+        self.assertNotIn("slip dress", prompt2.lower())
+        self.assertIn("Summer Bikini", label2)
+
+        # 3. LLM reply hallucinating 'piyama' does NOT overwrite manual /outfit selection via sync_outfit_from_chat
+        synced = pm.sync_outfit_from_chat(
+            uid,
+            user_text="pap dong",
+            reply_text="Bentar ya, aku lagi rebahan pakai piyama tidur nih.",
+        )
+        self.assertIsNone(synced)
+        cur_key, _ = pm.get_user_outfit(uid)
+        self.assertEqual(cur_key, "bikini")
+
+        # 4. Locked /outfit stays active even if user_text mentions pajamas in chat
+        pm.set_user_outfit(uid, "school_jk", is_locked=True, source="manual")
+        prompt3, _, _, label3 = pm.craft_visual_prompt_full(
+            "tadi kamu pake piyama lucu", user_id=uid, history=pajama_history
+        )
+        self.assertIn("school uniform", prompt3.lower())
+        self.assertIn("School JK", label3)
+
+        # Clean up test state
+        pm.set_user_outfit(uid, "default")
+
+    @patch("bot.is_authorized", return_value=True)
+    @patch("bot.safe_send_message")
+    @patch("bot.llm_client")
+    @patch("bot.media_engine")
+    @patch("bot.idle_engine")
+    def test_callback_set_outfit_then_pap_uses_chosen_outfit_even_if_reply_mentions_pajamas(
+        self, mock_idle, mock_media, mock_llm, mock_safe_send, mock_auth
+    ):
+        """End-to-end /outfit click -> photo request renders selected outfit even if reply text still says 'piyama'."""
+        uid = 99999
+        orig_mgr_rec = bot.persona_mgr.user_outfits.get(uid)
+        try:
+            self.mock_call.data = "set_outfit:bikini"
+            with patch("bot.bot.edit_message_text"):
+                bot.callback_set_outfit(self.mock_call)
+
+            details = bot.persona_mgr.get_user_outfit_details(uid)
+            self.assertEqual(details["key"], "bikini")
+            self.assertEqual(details["source"], "manual")
+
+            mock_idle.ensure_comfyui_active.return_value = True
+            mock_media.generate_photo.return_value = (b"fake_img", "ComfyUI")
+            mock_llm.chat.return_value = ("Nih foto aku pakai bikini di kamar~", "")
+
+            mock_msg = MagicMock()
+            mock_msg.chat.id = 12345
+            mock_msg.from_user.id = uid
+
+            with patch.object(
+                bot.persona_mgr,
+                "get_chat_history",
+                return_value=[{"role": "assistant", "content": "Aku lagi pakai piyama tidur nih"}],
+            ):
+                bot.process_photo_request(
+                    mock_msg,
+                    user_text="Aku lagi santai pakai piyama nih, bentar aku pap ya!",
+                    conversational_reply="Aku lagi santai pakai piyama nih, bentar aku pap ya!",
+                    is_followup=True,
+                    original_user_text="pap dong",
+                )
+                import time
+                for _ in range(40):
+                    if mock_media.generate_photo.called:
+                        break
+                    time.sleep(0.05)
+
+            self.assertTrue(mock_media.generate_photo.called)
+            visual_prompt = mock_media.generate_photo.call_args[0][0]
+            used_outfit = mock_media.generate_photo.call_args[1].get("outfit_label", "")
+            self.assertIn("bikini", visual_prompt.lower())
+            self.assertNotIn("camisole", visual_prompt.lower())
+            self.assertIn("Summer Bikini", used_outfit)
+        finally:
+            bot.persona_mgr.set_user_outfit(uid, "default")
+            if orig_mgr_rec is not None:
+                bot.persona_mgr.user_outfits[uid] = orig_mgr_rec
+
 
 if __name__ == "__main__":
     unittest.main()
