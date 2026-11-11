@@ -37,7 +37,8 @@ class VoiceEngine:
         self.groq_key = groq_key
         self.openai_key = openai_key
         self.llm_client = llm_client
-        self.voice_backend = voice_backend or os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
+        self._explicit_voice_backend = voice_backend.lower().strip() if voice_backend else None
+        self.voice_backend = self._explicit_voice_backend or os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
 
     @staticmethod
     def clean_text_for_speech(text: str) -> str:
@@ -241,7 +242,10 @@ class VoiceEngine:
                 return False
 
             # Check if local VoiceStudio backend is selected
-            cur_backend = os.environ.get("VOICE_BACKEND", getattr(self, "voice_backend", "edge-tts")).lower().strip()
+            cur_backend = (
+                self._explicit_voice_backend
+                or os.environ.get("VOICE_BACKEND", getattr(self, "voice_backend", "edge-tts")).lower().strip()
+            )
             if cur_backend in ("voicestudio", "local"):
                 try:
                     from voicestudio_engine import voicestudio_engine

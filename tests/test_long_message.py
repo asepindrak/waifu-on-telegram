@@ -33,6 +33,26 @@ class TestLongChatMessage(unittest.TestCase):
         self.assertIn("http://127.0.0.1:3000", call_text)
         self.assertNotIn("localhost", call_text)
 
+    @patch.object(bot.bot, "send_message")
+    def test_strip_private_url_buttons_on_telegram_url_error(self, mock_send):
+        from telebot import types
+        markup = types.InlineKeyboardMarkup()
+        markup.row(
+            types.InlineKeyboardButton("💻 Localhost:8086", url="http://127.0.0.1:8086/"),
+            types.InlineKeyboardButton("📱 Tailscale:8086", url="http://100.64.1.2:8086/")
+        )
+        markup.row(types.InlineKeyboardButton("🔊 Dengarkan Suara", callback_data="play_voice:abc123"))
+
+        mock_ok = MagicMock(message_id=999)
+        mock_send.side_effect = [Exception("Bad Request: BUTTON_URL_INVALID"), mock_ok]
+
+        res = bot.send_long_chat_message(chat_id=12345, text="Web preview ready", reply_markup=markup)
+        self.assertEqual(res, [mock_ok])
+        fallback_markup = mock_send.call_args_list[1][1]["reply_markup"]
+        remaining_cbs = [btn.callback_data for row in fallback_markup.keyboard for btn in row]
+        self.assertEqual(remaining_cbs, ["play_voice:abc123"])
+
+
 if __name__ == "__main__":
     unittest.main()
 

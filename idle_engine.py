@@ -602,10 +602,10 @@ class IdleEngine:
         if not self.enabled:
             return True
 
-        # Check if SFW provider is remote cloud
+        # Check if SFW provider is remote cloud (AGY runs local bridge on port 8001)
         split_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip() in ("split", "hybrid")
         sfw_provider = os.environ.get("SFW_LLM_PROVIDER", "local").lower().strip()
-        sfw_is_cloud = split_mode and sfw_provider not in ("local", "kobold", "ollama", "lm-studio", "locally-uncensored")
+        sfw_is_cloud = split_mode and sfw_provider not in ("local", "kobold", "ollama", "lm-studio", "locally-uncensored", "agy")
 
         if sfw_is_cloud and not is_nsfw:
             # Cloud SFW engine handles the request, KoboldCPP stays comfortably asleep

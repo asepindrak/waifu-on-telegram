@@ -124,14 +124,6 @@ fi
 EXISTING_MMPROJ=$(ls "$INSTALL_DIR/models/"*mmproj*.gguf 2>/dev/null | head -n 1)
 if [ -z "$EXISTING_MMPROJ" ]; then
     echo "  ℹ Vision adapter (mmproj) not found in '$INSTALL_DIR/models'."
-    read -p "  Auto-download 'Huihui-Qwythos Vision mmproj' (~879 MB)? [Y/n, default: Y]: " DL_VIS
-    DL_VIS=${DL_VIS:-Y}
-    if [[ "$DL_VIS" =~ ^[Yy]$ ]]; then
-        curl -fL -C - -o "$INSTALL_DIR/models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf" \
-          "https://huggingface.co/huihui-ai/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-GGUF/resolve/main/mmproj-model-bf16.gguf"
-        echo "  ✓ Vision adapter downloaded successfully."
-    fi
-fi
     read -p "  Auto-download Huihui-Qwythos Vision Adapter mmproj (~879 MB) so waifu can see photos? [Y/n, default: Y]: " DL_VISION
     DL_VISION=${DL_VISION:-Y}
     if [[ "$DL_VISION" =~ ^[Yy]$ ]]; then

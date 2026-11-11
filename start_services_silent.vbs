@@ -120,5 +120,14 @@ If FSO.FileExists(ScriptDir & "\music_player_server.js") Then
     WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && " & nodeCmd & " music_player_server.js", 0, False
 End If
 
+' 3.5. Start Google Antigravity Bridge silently if enabled or configured as active provider
+If FSO.FileExists(ScriptDir & "\agy_bridge.py") Then
+    Dim agyCheck
+    agyCheck = WshShell.Run("cmd /c cd /d """ & ScriptDir & """ && """ & pyCmd & """ -c ""import os, socket; from dotenv import load_dotenv; load_dotenv(); flag = os.environ.get('AGY_BRIDGE_ENABLED','').lower().strip(); active = any(os.environ.get(k,'').lower().strip() == 'agy' for k in ('SFW_LLM_PROVIDER','NSFW_LLM_PROVIDER','SFW_IMAGE_ENGINE','NSFW_IMAGE_ENGINE')); need = (flag in ('1','true','yes')) or (flag not in ('0','false','no') and active); s = socket.socket(); s.settimeout(0.5); listening = (s.connect_ex(('127.0.0.1', 8001)) == 0); s.close(); exit(0 if (need and not listening) else 1)""", 0, True)
+    If agyCheck = 0 Then
+        WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && """ & pyCmd & """ agy_bridge.py >> agy_bridge.log 2>&1", 0, False
+    End If
+End If
+
 ' 4. Start Python Bot
 WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && """ & pyCmd & """ bot.py >> bot.log 2>&1", 0, False

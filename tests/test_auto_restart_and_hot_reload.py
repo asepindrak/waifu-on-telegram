@@ -38,6 +38,9 @@ class TestAutoRestartAndHotReload(unittest.TestCase):
         """Verifies bot.reload_env_configurations updates in-memory voice without restart."""
         orig_voice = bot.voice_engine.default_voice
         orig_bot_voice = bot.VOICE_NAME
+        orig_bot_lang = bot.BOT_LANGUAGE
+        orig_env_lang = os.environ.get("BOT_LANGUAGE")
+        orig_env_voice = os.environ.get("VOICE_NAME")
 
         with tempfile.NamedTemporaryFile("w", delete=False, suffix=".env") as f:
             f.write("VOICE_NAME=ja-JP-NanamiNeural\nBOT_LANGUAGE=ja\n")
@@ -54,6 +57,15 @@ class TestAutoRestartAndHotReload(unittest.TestCase):
             # Restore
             bot.VOICE_NAME = orig_bot_voice
             bot.voice_engine.default_voice = orig_voice
+            bot.BOT_LANGUAGE = orig_bot_lang
+            if orig_env_lang is None:
+                os.environ.pop("BOT_LANGUAGE", None)
+            else:
+                os.environ["BOT_LANGUAGE"] = orig_env_lang
+            if orig_env_voice is None:
+                os.environ.pop("VOICE_NAME", None)
+            else:
+                os.environ["VOICE_NAME"] = orig_env_voice
             if os.path.exists(temp_env):
                 try:
                     os.remove(temp_env)

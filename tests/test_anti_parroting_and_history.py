@@ -38,8 +38,9 @@ class TestAntiParrotingAndConversationHistory(unittest.TestCase):
         reply2 = "Semangat yaa nugasnya! Nanti kalau udah selesai kabarin aku yaa 💕"
         self.assertFalse(bot.is_echo_or_parroting(reply2, user2))
 
-    def test_contextual_fallback_reaction(self):
-        """Provides natural contextual fallback for gathering and food."""
+    @patch("bot.is_port_listening", return_value=False)
+    def test_contextual_fallback_reaction(self, mock_port):
+        """Provides natural contextual fallback for gathering and food when offline."""
         res_eat = bot.get_contextual_fallback_reaction("nanti mau makan siang")
         self.assertIn("makan", res_eat.lower())
 

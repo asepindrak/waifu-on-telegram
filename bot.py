@@ -109,7 +109,7 @@ LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "kobold")
 COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://127.0.0.1:8188")
 MEDIA_FALLBACK = os.environ.get("MEDIA_FALLBACK_CLOUD", "false").lower() in ("true", "1", "yes")
-VOICE_ENABLED = os.environ.get("VOICE_REPLY_ENABLED", "false").lower() in ("true", "1", "yes")
+VOICE_ENABLED = False  # Auto-VN removed: voice is always triggered on-demand via button under waifu text
 VOICE_NAME = os.environ.get("VOICE_NAME", "en-US-AnaNeural")
 DEFAULT_PERSONA = os.environ.get("DEFAULT_PERSONA", "runa")
 
@@ -150,12 +150,12 @@ voice_engine = VoiceEngine(
     llm_client=llm_client
 )
 
-USER_VOICE_MODES: dict = {}      # user_id -> 'button' (default) | 'always' | 'match_vn' | 'off'
+USER_VOICE_MODES: dict = {}      # Legacy dict kept empty for backward import compatibility; voice is always button on-demand
 VOICE_CACHE: dict = {}           # v_id -> {'text': str, 'user_id': int, 'time': float}
 
 def get_user_voice_mode(user_id: int) -> str:
-    """Returns active voice mode for user: 'button' (default), 'always', 'match_vn', or 'off'."""
-    return USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "button")
+    """Voice is always delivered on-demand via the inline button under every waifu text message."""
+    return "button"
 
 def register_voice_cache(text: str, user_id: int) -> str:
     """Stores spoken text in memory cache and returns a short ID for Telegram callback buttons."""
@@ -172,9 +172,15 @@ def register_voice_cache(text: str, user_id: int) -> str:
     }
     return v_id
 
-def attach_voice_button(reply_markup: Optional[Any], text: str, user_id: int) -> types.InlineKeyboardMarkup:
+def attach_voice_button(reply_markup: Optional[Any], text: str, user_id: int) -> Optional[types.InlineKeyboardMarkup]:
     """Attaches '🔊 Dengarkan Suara' button to an existing markup or creates a new one."""
-    v_id = register_voice_cache(text, user_id)
+    if not text or not str(text).strip():
+        return reply_markup
+    if isinstance(reply_markup, types.InlineKeyboardMarkup):
+        existing_callbacks = [getattr(b, "callback_data", "") or "" for row in (reply_markup.keyboard or []) for b in row]
+        if any(cb.startswith("play_voice:") for cb in existing_callbacks):
+            return reply_markup
+    v_id = register_voice_cache(str(text), user_id)
     btn = types.InlineKeyboardButton("🔊 Dengarkan Suara", callback_data=f"play_voice:{v_id}")
     if reply_markup is None:
         markup = types.InlineKeyboardMarkup()
@@ -323,6 +329,72 @@ def safe_send_message(chat_id: int, text: str, reply_markup=None, parse_mode="Ma
             return None
 
 
+def _strip_private_url_buttons(markup: Optional[Any]) -> Optional[types.InlineKeyboardMarkup]:
+    """Removes inline URL buttons pointing to localhost/private IPs if Telegram API rejects them."""
+    if not markup:
+        return None
+    rows = getattr(markup, "keyboard", None)
+    if not rows:
+        return None
+    cleaned = types.InlineKeyboardMarkup()
+    has_any = False
+    for row in rows:
+        new_row = []
+        for btn in row:
+            btn_url = getattr(btn, "url", None) or ""
+            if re.match(r'^https?://(?:127\.0\.0\.1|localhost|100\.\d+\.\d+\.\d+)(?:[:/]|$)', btn_url, re.IGNORECASE):
+                continue
+            new_row.append(btn)
+        if new_row:
+            cleaned.row(*new_row)
+            has_any = True
+    return cleaned if has_any else None
+
+
+def _send_telegram_chunk_resilient(
+    chat_id: int,
+    chunk: str,
+    parse_mode: Optional[str],
+    reply_to_id: Optional[int],
+    reply_markup: Optional[Any]
+) -> Optional[Any]:
+    """Sends one message with automatic Markdown -> plain text -> URL-button-safe fallbacks."""
+    try:
+        return bot.send_message(
+            chat_id, chunk, parse_mode=parse_mode, reply_to_message_id=reply_to_id, reply_markup=reply_markup
+        )
+    except Exception as e_first:
+        err_low = str(e_first).lower()
+        # Try stripping private URL buttons first if Telegram rejects button URL
+        if reply_markup and any(k in err_low for k in ["button_url_invalid", "wrong http url", "inline keyboard"]):
+            safe_markup = _strip_private_url_buttons(reply_markup)
+            try:
+                return bot.send_message(
+                    chat_id, chunk, parse_mode=parse_mode, reply_to_message_id=reply_to_id, reply_markup=safe_markup
+                )
+            except Exception:
+                reply_markup = safe_markup
+
+        logger.warning(f"send_long_chat_message markdown send failed: {e_first}. Retrying as plain text.")
+        clean_text = chunk.replace("*", "").replace("_", "").replace("`", "")
+        try:
+            return bot.send_message(
+                chat_id, clean_text, reply_to_message_id=reply_to_id, reply_markup=reply_markup
+            )
+        except Exception as e_plain:
+            if reply_markup:
+                safe_markup = _strip_private_url_buttons(reply_markup)
+                try:
+                    return bot.send_message(
+                        chat_id, clean_text, reply_to_message_id=reply_to_id, reply_markup=safe_markup
+                    )
+                except Exception as e_final:
+                    logger.error(f"send_long_chat_message failed: {e_final}")
+                    return None
+            logger.error(f"send_long_chat_message failed: {e_plain}")
+            return None
+
+
 def send_long_chat_message(
     chat_id: int,
     text: str,
@@ -346,29 +418,8 @@ def send_long_chat_message(
     sent_messages = []
     # If text fits inside limit, send directly
     if len(text) <= max_chunk_size:
-        try:
-            msg = bot.send_message(
-                chat_id,
-                text,
-                parse_mode=parse_mode,
-                reply_to_message_id=reply_to_id,
-                reply_markup=reply_markup
-            )
-            return [msg]
-        except Exception as e_md:
-            logger.warning(f"send_long_chat_message single markdown send failed: {e_md}. Retrying as plain text.")
-            try:
-                clean_text = text.replace("*", "").replace("_", "").replace("`", "")
-                msg = bot.send_message(
-                    chat_id,
-                    clean_text,
-                    reply_to_message_id=reply_to_id,
-                    reply_markup=reply_markup
-                )
-                return [msg]
-            except Exception as e_plain:
-                logger.error(f"send_long_chat_message failed: {e_plain}")
-                return []
+        msg = _send_telegram_chunk_resilient(chat_id, text, parse_mode, reply_to_id, reply_markup)
+        return [msg] if msg else []
 
     # Split text into chunks respecting paragraphs / newlines
     chunks = []
@@ -397,23 +448,9 @@ def send_long_chat_message(
         first = False
         is_last = (idx == total_chunks - 1)
         chunk_markup = reply_markup if is_last else None
-        try:
-            m = bot.send_message(chat_id, chunk, parse_mode=parse_mode, reply_to_message_id=r_id, reply_markup=chunk_markup)
-            if m:
-                sent_messages.append(m)
-        except Exception as e_chk:
-            logger.warning(f"Chunk markdown send failed: {e_chk}. Retrying as plain text.")
-            try:
-                clean_chunk = chunk.replace("*", "").replace("_", "").replace("`", "")
-                m = bot.send_message(chat_id, clean_chunk, reply_to_message_id=r_id, reply_markup=chunk_markup)
-                if m:
-                    sent_messages.append(m)
-            except Exception as e_cplain:
-                logger.error(f"Failed sending plain chunk: {e_cplain}")
-                if m:
-                    sent_messages.append(m)
-            except Exception as e_chk_plain:
-                logger.error(f"Failed to send chunk: {e_chk_plain}")
+        m = _send_telegram_chunk_resilient(chat_id, chunk, parse_mode, r_id, chunk_markup)
+        if m:
+            sent_messages.append(m)
         time.sleep(0.3)  # Respect Telegram rate limits
 
     return sent_messages
@@ -473,7 +510,7 @@ def update_env_variable(key: str, value: str):
 
 def reload_env_configurations():
     """Hot-reloads modified variables from .env into global state and engines."""
-    global VOICE_NAME, BOT_LANGUAGE, VOICE_ENABLED
+    global VOICE_NAME, BOT_LANGUAGE
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     if not os.path.exists(env_path):
         return
@@ -929,7 +966,7 @@ def handle_welcome(message):
         "• 📸 **Kirim Selfie & Foto**: Cukup ketik *'pap foto dong'* atau `/pap` untuk membuka menu pose interaktif!\n"
         "• 🎵 **Remote Musik PC**: Putar lagu YouTube di PC langsung dari Telegram (`/play`, `/pause`, `/next`)!\n"
         "• 👗 **Pilihan Baju**: Pilih pakaian waifumu lewat `/outfit` (Kimono, Maid, Piyama, dll).\n"
-        "• 🎙️ **Voice Note**: Balasan suara jernih (`/voice`).\n"
+        "• 🎙️ **Voice Note**: Tekan tombol 🔊 di tiap chat waifu (atur suara: `/voice`).\n"
         "• ⚙️ **Panel Setup**: Atur seluruh konfigurasi bot dari Telegram (`/setup`).\n"
         "• ⏰ **Asisten & Pengingat**: Minta waifu ingetin jadwal lewat chat/voice note (`/remind`)!\n"
         "• ⏰ **Sapaan Otomatis**: Ucapan selamat pagi jam 7, makan siang 12:30 & tidur jam 10 malam (`/greetings`).\n"
@@ -950,7 +987,7 @@ def handle_welcome(message):
         "• `/persona` - Ganti karakter waifu (Runa, Akira, Hina, Shiro, Yume)\n"
         "• `/newpersona` - Ciptakan karakter waifu baru impianmu\n"
         "• `/love` - Cek skor cinta dan level kedekatan\n"
-        "• `/voice` - Atur gaya balasan suara (Always / Match / Mute)\n"
+        "• `/voice` - Atur engine & karakter suara waifu (Edge-TTS / VoiceStudio)\n"
         "• `/greetings` - Aktifkan/matikan sapaan harian otomatis (Pagi, Siang, Malam)\n"
         "• `/status` - Cek koneksi LLM & ComfyUI di PC\n"
         "• `/reset` - Hapus memori obrolan sementara untuk mulai topik baru\n"
@@ -968,13 +1005,6 @@ def handle_welcome(message):
 def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarkup]:
     """Builds the text and inline keyboard for the master Setup Dashboard."""
     persona = persona_mgr.get_active_persona()
-    v_mode = get_user_voice_mode(user_id)
-    v_labels = {
-        "button": "Tombol Suara di Chat 🔘",
-        "always": "Selalu Balas VN 🎙️",
-        "match_vn": "Hanya Saat Kirim VN 🎧",
-        "off": "Text Only (Mute) 🔇"
-    }
     cur_ar = USER_RATIOS.get(user_id, "3:4")
     cur_q = USER_QUALITIES.get(user_id, "high").upper()
     cur_auto = "AKTIF ✅" if is_autorun_enabled() else "NONAKTIF ❌"
@@ -1033,7 +1063,7 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         f"👑 **Waifu Aktif** : **{persona.get('name')}** _({persona.get('archetype', 'Companion')})_\n"
         f"🌐 **Bahasa**     : `{persona_mgr.get_language_display_name(BOT_LANGUAGE)}`\n"
         f"👗 **Pakaian**    : `{cur_outfit_name}`\n"
-        f"🎙️ **Mode Suara** : `{v_labels.get(v_mode, v_mode)}`\n"
+        f"🎙️ **Suara Chat** : `🔊 Tombol di Setiap Chat (On-Demand)`\n"
         f"🗣️ **Voice TTS**  : `{('VoiceStudio (' + persona.get('name', 'Local') + ')') if os.environ.get('VOICE_BACKEND', 'edge-tts').lower().strip() in ('voicestudio', 'local') else voice_engine.default_voice}`\n"
         f"🧠 **Model LLM**  : `{cur_llm}`\n"
         f"🎨 **Model Foto** : `{cur_ckpt}`\n"
@@ -1694,6 +1724,7 @@ def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, ye
             types.InlineKeyboardButton("💖 Peluk & Cium Waifu", callback_data="dates_act:kiss_reaction"),
             types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu")
         )
+        markup = attach_voice_button(markup, caption_msg, user_id)
 
         if img_bytes:
             bot.send_photo(chat_id, img_bytes, caption=caption_msg, reply_markup=markup, parse_mode="Markdown")
@@ -1701,21 +1732,6 @@ def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, ye
             bot.send_message(chat_id, caption_msg, reply_markup=markup, parse_mode="Markdown")
 
         persona_mgr.add_message(user_id, "assistant", caption_msg)
-
-        # 2. Generate and send celebration voice note
-        v_mode = USER_VOICE_MODES.get(user_id, "always" if VOICE_ENABLED else "off")
-        if v_mode != "off":
-            vn_path = voice_engine.generate_voice(voice_script, voice_name=persona.get("voice"))
-            if vn_path and os.path.exists(vn_path):
-                try:
-                    with open(vn_path, "rb") as vf:
-                        bot.send_voice(chat_id, vf)
-                except Exception as e_v:
-                    logger.error(f"Error sending celebration VN: {e_v}")
-                try:
-                    os.remove(vn_path)
-                except Exception:
-                    pass
 
     except Exception as e:
         logger.error(f"Error executing special day celebration for user {user_id}: {e}")
@@ -1959,13 +1975,10 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
         text = (
             f"🎙️ **PANDUAN VOICE NOTE & AUDIO (/voice)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• **Mendengar Balasan Suara**: Waifu dapat berbicara dengan suara asli manusia menggunakan Microsoft Edge-TTS yang jernih.\n\n"
-            f"• **Kirim Voice Note**: Kirim pesan suara langsung dari Telegram, waifu akan mentranskripsi dan menjawab suaramu secara otomatis!\n\n"
-            f"• **Pilihan Mode Suara (/voice)**:\n"
-            f"  - `🎙️ Selalu Balas Suara`: Setiap pesanmu dibalas teks dan audio VN.\n"
-            f"  - `🎧 Balas Suara Hanya Saat Kirim VN`: Waifu mengirim VN hanya jika kamu juga mengirim VN.\n"
-            f"  - `🔇 Text Only (Mute)`: Balasan teks saja tanpa audio.\n\n"
-            f"• **Pilihan Suara**: Ana (US Sweet), Gadis (Indonesia Alami), Nanami (Jepang Kawaii), Jenny (US Ceria)."
+            f"• **Tombol Suara di Setiap Chat**: Setiap pesan teks dari waifu dilengkapi tombol **🔊 Dengarkan Suara**. Tekan tombol tersebut kapan saja untuk mendengar suara waifu!\n\n"
+            f"• **Kirim Voice Note**: Kirim pesan suara langsung dari Telegram, waifu akan mentranskripsi dan membalas pesanmu secara otomatis!\n\n"
+            f"• **Pengaturan Suara (/voice)**: Pilih engine suara (**Edge-TTS Cloud** atau **VoiceStudio Local AI**) serta karakter suara:\n"
+            f"  Ana (US Sweet), Gadis (Indonesia Alami), Nanami (Jepang Kawaii), Jenny (US Ceria), atau Auto Sync."
         )
         markup.add(
             types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
@@ -2088,7 +2101,7 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
             f"`/newpersona` - Ciptakan karakter waifu baru impianmu\n"
             f"`/ratio` - Ganti rasio gambar (3:4, 9:16, 1:1, 4:3)\n"
             f"`/quality` - Atur kualitas foto (Ultra/High/Fast)\n"
-            f"`/voice` - Pengaturan balasan suara\n"
+            f"`/voice` - Pengaturan mesin & karakter suara (tombol 🔊 di chat)\n"
             f"`/love` - Cek skor cinta dan level kedekatan\n"
             f"`/greetings` - Toggle sapaan pagi, siang & malam otomatis\n"
             f"`/status` - Cek koneksi server GPU, LLM & ComfyUI\n"
@@ -2550,7 +2563,6 @@ def show_language_menu(chat_id: int, user_id: int, message_to_edit: Optional[int
 
 
 def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
-    cur_mode = get_user_voice_mode(user_id)
     cur_speaker = voice_engine.default_voice
     cur_backend = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
     is_vs = (cur_backend in ("voicestudio", "local"))
@@ -2564,14 +2576,6 @@ def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Option
     # 1. Voice Engine Toggle Button
     engine_toggle_label = "🏠 Engine: VoiceStudio (Local AI Port 3900) ➔ Ubah ke Edge-TTS" if is_vs else "🌐 Engine: Edge-TTS Cloud (Aktif) ➔ Ubah ke VoiceStudio"
     markup.add(types.InlineKeyboardButton(engine_toggle_label, callback_data="cfg_toggle_voice_engine"))
-
-    # 2. Voice Reply Mode
-    markup.add(
-        types.InlineKeyboardButton(f"🔘 Tombol Suara di Chat (Default) {'✓' if cur_mode in ('button', 'on_demand') else ''}", callback_data="set_voice:button"),
-        types.InlineKeyboardButton(f"🎙️ Selalu Balas Suara Otomatis {'✓' if cur_mode == 'always' else ''}", callback_data="set_voice:always"),
-        types.InlineKeyboardButton(f"🎧 Balas Suara Hanya Saat Kirim VN {'✓' if cur_mode == 'match_vn' else ''}", callback_data="set_voice:match_vn"),
-        types.InlineKeyboardButton(f"🔇 Text Only (Mute Total) {'✓' if cur_mode == 'off' else ''}", callback_data="set_voice:off")
-    )
 
     if is_vs:
         markup.add(
@@ -2594,10 +2598,10 @@ def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Option
             f"🎙️ **Pengaturan Voice & Audio Waifu**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"• Engine Suara : `🏠 VoiceStudio Local AI (Port 3900)`\n"
-            f"• Mode Balasan : **{cur_mode.upper()}**\n"
+            f"• Tombol Suara : `🔊 Selalu Aktif di Setiap Chat (On-Demand)`\n"
             f"• Persona Voice: **{p_name}**\n"
             f"• Karakteristik: _{p_char}_\n\n"
-            f"💡 _VoiceStudio beroperasi secara lokal & offline di PC Anda, otomatis menghasilkan intonasi suara sesuai persona {p_name}!_"
+            f"💡 _Tekan tombol 🔊 Dengarkan Suara di bawah chat waifu kapan saja untuk memutar suaranya via VoiceStudio!_"
         )
     else:
         speaker_desc = "🌐 Auto-sync (Ikuti Bahasa Chat)" if str(cur_speaker).lower() == "auto" else cur_speaker
@@ -2605,14 +2609,14 @@ def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Option
             f"🎙️ **Pengaturan Voice & Audio Waifu**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"• Engine Suara : `🌐 Edge-TTS Cloud (Ringan & 0 VRAM)`\n"
-            f"• Mode Balasan : **{cur_mode.upper()}**\n"
+            f"• Tombol Suara : `🔊 Selalu Aktif di Setiap Chat (On-Demand)`\n"
             f"• Model Suara  : `{speaker_desc}`\n\n"
             f"🗣️ **Pilihan Bahasa & Karakter Suara:**\n"
             f"• 🇮🇩 **Gadis** = Bahasa Indonesia alami\n"
             f"• 🇯🇵 **Nanami** = Bahasa Jepang (otomatis polyglot voice!)\n"
             f"• 🇬🇧 **Ana / Jenny** = Bahasa Inggris\n"
             f"• 🌐 **Auto** = Otomatis mengikuti bahasa chat waifu (`/language`)\n\n"
-            f"💡 _Fitur Polyglot Voice Guardrail otomatis menerjemahkan ucapan waifu ke bahasa suara yang kamu pilih!_"
+            f"💡 _Tekan tombol 🔊 Dengarkan Suara di bawah setiap pesan waifu untuk memutar audio kapan saja._"
         )
 
     if message_to_edit:
@@ -2846,7 +2850,7 @@ def build_system_diagnostics_report(user_id: int) -> str:
     vs_backend = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
     vs_speaker = os.environ.get("VOICE_NAME", getattr(voice_engine, "default_voice", "id-ID-GadisNeural"))
     vs_lang = os.environ.get("VOICE_LANGUAGE", "id-ID")
-    vs_reply = os.environ.get("VOICE_REPLY_MODE", "smart").title()
+    vs_reply = "Tombol 🔊 On-Demand (Selalu Aktif)"
     if "voicestudio" in vs_backend:
         vs_port = int(os.environ.get("VOICESTUDIO_PORT", "3900"))
         if is_voicestudio_online():
@@ -4340,16 +4344,30 @@ def handle_voice_command(message):
 def callback_set_voice(call):
     if not is_authorized(call.from_user.id):
         return
-    mode = call.data.split(":", 1)[1]
-    USER_VOICE_MODES[call.from_user.id] = mode
-    labels = {
-        "button": "🔘 Tombol Suara di Chat (Default)",
-        "always": "🎙️ Selalu Balas Suara Otomatis",
-        "match_vn": "🎧 Balas Suara Hanya Saat Kirim VN",
-        "off": "🔇 Text Only (Mute Total)"
-    }
-    bot.answer_callback_query(call.id, f"Mode Suara: {labels.get(mode, mode)}")
+    bot.answer_callback_query(call.id, "🔊 Tombol suara kini selalu aktif di setiap chat!")
     show_voice_settings_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+
+
+def _rebuild_voice_button_markup(existing_markup: Optional[Any], label: str, callback_data: str, target_prefix: str = "play_voice:") -> types.InlineKeyboardMarkup:
+    """Updates the play_voice button label/callback while preserving all other inline buttons on the message."""
+    new_markup = types.InlineKeyboardMarkup()
+    rows = getattr(existing_markup, "keyboard", None) if existing_markup else None
+    replaced = False
+    if rows:
+        for row in rows:
+            new_row = []
+            for btn in row:
+                cb = getattr(btn, "callback_data", "") or ""
+                if (cb.startswith(target_prefix) or cb == "noop_voice_loading") and not replaced:
+                    new_row.append(types.InlineKeyboardButton(label, callback_data=callback_data))
+                    replaced = True
+                else:
+                    new_row.append(btn)
+            if new_row:
+                new_markup.row(*new_row)
+    if not replaced:
+        new_markup.add(types.InlineKeyboardButton(label, callback_data=callback_data))
+    return new_markup
 
 
 @bot.callback_query_handler(func=lambda call: call.data and call.data.startswith("play_voice:"))
@@ -4378,9 +4396,9 @@ def callback_play_voice(call):
     except Exception:
         pass
 
+    orig_markup = getattr(call.message, "reply_markup", None)
     try:
-        loading_markup = types.InlineKeyboardMarkup()
-        loading_markup.add(types.InlineKeyboardButton("⏳ Sedang memproses suara... 💕", callback_data="noop"))
+        loading_markup = _rebuild_voice_button_markup(orig_markup, "⏳ Sedang memproses suara... 💕", "noop_voice_loading")
         bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=loading_markup)
     except Exception:
         pass
@@ -4402,10 +4420,12 @@ def callback_play_voice(call):
         with acquire_gpu_heavy_lock("Telegram Chat On-Demand Voice Note"):
             vn_path = voice_engine.generate_voice_note(clean_for_vn)
 
+        sent_ok = False
         if vn_path and os.path.exists(vn_path):
             try:
                 with open(vn_path, "rb") as vn_file:
                     bot.send_voice(chat_id, vn_file, reply_to_message_id=call.message.message_id)
+                sent_ok = True
             except Exception as e_send:
                 logger.error(f"Error sending on-demand voice note: {e_send}")
             finally:
@@ -4415,8 +4435,8 @@ def callback_play_voice(call):
                     pass
 
         try:
-            done_markup = types.InlineKeyboardMarkup()
-            done_markup.add(types.InlineKeyboardButton("🔊 Putar Suara Lagi", callback_data=f"play_voice:{v_id}"))
+            done_label = "🔊 Putar Suara Lagi" if sent_ok else "🔊 Dengarkan Suara"
+            done_markup = _rebuild_voice_button_markup(orig_markup, done_label, f"play_voice:{v_id}")
             bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=done_markup)
         except Exception:
             pass
@@ -4888,6 +4908,8 @@ def process_photo_request(
                     types.InlineKeyboardButton(f"🚪 Selesai Kencan ({v_title})", callback_data="end_hangout")
                 )
 
+            markup = attach_voice_button(markup, clean_caption or full_caption, user_id)
+
             # Optimize image bytes before sending to Telegram to prevent read timeout
             img_to_send = img_bytes
             if len(img_bytes) > 800 * 1024:
@@ -5194,7 +5216,8 @@ def handle_incoming_photo(message):
                     dyn_photo, _ = llm_client.chat(dyn_msg, max_tokens=250, temperature=0.9)
                     reply = dyn_photo if (dyn_photo and dyn_photo.strip()) else f"*{p_name} melihat fotomu dengan mata berbinar*\n\nFotonya manis banget! Suka deh lihatnya 🥰"
                 reply = format_roleplay_italics(reply, character_name=p_name)
-                safe_reply_to(message, reply)
+                vision_markup = attach_voice_button(None, reply, message.from_user.id)
+                safe_reply_to(message, reply, reply_markup=vision_markup)
 
                 persona_mgr.add_message(message.from_user.id, "user", f"[User sent a photo: {caption}]")
                 persona_mgr.add_message(message.from_user.id, "assistant", reply)
@@ -5203,7 +5226,8 @@ def handle_incoming_photo(message):
                 logger.error(f"Error handling user photo: {e}")
                 p_name = persona.get("name", "Runa")
                 err_reply = format_roleplay_italics(f"*{p_name} tersenyum kagum melihat fotomu*\n\nWah fotonya manis banget, kelihatan pas dan keren di kamu 🥰", character_name=p_name)
-                safe_reply_to(message, err_reply)
+                err_markup = attach_voice_button(None, err_reply, message.from_user.id)
+                safe_reply_to(message, err_reply, reply_markup=err_markup)
 
     threading.Thread(target=_vision_task, daemon=True).start()
 
@@ -6211,8 +6235,8 @@ def callback_project_runner_actions(call):
             ts_url = entry.get("tailscale_url")
             local_url = entry.get("local_url")
             magic_url = entry.get("magic_dns_url")
-            markup = types.InlineKeyboardMarkup()
-            markup.add(
+            markup = build_preview_url_buttons(port=int(entry["port"]), tailscale_url=ts_url)
+            markup.row(
                 types.InlineKeyboardButton("🛑 Stop Server", callback_data=f"srv_stop:{p_name}"),
                 types.InlineKeyboardButton("📄 Cek Log", callback_data=f"srv_logs:{p_name}")
             )
@@ -6303,6 +6327,35 @@ def callback_browser_profile_launch(call):
     safe_send_message(call.message.chat.id, f"🌸 **Waifu**:\n{msg}")
 
 
+def build_preview_url_buttons(
+    port: int,
+    tailscale_url: Optional[str] = None,
+    existing_markup: Optional[types.InlineKeyboardMarkup] = None
+) -> types.InlineKeyboardMarkup:
+    """
+    Attaches live preview URL button(s) to an inline keyboard.
+    When Tailscale is installed with an active IP, includes both Localhost and Tailscale IP buttons.
+    """
+    markup = existing_markup if isinstance(existing_markup, types.InlineKeyboardMarkup) else types.InlineKeyboardMarkup()
+    local_url = f"http://127.0.0.1:{port}/"
+    ts_url = tailscale_url
+    if not ts_url:
+        try:
+            from project_server_manager import resolve_tailscale_url
+            _, ts_url = resolve_tailscale_url(port)
+        except Exception:
+            ts_url = None
+
+    if ts_url:
+        markup.row(
+            types.InlineKeyboardButton(f"💻 Localhost:{port}", url=local_url),
+            types.InlineKeyboardButton(f"📱 Tailscale:{port}", url=ts_url)
+        )
+    else:
+        markup.row(types.InlineKeyboardButton(f"🌐 Buka Live Web Preview (Port {port})", url=local_url))
+    return markup
+
+
 def process_coding_request(message, user_text: str, is_voice: bool = False):
     """Executes coding / engineering tasks within the active project workspace."""
     chat_id = message.chat.id
@@ -6344,41 +6397,27 @@ def process_coding_request(message, user_text: str, is_voice: bool = False):
     except Exception:
         pass
 
-    # Detect preview URL (127.0.0.1 or localhost) and attach an Inline Keyboard Button for 1-tap direct opening
-    preview_match = re.search(r'http://(?:127\.0\.0\.1|localhost):(\d+)/?', response_text)
+    # Detect preview URL (localhost / 127.0.0.1 / Tailscale IP) and attach 1 or 2 preview buttons
+    preview_match = re.search(r'http://(?:127\.0\.0\.1|localhost|\d+\.\d+\.\d+\.\d+):(\d+)/?', response_text)
     preview_markup = None
     if preview_match:
-        p_port = preview_match.group(1)
-        p_url = f"http://127.0.0.1:{p_port}/"
-        preview_markup = types.InlineKeyboardMarkup()
-        preview_markup.add(types.InlineKeyboardButton(f"🌐 Buka Live Web Preview (Port {p_port})", url=p_url))
+        p_port = int(preview_match.group(1))
+        ts_match = re.search(rf'(http://(?!127\.0\.0\.1\b)\d+\.\d+\.\d+\.\d+:{p_port}/?)', response_text)
+        parsed_ts_url = ts_match.group(1) if ts_match else None
+        preview_markup = build_preview_url_buttons(port=p_port, tailscale_url=parsed_ts_url)
 
-    v_mode = get_user_voice_mode(user_id)
-    if v_mode in ("button", "on_demand"):
-        preview_markup = attach_voice_button(preview_markup, voice_text or response_text, user_id)
+    preview_markup = attach_voice_button(preview_markup, voice_text or response_text, user_id)
     send_long_chat_message(chat_id, response_text, reply_to_id=message.message_id, reply_markup=preview_markup)
+
+    # Record coding exchange in main chat history so casual follow-ups retain coding context
+    try:
+        concise_reply = response_text if len(response_text) <= 1200 else response_text[:1200] + "..."
+        persona_mgr.add_message(user_id, "user", f"[Coding Task ({active_proj})]: {user_text}")
+        persona_mgr.add_message(user_id, "assistant", concise_reply)
+    except Exception as e_mem:
+        logger.debug(f"Could not log coding task to persona history: {e_mem}")
+
     pending_manager.clear_pending(chat_id)
-
-    should_send_vn = (v_mode == "always" and VOICE_ENABLED) or (v_mode == "match_vn" and is_voice)
-    if should_send_vn and voice_engine:
-        # User requested: batasi voice note secukupnya saja (singkat & manis, tidak membaca teks panjang / kode)
-        raw_spoken = voice_text or ""
-        clean_spoken = re.sub(r'[*_`#~<>]', '', raw_spoken).strip()
-        if not clean_spoken or len(clean_spoken) > 100 or "\n" in clean_spoken or "http" in clean_spoken.lower():
-            clean_spoken = f"Proyek {active_proj} sudah aku selesaikan yaa! Kamu bisa langsung cek dan coba preview hasilnya~"
-
-        try:
-            with acquire_gpu_heavy_lock("Coding Task Voice Note"):
-                vn_path = voice_engine.generate_voice_note(clean_spoken)
-            if vn_path and os.path.exists(vn_path):
-                with open(vn_path, "rb") as bio:
-                    bot.send_voice(chat_id, bio, caption=f"🌸 {p_name}")
-                try:
-                    os.remove(vn_path)
-                except Exception:
-                    pass
-        except Exception as e_vn:
-            logger.warning(f"Voice send failed: {e_vn}")
 
 
 def process_computer_request(message, user_text: str):
@@ -6602,6 +6641,37 @@ def is_echo_or_parroting(reply: str, user_text: str) -> bool:
     return False
 
 
+def _is_llm_client_endpoint_reachable(client: Any, is_nsfw: bool = False) -> bool:
+    """Checks whether the configured LLM endpoint (KoboldCPP, AGY Bridge, or Cloud API) is reachable."""
+    if not client:
+        return False
+
+    target_client = client
+    split_checker = getattr(client, "is_split_mode", None)
+    if callable(split_checker):
+        try:
+            if split_checker() is True:
+                target_client = (
+                    getattr(client, "nsfw_client", None)
+                    if is_nsfw
+                    else getattr(client, "sfw_client", None)
+                ) or client
+        except Exception:
+            pass
+
+    base_url = getattr(target_client, "base_url", None)
+    if not isinstance(base_url, str) or not base_url.strip():
+        return is_port_listening(5001) or is_port_listening(8001)
+
+    low_url = base_url.lower().strip()
+    if any(host in low_url for host in ("127.0.0.1", "localhost")):
+        port_match = re.search(r":(\d+)", low_url)
+        port = int(port_match.group(1)) if port_match else (8001 if "agy" in str(getattr(target_client, "api_key", "")).lower() else 5001)
+        return is_port_listening(port)
+
+    return bool(str(getattr(target_client, "api_key", "") or "").strip())
+
+
 def generate_dynamic_visual_novel_reaction(
     user_text: str,
     persona_name: str = "Runa",
@@ -6617,7 +6687,7 @@ def generate_dynamic_visual_novel_reaction(
     p_name = persona_name or "Runa"
     client = llm_client or globals().get("llm_client")
 
-    if client and is_port_listening(5001):
+    if _is_llm_client_endpoint_reachable(client, is_nsfw=is_nsfw):
         try:
             prompt = (
                 f"Lawan bicaramu baru saja berkata: \"{user_text}\".\n"
@@ -6824,6 +6894,23 @@ class ChatQueueManager:
 chat_queue_mgr = ChatQueueManager(debounce_window=1.2, max_debounce_window=2.5)
 
 
+_CODING_USER_LOCKS: Dict[int, threading.Lock] = {}
+_CODING_USER_LOCKS_GUARD = threading.Lock()
+
+
+def _dispatch_coding_background(message, user_text: str, is_voice: bool = False):
+    """Runs long coding tasks off the main chat queue worker, serialized per user."""
+    uid = message.from_user.id
+    with _CODING_USER_LOCKS_GUARD:
+        lock = _CODING_USER_LOCKS.setdefault(uid, threading.Lock())
+
+    def _runner():
+        with lock:
+            process_coding_request(message, user_text, is_voice=is_voice)
+
+    threading.Thread(target=_runner, daemon=True).start()
+
+
 def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
     """Executes a single conversational turn synchronously inside the worker thread."""
     def _execute():
@@ -6844,15 +6931,16 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     persona_name=p_name
                 )
                 if ok:
-                    safe_reply_to(message, reply_msg)
-                    # If this was switch/create AND the user also gave a coding prompt, continue to coding!
+                    proj_markup = attach_voice_button(None, reply_msg, message.from_user.id)
+                    safe_reply_to(message, reply_msg, reply_markup=proj_markup)
+                    # If this was switch/create AND the user also gave a coding prompt, continue to coding off-queue
                     if p_intent.intent_type in ("SWITCH", "CREATE") and coding_engine.is_coding_intent(user_text, user_id=message.from_user.id):
-                        process_coding_request(message, user_text, is_voice=is_voice)
+                        _dispatch_coding_background(message, user_text, is_voice=is_voice)
                     return
 
-            # Check Coding Intent (programming / workspace tasks)
+            # Check Coding Intent (programming / workspace tasks) without stalling casual chat queue
             if coding_engine.is_coding_intent(user_text, user_id=message.from_user.id):
-                process_coding_request(message, user_text, is_voice=is_voice)
+                _dispatch_coding_background(message, user_text, is_voice=is_voice)
                 return
 
             is_media, media_type = persona_mgr.detect_media_request(user_text)
@@ -6892,23 +6980,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     types.InlineKeyboardButton("📋 Lihat Semua Pengingat", callback_data="open_reminders_menu"),
                     types.InlineKeyboardButton("❌ Batalkan", callback_data=f"rem_del:{item['id']}")
                 )
-
-                v_mode = get_user_voice_mode(message.from_user.id)
-                should_voice = (v_mode == "always" and VOICE_ENABLED) or (v_mode == "match_vn" and is_voice)
-                if should_voice:
-                    voice_text = f"Siap! Aku bakal ingetin kamu buat {rem_task} {rem_str}. Tenang aja, aku selalu ada buat kamu!"
-                    vn_path = voice_engine.generate_voice(voice_text, voice_name=persona.get("voice"))
-                    if vn_path and os.path.exists(vn_path):
-                        try:
-                            with open(vn_path, 'rb') as vf:
-                                bot.send_voice(message.chat.id, vf, caption=confirm_msg, parse_mode="Markdown", reply_markup=markup, reply_to_message_id=message.message_id)
-                        except Exception as ve:
-                            logger.error(f"Error sending reminder ack voice: {ve}")
-                        try:
-                            os.remove(vn_path)
-                        except Exception:
-                            pass
-                        return
+                markup = attach_voice_button(markup, confirm_msg, message.from_user.id)
                 safe_reply_to(message, confirm_msg, reply_markup=markup)
                 return
 
@@ -6945,6 +7017,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         )
                     markup = types.InlineKeyboardMarkup()
                     markup.add(types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu"))
+                    markup = attach_voice_button(markup, reply_msg, message.from_user.id)
                     safe_reply_to(message, reply_msg, reply_markup=markup)
                     return
                 else:
@@ -6982,6 +7055,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     )
                 markup = types.InlineKeyboardMarkup()
                 markup.add(types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu"))
+                markup = attach_voice_button(markup, conf_msg, message.from_user.id)
                 safe_reply_to(message, conf_msg, reply_markup=markup)
                 return
 
@@ -7411,10 +7485,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 )
 
                 formatted_reply = format_roleplay_italics(clean_reply, character_name=persona.get("name", "Runa"))
-                u_voice_mode = get_user_voice_mode(message.from_user.id)
-                chat_markup = None
-                if u_voice_mode in ("button", "on_demand"):
-                    chat_markup = attach_voice_button(None, clean_reply, message.from_user.id)
+                chat_markup = attach_voice_button(None, clean_reply, message.from_user.id)
                 safe_reply_to(message, formatted_reply, reply_markup=chat_markup, parse_mode="Markdown")
 
                 if should_send_conv_photo or should_send_spontaneous:
@@ -7490,35 +7561,6 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         except Exception as e_rep:
                             logger.debug(f"Buffer replenishment error: {e_rep}")
                     threading.Thread(target=_replenish_buffer, daemon=True).start()
-
-                user_mode = get_user_voice_mode(message.from_user.id)
-                should_voice = False
-                if user_mode == "always" and VOICE_ENABLED:
-                    should_voice = (is_voice or len(reply_text) < 220)
-                elif user_mode == "match_vn" and is_voice and VOICE_ENABLED:
-                    should_voice = True
-
-                if should_voice:
-                    def send_voice():
-                        clean_for_vn = voice_engine.clean_text_for_speech(reply_text)
-                        if len(clean_for_vn) > 200:
-                            m = re.search(r'^(.*[.!?])\s', clean_for_vn[:220])
-                            if m:
-                                clean_for_vn = m.group(1)
-                            else:
-                                clean_for_vn = clean_for_vn[:180].rsplit(' ', 1)[0]
-
-                        from resource_lock import acquire_gpu_heavy_lock
-                        with acquire_gpu_heavy_lock("Telegram Chat Voice Note"):
-                            vn_path = voice_engine.generate_voice_note(clean_for_vn)
-                        if vn_path:
-                            try:
-                                with open(vn_path, "rb") as vn_file:
-                                    bot.send_voice(message.chat.id, vn_file)
-                            finally:
-                                if os.path.exists(vn_path):
-                                    os.remove(vn_path)
-                    threading.Thread(target=send_voice, daemon=True).start()
 
         except Exception as e_proc:
             logger.error(f"Error handling message in process_text_chat: {e_proc}", exc_info=True)
@@ -7615,18 +7657,9 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
             if not text:
                 text = fallback
 
-        bot.send_message(user_id, f"{tag}\n\n{text}", parse_mode="Markdown")
+        greeting_markup = attach_voice_button(None, text, user_id)
+        bot.send_message(user_id, f"{tag}\n\n{text}", reply_markup=greeting_markup, parse_mode="Markdown")
         persona_mgr.add_message(user_id, "assistant", text)
-
-        if VOICE_ENABLED:
-            vn_path = voice_engine.generate_voice_note(text)
-            if vn_path:
-                try:
-                    with open(vn_path, "rb") as f:
-                        bot.send_voice(user_id, f)
-                finally:
-                    if os.path.exists(vn_path):
-                        os.remove(vn_path)
     except Exception as e:
         logger.error(f"Error sending scheduled greeting to {user_id}: {e}")
 
@@ -7687,24 +7720,8 @@ def schedule_daily_greetings():
                         types.InlineKeyboardButton("📋 Kelola Pengingat", callback_data="open_reminders_menu")
                     )
 
-                    v_mode = get_user_voice_mode(uid)
-                    sent_voice = False
-                    if v_mode == "always" and VOICE_ENABLED:
-                        voice_msg = f"Halo! Waktunya {task}, jangan lupa dikerjakan yaa!"
-                        vn_path = voice_engine.generate_voice(voice_msg, voice_name=persona.get("voice"))
-                        if vn_path and os.path.exists(vn_path):
-                            try:
-                                with open(vn_path, "rb") as vf:
-                                    bot.send_voice(cid, vf, caption=alert_text, parse_mode="Markdown", reply_markup=rem_markup)
-                                sent_voice = True
-                            except Exception as e_v:
-                                logger.error(f"Error sending reminder voice note: {e_v}")
-                            try:
-                                os.remove(vn_path)
-                            except Exception:
-                                pass
-                    if not sent_voice:
-                        bot.send_message(cid, alert_text, reply_markup=rem_markup, parse_mode="Markdown")
+                    rem_markup = attach_voice_button(rem_markup, alert_text, uid)
+                    bot.send_message(cid, alert_text, reply_markup=rem_markup, parse_mode="Markdown")
                 except Exception as rem_err:
                     logger.error(f"Error dispatching reminder {rem.get('id')}: {rem_err}")
 
@@ -7728,23 +7745,10 @@ def schedule_daily_greetings():
                                 )
                         if p_msg:
                             persona_mgr.add_message(uid, "assistant", p_msg)
-                            u_mode = get_user_voice_mode(uid)
-                            proactive_markup = None
-                            if u_mode in ("button", "on_demand"):
-                                proactive_markup = attach_voice_button(None, p_msg, uid)
+                            proactive_markup = attach_voice_button(None, p_msg, uid)
                             bot.send_message(uid, p_msg, reply_markup=proactive_markup)
                             proactive_engine.mark_proactive_sent(uid)
                             logger.info(f"Dispatched proactive check-in to user {uid}: {p_msg}")
-
-                            if u_mode == "always" and VOICE_ENABLED and len(p_msg) < 180:
-                                vn_path = voice_engine.generate_voice_note(p_msg)
-                                if vn_path:
-                                    try:
-                                        with open(vn_path, "rb") as vf:
-                                            bot.send_voice(uid, vf)
-                                    finally:
-                                        if os.path.exists(vn_path):
-                                            os.remove(vn_path)
                     except Exception as e_proact:
                         logger.error(f"Error sending proactive check-in to {uid}: {e_proact}")
 
@@ -7788,7 +7792,7 @@ def setup_bot_commands():
         types.BotCommand("newpersona", "🎭 Buat waifu kustom baru"),
         types.BotCommand("ratio", "📐 Ganti rasio foto (3:4, 9:16, 1:1, 4:3)"),
         types.BotCommand("quality", "✨ Atur kualitas foto (Ultra/High/Fast)"),
-        types.BotCommand("voice", "🎙️ Pengaturan balasan suara / VN"),
+        types.BotCommand("voice", "🎙️ Pengaturan mesin & karakter suara (tombol 🔊)"),
         types.BotCommand("video_engine", "🎬 Dashboard AI Video Engine (Wan 2.1 / AnimateDiff)"),
         types.BotCommand("love", "💖 Cek skor cinta & status hubungan"),
         types.BotCommand("greetings", "⏰ Toggle sapaan harian (Pagi, Siang, Malam)"),

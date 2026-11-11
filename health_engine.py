@@ -232,17 +232,21 @@ class HealthEngine:
         nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "").lower().strip()
         mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip()
 
-        # In split mode, check whichever engine is offline
+        # In split mode, check whichever engine is offline (avoid duplicate 5001 probes)
         if mode in ("split", "hybrid"):
             ok = True
+            kobold_checked = False
             if (sfw_p == "agy" or ":8001" in str(base_url)):
                 if not is_port_listening(8001, timeout=1.5):
                     ok = self.heal_agy() and ok
-            elif not is_port_listening(5001):
-                ok = self._heal_koboldcpp_instance() and ok
+            else:
+                kobold_checked = True
+                if not is_port_listening(5001):
+                    ok = self._heal_koboldcpp_instance() and ok
 
-            if (nsfw_p == "local" or ":5001" in str(getattr(self.llm_client, "nsfw_client", ""))) and not is_port_listening(5001):
-                ok = self._heal_koboldcpp_instance() and ok
+            if not kobold_checked and (nsfw_p == "local" or ":5001" in str(getattr(self.llm_client, "nsfw_client", ""))):
+                if not is_port_listening(5001):
+                    ok = self._heal_koboldcpp_instance() and ok
             return ok
 
         # If active LLM is AGY OpenAI Bridge (Port 8001)

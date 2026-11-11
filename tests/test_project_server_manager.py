@@ -71,6 +71,25 @@ class TestProjectServerManager(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(len(self.mgr.list_active_servers()), 0)
 
+    def test_start_preview_server_includes_tailscale_url_when_installed(self):
+        from unittest.mock import patch
+        sub = os.path.join(self.test_dir, "ts-app")
+        os.makedirs(sub, exist_ok=True)
+        with open(os.path.join(sub, "index.html"), "w") as f:
+            f.write("<!DOCTYPE html><html><body><h1>TS Preview</h1></body></html>")
+
+        with patch("project_runner.TailscaleManager.get_tailscale_info", return_value={"installed": True, "online": True, "ip": "100.64.10.5"}):
+            s_info = self.mgr.start_preview_server("ts-app", sub)
+            self.assertIsNotNone(s_info)
+            port = s_info["port"]
+            self.assertEqual(s_info["url"], f"http://127.0.0.1:{port}/")
+            self.assertEqual(s_info["tailscale_ip"], "100.64.10.5")
+            self.assertEqual(s_info["tailscale_url"], f"http://100.64.10.5:{port}/")
+            formatted = self.mgr.format_active_servers_message()
+            self.assertIn(f"http://127.0.0.1:{port}/", formatted)
+            self.assertIn(f"http://100.64.10.5:{port}/", formatted)
+            self.mgr.stop_preview_server(port)
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -79,7 +79,8 @@ class TestPerformanceAndProgressFeedback(unittest.TestCase):
     def test_koboldcpp_launch_args_contain_bounded_context(self):
         """Ensure KoboldCPP is launched with explicit contextsize and thread constraints to prevent PC freezing."""
         engine = idle_engine.IdleEngine()
-        with patch("subprocess.Popen") as mock_popen, \
+        with patch.dict(os.environ, {"AI_ENGINE_MODE": "unified", "SFW_LLM_PROVIDER": "local", "LLM_BASE_URL": "http://127.0.0.1:5001/v1"}, clear=False), \
+             patch("subprocess.Popen") as mock_popen, \
              patch("os.path.isfile", return_value=True), \
              patch("os.path.isdir", return_value=True), \
              patch("os.listdir", return_value=["Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"]), \

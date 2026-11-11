@@ -146,6 +146,59 @@ class CodingEngine:
                 return True
         return False
 
+    def _extract_voice_reply(self, raw_text: str) -> Tuple[str, Optional[str]]:
+        """Extracts optional <<<VOICE_REPLY>>> tag from output and returns (clean_text, voice_text)."""
+        if not raw_text or "<<<VOICE_REPLY>>>" not in raw_text:
+            return raw_text, None
+        m = re.search(r'<<<VOICE_REPLY>>>(.*?)<<<END_VOICE_REPLY>>>', raw_text, re.DOTALL)
+        if not m:
+            return raw_text, None
+        voice_text = m.group(1).strip()
+        clean_text = re.sub(r'<<<VOICE_REPLY>>>.*?<<<END_VOICE_REPLY>>>', '', raw_text, flags=re.DOTALL).strip()
+        return clean_text, voice_text
+
+    def _run_llm_coding_fallback(
+        self,
+        prompt: str,
+        system_instruction: str,
+        voice_instruction: str,
+        active_project: str,
+        project_path: str,
+        reason: str
+    ) -> Tuple[str, Optional[str]]:
+        """
+        Falls back to the configured SFW LLM client (via HybridLLMClient) when AGY CLI
+        is unavailable or exits with an error, ensuring coding requests never silently fail.
+        """
+        try:
+            from routing_engine import get_hybrid_llm_client
+            client = get_hybrid_llm_client()
+            fallback_sys = (
+                f"{system_instruction}{voice_instruction}\n\n"
+                "[FALLBACK MODE - TEXT/CODE GENERATION ONLY]\n"
+                "The autonomous CLI agent is currently unavailable in this turn, so you cannot directly edit disk files. "
+                "Provide clear, complete, copy-paste-ready code, root-cause analysis, and exact file paths/commands the user can apply."
+            )
+            msgs = [
+                {"role": "system", "content": fallback_sys},
+                {"role": "user", "content": prompt}
+            ]
+            reply, _ = client.chat(msgs, max_tokens=1500, is_nsfw=False)
+            if reply and reply.strip():
+                clean_reply, voice_text = self._extract_voice_reply(reply.strip())
+                notice = (
+                    f"ℹ️ _Catatan: CLI coding otonom (`agy`) {reason}. "
+                    f"Berikut solusi kode & langkah perbaikan via SFW LLM (belum otomatis menulis ke file project `{active_project}`):_\n\n"
+                )
+                return f"{notice}{clean_reply}", voice_text
+        except Exception as e_fb:
+            logger.warning(f"LLM coding fallback failed: {e_fb}")
+
+        return (
+            f"⚠️ Gagal menjalankan agen coding (`agy`: {reason}) pada project `{active_project}` (`{project_path}`), "
+            f"dan fallback SFW LLM sedang tidak dapat dijangkau."
+        ), None
+
     def execute_coding_task(
         self,
         user_id: int,
@@ -156,7 +209,8 @@ class CodingEngine:
     ) -> Tuple[str, Optional[str]]:
         """
         Executes an autonomous coding task inside the user's active project workspace.
-        Uses Antigravity CLI ('agy') with --dangerously-skip-permissions.
+        Uses Antigravity CLI ('agy') with --dangerously-skip-permissions, and falls back
+        to SFW LLM (HybridLLMClient) if 'agy' is missing, fails, or times out.
         Injects project memory vault and ARCHITECTURE.md blueprint.
         Returns: (response_text, optional_voice_note_text)
         """
@@ -254,10 +308,6 @@ class CodingEngine:
                 created_files, modified_files = diff_project_snapshots(before_snap, after_snap)
                 all_touched = created_files + modified_files
 
-                raw_output = proc.stdout.strip()
-                if not raw_output and proc.stderr:
-                    raw_output = f"⚠️ Catatan eksekusi: {proc.stderr.strip()}"
-
                 # Clean up buffer file if created
                 if temp_task_file and os.path.exists(temp_task_file):
                     try:
@@ -265,13 +315,27 @@ class CodingEngine:
                     except Exception:
                         pass
 
-                # Extract voice reply if present
-                voice_text = None
-                if "<<<VOICE_REPLY>>>" in raw_output:
-                    m = re.search(r'<<<VOICE_REPLY>>>(.*?)<<<END_VOICE_REPLY>>>', raw_output, re.DOTALL)
-                    if m:
-                        voice_text = m.group(1).strip()
-                        raw_output = re.sub(r'<<<VOICE_REPLY>>>.*?<<<END_VOICE_REPLY>>>', '', raw_output, flags=re.DOTALL).strip()
+                stdout_str = (proc.stdout or "").strip()
+                stderr_str = (proc.stderr or "").strip()
+
+                # Check exit status so CLI failures aren't misreported as completed tasks
+                if proc.returncode != 0:
+                    err_detail = (stderr_str or stdout_str or f"exit code {proc.returncode}")[:200]
+                    logger.warning(f"agy CLI exited with code {proc.returncode}: {err_detail}")
+                    return self._run_llm_coding_fallback(
+                        prompt=enhanced_user_prompt,
+                        system_instruction=system_instruction,
+                        voice_instruction=voice_instruction,
+                        active_project=active_project,
+                        project_path=project_path,
+                        reason=f"keluar dengan error (code {proc.returncode}: {err_detail})"
+                    )
+
+                raw_output = stdout_str
+                if not raw_output and stderr_str:
+                    raw_output = f"⚠️ Catatan eksekusi: {stderr_str}"
+
+                raw_output, voice_text = self._extract_voice_reply(raw_output)
 
                 # Automatically record task completion in Project Memory Vault with real touched files
                 clean_summary = prompt[:100] + ("..." if len(prompt) > 100 else "")
@@ -295,13 +359,11 @@ class CodingEngine:
                 if applied_design_style:
                     final_text += f"\n\n🎨 *Design System:* `Open-Design ({applied_design_style.title()})`"
 
-                # Auto-detect and launch live preview server ONLY if prompt asks for web / frontend / server / preview / app
-                is_web_or_preview_task = any(
-                    k in prompt.lower() for k in [
-                        "web", "html", "landing page", "frontend", "ui", "ux", "halaman",
-                        "preview", "run", "jalankan", "start", "server", "app", "aplikasi", "port"
-                    ]
-                )
+                # Auto-detect and launch live preview server using word-boundary triggers
+                is_web_or_preview_task = bool(re.search(
+                    r'\b(?:web|website|html|css|landing\s+page|frontend|ui|ux|halaman|preview|live\s+preview|run|jalankan|start|server|app|aplikasi|port)\b',
+                    prompt.lower()
+                ))
                 if is_web_or_preview_task:
                     try:
                         from project_server_manager import get_project_server_manager
@@ -310,9 +372,12 @@ class CodingEngine:
                         if preview_info:
                             p_url = preview_info.get("url")
                             p_port = preview_info.get("port")
+                            ts_url = preview_info.get("tailscale_url")
+                            ts_block = f"📱 Tailscale: [{ts_url}]({ts_url})\n" if ts_url else ""
                             final_text += (
                                 f"\n\n🌐 **Live Web Preview (Port {p_port}):**\n"
-                                f"👉 [{p_url}]({p_url})\n"
+                                f"💻 Localhost: [{p_url}]({p_url})\n"
+                                f"{ts_block}"
                                 f"Direct Link: {p_url}\n"
                                 f"*(Web server sudah otomatis menyala di background PC kamu!)*"
                             )
@@ -334,9 +399,24 @@ class CodingEngine:
                         os.remove(temp_task_file)
                     except Exception:
                         pass
+                return self._run_llm_coding_fallback(
+                    prompt=enhanced_user_prompt,
+                    system_instruction=system_instruction,
+                    voice_instruction=voice_instruction,
+                    active_project=active_project,
+                    project_path=project_path,
+                    reason=f"mengalami exception ({e})"
+                )
 
-        # 2. Fallback
-        return f"💡 Project `{active_project}` ({project_path}) aktif. Install 'agy' untuk pengerjaan coding otonom lengkap.", None
+        # 2. Fallback to SFW LLM when 'agy' CLI is not installed
+        return self._run_llm_coding_fallback(
+            prompt=enhanced_user_prompt,
+            system_instruction=system_instruction,
+            voice_instruction=voice_instruction,
+            active_project=active_project,
+            project_path=project_path,
+            reason="belum terpasang (`agy` tidak ditemukan di PATH)"
+        )
 
     def execute_task(
         self,

@@ -221,11 +221,19 @@ def start_auxiliary_services():
                             break
                 if model_path:
                     mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
+                    gpu_layers = os.environ.get("LLM_GPU_LAYERS", "").strip()
+                    if not gpu_layers:
+                        try:
+                            hw_profile = asset_manager.detect_hardware_profile() if asset_manager else {}
+                            gpu_layers = str(hw_profile.get("recommended_llm_layers", 24))
+                        except Exception:
+                            gpu_layers = "24"
+                    ctx_size = os.environ.get("LLM_CONTEXT_SIZE", "4096").strip() or "4096"
                     cmd = [
                         kcpp_exe, "--model", model_path,
                         "--port", "5001",
-                        "--gpulayers", "99",
-                        "--contextsize", "4096",
+                        "--gpulayers", gpu_layers,
+                        "--contextsize", ctx_size,
                         "--smartcontext",
                         "--threads", "4"
                     ] + mm_args
@@ -437,8 +445,7 @@ def cmd_status():
         v_backend = os.environ.get("VOICE_BACKEND", "edge-tts")
         v_speaker = os.environ.get("VOICE_NAME", "id-ID-GadisNeural")
         v_lang = os.environ.get("VOICE_LANGUAGE", "id-ID")
-        v_reply = os.environ.get("VOICE_REPLY_MODE", "smart")
-        print(f"  🎙️ Voice Engine: {v_backend} (Speaker: {v_speaker} • Lang: {v_lang} • Reply: {v_reply})")
+        print(f"  🎙️ Voice Engine: {v_backend} (Speaker: {v_speaker} • Lang: {v_lang} • Tombol Suara: On-Demand di Chat)")
         if "voicestudio" in v_backend.lower():
             vs_port = int(os.environ.get("VOICESTUDIO_PORT", "3900"))
             try:
@@ -1023,7 +1030,7 @@ def _execute_update():
             print(c(CYAN, "  🌉 User terkonfigurasi menggunakan Google Antigravity (AGY) Engine. Melewati auto-switch ComfyUI."))
 
         comfy_dir = asset_manager.detect_comfyui_dir()
-        if not comfy_dir and platform.system() == "Windows":
+        if not comfy_dir and platform.system() == "Windows" and not is_agy_user:
             print(c(YELLOW, "  ⏳ ComfyUI not detected locally. Auto-installing official ComfyUI Portable (~1.4 GB)..."))
             if asset_manager.ensure_comfyui():
                 comfy_dir = asset_manager.detect_comfyui_dir()

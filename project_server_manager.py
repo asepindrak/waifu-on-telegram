@@ -25,6 +25,19 @@ ACTIVE_SERVERS_FILE = os.path.join(DATA_DIR, "active_preview_servers.json")
 RESERVED_PORTS = {8001, 8002, 8188, 5001, 3900}
 
 
+def resolve_tailscale_url(port: int) -> Tuple[Optional[str], Optional[str]]:
+    """Returns (tailscale_ip, tailscale_url) for port when Tailscale is installed with an IP."""
+    try:
+        from project_runner import TailscaleManager
+        ts_info = TailscaleManager.get_tailscale_info()
+        ts_ip = ts_info.get("ip") if ts_info and ts_info.get("installed") else None
+        if ts_ip:
+            return ts_ip, f"http://{ts_ip}:{port}/"
+    except Exception as e:
+        logger.debug(f"Tailscale detection skipped: {e}")
+    return None, None
+
+
 def is_port_in_use(port: int) -> bool:
     """Checks if a local TCP port is already open/in use."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -168,6 +181,13 @@ class ProjectServerManager:
             s_dir = os.path.normpath(s_info.get("dir", ""))
             s_port = s_info.get("port")
             if s_dir == norm_dir and s_port and self.is_server_healthy(s_port, s_info.get("pid")):
+                ts_ip, ts_url = resolve_tailscale_url(s_port)
+                if ts_ip:
+                    s_info["tailscale_ip"] = ts_ip
+                    s_info["tailscale_url"] = ts_url
+                else:
+                    s_info.pop("tailscale_ip", None)
+                    s_info.pop("tailscale_url", None)
                 logger.info(f"Reusing existing preview server for '{project_name}' on port {s_port}")
                 return s_info
 
@@ -201,10 +221,13 @@ class ProjectServerManager:
         if not self.is_server_healthy(port, proc.pid):
             logger.warning(f"Preview server on port {port} not responding immediately; registered anyway.")
 
+        ts_ip, ts_url = resolve_tailscale_url(port)
         server_info = {
             "project": project_name,
             "port": port,
             "url": f"http://127.0.0.1:{port}/",
+            "tailscale_ip": ts_ip,
+            "tailscale_url": ts_url,
             "dir": web_dir,
             "entry_file": entry_file,
             "pid": proc.pid,
@@ -277,10 +300,15 @@ class ProjectServerManager:
             p_name = s.get("project", "Project")
             p_port = s.get("port")
             p_url = s.get("url", f"http://127.0.0.1:{p_port}/")
+            ts_url = s.get("tailscale_url")
+            if not ts_url and p_port:
+                _, ts_url = resolve_tailscale_url(p_port)
             p_dir = s.get("dir", "")
+            ts_line = f"   📱 **Tailscale:** [{ts_url}]({ts_url})\n" if ts_url else ""
             lines.append(
                 f"{idx}. 🚀 **{p_name}**\n"
-                f"   👉 **Link Preview:** [{p_url}]({p_url})\n"
+                f"   💻 **Localhost:** [{p_url}]({p_url})\n"
+                f"{ts_line}"
                 f"   🔌 **Port:** `{p_port}` | **PID:** `{s.get('pid')}`\n"
                 f"   📁 **Folder:** `{p_dir}`\n"
             )

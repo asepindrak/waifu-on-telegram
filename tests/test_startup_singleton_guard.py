@@ -54,7 +54,8 @@ class TestStartupSingletonGuard(unittest.TestCase):
         mock_client.check_health.return_value = {"online": True}
         he = health_engine.HealthEngine(llm_client=mock_client)
 
-        with patch("health_engine.is_port_listening", side_effect=[False, True]), \
+        with patch.dict(os.environ, {"AI_ENGINE_MODE": "unified", "SFW_LLM_PROVIDER": "local"}, clear=False), \
+             patch("health_engine.is_port_listening", side_effect=[False, True]), \
              patch("health_engine.get_koboldcpp_process_count", return_value=5), \
              patch("health_engine.kill_all_koboldcpp") as mock_kill, \
              patch("subprocess.Popen") as mock_popen, \

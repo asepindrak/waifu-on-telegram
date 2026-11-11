@@ -74,7 +74,8 @@ class TestScheduledBufferAndGamingProtection(unittest.TestCase):
         engine = IdleEngine(enabled=True)
         engine.is_llm_sleeping = True
 
-        with patch.object(engine, "is_llm_ready", return_value=False):
+        with patch.dict(os.environ, {"AI_ENGINE_MODE": "unified", "SFW_LLM_PROVIDER": "local", "LLM_BASE_URL": "http://127.0.0.1:5001/v1"}, clear=False), \
+             patch.object(engine, "is_llm_ready", return_value=False):
             with patch.object(engine, "wake_llm") as mock_wake:
                 ok = engine.ensure_llm_active(is_user_chat=False)
                 self.assertFalse(ok)

@@ -1,14 +1,14 @@
-try:
-    import asset_manager
-except ImportError:
-    asset_manager = None
-
 #!/usr/bin/env python3
 """
 💖 WAIFU ON TELEGRAM - Interactive Setup & Reconfiguration CLI
 Multiplatform: Windows, Linux, macOS.
 Repository: https://github.com/asepindrak/waifu-on-telegram
 """
+
+try:
+    import asset_manager
+except ImportError:
+    asset_manager = None
 
 import os
 import sys
@@ -99,20 +99,23 @@ def write_env(env_vars):
 
 def is_bot_running():
     """Checks if bot.py is currently running, returning its PID if found."""
-    pid_file = os.path.join(SCRIPT_DIR, "data", "waifu.pid")
-    if os.path.exists(pid_file):
-        try:
-            with open(pid_file, "r") as f:
-                pid = int(f.read().strip())
-            if sys.platform == "win32":
-                res = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True)
-                if str(pid) in res.stdout:
+    for pid_file in (
+        os.path.join(SCRIPT_DIR, "bot.pid"),
+        os.path.join(SCRIPT_DIR, "data", "waifu.pid"),
+    ):
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file, "r") as f:
+                    pid = int(f.read().strip())
+                if sys.platform == "win32":
+                    res = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True)
+                    if str(pid) in res.stdout:
+                        return pid
+                else:
+                    os.kill(pid, 0)
                     return pid
-            else:
-                os.kill(pid, 0)
-                return pid
-        except Exception:
-            pass
+            except Exception:
+                pass
 
     # Process search fallback (Windows / Unix)
     try:
@@ -158,18 +161,24 @@ def restart_bot_if_running() -> bool:
 
     # 2. Spawn new bot.py in detached background
     bot_script = os.path.join(SCRIPT_DIR, "bot.py")
+    log_file = os.path.join(SCRIPT_DIR, "bot.log")
     popen_kwargs = {"creationflags": 0x08000000 | 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
+    f_log = None
     try:
+        try:
+            f_log = open(log_file, "a", encoding="utf-8")
+            out_dest = f_log
+        except Exception:
+            out_dest = subprocess.DEVNULL
         proc = subprocess.Popen(
             [sys.executable, bot_script],
             cwd=SCRIPT_DIR,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=out_dest,
+            stderr=out_dest,
             **popen_kwargs
         )
-        pid_file = os.path.join(SCRIPT_DIR, "data", "waifu.pid")
+        pid_file = os.path.join(SCRIPT_DIR, "bot.pid")
         try:
-            os.makedirs(os.path.dirname(pid_file), exist_ok=True)
             with open(pid_file, "w") as f:
                 f.write(str(proc.pid))
         except Exception:
@@ -179,6 +188,12 @@ def restart_bot_if_running() -> bool:
     except Exception as e:
         print(c(RED, f"❌ Gagal me-restart bot otomatis: {e}"))
         return False
+    finally:
+        if f_log:
+            try:
+                f_log.close()
+            except Exception:
+                pass
 
 def save_config(env_vars: dict, auto_restart: bool = True):
     """Saves configuration to .env and automatically restarts bot if running."""
@@ -1287,7 +1302,7 @@ if __name__ == "__main__":
     parser.add_argument("--wizard", action="store_true", help="Force run the full 7-step wizard")
     args = parser.parse_args()
 
-    if args.token or args.user or args.backend or args.autostart:
+    if args.token or args.user or args.backend or args.autostart or args.language or args.video_engine:
         env_vars = read_env()
         if args.token:
             env_vars["TELEGRAM_BOT_TOKEN"] = args.token
@@ -1295,12 +1310,14 @@ if __name__ == "__main__":
             env_vars["TELEGRAM_ALLOWED_USER_ID"] = args.user
         if args.backend:
             env_vars["LLM_BASE_URL"] = args.backend
-        save_config(env_vars)
         if args.language:
             env_vars["BOT_LANGUAGE"] = args.language
+            print(f"✓ Waifu Language set to: {args.language}")
         if args.video_engine:
             env_vars["VIDEO_ENGINE"] = args.video_engine
             print(f"✓ Video Engine set to: {args.video_engine}")
+        if args.token or args.user or args.backend or args.language or args.video_engine:
+            save_config(env_vars)
         if args.autostart:
             setup_autostart(enable=(args.autostart == "yes"))
     elif args.wizard:

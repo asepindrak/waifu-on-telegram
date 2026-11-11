@@ -228,6 +228,82 @@ class TestCodingEngine(unittest.TestCase):
         call_kwargs = mock_run.call_args[1]
         self.assertEqual(call_kwargs.get("cwd"), active_path)
 
+    @patch("subprocess.run")
+    @patch("routing_engine.get_hybrid_llm_client")
+    def test_execute_coding_task_nonzero_returncode_falls_back_to_sfw_llm(self, mock_get_llm, mock_run):
+        mock_proc = MagicMock()
+        mock_proc.returncode = 1
+        mock_proc.stdout = ""
+        mock_proc.stderr = "AGY CLI auth failed"
+        mock_run.return_value = mock_proc
+
+        mock_client = MagicMock()
+        mock_client.chat.return_value = ("Berikut perbaikan kodenya:\n```python\nprint('ok')\n```", None)
+        mock_get_llm.return_value = mock_client
+
+        with patch("shutil.which", return_value="agy"):
+            text, _ = self.ce.execute_coding_task(user_id=1, prompt="perbaiki bug syntax main.py", persona={"name": "Waifu"})
+
+        self.assertIn("SFW LLM", text)
+        self.assertIn("print('ok')", text)
+        mock_client.chat.assert_called_once()
+        self.assertFalse(mock_client.chat.call_args[1].get("is_nsfw"))
+
+    @patch("subprocess.run")
+    @patch("project_server_manager.get_project_server_manager")
+    def test_preview_trigger_ignores_false_positive_substrings(self, mock_get_psm, mock_run):
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = "Selesai!"
+        mock_proc.stderr = ""
+        mock_run.return_value = mock_proc
+
+        with patch("shutil.which", return_value="agy"):
+            # "bantuin" and "turun" contain "ui" and "run" substrings but must NOT trigger preview server
+            self.ce.execute_coding_task(user_id=1, prompt="bantuin cek angka turun di utils.py", persona={"name": "Waifu"})
+        mock_get_psm.return_value.start_preview_server.assert_not_called()
+
+    def test_build_preview_url_buttons_localhost_and_tailscale(self):
+        import bot
+        with patch("project_server_manager.resolve_tailscale_url", return_value=("100.88.1.9", "http://100.88.1.9:8086/")):
+            markup_dual = bot.build_preview_url_buttons(port=8086)
+            urls = [btn.url for row in markup_dual.keyboard for btn in row]
+            self.assertEqual(urls, ["http://127.0.0.1:8086/", "http://100.88.1.9:8086/"])
+
+        with patch("project_server_manager.resolve_tailscale_url", return_value=(None, None)):
+            markup_single = bot.build_preview_url_buttons(port=8086)
+            urls_single = [btn.url for row in markup_single.keyboard for btn in row]
+            self.assertEqual(urls_single, ["http://127.0.0.1:8086/"])
+
+    def test_process_coding_request_attaches_dual_preview_voice_and_saves_history(self):
+        import bot
+        msg = MagicMock()
+        msg.from_user.id = 999
+        msg.chat.id = 999
+        msg.message_id = 42
+
+        preview_text = (
+            "Web berhasil dibuat!\n\n🌐 **Live Web Preview (Port 8090):**\n"
+            "💻 Localhost: [http://127.0.0.1:8090/](http://127.0.0.1:8090/)\n"
+            "📱 Tailscale: [http://100.77.2.3:8090/](http://100.77.2.3:8090/)"
+        )
+        with patch.object(bot.coding_engine, "execute_coding_task", return_value=(preview_text, None)), \
+             patch.object(bot, "send_long_chat_message") as mock_send_long, \
+             patch.object(bot.persona_mgr, "add_message") as mock_add_msg, \
+             patch.object(bot.bot, "reply_to"), \
+             patch.object(bot.bot, "delete_message"), \
+             patch.object(bot.pending_manager, "clear_pending"):
+            bot.process_coding_request(msg, "buatkan landing page html", is_voice=False)
+
+        mock_send_long.assert_called_once()
+        markup = mock_send_long.call_args[1]["reply_markup"]
+        all_btns = [btn for row in markup.keyboard for btn in row]
+        urls = [getattr(b, "url", None) for b in all_btns if getattr(b, "url", None)]
+        cbs = [getattr(b, "callback_data", "") or "" for b in all_btns]
+        self.assertEqual(urls, ["http://127.0.0.1:8090/", "http://100.77.2.3:8090/"])
+        self.assertTrue(any(cb.startswith("play_voice:") for cb in cbs))
+        self.assertEqual(mock_add_msg.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

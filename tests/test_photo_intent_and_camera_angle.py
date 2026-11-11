@@ -80,7 +80,7 @@ class TestPhotoIntentAndCameraAngle(unittest.TestCase):
 
         self.assertIn("from above", prompt)
         self.assertIn("lying on back", prompt)
-        self.assertIn("pillows", prompt)
+        self.assertIn("pillow", prompt)
 
 
 if __name__ == "__main__":

@@ -93,10 +93,10 @@ $defaultInstallDir = "$env:USERPROFILE\waifu-on-telegram"
 
 if ((Test-Path "bot.py") -and (Test-Path "setup.py")) {
     $installDir = (Get-Location).Path
-    Write-Host "[1/8] Running inside project folder: $installDir" -ForegroundColor Cyan
+    Write-Host "[1/9] Running inside project folder: $installDir" -ForegroundColor Cyan
 } else {
     $installDir = $defaultInstallDir
-    Write-Host "[1/8] Target installation directory: $installDir" -ForegroundColor Cyan
+    Write-Host "[1/9] Target installation directory: $installDir" -ForegroundColor Cyan
 
     if (Test-Path "$installDir\.git") {
         Write-Host "  Updating existing Git repository..." -ForegroundColor Yellow
@@ -129,7 +129,7 @@ if ((Test-Path "bot.py") -and (Test-Path "setup.py")) {
 }
 
 # 2. Check & Setup Core Runtimes (Python 3.8+ & Node.js LTS)
-Write-Host "`n[2/8] Checking Core Runtimes (Python, Node.js & C++)..." -ForegroundColor Cyan
+Write-Host "`n[2/9] Checking Core Runtimes (Python, Node.js & C++)..." -ForegroundColor Cyan
 
 function Get-RealPythonCommand {
     $candidates = @("python", "py", "python3")
@@ -256,7 +256,7 @@ if (-not $hasVc) {
 }
 
 # 3. Install Python & Node.js Requirements
-Write-Host "`n[3/8] Installing Dependencies (Python & Node.js libraries)..." -ForegroundColor Cyan
+Write-Host "`n[3/9] Installing Dependencies (Python & Node.js libraries)..." -ForegroundColor Cyan
 & $py -m pip install -r requirements.txt --quiet --disable-pip-version-check
 Write-Host "  [OK] Python libraries installed successfully." -ForegroundColor Green
 
@@ -267,7 +267,7 @@ if ($node) {
 }
 
 # 4. Check & Setup Local LLM Engine (KoboldCPP / Auto-loading Engine)
-Write-Host "`n[4/8] Checking Local LLM Engine (Chat & Romance Brain)..." -ForegroundColor Cyan
+Write-Host "`n[4/9] Checking Local LLM Engine (Chat & Romance Brain)..." -ForegroundColor Cyan
 $llmOnline = $false
 foreach ($port in @(5001, 8127, 11434, 1234)) {
     try {
@@ -371,7 +371,7 @@ if ($existingMmproj.Count -eq 0) {
 }
 
 # 5. Check & Setup ComfyUI & Models (MeinaMix & AnimateDiff)
-Write-Host "`n[5/8] Checking ComfyUI & Generative Models (Photos & Videos)..." -ForegroundColor Cyan
+Write-Host "`n[5/9] Checking ComfyUI & Generative Models (Photos & Videos)..." -ForegroundColor Cyan
 $foundComfy = $null
 
 # 5.1 Check running process on port 8188 first
@@ -622,7 +622,7 @@ if ($foundComfy) {
 }
 
 # 6. Check Computer Use Engine (agent-desktop)
-Write-Host "`n[6/8] Checking Computer Use & Desktop Engine..." -ForegroundColor Cyan
+Write-Host "`n[6/9] Checking Computer Use & Desktop Engine..." -ForegroundColor Cyan
 if (-not (Get-Command agent-desktop -ErrorAction SilentlyContinue)) {
     Write-Host "  >> Auto-installing agent-desktop for computer use & browser automation..." -ForegroundColor Yellow
     try { & npm install -g agent-desktop --silent } catch {}
@@ -634,7 +634,7 @@ if (Get-Command agent-desktop -ErrorAction SilentlyContinue) {
 }
 
 # 7. Register Global CLI Commands ('waifu')
-Write-Host "`n[7/8] Registering Global CLI Command 'waifu'..." -ForegroundColor Cyan
+Write-Host "`n[7/9] Registering Global CLI Command 'waifu'..." -ForegroundColor Cyan
 
 # Link globally via npm
 if (Get-Command npm -ErrorAction SilentlyContinue) {
@@ -666,7 +666,6 @@ if ($userPath -notlike "*$userBin*") {
     $env:Path = "$userBin;$env:Path"
     Write-Host "  [OK] Added '$userBin' to User PATH." -ForegroundColor Green
 }
-Write-Host "  [OK] Global CLI 'waifu' registered successfully." -ForegroundColor Green
 Write-Host "  [OK] Global CLI 'waifu' registered successfully." -ForegroundColor Green
 
 # 8. Configure Windows Startup Autorun (Auto-start on PC boot)
