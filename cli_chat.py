@@ -559,8 +559,9 @@ class WaifuCLISession:
 
         if not long_form_req:
             system_inst += (
-                f"\n\n[STRICT REPLY LENGTH RULE]\n"
-                f"Keep your response BRIEF like casual WhatsApp texting: 1 short *action* line + 1-2 short sentences (~15-35 words total)."
+                f"\n\n[ATURAN BALASAN SINGKAT]\n"
+                f"Balas singkat seperti chat WhatsApp biasa: 1 baris *aksi* pendek + 1-2 kalimat dialog santai (~15-35 kata total). "
+                f"Jawab langsung dalam bahasa yang sama dengan user; DILARANG menerjemahkan atau menyalin pesan user."
             )
 
         mem_context = self.memory_engine.format_memory_context(self.user_id, query=user_text)

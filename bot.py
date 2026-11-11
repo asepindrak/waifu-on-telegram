@@ -8,6 +8,7 @@ import logging
 import threading
 import time
 import datetime
+import difflib
 import platform
 import subprocess
 from typing import Optional, Dict, Any, Tuple, List, Callable
@@ -6737,37 +6738,140 @@ def handle_text_messages(message):
     process_text_chat(message, message.text, is_voice=False)
 
 
+_ID_CHAT_WORDS = {
+    "aku", "kamu", "kau", "mu", "ku", "nya", "yang", "ini", "itu", "dan", "di", "ke", "dari",
+    "lagi", "sudah", "udah", "belum", "mau", "bisa", "akan", "tidak", "gak", "ga", "nggak",
+    "ngga", "enggak", "aja", "saja", "nih", "ya", "yaa", "yah", "kok", "sih", "dong", "deh",
+    "kan", "tuh", "banget", "sama", "buat", "untuk", "kalau", "kalo", "tapi", "juga",
+    "kenapa", "apa", "gimana", "bagaimana", "siapa", "kapan", "dimana", "mana", "nanti",
+    "tadi", "sekarang", "baru", "masih", "sedang", "punya", "ada", "bikin", "makan", "minum",
+    "tidur", "main", "jalan", "pulang", "kerja", "kuliah", "tugas", "kos", "rumah", "sayang",
+    "hehe", "wkwk", "hihi", "hmm", "iya", "makasih", "maaf", "tolong", "ayok", "yuk", "mari",
+    "biar", "supaya", "soalnya", "habis", "abis", "seneng", "senang", "kangen", "capek",
+}
+
+_EN_CHAT_WORDS = {
+    "i", "i'm", "im", "i'll", "ill", "you", "you're", "youre", "your", "yours", "my", "mine",
+    "me", "we", "our", "they", "their", "he", "she", "it", "its", "the", "a", "an", "is",
+    "am", "are", "was", "were", "be", "been", "do", "does", "did", "don't", "dont", "didn't",
+    "can", "can't", "cant", "will", "won't", "would", "should", "could", "have", "has", "had",
+    "this", "that", "these", "those", "what", "when", "where", "why", "how", "who", "which",
+    "with", "for", "from", "about", "into", "just", "not", "but", "and", "or", "so", "if",
+    "because", "very", "really", "right", "now", "here", "there", "today", "tonight", "want",
+    "need", "like", "love", "know", "think", "feel", "going", "doing", "asking", "saying",
+    "translate", "translation", "means", "meaning", "yes", "no", "please", "sorry", "thanks",
+}
+
+
+def _strip_roleplay_actions(text: str) -> str:
+    """Removes *action* / _action_ stage cues so spoken dialogue can be inspected cleanly."""
+    stripped = re.sub(r'(?<!\*)\*[^*\n]{1,200}\*(?!\*)', ' ', text or '')
+    stripped = re.sub(r'(?<!_)_[^_\n]{1,200}_(?!_)', ' ', stripped)
+    return re.sub(r'\s+', ' ', stripped).strip()
+
+
 def is_echo_or_parroting(reply: str, user_text: str) -> bool:
     """
-    Detects if the AI reply is degenerate echoing or parroting of the user's message.
+    Detects if the AI reply is degenerate echoing or parroting of the user's message,
+    including copies wrapped inside *action* stage cues or thin filler prefixes.
     """
     if not reply or not user_text:
         return False
 
-    r_clean = re.sub(r'[^\w\s]', '', reply).strip().lower()
     u_clean = re.sub(r'[^\w\s]', '', user_text).strip().lower()
+    if not u_clean:
+        return False
+    u_words = u_clean.split()
 
-    if not r_clean or not u_clean:
+    spoken = _strip_roleplay_actions(reply)
+    candidates = [reply]
+    if spoken and spoken != reply:
+        candidates.append(spoken)
+
+    filler_words = {"iya", "ya", "yah", "hmm", "hm", "oh", "eh", "wah", "oke", "ok", "nih", "sih", "kok", "lah", "dong", "deh"}
+    empathy_words = {"juga", "too", "sama", "selamat", "wah", "enak", "bagus", "lucu", "keren", "asyik", "seru", "semangat"}
+
+    for cand in candidates:
+        c_clean = re.sub(r'[^\w\s]', '', cand).strip().lower()
+        if not c_clean:
+            continue
+        c_words = c_clean.split()
+
+        # 1. Exact match (case & punctuation insensitive)
+        if c_clean == u_clean:
+            return True
+
+        # 2. Short token echo from a longer user sentence
+        if len(c_words) <= 2 and len(u_words) >= 3 and c_clean in u_clean:
+            return True
+
+        # 3. Reply is entirely a subset of user words without adding new thought
+        if len(c_words) <= 6 and set(c_words).issubset(set(u_words)):
+            return True
+
+        # 4. User text embedded verbatim with only minimal chars or filler words
+        if u_clean in c_clean:
+            if len(c_clean) - len(u_clean) < 5:
+                return True
+            remainder_words = [w for w in c_clean.replace(u_clean, " ").split() if w]
+            if len(u_words) >= 2 and all(w in filler_words for w in remainder_words):
+                return True
+
+        # 5. Near-verbatim copy (e.g. minor typo/punctuation change) without empathetic response
+        if len(u_words) >= 4 and not (set(c_words) & empathy_words):
+            non_filler_c = " ".join(w for w in c_words if w not in filler_words)
+            if non_filler_c and difflib.SequenceMatcher(None, non_filler_c, u_clean).ratio() >= 0.88:
+                return True
+
+    return False
+
+
+def is_unwanted_english_or_translation(
+    reply: str,
+    user_text: str,
+    bot_language: Optional[str] = None,
+) -> bool:
+    """
+    Detects when local models (e.g. Huihui) ignore Indonesian conversation and instead
+    translate the user's Indonesian message into English or reply entirely in English.
+    """
+    if not reply or not reply.strip():
         return False
 
-    # 1. Exact match (case & punctuation insensitive)
-    if r_clean == u_clean:
+    cur_lang = (bot_language or globals().get("BOT_LANGUAGE") or os.environ.get("BOT_LANGUAGE", "id")).strip().lower()
+    if cur_lang in ("en", "english", "ja", "jp", "japan", "japanese", "nihongo"):
+        return False
+
+    u_low = (user_text or "").lower()
+    # Allow English if user explicitly asked for an English reply / translation
+    if any(k in u_low for k in ("translate", "terjemahin", "terjemahkan", "in english", "bahasa inggris", "artinya apa")):
+        return False
+
+    u_tokens = set(re.findall(r"[a-z']+", u_low))
+    u_id_hits = len(u_tokens & _ID_CHAT_WORDS)
+    u_en_hits = len(u_tokens & _EN_CHAT_WORDS)
+    user_looks_english = (u_en_hits >= 2 and u_id_hits == 0)
+
+    if cur_lang in ("auto", "adaptive") and user_looks_english:
+        return False
+
+    # Explicit translation prefixes leaked by local LLMs
+    if re.search(r"(?im)^\s*(?:translation|translated|english translation|terjemahan)\s*:", reply):
         return True
 
-    # 2. Reply is a single word or short token from user_text (e.g. user: "nanti mau makan sambil gathering HO jam 4", reply: "gathering")
-    r_words = r_clean.split()
-    u_words = u_clean.split()
-    if len(r_words) <= 2 and len(u_words) >= 3 and r_clean in u_clean:
-        return True
+    spoken = _strip_roleplay_actions(reply) or reply
+    r_tokens = re.findall(r"[a-z']+", spoken.lower())
+    if not r_tokens:
+        return False
 
-    # 3. Reply is entirely a subset of user words without adding new thought
-    if len(r_words) <= 5 and set(r_words).issubset(set(u_words)):
-        return True
+    r_token_set = set(r_tokens)
+    id_count = len(r_token_set & _ID_CHAT_WORDS)
+    en_count = len(r_token_set & _EN_CHAT_WORDS)
 
-    # 4. Reply starts with exact user_text followed by minimal characters
-    if u_clean in r_clean and len(r_clean) - len(u_clean) < 4:
+    if en_count >= 2 and id_count == 0:
         return True
-
+    if en_count >= 4 and en_count > id_count * 2:
+        return True
     return False
 
 
@@ -6840,7 +6944,8 @@ def generate_dynamic_visual_novel_reaction(
             if (dyn_reply 
                 and dyn_reply.strip() 
                 and not is_echo_or_parroting(dyn_reply, user_text) 
-                and not is_meta_or_reasoning_leak(dyn_reply)):
+                and not is_meta_or_reasoning_leak(dyn_reply)
+                and not is_unwanted_english_or_translation(dyn_reply, user_text)):
                 concise_dyn = enforce_concise_chat_reply(dyn_reply.strip(), max_sentences=2, max_chars=(280 if is_nsfw else 240))
                 return format_roleplay_italics(concise_dyn, character_name=p_name)
         except Exception as e_dyn:
@@ -7405,8 +7510,8 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         "2. BUKA BAJU BERTAHAP & BERURUTAN: Buka pakaian secara berurutan dan bertahap sesuai alur chat: Kaos -> Celana/Rok -> BH -> Celana Dalam -> Telanjang Bulat. DILARANG melompati urutan kecuali jika pasanganmu meminta telanjang bulat sekaligus!\n"
                         "3. MEMANCING AKSI BERIKUTNYA (RINGKAS): Tetap hangat dan proaktif dalam 1-2 kalimat pendek yang menggoda (bukan paragraf panjang). Contoh: 'Kalau suka segini, mau aku lanjutin buka pelan-pelan atau kamu mau sentuh dulu? 😳'\n"
                         "4. FORMAT VISUAL NOVEL & SENSASI TUBUH MENDALAM:\n"
-                        f"   - Awali dengan aksi panggung di dalam tanda bintang *...* yang menggambarkan sensasi tubuhmu yang nyata: debaran jantung, getaran napas, tubuh yang melengkung (arching), kulit yang merona hangat, tangan gemetar menuntun sentuhan, atau desahan tertahan (misal: *{p_name} arching into your touch with a soft gasp, skin flushing deeper under your fingertips* atau *{p_name} merona hebat sambil memegang tanganmu di pinggangnya dan mendesah tertahan*).\n"
-                        "   - Berikan baris baru ganda, lalu balas ucapan pasanganmu dengan nada manja, berbisik sensual, mesra, dan menggairahkan.\n"
+                        f"   - Awali dengan aksi panggung di dalam tanda bintang *...* dalam Bahasa Indonesia yang menggambarkan sensasi tubuhmu yang nyata: debaran jantung, getaran napas, tubuh yang melengkung, kulit yang merona hangat, tangan gemetar menuntun sentuhan, atau desahan tertahan (misal: *merona hebat sambil memegang tanganmu di pinggangnya dan mendesah tertahan*).\n"
+                        "   - Berikan baris baru ganda, lalu balas ucapan pasanganmu dalam Bahasa Indonesia santai dengan nada manja, berbisik sensual, mesra, dan menggairahkan.\n"
                         "5. SELALU AKTIF BERBAGI FOTO OTOMATIS: Dalam setiap aksi intim, pembukaan baju, ekspresi kenikmatan, atau saat memperlihatkan bagian tubuh yang basah/sensual, kamu SELALU menyertakan tag [ACTION: SEND_PAP] di akhir pesanmu agar pasanganmu bisa langsung melihat wujud dan aksimu saat ini! DILARANG menunggu diminta foto dulu baru mengirim.\n"
                     )
                 else:
@@ -7470,12 +7575,21 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     )
 
                 if not long_form_req:
-                    system_inst += (
-                        f"\n\n[STRICT REPLY LENGTH RULE]\n"
-                        f"Keep your response BRIEF like casual WhatsApp texting: maximum 1 short *action* line + 1-2 short spoken sentences (~15-35 words total). "
-                        f"Example:\n*{p_name} nyengir tipis menatapmu*\n\nLagi santai di kos nih, baru beres makan. Kamu udah makan belum?\n"
-                        f"Do NOT write paragraphs, long descriptions, or essays."
-                    )
+                    cur_lang_low = (globals().get("BOT_LANGUAGE") or os.environ.get("BOT_LANGUAGE", "id")).strip().lower()
+                    if cur_lang_low in ("id", "indonesia", "indonesian", "bahasa"):
+                        system_inst += (
+                            f"\n\n[ATURAN BALASAN SINGKAT - WAJIB BAHASA INDONESIA]\n"
+                            f"Balas singkat seperti chat WhatsApp biasa (maksimal 1 baris aksi *...* + 1-2 kalimat dialog pendek, ~15-35 kata total).\n"
+                            f"Contoh:\n*nyengir tipis menatapmu*\n\nLagi santai di kos nih, baru beres makan. Kamu udah makan belum?\n"
+                            f"WAJIB JAWAB dalam Bahasa Indonesia santai. DILARANG menerjemahkan pesan user ke bahasa Inggris dan DILARANG menyalin/mengulang kalimat user!"
+                        )
+                    else:
+                        system_inst += (
+                            f"\n\n[STRICT REPLY LENGTH RULE]\n"
+                            f"Keep your response BRIEF like casual WhatsApp texting: maximum 1 short *action* line + 1-2 short spoken sentences (~15-35 words total). "
+                            f"Example:\n*nyengir tipis menatapmu*\n\nLagi santai di kos nih, baru beres makan. Kamu udah makan belum?\n"
+                            f"Do NOT translate or copy the user's message, and reply in the same language as the user."
+                        )
 
                 history = persona_mgr.get_chat_history(message.from_user.id)
                 if long_form_req:
@@ -7525,14 +7639,18 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         is_nsfw=is_nsfw_turn
                     )
 
-                # Anti-Parroting & Meta-Leak Guard: Intercept repetition or leaked reasoning thoughts
-                if is_echo_or_parroting(reply_text, user_text) or is_meta_or_reasoning_leak(reply_text):
-                    logger.warning(f"⚠️ Echo or Meta-leak detected from LLM: '{reply_text}' (User: '{user_text}'). Intercepting...")
+                # Anti-Parroting, English-Translation Leak & Meta-Leak Guard
+                if (
+                    is_echo_or_parroting(reply_text, user_text)
+                    or is_meta_or_reasoning_leak(reply_text)
+                    or is_unwanted_english_or_translation(reply_text, user_text)
+                ):
+                    logger.warning(f"⚠️ Echo/Translation/Meta-leak detected from LLM: '{reply_text}' (User: '{user_text}'). Intercepting...")
                     try:
                         steer_sys = (
                             system_inst + 
-                            "\n\n[PENTING - RESPON SINGKAT: Langsung balas perkataan pasanganmu dengan hangat dalam 1 baris aksi *...* + 1-2 kalimat dialog pendek. "
-                            "DILARANG mengulang kata pasanganmu dan DILARANG menulis monolog berpikir!]"
+                            "\n\n[PENTING - RESPON SINGKAT BAHASA INDONESIA: Langsung tanggapi perkataan pasanganmu dengan hangat dalam 1 baris aksi *...* + 1-2 kalimat dialog Bahasa Indonesia santai. "
+                            "DILARANG menyalin/mengulang kalimat pasanganmu, DILARANG menerjemahkan ke bahasa Inggris, dan DILARANG menulis monolog berpikir!]"
                         )
                         retry_messages = [{"role": "system", "content": steer_sys}]
                         retry_messages.extend(prompt_history)
@@ -7540,8 +7658,9 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         steered_reply, _ = llm_client.chat(retry_messages, max_tokens=chat_max_tokens, temperature=0.88, is_nsfw=is_nsfw_turn)
                         if (steered_reply 
                             and not is_echo_or_parroting(steered_reply, user_text)
-                            and not is_meta_or_reasoning_leak(steered_reply)):
-                            logger.info(f"✓ Steering resolved echo/leak: '{steered_reply}'")
+                            and not is_meta_or_reasoning_leak(steered_reply)
+                            and not is_unwanted_english_or_translation(steered_reply, user_text)):
+                            logger.info(f"✓ Steering resolved echo/translation/leak: '{steered_reply}'")
                             reply_text = steered_reply
                         else:
                             reply_text = get_contextual_fallback_reaction(
@@ -7624,7 +7743,12 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                 # Clean action tag from text so user only sees natural dialogue
                 clean_reply = re.sub(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", "", reply_text, flags=re.IGNORECASE).strip()
-                if not clean_reply or is_meta_or_reasoning_leak(clean_reply):
+                if (
+                    not clean_reply
+                    or is_meta_or_reasoning_leak(clean_reply)
+                    or is_echo_or_parroting(clean_reply, user_text)
+                    or is_unwanted_english_or_translation(clean_reply, user_text)
+                ):
                     clean_reply = get_contextual_fallback_reaction(
                         user_text=user_text,
                         persona_name=p_name,

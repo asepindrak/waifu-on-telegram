@@ -193,30 +193,49 @@ class LocallyUncensoredClient:
             "Authorization": f"Bearer {key}"
         }
 
-        # Format messages, inject vision image if present
+        # Detect local KoboldCPP / Huihui Qwen3 models to suppress verbose <think> blocks
+        is_local_gguf = any(
+            k in f"{self.base_url} {self.model}".lower()
+            for k in (":5001", ":8127", "kobold", "huihui", "qwythos")
+        )
+
+        # Format messages, inject vision image if present, and extract last user text for echo filtering
+        last_user_text = ""
         payload_messages = []
         for i, m in enumerate(messages):
+            role = m.get("role", "user")
+            content = m.get("content", "")
+            if role == "user":
+                if isinstance(content, str):
+                    last_user_text = content
+                elif isinstance(content, list):
+                    last_user_text = " ".join(
+                        p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"
+                    )
+            if role == "system" and is_local_gguf and isinstance(content, str) and "/no_think" not in content:
+                content = f"{content.rstrip()}\n/no_think"
+
             if i == len(messages) - 1 and image_bytes:
                 # Append multimodal image to last user message
                 b64_img = base64.b64encode(image_bytes).decode("utf-8")
                 payload_messages.append({
-                    "role": m["role"],
+                    "role": role,
                     "content": [
-                        {"type": "text", "text": m["content"]},
+                        {"type": "text", "text": content},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}}
                     ]
                 })
             else:
-                payload_messages.append({"role": m["role"], "content": m["content"]})
+                payload_messages.append({"role": role, "content": content})
 
         payload = {
             "model": self.model,
             "messages": payload_messages,
             "temperature": temperature,
             "top_p": 0.9,
-            "presence_penalty": 0.3,
-            "frequency_penalty": 0.3,
-            "repetition_penalty": 1.1,
+            "presence_penalty": 0.35,
+            "frequency_penalty": 0.35,
+            "repetition_penalty": 1.15,
             "max_tokens": max_tokens,
             "chat_template_kwargs": {"enable_thinking": False},
             "reasoning_budget": 0,
@@ -234,10 +253,17 @@ class LocallyUncensoredClient:
                     timeout=self.timeout
                 )
 
-                # If backend rejected extension kwargs (400 Bad Request), fallback progressively
+                # If backend rejected thinking extension kwargs (400), drop them first while keeping repetition_penalty
                 if resp.status_code == 400:
                     payload.pop("chat_template_kwargs", None)
                     payload.pop("reasoning_budget", None)
+                    resp = requests.post(
+                        f"{self.base_url}/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=self.timeout
+                    )
+                if resp.status_code == 400:
                     payload.pop("repetition_penalty", None)
                     resp = requests.post(
                         f"{self.base_url}/chat/completions",
@@ -294,12 +320,13 @@ class LocallyUncensoredClient:
         raw_content = choice.get("content", "") or ""
         reasoning = choice.get("reasoning_content", "") or ""
 
-        # If reasoning was enclosed inside <think> tags in content
-        if "<think>" in raw_content and "</think>" in raw_content:
-            parts = re.split(r"</think>", raw_content, flags=re.DOTALL)
+        # If reasoning was enclosed inside <think>...</think> (or template prefilled <think> leaving closing </think>)
+        if "</think>" in raw_content:
+            parts = re.split(r"</think>", raw_content, maxsplit=1, flags=re.DOTALL)
             think_part = parts[0].replace("<think>", "").strip()
             clean_reply = parts[1].strip()
-            reasoning = think_part
+            if think_part:
+                reasoning = think_part
         elif "<think>" in raw_content:
             # Thought started but never finished (token limit hit during thinking)
             clean_reply = ""
@@ -316,20 +343,28 @@ class LocallyUncensoredClient:
             filtered_lines = []
             for line in lines:
                 l_strip = line.strip()
-                if re.match(r'(?i)^(i need to|i should|i must|make sure not to|moments spontaneously|repeat their exact words)', l_strip):
+                if re.match(r'(?i)^(i need to|i should|i must|make sure not to|moments spontaneously|repeat their exact words|translation:|translated:)', l_strip):
                     continue
                 filtered_lines.append(line)
             clean_reply = '\n'.join(filtered_lines).strip()
 
-        # If clean_reply was empty because tokens ended during reasoning or was pure meta-leak:
+        # Do NOT blindly salvage quotes from <think> when those quotes mirror or translate user's own message
         if not clean_reply and reasoning:
-            # Look for quoted dialogue or Indonesian sentence inside reasoning
+            u_norm = re.sub(r'[^\w\s]', '', last_user_text or '').strip().lower()
             quotes = re.findall(r'"([^"]{5,120})"', reasoning)
             for q in reversed(quotes):
                 q_strip = q.strip()
-                if not re.match(r'(?i)^(i need to|i should|i must|respond|user|girlfriend|assistant|character|system)', q_strip):
-                    clean_reply = q_strip
-                    break
+                q_norm = re.sub(r'[^\w\s]', '', q_strip).strip().lower()
+                if not q_norm or (u_norm and (q_norm == u_norm or q_norm in u_norm or u_norm in q_norm)):
+                    continue
+                if re.match(r'(?i)^(i need to|i should|i must|respond|user|girlfriend|assistant|character|system|let me|the user|they said|translate|meaning)', q_strip):
+                    continue
+                # Also skip English-only quoted translations unless user explicitly wrote in English
+                q_words = set(q_norm.split())
+                if q_words & {'you', 'your', 'are', 'the', 'what', 'where', 'when', 'why', 'how', 'with', 'that', 'this', 'translate'}:
+                    continue
+                clean_reply = q_strip
+                break
 
         return clean_reply, reasoning
 
