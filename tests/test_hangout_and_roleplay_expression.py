@@ -123,6 +123,13 @@ class TestHangoutAndRoleplayExpression(unittest.TestCase):
         ])
         self.assertTrue("libur" in all_arcs_text.lower() or "quality time" in all_arcs_text.lower())
 
+    def test_hangout_venues_attribute_accessible_on_instance(self):
+        """Verifies HANGOUT_VENUES is accessible directly as an attribute on HangoutEngine instances."""
+        self.assertTrue(hasattr(self.hangout_engine, "HANGOUT_VENUES"))
+        self.assertIsInstance(self.hangout_engine.HANGOUT_VENUES, dict)
+        venue_info = self.hangout_engine.HANGOUT_VENUES.get("cafe", {})
+        self.assertEqual(venue_info.get("name"), "Kafe Estetik")
+
 
 if __name__ == '__main__':
     unittest.main()

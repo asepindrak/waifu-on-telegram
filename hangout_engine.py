@@ -120,6 +120,8 @@ class HangoutEngine:
     Manages interactive shared date sessions, invitations, and romantic date POV moments.
     """
 
+    HANGOUT_VENUES = HANGOUT_VENUES
+
     def __init__(self, data_file: str = DATA_FILE, max_date_duration_hours: float = 2.5):
         self.data_file = data_file
         self.max_duration_seconds = max_date_duration_hours * 3600
