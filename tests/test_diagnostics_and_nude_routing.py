@@ -51,6 +51,7 @@ class TestDiagnosticsAndNudeRouting(unittest.TestCase):
         me = MediaEngine(comfyui_url="http://127.0.0.1:8188")
         with patch.object(me, "get_available_checkpoints", return_value=["AnythingXL_xl.safetensors", "AOM3A1B_orange_mixs.safetensors"]):
             with patch.dict(os.environ, {
+                "IMAGE_ENGINE_MODE": "split",
                 "SFW_COMFYUI_CHECKPOINT": "AnythingXL_xl.safetensors",
                 "NSFW_COMFYUI_CHECKPOINT": "AOM3A1B_orange_mixs.safetensors"
             }):

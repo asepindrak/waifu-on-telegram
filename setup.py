@@ -514,6 +514,10 @@ def config_llm_model(env_vars):
             env_vars["LLM_BASE_URL"] = base_url
             env_vars["LLM_API_KEY"] = api_key
             env_vars["LLM_MODEL"] = model_name
+            env_vars["SFW_LLM_PROVIDER"] = "agy" if ":8001" in base_url else ("ollama" if ":11434" in base_url else "local")
+            env_vars["SFW_LLM_BASE_URL"] = base_url
+            env_vars["SFW_LLM_API_KEY"] = api_key or "kobold"
+            env_vars["SFW_LLM_MODEL"] = model_name
             if model_name.endswith(".gguf"):
                 env_vars["LOCAL_LLM_MODEL"] = model_name
                 env_vars["NSFW_LLM_MODEL"] = model_name

@@ -1,4 +1,6 @@
 # Health & Status Checker for Waifu on Telegram
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+$bullet = [char]0x2022
 $vPath = Join-Path $PSScriptRoot "VERSION"
 $version = if (Test-Path $vPath) { (Get-Content $vPath).Trim() } else { "1.6.26" }
 
@@ -57,7 +59,12 @@ try {
         $rawOutfitJson = Get-Content $outfitsPath -Raw -Encoding UTF8 | ConvertFrom-Json
         $propList = @($rawOutfitJson.PSObject.Properties)
         if ($propList.Count -gt 0) {
-            $outfitRawKey = $propList[-1].Value
+            $rawOutfitVal = $propList[-1].Value
+            if ($rawOutfitVal -and ($rawOutfitVal -isnot [string]) -and $rawOutfitVal.PSObject.Properties["key"]) {
+                $outfitRawKey = [string]$rawOutfitVal.key
+            } else {
+                $outfitRawKey = [string]$rawOutfitVal
+            }
             $outfitMap = @{
                 "default" = "Default (Persona Style)"
                 "campus_casual" = "Pakaian Kuliah (Campus Casual)"
@@ -93,13 +100,47 @@ try {
 try {
     $gpuName = "CPU / Integrated Graphics"
     $vramMB = 0
-    if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) {
+    $smiExe = $null
+    $cmdSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+    if ($cmdSmi) { $smiExe = $cmdSmi.Source }
+    elseif (Test-Path "C:\Windows\System32\nvidia-smi.exe") { $smiExe = "C:\Windows\System32\nvidia-smi.exe" }
+    elseif (Test-Path "C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe") { $smiExe = "C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe" }
+
+    if ($smiExe) {
         try {
-            $nvsmi = & nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits 2>$null
+            $nvsmi = & $smiExe --query-gpu=name,memory.total --format=csv,noheader,nounits 2>$null
             if ($nvsmi) {
-                $parts = $nvsmi[0] -split ','
-                $gpuName = $parts[0].Trim()
-                $vramMB = [int]$parts[1].Trim()
+                $firstLine = @($nvsmi)[0]
+                $parts = $firstLine -split ','
+                if ($parts.Count -ge 2) {
+                    $gpuName = $parts[0].Trim()
+                    $vramMB = [int]$parts[1].Trim()
+                }
+            }
+        } catch {}
+    }
+    if ($vramMB -eq 0) {
+        try {
+            $regKeys = Get-ChildItem "HKLM:\SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}" -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -match '^\d+$' }
+            $bestQw = [uint64]0
+            foreach ($rk in $regKeys) {
+                $props = Get-ItemProperty -Path $rk.PSPath -ErrorAction SilentlyContinue
+                if ($props -and $props.PSObject.Properties["HardwareInformation.qwMemorySize"]) {
+                    $rawQw = $props."HardwareInformation.qwMemorySize"
+                    $qwBytes = [uint64]0
+                    if ($rawQw -is [byte[]] -and $rawQw.Length -ge 8) {
+                        $qwBytes = [BitConverter]::ToUInt64($rawQw, 0)
+                    } elseif ($rawQw) {
+                        $qwBytes = [uint64]$rawQw
+                    }
+                    if ($qwBytes -gt $bestQw) {
+                        $bestQw = $qwBytes
+                        if ($props.DriverDesc) { $gpuName = [string]$props.DriverDesc }
+                    }
+                }
+            }
+            if ($bestQw -gt 0) {
+                $vramMB = [int]($bestQw / 1MB)
             }
         } catch {}
     }
@@ -116,43 +157,68 @@ try {
     $tierLabel = "Entry / iGPU / Office PC"
     if ($vramMB -ge 7800) { $tierLabel = "High-End (SDXL & Wan 2.1 Ready)" }
     elseif ($vramMB -ge 5800) { $tierLabel = "Mid-Range (SDXL & Wan 2.1 Compatible)" }
-    elseif ($vramMB -ge 2000) { $tierLabel = "Compact (SD 1.5 MeinaMix & AnimateDiff)" }
+    elseif ($vramMB -ge 2000) { $tierLabel = "Compact (SD 1.5 AOM3 & AnimateDiff)" }
 
-    Write-Host "  [HARDWARE] GPU & VRAM: $gpuName ($vramGB GB VRAM • $tierLabel)" -ForegroundColor Yellow
+    Write-Host "  [HARDWARE] GPU & VRAM: $gpuName ($vramGB GB VRAM $bullet $tierLabel)" -ForegroundColor Yellow
 } catch {}
 
 # 1c. AI & Image Engine Architecture Setup
 try {
     $aiMode = $env:AI_ENGINE_MODE
-    if (-not $aiMode) { $aiMode = "split" }
+    if (-not $aiMode) { $aiMode = "unified" }
     $aiModeLabel = if ($aiMode -eq "split") { "Split Hybrid (SFW Provider + NSFW Local)" } else { "Unified (Single Model)" }
     $sfwProv = $env:SFW_LLM_PROVIDER
-    if (-not $sfwProv) { $sfwProv = "gemini" }
+    if (-not $sfwProv) { $sfwProv = "local" }
     $sfwModel = $env:SFW_LLM_MODEL
-    if (-not $sfwModel) { $sfwModel = "gemini-2.5-flash" }
+    if (-not $sfwModel) { $sfwModel = $env:LLM_MODEL }
+    if (-not $sfwModel) { $sfwModel = "default" }
     $nsfwProv = $env:NSFW_LLM_PROVIDER
     if (-not $nsfwProv) { $nsfwProv = "local" }
     $nsfwModel = $env:LOCAL_LLM_MODEL
-    if (-not $nsfwModel) { $nsfwModel = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf" }
+    if (-not $nsfwModel) { $nsfwModel = "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf" }
 
     Write-Host "  [AI ARCH] Mode AI: $aiModeLabel" -ForegroundColor Cyan
-    Write-Host "            - SFW Engine : $sfwProv ($sfwModel)" -ForegroundColor DarkCyan
-    Write-Host "            - NSFW Engine: $nsfwProv ($nsfwModel)" -ForegroundColor DarkCyan
+    if ($aiMode -eq "split") {
+        Write-Host "            - SFW Engine : $sfwProv ($sfwModel)" -ForegroundColor DarkCyan
+        Write-Host "            - NSFW Engine: $nsfwProv ($nsfwModel)" -ForegroundColor DarkCyan
+    } else {
+        $uniUrl = $env:LLM_BASE_URL
+        if (-not $uniUrl) { $uniUrl = "http://127.0.0.1:5001/v1" }
+        $uniModel = $env:LLM_MODEL
+        if (-not $uniModel -or $uniModel -eq "default") { $uniModel = $nsfwModel }
+        Write-Host "            - Unified LLM: $uniModel ($uniUrl)" -ForegroundColor DarkCyan
+        if ($sfwProv -and ($sfwProv -ne "local") -and ($uniUrl -like "*:5001*")) {
+            Write-Host "            - Note       : SFW_LLM_PROVIDER='$sfwProv' aktif untuk SFW (Port 8001/Cloud)" -ForegroundColor DarkCyan
+        }
+    }
 
     $imgMode = $env:IMAGE_ENGINE_MODE
-    if (-not $imgMode) { $imgMode = "split" }
+    if (-not $imgMode) { $imgMode = "unified" }
+    $imgModeLabel = if ($imgMode -eq "split") { "Split Hybrid (SFW + NSFW)" } else { "Unified (Single Model)" }
+    $uniCkpt = $env:COMFYUI_CHECKPOINT
+    if (-not $uniCkpt) { $uniCkpt = "AOM3A1B_orangemixs.safetensors" }
     $sfwImg = $env:SFW_IMAGE_ENGINE
     if (-not $sfwImg) { $sfwImg = "comfyui" }
     $nsfwImg = $env:NSFW_IMAGE_ENGINE
     if (-not $nsfwImg) { $nsfwImg = "comfyui" }
-    $sfwCkpt = $env:SFW_COMFYUI_CHECKPOINT
-    if (-not $sfwCkpt) { $sfwCkpt = "AnythingXL_xl.safetensors" }
-    $nsfwCkpt = $env:NSFW_COMFYUI_CHECKPOINT
-    if (-not $nsfwCkpt) { $nsfwCkpt = "AOM3A1B_orange_mixs.safetensors" }
+    if ($imgMode -eq "split") {
+        $sfwCkpt = $env:SFW_COMFYUI_CHECKPOINT
+        if (-not $sfwCkpt) { $sfwCkpt = $uniCkpt }
+        $nsfwCkpt = $env:NSFW_COMFYUI_CHECKPOINT
+        if (-not $nsfwCkpt) { $nsfwCkpt = "AOM3A1B_orangemixs.safetensors" }
+    } else {
+        $sfwCkpt = $uniCkpt
+        $nsfwCkpt = $uniCkpt
+    }
 
-    Write-Host "  [IMG ARCH] Visual Generator Architecture:" -ForegroundColor Cyan
-    Write-Host "            - SFW Image  : $sfwImg ($sfwCkpt)" -ForegroundColor DarkCyan
-    Write-Host "            - NSFW Image : $nsfwImg ($nsfwCkpt)" -ForegroundColor DarkCyan
+    Write-Host "  [IMG ARCH] Visual Generator Architecture ($imgModeLabel):" -ForegroundColor Cyan
+    if ($imgMode -eq "split") {
+        Write-Host "            - SFW Image  : $sfwImg ($sfwCkpt)" -ForegroundColor DarkCyan
+        Write-Host "            - NSFW Image : $nsfwImg ($nsfwCkpt)" -ForegroundColor DarkCyan
+    } else {
+        $activeImgDesc = if ($sfwImg -eq "agy") { "agy (Google Antigravity Generator)" } else { "$sfwImg ($uniCkpt)" }
+        Write-Host "            - Unified Img: $activeImgDesc" -ForegroundColor DarkCyan
+    }
 } catch {}
 
 # 2. Check Local LLM (KoboldCPP 5001 / Locally Uncensored 8127 / Ollama 11434 / LM Studio 1234)
@@ -368,11 +434,9 @@ try {
     if (-not $vSpeaker) { $vSpeaker = "id-ID-GadisNeural" }
     $vLang = $env:VOICE_LANGUAGE
     if (-not $vLang) { $vLang = "id-ID" }
-    $vReply = $env:VOICE_REPLY_MODE
-    if (-not $vReply) { $vReply = "smart" }
 
     $vBackendLabel = if ($vBackend -like "*voicestudio*") { "VoiceStudio Local AI (Port 3900)" } else { "Microsoft Edge-TTS Cloud" }
-    Write-Host "  [VOICE]   Voice Engine: $vBackendLabel (Speaker: $vSpeaker • Lang: $vLang • Reply: $vReply)" -ForegroundColor Cyan
+    Write-Host "  [VOICE]   Voice Engine: $vBackendLabel (Speaker: $vSpeaker $bullet Lang: $vLang $bullet Tombol Suara On-Demand)" -ForegroundColor Cyan
 
     if ($vBackend -like "*voicestudio*") {
         $vsPort = if ($env:VOICESTUDIO_PORT) { [int]$env:VOICESTUDIO_PORT } else { 3900 }

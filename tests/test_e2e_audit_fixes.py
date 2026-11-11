@@ -109,6 +109,93 @@ class TestE2EAuditFixes(unittest.TestCase):
             mock_kcpp.assert_called_once()
             self.assertEqual(calls, [8001, 5001])
 
+    def test_detect_hardware_profile_uses_winreg_qwmemorysize_above_4gb(self):
+        import asset_manager
+        import media_engine as _me
+
+        fake_dev_key = MagicMock()
+        fake_cls_key = MagicMock()
+        fake_dev_cm = MagicMock(__enter__=MagicMock(return_value=fake_dev_key), __exit__=MagicMock(return_value=False))
+        fake_cls_cm = MagicMock(__enter__=MagicMock(return_value=fake_cls_key), __exit__=MagicMock(return_value=False))
+
+        six_gb_bytes = 6 * 1024 * 1024 * 1024
+
+        def fake_query(key, name):
+            if name == "HardwareInformation.qwMemorySize":
+                return (six_gb_bytes.to_bytes(8, "little"), 3)
+            if name == "DriverDesc":
+                return ("NVIDIA GeForce RTX 3050 Laptop GPU", 1)
+            raise OSError("missing")
+
+        with patch("asset_manager.subprocess.check_output", side_effect=FileNotFoundError("no smi")), \
+             patch("sys.platform", "win32"), \
+             patch("winreg.OpenKey", side_effect=[fake_cls_cm, fake_dev_cm]), \
+             patch("winreg.EnumKey", side_effect=["0000", OSError("end")]), \
+             patch("winreg.QueryValueEx", side_effect=fake_query):
+            prof = asset_manager.detect_hardware_profile(refresh=True)
+            self.assertEqual(prof["source"], "win32_registry_qw")
+            self.assertEqual(prof["vram_mb"], 6144)
+            self.assertEqual(prof["vram_gb"], 6.0)
+            self.assertEqual(prof["tier"], "mid")
+            self.assertEqual(prof["recommended_llm_layers"], 24)
+        asset_manager.detect_hardware_profile(refresh=True)
+
+    def test_idle_engine_unified_with_sfw_agy_routes_sfw_to_8001_and_nsfw_to_5001(self):
+        engine = idle_engine.IdleEngine(enabled=True)
+        env = {
+            "AI_ENGINE_MODE": "unified",
+            "LLM_BASE_URL": "http://127.0.0.1:5001/v1",
+            "SFW_LLM_PROVIDER": "agy",
+            "SFW_LLM_BASE_URL": "http://127.0.0.1:8001/v1",
+            "NSFW_LLM_PROVIDER": "local",
+            "NSFW_LLM_BASE_URL": "http://127.0.0.1:5001/v1",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            p_sfw, url_sfw, _ = engine._resolve_llm_target(is_nsfw=False)
+            p_nsfw, url_nsfw, _ = engine._resolve_llm_target(is_nsfw=True)
+            self.assertEqual(p_sfw, "agy")
+            self.assertIn(":8001", url_sfw)
+            self.assertEqual(p_nsfw, "local")
+            self.assertIn(":5001", url_nsfw)
+
+    def test_media_engine_checkpoint_respects_unified_vs_split_mode(self):
+        import media_engine
+        me = media_engine.MediaEngine()
+        env_unified = {
+            "IMAGE_ENGINE_MODE": "unified",
+            "COMFYUI_CHECKPOINT": "AnythingXL_xl.safetensors",
+            "SFW_COMFYUI_CHECKPOINT": "meinamix_v12Final.safetensors",
+            "NSFW_COMFYUI_CHECKPOINT": "AOM3A1B_orangemixs.safetensors",
+        }
+        with patch.object(me, "get_available_checkpoints", return_value=[]), \
+             patch.dict(os.environ, env_unified, clear=False):
+            self.assertEqual(me.get_active_checkpoint(is_nude=False), "AnythingXL_xl.safetensors")
+            self.assertEqual(me.get_active_checkpoint(is_nude=True), "AnythingXL_xl.safetensors")
+
+        with patch.object(me, "get_available_checkpoints", return_value=[]), \
+             patch.dict(os.environ, {**env_unified, "IMAGE_ENGINE_MODE": "split"}, clear=False):
+            self.assertEqual(me.get_active_checkpoint(is_nude=False), "meinamix_v12Final.safetensors")
+            self.assertEqual(me.get_active_checkpoint(is_nude=True), "AOM3A1B_orangemixs.safetensors")
+
+    def test_apply_llm_choice_agy_updates_both_unified_and_sfw_vars(self):
+        orig_base = bot.LLM_BASE_URL
+        orig_env = {k: os.environ.get(k) for k in ("LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY", "SFW_LLM_PROVIDER", "SFW_LLM_BASE_URL", "SFW_LLM_MODEL", "SFW_LLM_API_KEY")}
+        try:
+            with patch("bot.update_env_variable") as mock_upd, \
+                 patch("bot.get_hybrid_llm_client"):
+                label = bot.apply_llm_choice("agy")
+                self.assertIn("AGY", label)
+                mock_upd.assert_any_call("LLM_BASE_URL", "http://127.0.0.1:8001/v1")
+                mock_upd.assert_any_call("SFW_LLM_PROVIDER", "agy")
+                mock_upd.assert_any_call("SFW_LLM_BASE_URL", "http://127.0.0.1:8001/v1")
+        finally:
+            bot.LLM_BASE_URL = orig_base
+            for k, v in orig_env.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
 
 if __name__ == "__main__":
     unittest.main()

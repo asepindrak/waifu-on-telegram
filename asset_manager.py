@@ -286,25 +286,78 @@ def detect_hardware_profile(refresh: bool = False) -> Dict[str, Any]:
     vram_mb = 0
     source = "fallback"
 
-    # 1. Probe NVIDIA SMI (most accurate for dedicated NVIDIA VRAM)
-    try:
-        cmd = ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"]
-        out = subprocess.check_output(
-            cmd,
-            timeout=3,
-            stderr=subprocess.DEVNULL,
-            creationflags=0x08000000 if sys.platform == "win32" else 0
-        ).decode("utf-8", errors="ignore").strip()
-        lines = [l.strip() for l in out.splitlines() if l.strip()]
-        if lines:
-            parts = lines[0].split(",")
-            gpu_name = parts[0].strip()
-            vram_mb = int(parts[1].strip())
-            source = "nvidia-smi"
-    except Exception:
-        pass
+    # 1. Probe NVIDIA SMI (check PATH and standard Windows installation folders)
+    smi_candidates = ["nvidia-smi"]
+    if sys.platform == "win32":
+        smi_candidates.extend([
+            r"C:\Windows\System32\nvidia-smi.exe",
+            r"C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe",
+        ])
+    for smi_bin in smi_candidates:
+        try:
+            cmd = [smi_bin, "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"]
+            out = subprocess.check_output(
+                cmd,
+                timeout=3,
+                stderr=subprocess.DEVNULL,
+                creationflags=0x08000000 if sys.platform == "win32" else 0
+            ).decode("utf-8", errors="ignore").strip()
+            lines = [l.strip() for l in out.splitlines() if l.strip()]
+            if lines:
+                parts = lines[0].split(",")
+                gpu_name = parts[0].strip()
+                vram_mb = int(parts[1].strip())
+                source = "nvidia-smi"
+                break
+        except Exception:
+            pass
 
-    # 2. Windows WMI / CimInstance probe if nvidia-smi failed or unavailable
+    # 2. Windows Registry 64-bit HardwareInformation.qwMemorySize (avoids 32-bit WMI 4GB AdapterRAM cap)
+    if vram_mb == 0 and sys.platform == "win32":
+        try:
+            import winreg
+            cls_path = r"SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, cls_path) as cls_key:
+                best_bytes = 0
+                best_desc = gpu_name
+                idx = 0
+                while True:
+                    try:
+                        sub_name = winreg.EnumKey(cls_key, idx)
+                        idx += 1
+                    except OSError:
+                        break
+                    if not sub_name.isdigit():
+                        continue
+                    try:
+                        with winreg.OpenKey(cls_key, sub_name) as dev_key:
+                            raw_qw, _ = winreg.QueryValueEx(dev_key, "HardwareInformation.qwMemorySize")
+                            if isinstance(raw_qw, bytes):
+                                mem_bytes = int.from_bytes(raw_qw, byteorder="little", signed=False)
+                            else:
+                                mem_bytes = int(raw_qw or 0)
+                            if mem_bytes > best_bytes:
+                                best_bytes = mem_bytes
+                                for desc_key in ("DriverDesc", "HardwareInformation.AdapterString"):
+                                    try:
+                                        desc_val, _ = winreg.QueryValueEx(dev_key, desc_key)
+                                        if isinstance(desc_val, bytes):
+                                            desc_val = desc_val.decode("utf-16-le", errors="ignore").rstrip("\x00")
+                                        if desc_val and str(desc_val).strip():
+                                            best_desc = str(desc_val).strip()
+                                            break
+                                    except OSError:
+                                        continue
+                    except OSError:
+                        continue
+                if best_bytes > 0:
+                    gpu_name = best_desc
+                    vram_mb = int(best_bytes / (1024 * 1024))
+                    source = "win32_registry_qw"
+        except Exception:
+            pass
+
+    # 3. Windows WMI / CimInstance fallback if both nvidia-smi and qwMemorySize failed
     if vram_mb == 0 and sys.platform == "win32":
         try:
             ps_cmd = (

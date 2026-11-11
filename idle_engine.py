@@ -112,8 +112,16 @@ class IdleEngine:
             target_provider = nsfw_p if is_nsfw else sfw_p
             target_url = nsfw_url if is_nsfw else sfw_url
         else:
-            target_url = os.environ.get("LLM_BASE_URL") or sfw_url
-            target_provider = "local" if ":5001" in target_url else sfw_p
+            llm_url = os.environ.get("LLM_BASE_URL", "").strip()
+            if not is_nsfw and (sfw_p == "agy" or ":8001" in llm_url):
+                target_provider = "agy"
+                target_url = sfw_url if (sfw_p == "agy" and sfw_url) else (llm_url or "http://127.0.0.1:8001/v1")
+            elif is_nsfw and (":8001" in llm_url or sfw_p == "agy"):
+                target_provider = nsfw_p
+                target_url = nsfw_url
+            else:
+                target_url = llm_url or sfw_url
+                target_provider = "local" if ":5001" in target_url else sfw_p
 
         return target_provider, target_url, split_mode
 
@@ -214,7 +222,12 @@ class IdleEngine:
             return False
         if self.health_engine and hasattr(self.health_engine, "llm_client"):
             try:
-                stat = self.health_engine.llm_client.check_health()
+                cli = self.health_engine.llm_client
+                target_cli = cli
+                nsfw_cli = getattr(cli, "nsfw_client", None)
+                if nsfw_cli and ":5001" in str(getattr(nsfw_cli, "base_url", "")):
+                    target_cli = nsfw_cli
+                stat = target_cli.check_health()
                 return bool(stat.get("online"))
             except Exception:
                 return True

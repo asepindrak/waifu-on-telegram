@@ -255,10 +255,18 @@ class HealthEngine:
 
         return self._heal_koboldcpp_instance()
 
+    def _check_kobold_port_health(self) -> Dict[str, Any]:
+        """Checks health specifically against the local KoboldCPP (5001) client if in split mode."""
+        cli = self.llm_client
+        nsfw_cli = getattr(cli, "nsfw_client", None)
+        if nsfw_cli and ":5001" in str(getattr(nsfw_cli, "base_url", "")):
+            return nsfw_cli.check_health()
+        return cli.check_health()
+
     def _heal_koboldcpp_instance(self) -> bool:
         with _KOBOLD_SPAWN_LOCK:
             if is_port_listening(5001):
-                stat = self.llm_client.check_health()
+                stat = self._check_kobold_port_health()
                 if stat.get("online"):
                     return True
 
@@ -273,7 +281,7 @@ class HealthEngine:
                 for sec in range(1, 45):
                     time.sleep(1)
                     if is_port_listening(5001):
-                        stat = self.llm_client.check_health()
+                        stat = self._check_kobold_port_health()
                         if stat.get("online"):
                             logger.info(f"Existing KoboldCPP became ready in {sec}s.")
                             return True
@@ -324,7 +332,7 @@ class HealthEngine:
                     time.sleep(1)
                     if is_port_listening(5001):
                         # Give KoboldCPP a brief moment to finish binding endpoint
-                        stat = self.llm_client.check_health()
+                        stat = self._check_kobold_port_health()
                         if stat.get("online"):
                             logger.info(f"Self-healing: KoboldCPP restored successfully in {sec}s.")
                             return True
@@ -391,7 +399,7 @@ class HealthEngine:
                 for sec in range(1, 46):
                     time.sleep(1)
                     if is_port_listening(5001):
-                        stat = self.llm_client.check_health()
+                        stat = self._check_kobold_port_health()
                         if stat.get("online"):
                             logger.info(f"Self-healing: KoboldCPP restored successfully in {sec}s.")
                             return True

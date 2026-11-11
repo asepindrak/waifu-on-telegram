@@ -1,4 +1,6 @@
+import sys
 import unittest
+from contextlib import nullcontext
 from unittest.mock import patch, MagicMock
 import asset_manager
 
@@ -41,7 +43,8 @@ class TestHardwareAutoTune(unittest.TestCase):
 
     def test_tier_entry_or_igpu_recommends_cloud_and_motion(self):
         """When GPU has < 2GB VRAM or no dedicated GPU (iGPU / Office PC), Cloud and Motion 2.5D are recommended."""
-        with patch("asset_manager.subprocess.check_output", side_effect=Exception("No nvidia-smi")):
+        reg_patch = patch("winreg.OpenKey", side_effect=OSError("No registry GPU")) if sys.platform == "win32" else nullcontext()
+        with patch("asset_manager.subprocess.check_output", side_effect=Exception("No nvidia-smi")), reg_patch:
             profile = asset_manager.detect_hardware_profile(refresh=True)
             self.assertEqual(profile["tier"], "entry")
             self.assertEqual(profile["recommended_image_model"], "cloud")

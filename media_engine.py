@@ -122,10 +122,17 @@ class MediaEngine:
     def get_active_checkpoint(self, is_nude: bool = False) -> str:
         """Determines the active image checkpoint model currently selected/available for SFW or NSFW."""
         ckpts = self.get_available_checkpoints()
-        if is_nude:
-            env_ckpt = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "").strip() or os.environ.get("COMFYUI_CHECKPOINT", "").strip()
+        img_mode = os.environ.get("IMAGE_ENGINE_MODE", "unified").lower().strip()
+        if img_mode in ("split", "hybrid"):
+            if is_nude:
+                env_ckpt = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "").strip() or os.environ.get("COMFYUI_CHECKPOINT", "").strip()
+            else:
+                env_ckpt = os.environ.get("SFW_COMFYUI_CHECKPOINT", "").strip() or os.environ.get("COMFYUI_CHECKPOINT", "").strip()
         else:
-            env_ckpt = os.environ.get("SFW_COMFYUI_CHECKPOINT", "").strip() or os.environ.get("COMFYUI_CHECKPOINT", "").strip()
+            env_ckpt = (
+                os.environ.get("COMFYUI_CHECKPOINT", "").strip()
+                or os.environ.get("NSFW_COMFYUI_CHECKPOINT" if is_nude else "SFW_COMFYUI_CHECKPOINT", "").strip()
+            )
         if env_ckpt and ckpts:
             matched = [c for c in ckpts if env_ckpt.lower() in c.lower()]
             if matched:

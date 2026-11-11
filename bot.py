@@ -610,6 +610,14 @@ def apply_llm_choice(choice: str) -> str:
         update_env_variable("LOCAL_LLM_MODEL", new_model)
         update_env_variable("NSFW_LLM_MODEL", new_model)
         update_env_variable("LLM_MODEL", new_model)
+    elif choice in ("agy", "agy_bridge"):
+        new_base = "http://127.0.0.1:8001/v1"
+        new_model = "gemini-3.8-flash-medium"
+        label = "Google Antigravity Bridge (AGY Port 8001)"
+        os.environ["LLM_API_KEY"] = "sk-agy-secret-key-12345"
+        os.environ["SFW_LLM_API_KEY"] = "sk-agy-secret-key-12345"
+        update_env_variable("LLM_API_KEY", "sk-agy-secret-key-12345")
+        update_env_variable("SFW_LLM_API_KEY", "sk-agy-secret-key-12345")
     elif choice == "kobold" or choice == "auto":
         new_base = "http://127.0.0.1:5001/v1"
         new_model = "default"
@@ -646,6 +654,12 @@ def apply_llm_choice(choice: str) -> str:
         return "Unknown"
 
     LLM_BASE_URL = new_base
+    os.environ["LLM_BASE_URL"] = new_base
+    os.environ["LLM_MODEL"] = new_model
+    sfw_prov = "agy" if ":8001" in new_base else ("ollama" if ":11434" in new_base else "local")
+    os.environ["SFW_LLM_PROVIDER"] = sfw_prov
+    os.environ["SFW_LLM_BASE_URL"] = new_base
+    os.environ["SFW_LLM_MODEL"] = new_model
     try:
         llm_client.base_url = new_base
         llm_client.model = new_model
@@ -653,6 +667,9 @@ def apply_llm_choice(choice: str) -> str:
         pass
     update_env_variable("LLM_BASE_URL", new_base)
     update_env_variable("LLM_MODEL", new_model)
+    update_env_variable("SFW_LLM_PROVIDER", sfw_prov)
+    update_env_variable("SFW_LLM_BASE_URL", new_base)
+    update_env_variable("SFW_LLM_MODEL", new_model)
     try:
         get_hybrid_llm_client(force_reload=True)
     except Exception:
@@ -688,33 +705,45 @@ def apply_ckpt_choice(choice: str) -> str:
     elif choice == "meinamix":
         ckpt_name = "meinamix_v12Final.safetensors"
         os.environ["COMFYUI_CHECKPOINT"] = ckpt_name
+        os.environ["SFW_COMFYUI_CHECKPOINT"] = ckpt_name
+        os.environ["NSFW_COMFYUI_CHECKPOINT"] = ckpt_name
         os.environ["COMFYUI_URL"] = "http://127.0.0.1:8188"
         os.environ["MEDIA_FALLBACK_CLOUD"] = "false"
         media_engine.comfyui_url = "http://127.0.0.1:8188"
         media_engine.allow_cloud_fallback = False
         update_env_variable("COMFYUI_CHECKPOINT", ckpt_name)
+        update_env_variable("SFW_COMFYUI_CHECKPOINT", ckpt_name)
+        update_env_variable("NSFW_COMFYUI_CHECKPOINT", ckpt_name)
         update_env_variable("COMFYUI_URL", "http://127.0.0.1:8188")
         update_env_variable("MEDIA_FALLBACK_CLOUD", "false")
         return "MeinaMix v12 (SD 1.5)"
     elif choice == "aom3":
         ckpt_name = "AOM3A1B_orangemixs.safetensors"
         os.environ["COMFYUI_CHECKPOINT"] = ckpt_name
+        os.environ["SFW_COMFYUI_CHECKPOINT"] = ckpt_name
+        os.environ["NSFW_COMFYUI_CHECKPOINT"] = ckpt_name
         os.environ["COMFYUI_URL"] = "http://127.0.0.1:8188"
         os.environ["MEDIA_FALLBACK_CLOUD"] = "false"
         media_engine.comfyui_url = "http://127.0.0.1:8188"
         media_engine.allow_cloud_fallback = False
         update_env_variable("COMFYUI_CHECKPOINT", ckpt_name)
+        update_env_variable("SFW_COMFYUI_CHECKPOINT", ckpt_name)
+        update_env_variable("NSFW_COMFYUI_CHECKPOINT", ckpt_name)
         update_env_variable("COMFYUI_URL", "http://127.0.0.1:8188")
         update_env_variable("MEDIA_FALLBACK_CLOUD", "false")
         return "AbyssOrangeMix3 (AOM3A1B SD 1.5)"
     elif choice == "anything_xl":
         ckpt_name = "AnythingXL_xl.safetensors"
         os.environ["COMFYUI_CHECKPOINT"] = ckpt_name
+        os.environ["SFW_COMFYUI_CHECKPOINT"] = ckpt_name
+        os.environ["NSFW_COMFYUI_CHECKPOINT"] = ckpt_name
         os.environ["COMFYUI_URL"] = "http://127.0.0.1:8188"
         os.environ["MEDIA_FALLBACK_CLOUD"] = "false"
         media_engine.comfyui_url = "http://127.0.0.1:8188"
         media_engine.allow_cloud_fallback = False
         update_env_variable("COMFYUI_CHECKPOINT", ckpt_name)
+        update_env_variable("SFW_COMFYUI_CHECKPOINT", ckpt_name)
+        update_env_variable("NSFW_COMFYUI_CHECKPOINT", ckpt_name)
         update_env_variable("COMFYUI_URL", "http://127.0.0.1:8188")
         update_env_variable("MEDIA_FALLBACK_CLOUD", "false")
         return "Anything XL (SDXL 1024px)"
@@ -2347,7 +2376,9 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
             markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih Huihui-Qwythos 9B (~5.5 GB • 100% Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
         markup.add(types.InlineKeyboardButton(f"☁️ OpenRouter Uncensored {'✓' if nsfw_p == 'openrouter_uncensored' else ''}", callback_data="cfg_set_nsfw_p:openrouter_uncensored"))
     else:
-        is_kobold = ("5001" in cur_base)
+        is_agy_llm = ("8001" in cur_base or sfw_p == "agy")
+        is_kobold = ("5001" in cur_base and not is_agy_llm)
+        markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity Bridge (AGY Port 8001) {'✓' if is_agy_llm else ''}", callback_data="cfg_set_llm:agy"))
         markup.add(types.InlineKeyboardButton(f"🤖 KoboldCPP (Port 5001 - Auto-start) {'✓' if is_kobold else ''}", callback_data="cfg_set_llm:kobold"))
 
         has_huihui = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
@@ -2801,10 +2832,10 @@ def build_system_diagnostics_report(user_id: int) -> str:
     affinity_score = memory_engine.get_affinity(user_id)
 
     # Resolve AI Architecture
-    ai_mode = os.environ.get("AI_ENGINE_MODE", "split").lower()
+    ai_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower()
     ai_mode_str = "Split Hybrid (SFW + NSFW Khusus)" if ai_mode == "split" else "Unified (Model Tunggal)"
-    sfw_p = os.environ.get("SFW_LLM_PROVIDER", "gemini")
-    sfw_m = os.environ.get("SFW_LLM_MODEL", "gemini-2.5-flash")
+    sfw_p = os.environ.get("SFW_LLM_PROVIDER", "local")
+    sfw_m = os.environ.get("SFW_LLM_MODEL", os.environ.get("LLM_MODEL", "default"))
     nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local")
     nsfw_m = os.environ.get("LOCAL_LLM_MODEL", llm_model_name)
 
@@ -2818,10 +2849,15 @@ def build_system_diagnostics_report(user_id: int) -> str:
     ckpt_badge = "_(Terpasang ✓)_" if ckpt_installed else ("_(Aktif di ComfyUI ✓)_" if media_stat.get("online") else "_(Perlu Download)_")
     sfw_img_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower()
     nsfw_img_engine = os.environ.get("NSFW_IMAGE_ENGINE", "comfyui").lower()
-    sfw_ckpt_name = os.environ.get("SFW_COMFYUI_CHECKPOINT", "AnythingXL_xl.safetensors")
-    nsfw_ckpt_name = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "AOM3A1B_orange_mixs.safetensors")
-    img_mode = os.environ.get("IMAGE_ENGINE_MODE", "split").lower()
-    img_mode_str = "Split Hybrid (SFW + NSFW Khusus)" if img_mode == "split" else "Unified"
+    uni_ckpt_name = os.environ.get("COMFYUI_CHECKPOINT", "AOM3A1B_orangemixs.safetensors")
+    img_mode = os.environ.get("IMAGE_ENGINE_MODE", "unified").lower()
+    if img_mode in ("split", "hybrid"):
+        sfw_ckpt_name = os.environ.get("SFW_COMFYUI_CHECKPOINT", uni_ckpt_name)
+        nsfw_ckpt_name = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "AOM3A1B_orangemixs.safetensors")
+    else:
+        sfw_ckpt_name = uni_ckpt_name
+        nsfw_ckpt_name = uni_ckpt_name
+    img_mode_str = "Split Hybrid (SFW + NSFW Khusus)" if img_mode in ("split", "hybrid") else "Unified"
 
     if raw_outfit_key == "nude":
         active_model_str = f"`{cur_ckpt}` _(NSFW Model Dipakai Otomatis 🔞)_"
@@ -3700,16 +3736,24 @@ def callback_set_sfw_provider(call):
         "local": ("http://127.0.0.1:5001/v1", "kobold", "default")
     }
     base, key, model = presets.get(prov, ("http://127.0.0.1:5001/v1", "kobold", "default"))
+    os.environ["AI_ENGINE_MODE"] = "split"
     os.environ["SFW_LLM_PROVIDER"] = prov
     os.environ["SFW_LLM_BASE_URL"] = base
+    os.environ["LLM_BASE_URL"] = base
     if key:
         os.environ["SFW_LLM_API_KEY"] = key
+        os.environ["LLM_API_KEY"] = key
     os.environ["SFW_LLM_MODEL"] = model
+    os.environ["LLM_MODEL"] = model
+    update_env_variable("AI_ENGINE_MODE", "split")
     update_env_variable("SFW_LLM_PROVIDER", prov)
     update_env_variable("SFW_LLM_BASE_URL", base)
+    update_env_variable("LLM_BASE_URL", base)
     if key:
         update_env_variable("SFW_LLM_API_KEY", key)
+        update_env_variable("LLM_API_KEY", key)
     update_env_variable("SFW_LLM_MODEL", model)
+    update_env_variable("LLM_MODEL", model)
     get_hybrid_llm_client(force_reload=True)
     bot.answer_callback_query(call.id, f"SFW Provider: {prov.upper()}")
     show_llm_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
@@ -3728,11 +3772,13 @@ def callback_set_nsfw_provider(call):
         base = "http://127.0.0.1:5001/v1"
         key = "kobold"
         model = "default"
+    os.environ["AI_ENGINE_MODE"] = "split"
     os.environ["NSFW_LLM_PROVIDER"] = prov
     os.environ["NSFW_LLM_BASE_URL"] = base
     if key:
         os.environ["NSFW_LLM_API_KEY"] = key
     os.environ["NSFW_LLM_MODEL"] = model
+    update_env_variable("AI_ENGINE_MODE", "split")
     update_env_variable("NSFW_LLM_PROVIDER", prov)
     update_env_variable("NSFW_LLM_BASE_URL", base)
     if key:
@@ -3874,6 +3920,8 @@ def callback_set_sfw_img(call):
     if not is_authorized(call.from_user.id):
         return
     key = call.data.split(":", 1)[1]
+    os.environ["IMAGE_ENGINE_MODE"] = "split"
+    update_env_variable("IMAGE_ENGINE_MODE", "split")
     if key == "agy":
         os.environ["SFW_IMAGE_ENGINE"] = "agy"
         update_env_variable("SFW_IMAGE_ENGINE", "agy")
@@ -3923,8 +3971,10 @@ def callback_set_nsfw_img(call):
     else:
         ckpt = key
         label = key
+    os.environ["IMAGE_ENGINE_MODE"] = "split"
     os.environ["NSFW_IMAGE_ENGINE"] = "comfyui"
     os.environ["NSFW_COMFYUI_CHECKPOINT"] = ckpt
+    update_env_variable("IMAGE_ENGINE_MODE", "split")
     update_env_variable("NSFW_IMAGE_ENGINE", "comfyui")
     update_env_variable("NSFW_COMFYUI_CHECKPOINT", ckpt)
     bot.answer_callback_query(call.id, f"NSFW Foto: {label}")

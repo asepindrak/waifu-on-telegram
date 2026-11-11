@@ -214,8 +214,11 @@ class ProjectServerManager:
             logger.error(f"Failed to spawn http.server on port {port}: {e}")
             return None
 
-        # Give it a brief moment to bind socket
-        time.sleep(0.8)
+        # Wait briefly for socket to bind (handles slower Python startup under load)
+        for _ in range(15):
+            if proc.poll() is not None or is_port_in_use(port):
+                break
+            time.sleep(0.2)
 
         # 4. Verify server started
         if not self.is_server_healthy(port, proc.pid):

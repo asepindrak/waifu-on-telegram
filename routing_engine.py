@@ -298,9 +298,14 @@ class HybridLLMClient:
         if sfw_client:
             self.sfw_client = sfw_client
         else:
-            sfw_base = os.environ.get("SFW_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1"))
-            sfw_key = os.environ.get("SFW_LLM_API_KEY", os.environ.get("LLM_API_KEY", "auto"))
-            sfw_model = os.environ.get("SFW_LLM_MODEL", os.environ.get("LLM_MODEL", "default"))
+            if self.mode == "unified" and self.sfw_provider in ("", "local", "kobold", "ollama", "lm-studio") and os.environ.get("LLM_BASE_URL"):
+                sfw_base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
+                sfw_key = os.environ.get("LLM_API_KEY", os.environ.get("SFW_LLM_API_KEY", "auto"))
+                sfw_model = os.environ.get("LLM_MODEL", os.environ.get("SFW_LLM_MODEL", "default"))
+            else:
+                sfw_base = os.environ.get("SFW_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1"))
+                sfw_key = os.environ.get("SFW_LLM_API_KEY", os.environ.get("LLM_API_KEY", "auto"))
+                sfw_model = os.environ.get("SFW_LLM_MODEL", os.environ.get("LLM_MODEL", "default"))
             self.sfw_client = LocallyUncensoredClient(base_url=sfw_base, api_key=sfw_key, model=sfw_model)
 
         # Initialize NSFW client

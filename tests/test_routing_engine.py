@@ -103,6 +103,7 @@ class TestRoutingEngine(unittest.TestCase):
         ])
 
         with patch.dict(os.environ, {
+            "IMAGE_ENGINE_MODE": "split",
             "SFW_COMFYUI_CHECKPOINT": "AnythingXL_xl.safetensors",
             "NSFW_COMFYUI_CHECKPOINT": "AOM3A1B_orangemixs.safetensors"
         }):
