@@ -196,6 +196,51 @@ class TestE2EAuditFixes(unittest.TestCase):
                 else:
                     os.environ[k] = v
 
+    def test_health_engine_heal_llm_nsfw_in_unified_agy_targets_koboldcpp(self):
+        mock_cli = MagicMock()
+        mock_cli.base_url = "http://127.0.0.1:8001/v1"
+        he = health_engine.HealthEngine(llm_client=mock_cli, enabled=False)
+        env = {
+            "AI_ENGINE_MODE": "unified",
+            "SFW_LLM_PROVIDER": "agy",
+            "NSFW_LLM_PROVIDER": "local",
+            "NSFW_LLM_BASE_URL": "http://127.0.0.1:5001/v1",
+        }
+        with patch.dict(os.environ, env, clear=False), \
+             patch.object(he, "_heal_koboldcpp_instance", return_value=True) as mock_kcpp, \
+             patch.object(he, "heal_agy", return_value=True) as mock_agy:
+            ok = he.heal_llm(is_nsfw=True)
+            self.assertTrue(ok)
+            mock_kcpp.assert_called_once()
+            mock_agy.assert_not_called()
+
+    def test_idle_engine_unified_agy_nsfw_falls_back_to_8001_when_5001_unavailable(self):
+        engine = idle_engine.IdleEngine(enabled=True)
+        env = {
+            "AI_ENGINE_MODE": "unified",
+            "LLM_BASE_URL": "http://127.0.0.1:8001/v1",
+            "SFW_LLM_PROVIDER": "agy",
+            "SFW_LLM_BASE_URL": "http://127.0.0.1:8001/v1",
+            "NSFW_LLM_PROVIDER": "local",
+            "NSFW_LLM_BASE_URL": "http://127.0.0.1:5001/v1",
+        }
+        with patch.dict(os.environ, env, clear=False), \
+             patch("idle_engine.is_port_listening", side_effect=lambda p, timeout=1.0: p == 8001), \
+             patch.object(engine, "wake_llm", return_value=False):
+            ok = engine.ensure_llm_active(is_user_chat=True, is_nsfw=True)
+            self.assertTrue(ok)
+
+    def test_idle_engine_comfyui_does_not_sleep_llm_when_comfyui_not_installed(self):
+        engine = idle_engine.IdleEngine(enabled=True)
+        with patch("asset_manager.detect_hardware_profile", return_value={"vram_mb": 6144}), \
+             patch("asset_manager.detect_comfyui_dir", return_value=None), \
+             patch.object(engine, "is_comfyui_ready", return_value=False), \
+             patch.object(engine, "sleep_llm") as mock_sleep_llm, \
+             patch.dict(os.environ, {"VRAM_EXCLUSIVE_SWAP": "auto", "SFW_IMAGE_ENGINE": "comfyui"}, clear=False):
+            ok = engine.ensure_comfyui_active(is_nude=False)
+            self.assertFalse(ok)
+            mock_sleep_llm.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

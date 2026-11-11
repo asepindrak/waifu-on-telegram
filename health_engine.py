@@ -221,7 +221,7 @@ class HealthEngine:
 
         return True
 
-    def heal_llm(self) -> bool:
+    def heal_llm(self, is_nsfw: bool = False) -> bool:
         """
         Attempts to automatically start or resurrect the active LLM service (AGY Bridge / KoboldCPP / Ollama).
         Guarantees strict singleton execution: prevents multiple KoboldCPP instances from spawning.
@@ -229,8 +229,18 @@ class HealthEngine:
         """
         base_url = getattr(self.llm_client, "base_url", "")
         sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
-        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "").lower().strip()
+        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local").lower().strip()
+        nsfw_url = os.environ.get("NSFW_LLM_BASE_URL", "")
         mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip()
+
+        # When specifically waking/healing for an NSFW turn that targets local KoboldCPP (port 5001),
+        # never short-circuit to SFW AGY (8001) even if AI_ENGINE_MODE=unified.
+        nsfw_targets_local = (
+            nsfw_p in ("", "local", "kobold", "koboldcpp", "locally-uncensored")
+            or ":5001" in str(nsfw_url)
+        )
+        if is_nsfw and nsfw_targets_local:
+            return self._heal_koboldcpp_instance()
 
         # In split mode, check whichever engine is offline (avoid duplicate 5001 probes)
         if mode in ("split", "hybrid"):

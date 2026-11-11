@@ -379,7 +379,10 @@ class IdleEngine:
                     from health_engine import kill_all_koboldcpp
                     kill_all_koboldcpp()
                 
-                time.sleep(1)
+                for _ in range(5):
+                    time.sleep(0.2)
+                    if not is_port_listening(5001):
+                        break
                 self.is_llm_sleeping = True
                 logger.info("✓ Smart Idle: KoboldCPP put to sleep. VRAM & RAM successfully freed!")
                 return True
@@ -407,7 +410,10 @@ class IdleEngine:
                 else:
                     subprocess.run(["pkill", "-9", "-f", "python.*main.py.*8188"], capture_output=True)
                 
-                time.sleep(1)
+                for _ in range(5):
+                    time.sleep(0.2)
+                    if not is_port_listening(8188):
+                        break
                 self.is_comfyui_sleeping = True
                 logger.info("✓ Smart Idle: ComfyUI put to sleep. VRAM successfully freed!")
                 return True
@@ -485,7 +491,7 @@ class IdleEngine:
 
         return results
 
-    def wake_llm(self, timeout_seconds: int = 50, is_nsfw: bool = False) -> bool:
+    def wake_llm(self, timeout_seconds: int = 75, is_nsfw: bool = False) -> bool:
         """
         Wakes active LLM on-demand (AGY Bridge or KoboldCPP).
         """
@@ -516,7 +522,10 @@ class IdleEngine:
             # Use HealthEngine heal_llm if available
             started = False
             if self.health_engine and hasattr(self.health_engine, "heal_llm"):
-                started = self.health_engine.heal_llm()
+                try:
+                    started = self.health_engine.heal_llm(is_nsfw=is_nsfw)
+                except TypeError:
+                    started = self.health_engine.heal_llm()
             else:
                 # Direct launch fallback using asset_manager discovery
                 try:
@@ -541,7 +550,15 @@ class IdleEngine:
                 except Exception as e:
                     logger.error(f"Failed to launch KoboldCPP on-demand fallback: {e}")
 
+            kcpp_loading = False
             if not started and not is_port_listening(5001):
+                try:
+                    from health_engine import get_koboldcpp_process_count
+                    kcpp_loading = get_koboldcpp_process_count() >= 1
+                except Exception:
+                    kcpp_loading = False
+
+            if not started and not is_port_listening(5001) and not kcpp_loading:
                 logger.warning("⚡ Smart Idle: Could not launch KoboldCPP (binary or model missing).")
                 return False
 
@@ -674,15 +691,23 @@ class IdleEngine:
         fb_thread = threading.Thread(target=_feedback_loop, daemon=True)
         fb_thread.start()
         try:
-            ok = self.wake_llm(timeout_seconds=50, is_nsfw=is_nsfw)
+            ok = self.wake_llm(timeout_seconds=75, is_nsfw=is_nsfw)
         finally:
             stop_feedback.set()
             fb_thread.join(timeout=1.0)
 
-        # Split mode high-availability fallback:
-        # If NSFW KoboldCPP on port 5001 failed to wake, but SFW engine is ready, proceed with fallback!
-        if not ok and split_mode and is_nsfw:
-            if self.is_llm_ready(is_nsfw=False):
+        # High-availability fallback:
+        # If NSFW KoboldCPP on port 5001 failed to wake, but SFW engine (AGY 8001 or Cloud) is ready,
+        # proceed seamlessly via SFW fallback regardless of unified vs split mode!
+        if not ok and is_nsfw:
+            sfw_p_chk, sfw_url_chk, _ = self._resolve_llm_target(is_nsfw=False)
+            sfw_is_alt_engine = (
+                split_mode
+                or sfw_p_chk == "agy"
+                or ":8001" in sfw_url_chk
+                or (sfw_p_chk not in ("", "local", "kobold", "koboldcpp", "ollama", "lm-studio", "locally-uncensored"))
+            )
+            if sfw_is_alt_engine and self.is_llm_ready(is_nsfw=False):
                 logger.warning("⚡ Smart Idle: KoboldCPP (port 5001) could not be awakened, but SFW engine is ready. Seamlessly proceeding via SFW fallback.")
                 ok = True
 
@@ -742,9 +767,20 @@ class IdleEngine:
             return True
 
         # Check if active visual engine actually uses ComfyUI
+        img_mode = os.environ.get("IMAGE_ENGINE_MODE", "unified").lower().strip()
         sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
-        if not is_nude and sfw_img in ("agy", "cloud"):
+        uni_img = os.environ.get("IMAGE_ENGINE", sfw_img).lower().strip() if img_mode == "unified" else sfw_img
+        if not is_nude and uni_img in ("agy", "cloud"):
             return True
+
+        # Avoid killing live KoboldCPP on <= 6.5 GB GPU if ComfyUI is neither running nor installed locally
+        if not self.is_comfyui_ready():
+            try:
+                import asset_manager
+                if not asset_manager.detect_comfyui_dir():
+                    return False
+            except Exception:
+                pass
 
         self._prepare_vram_for_comfyui()
 
