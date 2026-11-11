@@ -154,6 +154,142 @@ class MemoryEngine:
     and semantic vector-based memory retrieval.
     """
 
+    _PET_NAMES = frozenset({"sayang", "ayang", "babe", "bebe", "darling", "honey"})
+
+    _NON_NAME_WORDS = frozenset({
+        # Pronouns / people words / filler
+        "aku", "saya", "gue", "gua", "gw", "kamu", "kau", "engkau", "dia", "ia", "mereka",
+        "kita", "kami", "kalian", "anda", "beliau", "lu", "lo", "elu", "elo", "diri", "sendiri",
+        "orang", "pacar", "istri", "suami", "teman", "temen", "sahabat", "dokter", "polisi",
+        "kak", "bang", "bro", "sis", "mas", "mbak", "mba", "dek", "om", "tante",
+        # Negations / particles / adverbs / conjunctions / questions / greetings
+        "ya", "iya", "yah", "yo", "yup", "yap", "gak", "ga", "gk", "nggak", "enggak", "tidak", "tak",
+        "bukan", "jangan", "belum", "blm", "udah", "sudah", "sdh", "lagi", "lg", "sedang", "baru",
+        "masih", "akan", "bakal", "pernah", "sering", "jarang", "selalu", "terus", "mulai",
+        "nanti", "ntar", "besok", "kemarin", "tadi", "sekarang", "skrg", "barusan", "dulu",
+        "bentar", "sebentar", "lama", "cepat", "cepet", "pelan", "langsung", "sekalian",
+        "sama", "bareng", "saja", "aja", "cuma", "hanya", "juga", "pun", "malah", "justru",
+        "memang", "emang", "bener", "benar", "beneran", "bohong", "palsu", "salah", "kurang",
+        "lebih", "paling", "banget", "bgt", "sekali", "amat", "terlalu", "cukup", "agak",
+        "sedikit", "dikit", "banyak", "semua", "setiap", "tiap", "ada", "tiada", "kosong",
+        "siap", "ready", "ok", "oke", "okay", "sip", "siip", "mantap", "bagus", "baik", "jelek",
+        "buruk", "keren", "lucu", "imut", "cantik", "cakep", "ganteng", "manis", "gemas", "gemes",
+        "nakal", "jahat", "halo", "hai", "hei", "hi", "hey", "hello", "pagi", "siang", "sore",
+        "malam", "malem", "subuh", "makasih", "terima", "kasih", "thanks", "thank", "maaf",
+        "sorry", "permisi", "tolong", "please", "pls", "ke", "di", "dari", "untuk", "buat",
+        "bagi", "oleh", "tentang", "soal", "pada", "dengan", "tanpa", "karena", "karna",
+        "sebab", "kalau", "kalo", "jika", "bila", "agar", "supaya", "biar", "walau", "meski",
+        "tapi", "tetapi", "namun", "melainkan", "atau", "dan", "serta", "lalu", "kemudian",
+        "habis", "setelah", "sebelum", "sampai", "hingga", "kok", "sih", "deh", "dong", "nih",
+        "tuh", "kah", "lah", "apa", "siapa", "mana", "kapan", "kenapa", "mengapa", "gimana",
+        "bagaimana", "berapa", "what", "who", "where", "when", "why", "how", "yes", "no", "not",
+        "none", "nothing", "fine", "good", "bad", "busy", "tired", "sleepy", "hungry", "happy",
+        "sad", "here", "there", "back", "excited", "coming", "going", "sayang", "ayang", "babe",
+        "bebe", "darling", "honey",
+        # Commands / bot terms / clothes / media
+        "pap", "foto", "fotoin", "selfie", "outfit", "pajama", "piyama", "baju", "celana", "rok",
+        "dress", "hoodie", "kaos", "jaket", "seragam", "bikini", "lingerie", "story", "help",
+        "start", "stop", "menu", "status", "reset", "clear", "memory", "profile", "setting", "setup",
+        # Daily verbs / states / intimate & action words that must never be parsed as user names
+        "tidur", "bangun", "makan", "minum", "mandi", "keramas", "ganti", "pake", "pakai",
+        "lepas", "lepasin", "buka", "bukain", "tutup", "duduk", "berdiri", "jalan", "lari",
+        "pulang", "pergi", "berangkat", "datang", "tiba", "balik", "kembali", "kerja", "bekerja",
+        "kuliah", "sekolah", "belajar", "nugas", "ngoding", "main", "bermain", "nonton", "denger",
+        "dengerin", "baca", "tulis", "gambar", "kirim", "kirimin", "liat", "lihat", "liatin",
+        "tunjuk", "tunjukin", "kasih", "kasihin", "beri", "ambil", "ambilin", "bawa", "taruh",
+        "simpan", "beli", "bayar", "pesan", "masak", "cuci", "bersih", "beres", "rebahan",
+        "santai", "istirahat", "ngantuk", "lapar", "haus", "kenyang", "capek", "lelah", "pusing",
+        "sakit", "sehat", "sembuh", "senang", "bahagia", "sedih", "nangis", "galau", "marah",
+        "kesal", "bete", "bosan", "bosen", "takut", "kaget", "malu", "bingung", "penasaran",
+        "baper", "kangen", "rindu", "cinta", "suka", "benci", "mau", "ingin", "pengen", "butuh",
+        "perlu", "harus", "mesti", "bisa", "dapat", "boleh", "mampu", "berani", "coba", "nyoba",
+        "lupa", "ingat", "tahu", "tau", "kenal", "paham", "ngerti", "kira", "rasa", "pikir",
+        "bilang", "omong", "ngomong", "bicara", "tanya", "nanya", "jawab", "cerita", "curhat",
+        "janji", "minta", "bantu", "nunggu", "tunggu", "ajak", "ikut", "temenin", "ngobrol",
+        "chat", "ketik", "hapus", "ulang", "lanjut", "selesai", "kelar", "ngopi", "ngeteh",
+        "jajan", "begadang", "kesiangan", "bikin", "bikinin", "lakuin", "bangunin", "suapin",
+        "mandiin", "manjain", "cepetin", "pelanin", "kencengin", "punya", "heeh", "hehe",
+        # Intimate / physical actions frequently mistaken as names
+        "masuk", "masukin", "masukkan", "keluar", "keluarin", "keluarkan", "cium", "ciumin",
+        "cumbu", "peluk", "pelukin", "raba", "remas", "jilat", "hisap", "isap", "emut", "kocok",
+        "gesek", "tusuk", "genjot", "sodok", "entot", "ngewe", "colmek", "coli", "sepong",
+        "copot", "telanjang", "bugil", "pegang", "sentuh", "belai", "elus", "usap", "pijat",
+        "pangku", "tidurin", "tiduri", "nikmatin", "nikmati", "rasain", "goyang", "desah",
+        "basah", "keras", "tegang", "puas", "puasin", "crot", "klimaks", "orgasme", "horny",
+        "sange", "kiss", "hug", "touch", "lick", "suck", "fuck", "cum",
+    })
+
+    @classmethod
+    def _clean_extracted_name(cls, raw_val: str) -> str:
+        val = (raw_val or "").strip()
+        while val:
+            cleaned = re.sub(
+                r"\s+(?:aja|ya|dong|deh|nih|kok|sih|salam\s+kenal|hehe|kak|bang|bro|sis|please|pls)[.!?~]*$",
+                "",
+                val,
+                flags=re.IGNORECASE,
+            ).strip().rstrip(".,!?~")
+            if cleaned == val:
+                break
+            val = cleaned
+        return val
+
+    @classmethod
+    def is_valid_name(cls, candidate: str, allow_pet: bool = False) -> bool:
+        """Returns True only if candidate looks like a genuine personal name rather than a verb/action/particle."""
+        if not isinstance(candidate, str):
+            return False
+        clean = " ".join(candidate.strip().split())
+        if len(clean) < 2 or len(clean) > 40:
+            return False
+        words = clean.split()
+        if not (1 <= len(words) <= 3):
+            return False
+        for w in words:
+            if not re.match(r"^[A-Za-z][A-Za-z0-9_'-]*$", w):
+                return False
+            lw = w.lower()
+            if lw in cls._PET_NAMES:
+                if not allow_pet:
+                    return False
+                continue
+            if lw in cls._NON_NAME_WORDS:
+                return False
+        return True
+
+    def _sanitize_profile_dict(self, uid: str, prof: Dict[str, Any]) -> bool:
+        """Clears obviously non-name poisoned profile fields and matching bogus identity facts."""
+        changed = False
+        name_val = str(prof.get("name", "") or "").strip()
+        if name_val and not self.is_valid_name(name_val, allow_pet=False):
+            prof["name"] = ""
+            changed = True
+
+        allow_pet = bool(prof.get("allow_pet_name", False))
+        call_val = str(prof.get("call_name", "") or "").strip()
+        if call_val and not self.is_valid_name(call_val, allow_pet=allow_pet):
+            prof["call_name"] = ""
+            changed = True
+
+        facts = self.data.get("facts", {}).get(uid)
+        if isinstance(facts, list):
+            kept = []
+            removed_any = False
+            for item in facts:
+                fact_text = str(item.get("fact", ""))
+                if item.get("category") == "identity" and fact_text.lower().startswith("nama:"):
+                    extracted = fact_text.split(":", 1)[1].strip()
+                    if not self.is_valid_name(extracted, allow_pet=False):
+                        removed_any = True
+                        continue
+                kept.append(item)
+            if removed_any:
+                for idx, item in enumerate(kept, 1):
+                    item["id"] = idx
+                self.data["facts"][uid] = kept
+                changed = True
+        return changed
+
     def __init__(self, data_file: Optional[str] = None):
         if data_file is None:
             project_root = os.path.dirname(os.path.abspath(__file__))
@@ -188,6 +324,12 @@ class MemoryEngine:
                 except Exception as e:
                     logger.error(f"Error loading memories from {self.data_file}: {e}")
                     self.data = {"profiles": {}, "facts": {}, "diary": {}, "affinity": {}}
+                cleaned = False
+                for uid, prof in list(self.data.get("profiles", {}).items()):
+                    if isinstance(prof, dict) and self._sanitize_profile_dict(str(uid), prof):
+                        cleaned = True
+                if cleaned:
+                    self._save_data_unlocked()
             else:
                 self._ensure_dir()
                 self._save_data_unlocked()
@@ -209,7 +351,7 @@ class MemoryEngine:
     def get_profile(self, user_id: int) -> Dict[str, Any]:
         with self.lock:
             s_uid = str(user_id)
-            return self.data.setdefault("profiles", {}).setdefault(s_uid, {
+            prof = self.data.setdefault("profiles", {}).setdefault(s_uid, {
                 "name": "",
                 "nickname": "",
                 "birthday": "",
@@ -218,6 +360,9 @@ class MemoryEngine:
                 "hobbies": "",
                 "preferences": ""
             })
+            if self._sanitize_profile_dict(s_uid, prof):
+                self._save_data_unlocked()
+            return prof
 
     def update_profile(self, user_id: int, **kwargs):
         with self.lock:
@@ -443,7 +588,9 @@ class MemoryEngine:
                 lines.append(f"  - {f['fact']}")
 
         # Panggilan / Pet name directive based on user preference
-        call_name = prof.get("call_name") or prof.get("name")
+        raw_call_name = prof.get("call_name") or prof.get("name") or ""
+        allow_pet = bool(prof.get("allow_pet_name", False))
+        call_name = raw_call_name if self.is_valid_name(raw_call_name, allow_pet=allow_pet) else ""
         if call_name:
             lines.append(f"• User's Calling Preference: Panggil user '{call_name}'. Kamu sudah mengetahui namanya, DILARANG KERAS menanyakan namanya lagi!")
         else:
@@ -476,78 +623,60 @@ class MemoryEngine:
             self.update_profile(user_id, call_name="sayang", allow_pet_name=True)
             learned.append("Panggilan: sayang")
         else:
-            # 1. Name detection (handles self-introductions, corrections e.g. 'bukan alex, aku adens, ayo...', and English 'not alex, i am...')
-            intro_stopwords = {
-                "lagi", "mau", "udah", "sudah", "sedang", "bisa", "suka", "gak", "nggak", "tidak", "senang", "capek",
-                "bingung", "pengen", "tadi", "ke", "di", "dari", "sama", "baru", "bukan", "paling", "kurang", "banget",
-                "selalu", "siap", "punya", "lapar", "haus", "ngantuk", "tidur", "kerja", "kuliah", "sekolah", "main",
-                "ada", "juga", "cuma", "hanya", "tahu", "tau", "beneran", "masih", "belum", "paham", "ngerti", "baper",
-                "penasaran", "excited", "happy", "sad", "tired", "hungry", "sleepy", "fine", "okay", "good", "bad", "busy",
-                "here", "there", "back", "sorry", "makan", "minum", "nugas", "belajar", "rebahan", "santai"
-            }
-
+            # 1. Name detection (explicit cues, correction clauses, intros, or direct answer to name question)
+            # Note: Bare mid-sentence pronouns ('aku X', 'panggil X') are intentionally excluded so verbs/actions
+            # like 'aku masukin', 'aku cium', or 'aku peluk kamu' are never misread as the user's name.
+            trailing_boundary = (
+                r"(?=[,\.\?!~;]|\s+(?:ayo|mari|yuk|kita|dan|salam|senang|mau|udah|lagi|ya|nih|dong|kok|deh|"
+                r"kak|bang|bro|sis|let's|lets|and|nice|ready)\b|$)"
+            )
             name_patterns = [
+                # Explicit naming phrases anywhere in sentence
+                rf"\b(?:nama\s+(?:saya|aku|gua|gue|gw)|namaku|nama\s+ku|panggil(?:\s+kan)?\s+(?:aku|saya|gue|gua|gw)(?:\s+aja)?|panggil\s+aja|my\s+name\s+is|call\s+me)\s*(?:adalah|=|:)?\s*([A-Za-z][A-Za-z0-9_'-]*(?:\s+[A-Za-z][A-Za-z0-9_'-]*)?){trailing_boundary}",
                 # Correction + introduction: "bukan alex, aku adens, ayo...", "not alex, i'm aden, let's..."
-                r"(?:\b(?:bukan|not)\s+[A-Za-z0-9_'-]+[,\s]+)?\b(?:nama\s+(?:saya|aku|gua|gue|gw)|namaku|nama\s+ku|panggil(?:\s+kan)?\s+(?:aku|saya|gue|gua|gw)|panggil\s+aja|panggil|aku|saya|gue|gua|gw|my\s+name\s+is|call\s+me|i'm|i\s+am)\s*(?:adalah|=|:)?\s*([A-Za-z][A-Za-z0-9_'-]*(?:\s+[A-Za-z][A-Za-z0-9_'-]*)?)(?=[,\.\?!~;]|\s+(?:ayo|mari|yuk|kita|dan|salam|senang|mau|udah|lagi|ya|nih|dong|kok|deh|kak|bang|bro|sis|let's|lets|and|nice|ready)\b|$)",
+                rf"\b(?:bukan|not)\s+[A-Za-z0-9_'-]+[,;\s]+(?:nama\s+(?:saya|aku|gua|gue|gw)\s+|namaku\s+|panggil(?:\s+aku)?\s+)?(?:aku|saya|gue|gua|gw|i'm|i\s+am)\s*(?:adalah|=|:)?\s*([A-Za-z][A-Za-z0-9_'-]*(?:\s+[A-Za-z][A-Za-z0-9_'-]*)?){trailing_boundary}",
                 # "Kenalin, aku Rama", "Salam kenal, namaku Rama", "Kenalkan nama saya Rama"
-                r"\b(?:kenalin|salam\s+kenal|kenalkan)[,\s]+(?:aku|nama(?:ku)?|saya|gue|gw)\s+([A-Za-z][A-Za-z0-9_'-]+(?:\s+[A-Za-z][A-Za-z0-9_'-]+)?)",
+                rf"\b(?:kenalin|salam\s+kenal|kenalkan)[,\s]+(?:aku|nama(?:ku)?|saya|gue|gw)\s+([A-Za-z][A-Za-z0-9_'-]+(?:\s+[A-Za-z][A-Za-z0-9_'-]+)?){trailing_boundary}",
                 # "Halo, aku Rama", "Hai, aku Rama", "Hi, I'm Rama"
-                r"\b(?:halo|hai|hi|hey)[,\s]+(?:aku|saya|gue|gw|i'm|i\s+am)\s+([A-Za-z][A-Za-z0-9_'-]+(?:\s+[A-Za-z][A-Za-z0-9_'-]+)?)"
+                rf"\b(?:halo|hai|hi|hey)[,\s]+(?:aku|saya|gue|gw|i'm|i\s+am)\s+([A-Za-z][A-Za-z0-9_'-]+(?:\s+[A-Za-z][A-Za-z0-9_'-]+)?){trailing_boundary}",
             ]
 
             detected_name = None
             for pat in name_patterns:
                 m = re.search(pat, user_text, re.IGNORECASE)
                 if m:
-                    raw_val = m.group(1).strip()
-                    # Strip multiple trailing filler words
-                    while True:
-                        cleaned = re.sub(r"\s+(?:aja|ya|dong|deh|nih|kok|sih|salam\s+kenal|hehe|kak|bang|bro|sis)[.!?~]*$", "", raw_val, flags=re.IGNORECASE).strip().rstrip(".,!?~")
-                        if cleaned == raw_val:
-                            break
-                        raw_val = cleaned
-                    words = raw_val.split()
-                    if raw_val and not any(w.lower() in intro_stopwords for w in words):
+                    raw_val = self._clean_extracted_name(m.group(1))
+                    if self.is_valid_name(raw_val, allow_pet=False):
                         detected_name = raw_val
                         break
 
-            # Check if user directly answers waifu's previous name question with a standalone name
-            if not detected_name and history:
+            # Check if user directly answers waifu's previous name question with a standalone non-question name
+            stripped_user = user_text.strip()
+            if not detected_name and history and not stripped_user.endswith("?"):
                 last_asst = next((m.get("content", "") for m in reversed(history) if m.get("role") == "assistant"), "")
                 if any(q in last_asst.lower() for q in ["nama kamu siapa", "namamu siapa", "siapa nama kamu", "manggil kamu siapa", "panggil kamu siapa", "siapa namamu", "siapa nama", "what's your name", "what is your name"]):
-                    clean_short = user_text.strip().rstrip(".,!?~")
-                    words = clean_short.split()
-                    if 1 <= len(words) <= 3:
-                        stopwords = {
-                            "ya", "iya", "gak", "tidak", "enggak", "bukan", "halo", "hai", "hei", "pagi", "siang", "malam", "sore",
-                            "siapa", "apa", "kenapa", "gimana", "ok", "oke", "okay", "sip", "makasih", "terima", "kasih", "pap",
-                            "foto", "outfit", "story", "help", "start", "stop", "menu", "status", "sayang", "ayang", "babe", "bebe",
-                            "kamu", "dia", "mereka", "kita", "lagi", "mau", "tidur", "makan", "nugas", "kuliah", "kerja", "belum"
-                        }
-                        if not any(w.lower() in stopwords for w in words) and all(re.match(r"^[A-Za-z0-9_'-]+$", w) for w in words):
-                            detected_name = clean_short
+                    clean_short = self._clean_extracted_name(stripped_user.rstrip(".,!~"))
+                    if self.is_valid_name(clean_short, allow_pet=False):
+                        detected_name = clean_short
 
-            # Also check direct self-introduction: "Aku Rama" / "Saya Rama" / "Gue Rama"
-            if not detected_name:
-                m_intro = re.match(r"^(?:aku|saya|gue|gua|gw)\s+([A-Za-z][A-Za-z0-9_'-]+(?:\s+[A-Za-z][A-Za-z0-9_'-]+)?)(?:\s+(?:aja|ya|nih|dong|salam\s+kenal|kok))?[.!?~]*$", user_text.strip(), re.IGNORECASE)
+            # Also check direct self-introduction at message start (non-question): "Aku Rama" / "Saya Rama"
+            if not detected_name and not stripped_user.endswith("?"):
+                m_intro = re.match(
+                    r"^(?:aku|saya|gue|gua|gw)\s+([A-Za-z][A-Za-z0-9_'-]+(?:\s+[A-Za-z][A-Za-z0-9_'-]+)?)(?:\s+(?:aja|ya|nih|dong|salam\s+kenal|kok))?[.!~]*$",
+                    stripped_user,
+                    re.IGNORECASE,
+                )
                 if m_intro:
-                    cand = m_intro.group(1).strip()
-                    if not any(w.lower() in intro_stopwords for w in cand.split()):
+                    cand = self._clean_extracted_name(m_intro.group(1))
+                    if self.is_valid_name(cand, allow_pet=False):
                         detected_name = cand
 
-            if detected_name:
-                low_name = detected_name.lower()
-                invalid_names = ("siapa", "ya", "dong", "deh", "bukan", "what", "aja", "dulu", "kamu", "aku", "saya", "gue", "gua", "not", "no")
-                if len(detected_name) >= 2 and low_name not in invalid_names:
-                    # Proper title casing for name (e.g. "adens" -> "Adens")
-                    formatted_name = " ".join(w[0].upper() + w[1:] if len(w) > 1 else w.upper() for w in detected_name.split())
-                    if low_name in ("sayang", "ayang", "babe", "bebe"):
-                        self.update_profile(user_id, call_name=detected_name, allow_pet_name=True)
-                        learned.append(f"Panggilan: {detected_name}")
-                    else:
-                        self.update_profile(user_id, name=formatted_name, call_name=formatted_name)
-                        self.add_fact(user_id, f"Nama: {formatted_name}", category="identity")
-                        learned.append(f"Nama: {formatted_name}")
+            if detected_name and self.is_valid_name(detected_name, allow_pet=False):
+                # Proper title casing for name (e.g. "adens" -> "Adens")
+                formatted_name = " ".join(w[0].upper() + w[1:] if len(w) > 1 else w.upper() for w in detected_name.split())
+                self.update_profile(user_id, name=formatted_name, call_name=formatted_name)
+                self.add_fact(user_id, f"Nama: {formatted_name}", category="identity")
+                learned.append(f"Nama: {formatted_name}")
 
         # 2. Favorite / Likes
         like_patterns = [

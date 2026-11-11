@@ -30,8 +30,8 @@ def is_port_listening(port: int, host: str = "127.0.0.1", timeout: float = 0.5) 
 
 
 class _ChatActionKeepalive:
-    """Keeps a Telegram chat action (e.g. typing, upload_photo, record_voice) active every 3s."""
-    def __init__(self, bot=None, chat_id: Optional[int] = None, action: str = "typing", interval: float = 3.0):
+    """Keeps a Telegram chat action (e.g. typing, upload_photo, record_voice) active well under Telegram's 5s expiry."""
+    def __init__(self, bot=None, chat_id: Optional[int] = None, action: str = "typing", interval: float = 2.0):
         self.bot = bot
         self.chat_id = chat_id
         self.action = action
@@ -43,13 +43,15 @@ class _ChatActionKeepalive:
         if self.bot and self.chat_id and hasattr(self.bot, "send_chat_action"):
             try:
                 self.bot.send_chat_action(self.chat_id, self.action)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"ChatActionKeepalive({self.action}) failed for {self.chat_id}: {e}")
 
     def _run(self) -> None:
         while not self._stop.is_set():
+            t0 = time.time()
             self.pulse()
-            self._stop.wait(self.interval)
+            remaining = max(0.4, self.interval - (time.time() - t0))
+            self._stop.wait(remaining)
 
     def __enter__(self):
         if self.bot and self.chat_id and hasattr(self.bot, "send_chat_action"):
@@ -667,7 +669,14 @@ class IdleEngine:
 
             return False
 
-    def ensure_llm_active(self, bot=None, chat_id: Optional[int] = None, is_user_chat: bool = True, is_nsfw: bool = False) -> bool:
+    def ensure_llm_active(
+        self,
+        bot=None,
+        chat_id: Optional[int] = None,
+        is_user_chat: bool = True,
+        is_nsfw: bool = False,
+        action: str = "typing"
+    ) -> bool:
         """
         Ensures LLM is active before answering messages.
         If sleeping, displays a friendly waking indicator and wakes KoboldCPP.
@@ -700,7 +709,7 @@ class IdleEngine:
             self.record_activity()
             return True
 
-        with _ChatActionKeepalive(bot, chat_id, "typing") as keepalive:
+        with _ChatActionKeepalive(bot, chat_id, action) as keepalive:
             if targets_kobold:
                 self._prepare_vram_for_llm()
 

@@ -344,15 +344,20 @@ def safe_reply_to(message, text, reply_markup=None, parse_mode="Markdown"):
     if Telegram API rejects parsing entities (400 Bad Request).
     In plain text fallback, restores *action* asterisks so roleplay actions remain readable.
     """
+    chat_id = getattr(getattr(message, "chat", None), "id", None)
     try:
-        return bot.reply_to(message, text, parse_mode=parse_mode, reply_markup=reply_markup)
+        res = bot.reply_to(message, text, parse_mode=parse_mode, reply_markup=reply_markup)
+        _repulse_active_chat_actions(chat_id)
+        return res
     except Exception as e:
         logger.warning(f"safe_reply_to failed with {parse_mode=}: {e}. Retrying as plain text.")
         try:
             # Preserve action markers as *action* in plain text instead of erasing them
             clean_text = re.sub(r'(?<!_)_([^_]+?)_(?!_)', r'*\1*', text)
             clean_text = clean_text.replace("`", "")
-            return bot.reply_to(message, clean_text, reply_markup=reply_markup)
+            res = bot.reply_to(message, clean_text, reply_markup=reply_markup)
+            _repulse_active_chat_actions(chat_id)
+            return res
         except Exception as e2:
             logger.error(f"Fatal error in safe_reply_to: {e2}")
             return None
@@ -364,13 +369,17 @@ def safe_send_message(chat_id: int, text: str, reply_markup=None, parse_mode="Ma
     In plain text fallback, restores *action* asterisks so roleplay actions remain readable.
     """
     try:
-        return bot.send_message(chat_id, text, parse_mode=parse_mode, reply_markup=reply_markup)
+        res = bot.send_message(chat_id, text, parse_mode=parse_mode, reply_markup=reply_markup)
+        _repulse_active_chat_actions(chat_id)
+        return res
     except Exception as e:
         logger.warning(f"safe_send_message failed with {parse_mode=}: {e}. Retrying as plain text.")
         try:
             clean_text = re.sub(r'(?<!_)_([^_]+?)_(?!_)', r'*\1*', text)
             clean_text = clean_text.replace("`", "")
-            return bot.send_message(chat_id, clean_text, reply_markup=reply_markup)
+            res = bot.send_message(chat_id, clean_text, reply_markup=reply_markup)
+            _repulse_active_chat_actions(chat_id)
+            return res
         except Exception as e2:
             logger.error(f"Fatal error in safe_send_message: {e2}")
             return None
@@ -509,12 +518,16 @@ def safe_edit_message_text(text: str, chat_id: int, message_id: int, reply_marku
     if Telegram API rejects parsing entities (400 Bad Request).
     """
     try:
-        return bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=reply_markup, parse_mode=parse_mode)
+        res = bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=reply_markup, parse_mode=parse_mode)
+        _repulse_active_chat_actions(chat_id)
+        return res
     except Exception as e:
         logger.warning(f"safe_edit_message_text failed with {parse_mode=}: {e}. Retrying as plain text.")
         try:
             clean_text = text.replace("*", "").replace("_", "").replace("`", "")
-            return bot.edit_message_text(clean_text, chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
+            res = bot.edit_message_text(clean_text, chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
+            _repulse_active_chat_actions(chat_id)
+            return res
         except Exception as e2:
             logger.error(f"Fatal error in safe_edit_message_text: {e2}")
             return None
@@ -875,40 +888,76 @@ def apply_language_choice(choice: str, change_voice: bool = False) -> Tuple[str,
     return norm_key, label
 
 
+_ACTIVE_CHAT_ACTION_LOOPS: Dict[int, List["ChatActionLoop"]] = {}
+_ACTIVE_CHAT_ACTION_LOCK = threading.Lock()
+
+
+def _repulse_active_chat_actions(chat_id: Optional[int]) -> None:
+    """Re-emits active header chat action (typing / upload_photo / etc.) after sending/editing status messages."""
+    if chat_id is None:
+        return
+    with _ACTIVE_CHAT_ACTION_LOCK:
+        loops = list(_ACTIVE_CHAT_ACTION_LOOPS.get(chat_id, []))
+    if loops:
+        latest = loops[-1]
+        if latest.running:
+            latest.pulse()
+
+
 class ChatActionLoop:
-    """Continuously sends chat action (e.g. typing or upload_photo) every 3s so Telegram never drops status."""
-    def __init__(self, bot_instance, chat_id: int, action: str = "typing"):
+    """Continuously sends Telegram chat action (typing / upload_photo / etc.) every ~2s so header status never drops."""
+    def __init__(self, bot_instance, chat_id: int, action: str = "typing", interval: float = 2.0):
         self.bot = bot_instance
         self.chat_id = chat_id
         self.action = action
+        self.interval = interval
         self.running = True
+        self._stop_event = threading.Event()
+        self._logged_error = False
         self.thread = threading.Thread(target=self._run, daemon=True)
 
     def pulse(self):
-        if self.bot and self.chat_id is not None:
+        if self.bot and self.chat_id is not None and self.running:
             try:
                 self.bot.send_chat_action(self.chat_id, self.action)
-            except Exception:
-                pass
+                self._logged_error = False
+            except Exception as e:
+                if not self._logged_error:
+                    logger.debug(f"ChatActionLoop.pulse({self.action}) failed for chat {self.chat_id}: {e}")
+                    self._logged_error = True
 
     def _run(self):
-        while self.running:
+        while self.running and not self._stop_event.is_set():
+            t0 = time.time()
             self.pulse()
-            for _ in range(30):
-                if not self.running:
-                    break
-                time.sleep(0.1)
+            remaining = max(0.4, self.interval - (time.time() - t0))
+            self._stop_event.wait(remaining)
+
+    def stop(self):
+        self.running = False
+        self._stop_event.set()
+        if self.chat_id is not None:
+            with _ACTIVE_CHAT_ACTION_LOCK:
+                loops = _ACTIVE_CHAT_ACTION_LOOPS.get(self.chat_id)
+                if loops and self in loops:
+                    loops.remove(self)
+                    if not loops:
+                        _ACTIVE_CHAT_ACTION_LOOPS.pop(self.chat_id, None)
+        try:
+            if self.thread.is_alive() and threading.current_thread() is not self.thread:
+                self.thread.join(timeout=0.3)
+        except Exception:
+            pass
 
     def __enter__(self):
+        if self.chat_id is not None:
+            with _ACTIVE_CHAT_ACTION_LOCK:
+                _ACTIVE_CHAT_ACTION_LOOPS.setdefault(self.chat_id, []).append(self)
         self.thread.start()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.running = False
-        try:
-            self.thread.join(timeout=0.3)
-        except Exception:
-            pass
+        self.stop()
 
 
 def is_authorized(user_id: int) -> bool:
@@ -5011,7 +5060,7 @@ def process_photo_request(
 
             try:
                 if is_nsfw_caption:
-                    idle_engine.ensure_llm_active(bot=bot, chat_id=chat_id, is_nsfw=True)
+                    idle_engine.ensure_llm_active(bot=bot, chat_id=chat_id, is_nsfw=True, action="upload_photo")
                 caption, _ = llm_client.chat(caption_prompt, max_tokens=110, is_nsfw=is_nsfw_caption)
                 if caption:
                     caption = enforce_concise_chat_reply(caption, max_sentences=2, max_chars=220)
@@ -5055,6 +5104,8 @@ def process_photo_request(
                     bot.delete_message(chat_id, status_msg.message_id)
                 except Exception:
                     pass
+                if photo_action_loop is not None:
+                    photo_action_loop.pulse()
 
             markup = types.InlineKeyboardMarkup(row_width=2)
             markup.add(
@@ -5311,6 +5362,8 @@ def process_video_request(
                     bot.delete_message(chat_id, status_msg.message_id)
                 except Exception:
                     pass
+                if photo_action_loop is not None:
+                    photo_action_loop.pulse()
 
             markup = types.InlineKeyboardMarkup(row_width=2)
             markup.add(
@@ -7142,7 +7195,6 @@ class ChatQueueManager:
             items = list(self.buffers[user_id])
             self.buffers[user_id] = []
             self.is_processing[user_id] = True
-            self._stop_wait_typing(user_id)
 
         def _worker():
             try:
@@ -7158,6 +7210,8 @@ class ChatQueueManager:
 
                 aggregated_text = "\n".join(combined_texts) if combined_texts else ""
                 target_fn = execute_fn or _execute_text_chat_direct
+                with self._get_user_lock(user_id):
+                    self._stop_wait_typing(user_id)
                 if last_msg and aggregated_text:
                     target_fn(last_msg, aggregated_text, is_voice=has_voice)
             except Exception as e:
@@ -7345,7 +7399,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
             if user_text.startswith("```python") and user_text.endswith("```"):
                 code = user_text.replace("```python", "").replace("```", "").strip()
-                with ChatActionLoop(bot, message.chat.id, "typing"):
+                with ChatActionLoop(bot, message.chat.id, "typing") as typing_loop:
                     ok, res = CodeRunner.execute_python(code)
                     tag = "✅ Execution Output:" if ok else "❌ Execution Error:"
                     safe_reply_to(message, f"💻 **{tag}**\n```\n{res}\n```")
@@ -7353,7 +7407,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
             persona = persona_mgr.get_active_persona()
 
-            with ChatActionLoop(bot, message.chat.id, "typing"):
+            with ChatActionLoop(bot, message.chat.id, "typing") as typing_loop:
                 # 1. Expire stale session outfits when switching to casual daily topics BEFORE checking NSFW routing
                 persona_mgr.check_context_shift(message.from_user.id, user_text)
                 is_nsfw_turn = detect_nsfw_intent(user_text)
@@ -7816,6 +7870,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                 formatted_reply = format_roleplay_italics(clean_reply, character_name=persona.get("name", "Runa"))
                 chat_markup = attach_voice_button(None, clean_reply, message.from_user.id)
+                typing_loop.stop()
                 safe_reply_to(message, formatted_reply, reply_markup=chat_markup, parse_mode="Markdown")
 
                 if should_send_conv_photo or should_send_spontaneous:
@@ -7826,7 +7881,6 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                     def _send_followup_photo():
                         try:
-                            time.sleep(1.0)  # Natural pause as if taking the photo
                             if is_nsfw_turn:
                                 action_ctx = undress_desc if undress_desc else ""
                                 photo_prompt = f"{action_ctx}, {user_text}, {clean_reply}".strip(", ")

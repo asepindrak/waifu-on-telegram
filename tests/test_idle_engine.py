@@ -63,11 +63,21 @@ class TestIdleEngine(unittest.TestCase):
         self.assertTrue(ok)
         self.assertFalse(self.idle_engine.is_llm_sleeping)
 
-    @patch("idle_engine.is_port_listening", side_effect=[False, True])
-    def test_ensure_llm_active_wakes_sleeping_service(self, mock_port):
+    def test_ensure_llm_active_wakes_sleeping_service(self):
         """When LLM is sleeping, ensure_llm_active wakes KoboldCPP on-demand."""
         self.idle_engine.is_llm_sleeping = True
-        with patch.object(self.health_engine, "heal_llm", return_value=True):
+        llm_port_checks = iter([False, False, True])
+
+        def _fake_port(port, *args, **kwargs):
+            if port == 8188:
+                return False
+            if port == 8001:
+                return True
+            return next(llm_port_checks, True)
+
+        with patch("idle_engine.is_port_listening", side_effect=_fake_port), \
+             patch.object(self.idle_engine, "_prepare_vram_for_llm"), \
+             patch.object(self.health_engine, "heal_llm", return_value=True):
             ok = self.idle_engine.ensure_llm_active()
             self.assertTrue(ok)
             self.assertFalse(self.idle_engine.is_llm_sleeping)
@@ -282,6 +292,32 @@ class TestIdleEngine(unittest.TestCase):
         _t.sleep(0.35)
         self.assertEqual(done, ["halo"])
         mock_queue_bot.send_chat_action.assert_any_call(888, "typing")
+
+    def test_repulse_active_chat_actions_after_status_message_and_photo_caption_action(self):
+        """Sending/editing progress messages immediately re-pulses active ChatActionLoop so header typing/upload_photo stays alive."""
+        import time as _t
+        import bot
+
+        mock_b = MagicMock()
+        mock_b.send_message.return_value = MagicMock(message_id=42)
+        with patch.object(bot, "bot", mock_b):
+            with bot.ChatActionLoop(mock_b, 98765, "upload_photo", interval=2.0):
+                _t.sleep(0.05)
+                before_calls = mock_b.send_chat_action.call_count
+                bot.safe_send_message(98765, "Menyiapkan foto...")
+                bot.safe_edit_message_text("Merender...", 98765, 42)
+                after_calls = mock_b.send_chat_action.call_count
+                self.assertGreaterEqual(after_calls, before_calls + 2)
+                mock_b.send_chat_action.assert_any_call(98765, "upload_photo")
+
+        # Also verify ensure_llm_active respects explicit upload_photo action
+        mock_llm_bot = MagicMock()
+        mock_llm_bot.send_message.return_value = None
+        with patch.object(self.idle_engine, "is_llm_ready", return_value=False), \
+             patch.object(self.idle_engine, "wake_llm", side_effect=lambda *a, **kw: (_t.sleep(0.1) or True)):
+            ok = self.idle_engine.ensure_llm_active(bot=mock_llm_bot, chat_id=98765, is_nsfw=True, action="upload_photo")
+            self.assertTrue(ok)
+            mock_llm_bot.send_chat_action.assert_any_call(98765, "upload_photo")
 
 
 if __name__ == "__main__":
