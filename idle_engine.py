@@ -29,6 +29,40 @@ def is_port_listening(port: int, host: str = "127.0.0.1", timeout: float = 0.5) 
         return False
 
 
+class _ChatActionKeepalive:
+    """Keeps a Telegram chat action (e.g. typing, upload_photo, record_voice) active every 3s."""
+    def __init__(self, bot=None, chat_id: Optional[int] = None, action: str = "typing", interval: float = 3.0):
+        self.bot = bot
+        self.chat_id = chat_id
+        self.action = action
+        self.interval = interval
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+
+    def pulse(self) -> None:
+        if self.bot and self.chat_id and hasattr(self.bot, "send_chat_action"):
+            try:
+                self.bot.send_chat_action(self.chat_id, self.action)
+            except Exception:
+                pass
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            self.pulse()
+            self._stop.wait(self.interval)
+
+    def __enter__(self):
+        if self.bot and self.chat_id and hasattr(self.bot, "send_chat_action"):
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=0.5)
+
+
 class IdleEngine:
     """
     💖 Smart Idle & Dynamic Power Saver Engine for Waifu on Telegram.
@@ -286,7 +320,7 @@ class IdleEngine:
                 logger.error(f"Failed to wake VoiceStudio: {e}")
             return False
 
-    def ensure_voicestudio_active(self) -> bool:
+    def ensure_voicestudio_active(self, bot=None, chat_id: Optional[int] = None, action: str = "record_voice") -> bool:
         """Ensures VoiceStudio is online before synthesis."""
         if not self.enabled:
             return True
@@ -294,7 +328,8 @@ class IdleEngine:
             self.is_voicestudio_sleeping = False
             self.record_activity(is_voice=True)
             return True
-        return self.wake_voicestudio()
+        with _ChatActionKeepalive(bot, chat_id, action):
+            return self.wake_voicestudio()
 
     def sleep_agy_bridge(self) -> bool:
         """Puts AGY Bridge to sleep, terminating python agy_bridge.py to free RAM. (Blocked if AGY is active provider)"""
@@ -353,7 +388,7 @@ class IdleEngine:
                 logger.error(f"Failed to wake AGY Bridge: {e}")
             return False
 
-    def ensure_agy_bridge_active(self) -> bool:
+    def ensure_agy_bridge_active(self, bot=None, chat_id: Optional[int] = None, action: str = "typing") -> bool:
         """Ensures AGY OpenAI Bridge is online before routing chat or image request."""
         if not self.enabled:
             return True
@@ -361,7 +396,8 @@ class IdleEngine:
             self.is_agy_sleeping = False
             self.record_activity(is_agy=True)
             return True
-        return self.wake_agy_bridge()
+        with _ChatActionKeepalive(bot, chat_id, action):
+            return self.wake_agy_bridge()
 
     def sleep_llm(self) -> bool:
         """Puts KoboldCPP LLM to sleep, freeing all GPU VRAM and model RAM."""
@@ -652,127 +688,137 @@ class IdleEngine:
             self.record_activity()
             return True
 
-        if self._targets_local_kobold(is_nsfw=is_nsfw):
-            self._prepare_vram_for_llm()
+        ready_before = self.is_llm_ready(is_nsfw=is_nsfw)
+        if not ready_before and not is_user_chat:
+            logger.info("⚡ Smart Idle: Blocked background automation from waking LLM (Gaming Protection Active).")
+            return False
 
-        if self.is_llm_ready(is_nsfw=is_nsfw):
+        targets_kobold = self._targets_local_kobold(is_nsfw=is_nsfw)
+        needs_vram_swap = bool(targets_kobold and self._should_exclusive_vram_swap() and is_port_listening(8188))
+        if ready_before and not needs_vram_swap:
             self.is_llm_sleeping = False
             self.record_activity()
             return True
 
-        if not is_user_chat:
-            logger.info("⚡ Smart Idle: Blocked background automation from waking LLM (Gaming Protection Active).")
-            return False
+        with _ChatActionKeepalive(bot, chat_id, "typing") as keepalive:
+            if targets_kobold:
+                self._prepare_vram_for_llm()
 
-        # Send temporary waking status to user
-        waking_msg = None
-        if bot and chat_id:
+            if self.is_llm_ready(is_nsfw=is_nsfw):
+                self.is_llm_sleeping = False
+                self.record_activity()
+                return True
+
+            if not is_user_chat:
+                logger.info("⚡ Smart Idle: Blocked background automation from waking LLM (Gaming Protection Active).")
+                return False
+
+            # Send temporary waking status to user
+            waking_msg = None
+            if bot and chat_id:
+                try:
+                    waking_msg = bot.send_message(
+                        chat_id,
+                        "🌸 *Waifu lagi bangun dari mode hemat daya...* (~5 detik) ✨",
+                        parse_mode="Markdown"
+                    )
+                    keepalive.pulse()
+                except Exception:
+                    pass
+
+            stop_feedback = threading.Event()
+
+            def _feedback_loop():
+                start_t = time.time()
+                while not stop_feedback.is_set():
+                    stop_feedback.wait(2.5)
+                    if stop_feedback.is_set():
+                        break
+                    keepalive.pulse()
+                    elapsed = int(time.time() - start_t)
+                    if bot and chat_id and waking_msg:
+                        try:
+                            bot.edit_message_text(
+                                f"🌸 *Waifu lagi bangun dari mode hemat daya...* ({elapsed}s) ✨",
+                                chat_id=chat_id,
+                                message_id=waking_msg.message_id,
+                                parse_mode="Markdown"
+                            )
+                            keepalive.pulse()
+                        except Exception:
+                            pass
+
+            sfw_p_chk, sfw_url_chk, _ = self._resolve_llm_target(is_nsfw=False)
+            sfw_is_alt_engine = (
+                split_mode
+                or sfw_p_chk == "agy"
+                or ":8001" in sfw_url_chk
+                or (sfw_p_chk not in ("", "local", "kobold", "koboldcpp", "ollama", "lm-studio", "locally-uncensored"))
+            )
+            has_live_fallback = bool(is_nsfw and sfw_is_alt_engine and self.is_llm_ready(is_nsfw=False))
+            wake_timeout = 30 if has_live_fallback else 55
+
+            fb_thread = threading.Thread(target=_feedback_loop, daemon=True)
+            fb_thread.start()
             try:
-                bot.send_chat_action(chat_id, "typing")
-                waking_msg = bot.send_message(
-                    chat_id,
-                    "🌸 *Waifu lagi bangun dari mode hemat daya...* (~5 detik) ✨",
-                    parse_mode="Markdown"
-                )
-                bot.send_chat_action(chat_id, "typing")
-            except Exception:
-                pass
+                ok = self.wake_llm(timeout_seconds=wake_timeout, is_nsfw=is_nsfw)
+            finally:
+                stop_feedback.set()
+                fb_thread.join(timeout=1.0)
 
-        stop_feedback = threading.Event()
+            # High-availability fallback:
+            # If NSFW KoboldCPP on port 5001 failed to wake, but SFW engine (AGY 8001 or Cloud) is ready,
+            # proceed seamlessly via SFW fallback regardless of unified vs split mode!
+            if not ok and is_nsfw:
+                if sfw_is_alt_engine and self.is_llm_ready(is_nsfw=False):
+                    logger.warning("⚡ Smart Idle: KoboldCPP (port 5001) could not be awakened, but SFW engine is ready. Seamlessly proceeding via SFW fallback.")
+                    ok = True
 
-        def _feedback_loop():
-            start_t = time.time()
-            while not stop_feedback.is_set():
-                stop_feedback.wait(2.5)
-                if stop_feedback.is_set():
-                    break
-                elapsed = int(time.time() - start_t)
-                if bot and chat_id and waking_msg:
+            # Handle feedback message
+            if waking_msg and bot and chat_id:
+                if ok:
                     try:
-                        bot.send_chat_action(chat_id, "typing")
+                        bot.delete_message(chat_id, waking_msg.message_id)
+                    except Exception:
+                        pass
+                    keepalive.pulse()
+                else:
+                    agy_hint = ""
+                    if is_port_listening(8001):
+                        agy_hint = "\n• 🌉 *AGY Bridge Aktif:* Ketik `/setup` ➔ `🧠 Model LLM` ➔ pilih `Google Antigravity Bridge` agar langsung aktif!"
+                    err_text = (
+                        "⚠️ *Waifu belum bisa dibangunkan otomatis!*\n\n"
+                        "Engine AI lokal (KoboldCPP) tidak merespons di port 5001.\n"
+                        "Kemungkinan model LLM belum terpasang atau file binary belum ditemukan.\n\n"
+                        "💡 *Solusi:*\n"
+                        "• Ketik `/status` untuk melihat diagnosa lengkap\n"
+                        f"• Atau jalankan `start_services.bat` di folder PC kamu.{agy_hint}"
+                    )
+                    try:
                         bot.edit_message_text(
-                            f"🌸 *Waifu lagi bangun dari mode hemat daya...* ({elapsed}s) ✨",
+                            err_text,
                             chat_id=chat_id,
                             message_id=waking_msg.message_id,
                             parse_mode="Markdown"
                         )
                     except Exception:
-                        pass
-
-        sfw_p_chk, sfw_url_chk, _ = self._resolve_llm_target(is_nsfw=False)
-        sfw_is_alt_engine = (
-            split_mode
-            or sfw_p_chk == "agy"
-            or ":8001" in sfw_url_chk
-            or (sfw_p_chk not in ("", "local", "kobold", "koboldcpp", "ollama", "lm-studio", "locally-uncensored"))
-        )
-        has_live_fallback = bool(is_nsfw and sfw_is_alt_engine and self.is_llm_ready(is_nsfw=False))
-        wake_timeout = 30 if has_live_fallback else 55
-
-        fb_thread = threading.Thread(target=_feedback_loop, daemon=True)
-        fb_thread.start()
-        try:
-            ok = self.wake_llm(timeout_seconds=wake_timeout, is_nsfw=is_nsfw)
-        finally:
-            stop_feedback.set()
-            fb_thread.join(timeout=1.0)
-
-        # High-availability fallback:
-        # If NSFW KoboldCPP on port 5001 failed to wake, but SFW engine (AGY 8001 or Cloud) is ready,
-        # proceed seamlessly via SFW fallback regardless of unified vs split mode!
-        if not ok and is_nsfw:
-            if sfw_is_alt_engine and self.is_llm_ready(is_nsfw=False):
-                logger.warning("⚡ Smart Idle: KoboldCPP (port 5001) could not be awakened, but SFW engine is ready. Seamlessly proceeding via SFW fallback.")
-                ok = True
-
-        # Handle feedback message
-        if waking_msg and bot and chat_id:
-            if ok:
+                        try:
+                            bot.send_message(chat_id, err_text.replace("*", ""))
+                        except Exception:
+                            pass
+            elif not ok and bot and chat_id:
                 try:
-                    bot.delete_message(chat_id, waking_msg.message_id)
-                except Exception:
-                    pass
-                try:
-                    bot.send_chat_action(chat_id, "typing")
-                except Exception:
-                    pass
-            else:
-                agy_hint = ""
-                if is_port_listening(8001):
-                    agy_hint = "\n• 🌉 *AGY Bridge Aktif:* Ketik `/setup` ➔ `🧠 Model LLM` ➔ pilih `Google Antigravity Bridge` agar langsung aktif!"
-                err_text = (
-                    "⚠️ *Waifu belum bisa dibangunkan otomatis!*\n\n"
-                    "Engine AI lokal (KoboldCPP) tidak merespons di port 5001.\n"
-                    "Kemungkinan model LLM belum terpasang atau file binary belum ditemukan.\n\n"
-                    "💡 *Solusi:*\n"
-                    "• Ketik `/status` untuk melihat diagnosa lengkap\n"
-                    f"• Atau jalankan `start_services.bat` di folder PC kamu.{agy_hint}"
-                )
-                try:
-                    bot.edit_message_text(
-                        err_text,
-                        chat_id=chat_id,
-                        message_id=waking_msg.message_id,
-                        parse_mode="Markdown"
+                    bot.send_message(
+                        chat_id,
+                        "⚠️ Otak AI lokal (KoboldCPP) belum aktif di port 5001. Silakan ketik /status untuk informasi lebih lanjut."
                     )
                 except Exception:
-                    try:
-                        bot.send_message(chat_id, err_text.replace("*", ""))
-                    except Exception:
-                        pass
-        elif not ok and bot and chat_id:
-            try:
-                bot.send_message(
-                    chat_id,
-                    "⚠️ Otak AI lokal (KoboldCPP) belum aktif di port 5001. Silakan ketik /status untuk informasi lebih lanjut."
-                )
-            except Exception:
-                pass
+                    pass
 
-        self.record_activity()
-        return ok
+            self.record_activity()
+            return ok
 
-    def ensure_comfyui_active(self, bot=None, chat_id: Optional[int] = None, is_nude: bool = False) -> bool:
+    def ensure_comfyui_active(self, bot=None, chat_id: Optional[int] = None, is_nude: bool = False, action: str = "upload_photo") -> bool:
         """
         Ensures ComfyUI is active before generating photos/videos on-demand.
         If user configured AGY or Cloud as active image engine, ComfyUI is bypassed.
@@ -788,7 +834,8 @@ class IdleEngine:
             return True
 
         # Avoid killing live KoboldCPP on <= 6.5 GB GPU if ComfyUI is neither running nor installed locally
-        if not self.is_comfyui_ready():
+        ready_before = self.is_comfyui_ready()
+        if not ready_before:
             try:
                 import asset_manager
                 if not asset_manager.detect_comfyui_dir():
@@ -796,89 +843,91 @@ class IdleEngine:
             except Exception:
                 pass
 
-        self._prepare_vram_for_comfyui()
-
-        if not self.comfyui_on_demand and not self.is_comfyui_sleeping:
+        needs_vram_swap = bool(self._should_exclusive_vram_swap() and is_port_listening(5001))
+        if ready_before and not needs_vram_swap and (not self.comfyui_on_demand and not self.is_comfyui_sleeping):
             return True
 
-        if self.is_comfyui_ready():
-            self.is_comfyui_sleeping = False
-            self.record_activity(is_media=True)
-            return True
+        with _ChatActionKeepalive(bot, chat_id, action) as keepalive:
+            self._prepare_vram_for_comfyui()
 
-        waking_msg = None
-        if bot and chat_id:
+            if not self.comfyui_on_demand and not self.is_comfyui_sleeping:
+                return True
+
+            if self.is_comfyui_ready():
+                self.is_comfyui_sleeping = False
+                self.record_activity(is_media=True)
+                return True
+
+            waking_msg = None
+            if bot and chat_id:
+                try:
+                    waking_msg = bot.send_message(
+                        chat_id,
+                        "📸 *Menyiapkan studio foto ComfyUI di PC...* (~5-15 detik) ✨",
+                        parse_mode="Markdown"
+                    )
+                    keepalive.pulse()
+                except Exception:
+                    pass
+
+            stop_feedback = threading.Event()
+
+            def _comfy_feedback_loop():
+                start_t = time.time()
+                while not stop_feedback.is_set():
+                    stop_feedback.wait(2.5)
+                    if stop_feedback.is_set():
+                        break
+                    keepalive.pulse()
+                    elapsed = int(time.time() - start_t)
+                    if bot and chat_id and waking_msg:
+                        try:
+                            bot.edit_message_text(
+                                f"📸 *Menyiapkan studio foto ComfyUI di PC...* ({elapsed}s) ✨",
+                                chat_id=chat_id,
+                                message_id=waking_msg.message_id,
+                                parse_mode="Markdown"
+                            )
+                            keepalive.pulse()
+                        except Exception:
+                            pass
+
+            fb_thread = threading.Thread(target=_comfy_feedback_loop, daemon=True)
+            fb_thread.start()
             try:
-                bot.send_chat_action(chat_id, "upload_photo")
-                waking_msg = bot.send_message(
-                    chat_id,
-                    "📸 *Menyiapkan studio foto ComfyUI di PC...* (~5-15 detik) ✨",
-                    parse_mode="Markdown"
-                )
-                bot.send_chat_action(chat_id, "upload_photo")
-            except Exception:
-                pass
+                ok = self.wake_comfyui()
+            finally:
+                stop_feedback.set()
+                fb_thread.join(timeout=1.0)
 
-        stop_feedback = threading.Event()
-
-        def _comfy_feedback_loop():
-            start_t = time.time()
-            while not stop_feedback.is_set():
-                stop_feedback.wait(2.5)
-                if stop_feedback.is_set():
-                    break
-                elapsed = int(time.time() - start_t)
-                if bot and chat_id and waking_msg:
+            if waking_msg and bot and chat_id:
+                if ok:
                     try:
-                        bot.send_chat_action(chat_id, "upload_photo")
+                        bot.delete_message(chat_id, waking_msg.message_id)
+                    except Exception:
+                        pass
+                    keepalive.pulse()
+                else:
+                    err_text = (
+                        "⚠️ *Studio foto ComfyUI belum dapat dinyalakan!*\n\n"
+                        "Layanan ComfyUI di port 8188 tidak merespons.\n"
+                        "💡 Periksa apakah ComfyUI sudah terinstall atau jalankan `start_services.bat`."
+                    )
+                    try:
                         bot.edit_message_text(
-                            f"📸 *Menyiapkan studio foto ComfyUI di PC...* ({elapsed}s) ✨",
+                            err_text,
                             chat_id=chat_id,
                             message_id=waking_msg.message_id,
                             parse_mode="Markdown"
                         )
                     except Exception:
-                        pass
+                        try:
+                            bot.send_message(chat_id, err_text.replace("*", ""))
+                        except Exception:
+                            pass
 
-        fb_thread = threading.Thread(target=_comfy_feedback_loop, daemon=True)
-        fb_thread.start()
-        try:
-            ok = self.wake_comfyui()
-        finally:
-            stop_feedback.set()
-            fb_thread.join(timeout=1.0)
-
-        if waking_msg and bot and chat_id:
-            if ok:
-                try:
-                    bot.delete_message(chat_id, waking_msg.message_id)
-                except Exception:
-                    pass
-                try:
-                    bot.send_chat_action(chat_id, "upload_photo")
-                except Exception:
-                    pass
-            else:
-                err_text = (
-                    "⚠️ *Studio foto ComfyUI belum dapat dinyalakan!*\n\n"
-                    "Layanan ComfyUI di port 8188 tidak merespons.\n"
-                    "💡 Periksa apakah ComfyUI sudah terinstall atau jalankan `start_services.bat`."
-                )
-                try:
-                    bot.edit_message_text(
-                        err_text,
-                        chat_id=chat_id,
-                        message_id=waking_msg.message_id,
-                        parse_mode="Markdown"
-                    )
-                except Exception:
-                    try:
-                        bot.send_message(chat_id, err_text.replace("*", ""))
-                    except Exception:
-                        pass
-
-        self.record_activity(is_media=True)
-        return ok
+            self.record_activity(is_media=True)
+            return ok
 
     def _monitor_loop(self):
         """Continuous background monitor checking for idle timeout."""

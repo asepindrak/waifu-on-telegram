@@ -627,6 +627,28 @@ class HealthEngine:
             for uid in recipients:
                 self.send_safe_message(bot, uid, init_text)
 
+        action_map = {
+            "comfyui": "upload_photo",
+            "voicestudio": "record_voice",
+        }
+        heal_action = action_map.get(service, "typing")
+        stop_heal_action = threading.Event()
+
+        def _heal_action_loop():
+            while not stop_heal_action.is_set():
+                if bot and hasattr(bot, "send_chat_action"):
+                    for uid in recipients:
+                        try:
+                            bot.send_chat_action(uid, heal_action)
+                        except Exception:
+                            pass
+                stop_heal_action.wait(3.0)
+
+        heal_thread = None
+        if bot and recipients and hasattr(bot, "send_chat_action"):
+            heal_thread = threading.Thread(target=_heal_action_loop, daemon=True)
+            heal_thread.start()
+
         success = False
         try:
             if service == "llm":
@@ -640,6 +662,9 @@ class HealthEngine:
             elif service == "agy":
                 success = self.heal_agy()
         finally:
+            stop_heal_action.set()
+            if heal_thread:
+                heal_thread.join(timeout=0.5)
             with self.lock:
                 self.healing_in_progress[service] = False
 

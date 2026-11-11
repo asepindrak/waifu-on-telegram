@@ -207,6 +207,82 @@ class TestIdleEngine(unittest.TestCase):
             bot.handle_text_messages(mock_msg)
             mock_handle_idle.assert_called_once_with(mock_msg)
 
+    def test_llm_and_comfyui_booting_always_send_telegram_chat_action(self):
+        """Even if waking status message fails to send, booting LLM emits typing and booting ComfyUI emits upload_photo."""
+        import time as _t
+
+        mock_bot = MagicMock()
+        mock_bot.send_message.return_value = None  # Simulate send_message failure / None
+
+        def _slow_wake_llm(*args, **kwargs):
+            _t.sleep(0.15)
+            return True
+
+        def _slow_wake_comfy(*args, **kwargs):
+            _t.sleep(0.15)
+            return True
+
+        with patch.object(self.idle_engine, "is_llm_ready", return_value=False), \
+             patch.object(self.idle_engine, "wake_llm", side_effect=_slow_wake_llm):
+            ok = self.idle_engine.ensure_llm_active(bot=mock_bot, chat_id=555, is_user_chat=True)
+            self.assertTrue(ok)
+            mock_bot.send_chat_action.assert_any_call(555, "typing")
+
+        mock_bot.reset_mock()
+        mock_bot.send_message.return_value = None
+        with patch.dict(os.environ, {"SFW_IMAGE_ENGINE": "comfyui", "IMAGE_ENGINE_MODE": "unified", "IMAGE_ENGINE": "comfyui"}), \
+             patch("asset_manager.detect_comfyui_dir", return_value="C:/ComfyUI"), \
+             patch.object(self.idle_engine, "is_comfyui_ready", return_value=False), \
+             patch.object(self.idle_engine, "wake_comfyui", side_effect=_slow_wake_comfy):
+            ok = self.idle_engine.ensure_comfyui_active(bot=mock_bot, chat_id=555, is_nude=False)
+            self.assertTrue(ok)
+            mock_bot.send_chat_action.assert_any_call(555, "upload_photo")
+
+        mock_bot.reset_mock()
+        mock_bot.send_message.return_value = None
+        with patch.dict(os.environ, {"SFW_IMAGE_ENGINE": "comfyui", "IMAGE_ENGINE_MODE": "unified", "IMAGE_ENGINE": "comfyui"}), \
+             patch("asset_manager.detect_comfyui_dir", return_value="C:/ComfyUI"), \
+             patch.object(self.idle_engine, "is_comfyui_ready", return_value=False), \
+             patch.object(self.idle_engine, "wake_comfyui", side_effect=_slow_wake_comfy):
+            ok = self.idle_engine.ensure_comfyui_active(bot=mock_bot, chat_id=555, is_nude=False, action="upload_video")
+            self.assertTrue(ok)
+            mock_bot.send_chat_action.assert_any_call(555, "upload_video")
+
+    def test_health_engine_heal_sends_chat_actions_and_queue_sends_typing(self):
+        """HealthEngine healing and ChatQueueManager waiting both emit Telegram chat actions."""
+        import time as _t
+        import bot
+        from health_engine import HealthEngine
+
+        he = HealthEngine(llm_client=MagicMock())
+        mock_bot = MagicMock()
+
+        def _slow_heal():
+            _t.sleep(0.15)
+            return True
+
+        with patch.object(he, "heal_llm", side_effect=_slow_heal), \
+             patch.object(he, "send_safe_message"):
+            self.assertTrue(he.attempt_heal_service("llm", mock_bot, [777], is_manual=True))
+            mock_bot.send_chat_action.assert_any_call(777, "typing")
+
+        mock_bot.reset_mock()
+        with patch.object(he, "heal_comfyui", side_effect=_slow_heal), \
+             patch.object(he, "send_safe_message"):
+            self.assertTrue(he.attempt_heal_service("comfyui", mock_bot, [777], is_manual=True))
+            mock_bot.send_chat_action.assert_any_call(777, "upload_photo")
+
+        mock_queue_bot = MagicMock()
+        q = bot.ChatQueueManager(debounce_window=0.15, max_debounce_window=0.3, action_bot=mock_queue_bot)
+        done = []
+        msg = MagicMock()
+        msg.from_user.id = 888
+        msg.chat.id = 888
+        q.enqueue(msg, "halo", execute_fn=lambda m, t, is_voice=False: done.append(t))
+        _t.sleep(0.35)
+        self.assertEqual(done, ["halo"])
+        mock_queue_bot.send_chat_action.assert_any_call(888, "typing")
+
 
 if __name__ == "__main__":
     unittest.main()

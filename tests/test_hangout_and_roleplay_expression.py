@@ -68,6 +68,28 @@ class TestHangoutAndRoleplayExpression(unittest.TestCase):
         self.assertIn("`print(*args)`", formatted_code)
         self.assertIn("_Akira mengetik cepat_\n\n", formatted_code)
 
+        # 8. Should NOT prepend or duplicate character name when action already has subject/character name
+        raw_dup = "*Bibir Hina sedikit terbuka menatap layar saat kau mendekat, lalu ia membenturkan kepalanya pelan ke dadamu dengan tatapan penuh harap* Halo..."
+        formatted_dup = bot.format_roleplay_italics(raw_dup, character_name="Hina")
+        self.assertEqual(
+            "_Bibir Hina sedikit terbuka menatap layar saat kau mendekat, lalu ia membenturkan kepalanya pelan ke dadamu dengan tatapan penuh harap_\n\nHalo...",
+            formatted_dup,
+        )
+
+        # 9. Should strip accidental leading "Hina " before "Bibir Hina..." or "Tangannya..."
+        raw_accidental_lead = "*Hina Bibir Hina sedikit terbuka* Oh?"
+        self.assertEqual("_Bibir Hina sedikit terbuka_\n\nOh?", bot.format_roleplay_italics(raw_accidental_lead, character_name="Hina"))
+        raw_possessive = "*Tangannya menyentuh bahumu lembut* Pelan-pelan ya..."
+        self.assertEqual("_Tangannya menyentuh bahumu lembut_\n\nPelan-pelan ya...", bot.format_roleplay_italics(raw_possessive, character_name="Hina"))
+        raw_lead_possessive = "*Hina Tangannya menyentuh bahumu lembut* Pelan-pelan ya..."
+        self.assertEqual("_Tangannya menyentuh bahumu lembut_\n\nPelan-pelan ya...", bot.format_roleplay_italics(raw_lead_possessive, character_name="Hina"))
+
+        # 10. Pronouns after initial mention stay natural without repeating character name
+        raw_pronouns = "*Bibirnya melengkung tersenyum lalu dia mendekat* Kamu lucu."
+        self.assertEqual("_Bibirnya melengkung tersenyum lalu Hina mendekat_\n\nKamu lucu.", bot.format_roleplay_italics(raw_pronouns, character_name="Hina"))
+        raw_two_pronouns = "*ia tersenyum lalu dia mengangguk* Iya."
+        self.assertEqual("_Hina tersenyum lalu dia mengangguk_\n\nIya.", bot.format_roleplay_italics(raw_two_pronouns, character_name="Hina"))
+
     def test_hangout_engine_lifecycle(self):
         """Tests starting a date, verifying active state, recording photos, and ending the date."""
         self.hangout_engine.end_date(self.user_id)

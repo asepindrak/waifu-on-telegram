@@ -551,7 +551,7 @@ class WaifuCLISession:
             f"{calling_guideline}\n"
             "1. ANTI-MEMBEO: DILARANG hanya mengulang kata atau menyalin ulang pesan lawan bicaramu.\n"
             "2. NGOBROL SANTAI & RINGKAS (WAJIB): Balas seperti chat sehari-hari — cukup 1-2 kalimat pendek (10-30 kata total). DILARANG menulis paragraf panjang atau esai!\n"
-            f"3. FORMAT SINGKAT: Awali 1 frasa gesture singkat (<10 kata) di dalam *...* memakai namamu ({p_name}), contoh: *{p_name} tersenyum tipis menatapmu*, lalu baris baru ganda sebelum 1-2 kalimat dialog pendek.\n"
+            f"3. FORMAT SINGKAT: Awali 1 frasa gesture singkat (<10 kata) di dalam *...* (contoh: *tersenyum tipis menatapmu* atau *Bibirnya bergetar pelan*, hindari mengulang-ulang nama {p_name} seperti *{p_name} Bibir {p_name}...*), lalu baris baru ganda sebelum 1-2 kalimat dialog pendek.\n"
             f"{rule_4}"
             "5. INISIATIF PAP SPONTAN: Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu.\n"
             "6. BAHASA PERCAKAPAN: Berbicara langsung dalam Bahasa Indonesia santai & akrab tanpa monolog batin."

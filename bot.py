@@ -255,13 +255,59 @@ def format_roleplay_italics(text: str, character_name: Optional[str] = None) -> 
         content = re.sub(r'\bpipiku\b', 'pipinya', content, flags=re.IGNORECASE)
         content = re.sub(r'\bbajuku\b', 'bajunya', content, flags=re.IGNORECASE)
         content = re.sub(r'\btubuhku\b', 'tubuhnya', content, flags=re.IGNORECASE)
-        # Convert third-person pronouns to character name
-        content = re.sub(r'\b(?:ia|dia)\b', char_name, content, flags=re.IGNORECASE)
+        char_pat = re.escape(char_name)
+        has_char_name = bool(re.search(rf'\b{char_pat}\b', content, re.IGNORECASE))
 
-        # If not already starting with char_name, check if we should prepend char_name
-        non_char = ['suara', 'angin', 'hujan', 'lampu', 'musik', 'suasana', 'hp', 'ponsel', 'notifikasi', 'pintu', 'gelas', 'waktu', 'hari']
-        first_word = content.split()[0].lower() if content.split() else ''
-        if not re.match(r'^(?:' + re.escape(char_name) + r')\b', content, re.IGNORECASE) and first_word not in non_char:
+        # Convert at most the initial third-person pronoun to character name when character_name isn't already present
+        if not has_char_name:
+            content = re.sub(r'\b(?:ia|dia)\b', char_name, content, count=1, flags=re.IGNORECASE)
+
+        # Strip duplicate leading character name (e.g. "Hina Hina ...")
+        content = re.sub(rf'^(?:{char_pat}\s+)+(?={char_pat}\b)', '', content, flags=re.IGNORECASE).strip()
+
+        subject_nouns = {
+            'suara', 'angin', 'hujan', 'lampu', 'cahaya', 'sinar', 'langit', 'awan',
+            'musik', 'suasana', 'udara', 'ruangan', 'kamar', 'hp', 'ponsel', 'layar',
+            'notifikasi', 'pintu', 'jendela', 'gelas', 'cangkir', 'meja', 'kasur',
+            'selimut', 'bantal', 'waktu', 'hari', 'malam', 'pagi', 'siang', 'sore',
+            'detik', 'menit', 'bibir', 'mata', 'tatapan', 'pandangan', 'pipi',
+            'wajah', 'muka', 'dahi', 'alis', 'hidung', 'telinga', 'rambut', 'kepala',
+            'leher', 'bahu', 'pundak', 'dada', 'jantung', 'detak', 'napas', 'nafas',
+            'hembusan', 'tangan', 'lengan', 'jari', 'jemari', 'telapak', 'pinggang',
+            'pinggul', 'paha', 'kaki', 'lutut', 'tubuh', 'badan', 'kulit', 'keringat',
+            'air', 'senyum', 'senyuman', 'tawa', 'ekspresi', 'rona', 'desahan',
+            'bisikan', 'getaran', 'langkah', 'gerak', 'gerakan', 'pelukan', 'sentuhan',
+            'baju', 'pakaian', 'kaos', 'kemeja', 'rok', 'celana', 'gaun', 'jaket',
+        }
+        subject_openers = subject_nouns | {
+            'aku', 'saya', 'kamu', 'kau', 'engkau', 'kita', 'kami', 'kalian', 'mereka',
+            'ia', 'dia', 'saat', 'ketika', 'begitu', 'seketika', 'mendadak', 'tiba-tiba',
+            'the', 'a', 'an', 'his', 'her', 'its', 'their', 'my', 'your', 'our',
+            'she', 'he', 'it', 'they', 'when', 'while', 'as',
+        }
+
+        def _starts_with_subject(txt: str) -> bool:
+            words = txt.split()
+            if not words:
+                return False
+            first_tok = re.sub(r'^[^\w-]+|[^\w-]+$', '', words[0].lower())
+            if not first_tok:
+                return False
+            if first_tok in subject_openers:
+                return True
+            if first_tok.endswith('nya') and len(first_tok) > 3 and first_tok[:-3] in subject_nouns:
+                return True
+            return False
+
+        # Remove awkward leading char_name when char_name already appears later or next word is a self-sufficient subject
+        lead_match = re.match(rf'^{char_pat}\s+(.+)$', content, flags=re.IGNORECASE)
+        if lead_match:
+            rest = lead_match.group(1).strip()
+            if rest and (re.search(rf'\b{char_pat}\b', rest, re.IGNORECASE) or _starts_with_subject(rest)):
+                content = rest
+
+        # Prepend char_name only for bare verb/predicate cues without a subject or existing character mention
+        if not re.search(rf'\b{char_pat}\b', content, re.IGNORECASE) and not _starts_with_subject(content):
             content = f'{char_name} {content}'
 
         return content.strip(' -—~')
@@ -829,7 +875,7 @@ def apply_language_choice(choice: str, change_voice: bool = False) -> Tuple[str,
 
 
 class ChatActionLoop:
-    """Continuously sends chat action (e.g. typing or upload_photo) every 3.5s so Telegram never drops status."""
+    """Continuously sends chat action (e.g. typing or upload_photo) every 3s so Telegram never drops status."""
     def __init__(self, bot_instance, chat_id: int, action: str = "typing"):
         self.bot = bot_instance
         self.chat_id = chat_id
@@ -837,12 +883,16 @@ class ChatActionLoop:
         self.running = True
         self.thread = threading.Thread(target=self._run, daemon=True)
 
-    def _run(self):
-        while self.running:
+    def pulse(self):
+        if self.bot and self.chat_id is not None:
             try:
                 self.bot.send_chat_action(self.chat_id, self.action)
             except Exception:
                 pass
+
+    def _run(self):
+        while self.running:
+            self.pulse()
             for _ in range(30):
                 if not self.running:
                     break
@@ -854,6 +904,10 @@ class ChatActionLoop:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.running = False
+        try:
+            self.thread.join(timeout=0.3)
+        except Exception:
+            pass
 
 
 def is_authorized(user_id: int) -> bool:
@@ -1737,28 +1791,25 @@ def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, ye
             )
 
         # 1. Generate celebration photo
-        try:
-            bot.send_chat_action(chat_id, "upload_photo")
-        except Exception:
-            pass
-        img_bytes, used_fallback = media_engine.generate_photo(
-            prompt=photo_prompt,
-            negative_prompt=persona.get("negative_prompt", ""),
-            aspect_ratio=cur_ar,
-            quality=USER_QUALITIES.get(user_id, "high")
-        )
+        with ChatActionLoop(bot, chat_id, "upload_photo"):
+            img_bytes, used_fallback = media_engine.generate_photo(
+                prompt=photo_prompt,
+                negative_prompt=persona.get("negative_prompt", ""),
+                aspect_ratio=cur_ar,
+                quality=USER_QUALITIES.get(user_id, "high")
+            )
 
-        markup = types.InlineKeyboardMarkup()
-        markup.add(
-            types.InlineKeyboardButton("💖 Peluk & Cium Waifu", callback_data="dates_act:kiss_reaction"),
-            types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu")
-        )
-        markup = attach_voice_button(markup, caption_msg, user_id)
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("💖 Peluk & Cium Waifu", callback_data="dates_act:kiss_reaction"),
+                types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu")
+            )
+            markup = attach_voice_button(markup, caption_msg, user_id)
 
-        if img_bytes:
-            bot.send_photo(chat_id, img_bytes, caption=caption_msg, reply_markup=markup, parse_mode="Markdown")
-        else:
-            bot.send_message(chat_id, caption_msg, reply_markup=markup, parse_mode="Markdown")
+            if img_bytes:
+                bot.send_photo(chat_id, img_bytes, caption=caption_msg, reply_markup=markup, parse_mode="Markdown")
+            else:
+                bot.send_message(chat_id, caption_msg, reply_markup=markup, parse_mode="Markdown")
 
         persona_mgr.add_message(user_id, "assistant", caption_msg)
 
@@ -3000,9 +3051,9 @@ def handle_status(message):
     if not is_authorized(message.from_user.id):
         return
 
-    bot.send_chat_action(message.chat.id, "typing")
-    user_id = message.from_user.id
-    report = build_system_diagnostics_report(user_id)
+    with ChatActionLoop(bot, message.chat.id, "typing"):
+        user_id = message.from_user.id
+        report = build_system_diagnostics_report(user_id)
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -4085,8 +4136,9 @@ def callback_cfg_self_heal(call):
         return
     bot.answer_callback_query(call.id, "🩹 Memulai Self-Healing di background...")
     def _run_heal():
-        results = health_engine.heal_all_services(bot, [call.from_user.id])
-        report = build_system_diagnostics_report(call.from_user.id)
+        with ChatActionLoop(bot, call.message.chat.id, "typing"):
+            results = health_engine.heal_all_services(bot, [call.from_user.id])
+            report = build_system_diagnostics_report(call.from_user.id)
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
             types.InlineKeyboardButton("🔄 Segarkan Status", callback_data="cfg_action:status"),
@@ -4455,42 +4507,43 @@ def callback_play_voice(call):
         pass
 
     def _generate_and_send():
-        v_backend = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
-        if v_backend in ("voicestudio", "local") and hasattr(idle_engine, "ensure_voicestudio_active"):
-            idle_engine.ensure_voicestudio_active()
+        with ChatActionLoop(bot, chat_id, "record_voice"):
+            v_backend = os.environ.get("VOICE_BACKEND", "edge-tts").lower().strip()
+            if v_backend in ("voicestudio", "local") and hasattr(idle_engine, "ensure_voicestudio_active"):
+                idle_engine.ensure_voicestudio_active(bot=bot, chat_id=chat_id, action="record_voice")
 
-        clean_for_vn = voice_engine.clean_text_for_speech(text_to_speak)
-        if len(clean_for_vn) > 220:
-            m = re.search(r'^(.*[.!?])\s', clean_for_vn[:240])
-            if m:
-                clean_for_vn = m.group(1)
-            else:
-                clean_for_vn = clean_for_vn[:200].rsplit(' ', 1)[0]
+            clean_for_vn = voice_engine.clean_text_for_speech(text_to_speak)
+            if len(clean_for_vn) > 220:
+                m = re.search(r'^(.*[.!?])\s', clean_for_vn[:240])
+                if m:
+                    clean_for_vn = m.group(1)
+                else:
+                    clean_for_vn = clean_for_vn[:200].rsplit(' ', 1)[0]
 
-        from resource_lock import acquire_gpu_heavy_lock
-        with acquire_gpu_heavy_lock("Telegram Chat On-Demand Voice Note"):
-            vn_path = voice_engine.generate_voice_note(clean_for_vn)
+            from resource_lock import acquire_gpu_heavy_lock
+            with acquire_gpu_heavy_lock("Telegram Chat On-Demand Voice Note"):
+                vn_path = voice_engine.generate_voice_note(clean_for_vn)
 
-        sent_ok = False
-        if vn_path and os.path.exists(vn_path):
-            try:
-                with open(vn_path, "rb") as vn_file:
-                    bot.send_voice(chat_id, vn_file, reply_to_message_id=call.message.message_id)
-                sent_ok = True
-            except Exception as e_send:
-                logger.error(f"Error sending on-demand voice note: {e_send}")
-            finally:
+            sent_ok = False
+            if vn_path and os.path.exists(vn_path):
                 try:
-                    os.remove(vn_path)
-                except Exception:
-                    pass
+                    with open(vn_path, "rb") as vn_file:
+                        bot.send_voice(chat_id, vn_file, reply_to_message_id=call.message.message_id)
+                    sent_ok = True
+                except Exception as e_send:
+                    logger.error(f"Error sending on-demand voice note: {e_send}")
+                finally:
+                    try:
+                        os.remove(vn_path)
+                    except Exception:
+                        pass
 
-        try:
-            done_label = "🔊 Putar Suara Lagi" if sent_ok else "🔊 Dengarkan Suara"
-            done_markup = _rebuild_voice_button_markup(orig_markup, done_label, f"play_voice:{v_id}")
-            bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=done_markup)
-        except Exception:
-            pass
+            try:
+                done_label = "🔊 Putar Suara Lagi" if sent_ok else "🔊 Dengarkan Suara"
+                done_markup = _rebuild_voice_button_markup(orig_markup, done_label, f"play_voice:{v_id}")
+                bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=done_markup)
+            except Exception:
+                pass
 
     threading.Thread(target=_generate_and_send, daemon=True).start()
 
@@ -4708,10 +4761,8 @@ def process_photo_request(
 
             persona = persona_mgr.get_active_persona()
 
-            try:
-                bot.send_chat_action(chat_id, "upload_photo")
-            except Exception:
-                pass
+            photo_action_loop = ChatActionLoop(bot, chat_id, "upload_photo")
+            photo_action_loop.__enter__()
 
             status_msg = None
             # If this is a followup photo after a conversational chat reply, don't spam a separate loading message
@@ -4727,9 +4778,7 @@ def process_photo_request(
 
                 if not status_msg:
                     status_msg = safe_send_message(chat_id, status_text)
-
-            photo_action_loop = ChatActionLoop(bot, chat_id, "upload_photo")
-            photo_action_loop.__enter__()
+                photo_action_loop.pulse()
 
             history = persona_mgr.get_chat_history(user_id)
             actual_user_msg = original_user_text or user_text
@@ -4790,7 +4839,7 @@ def process_photo_request(
             elif sfw_img_engine == "comfyui":
                 idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id, is_nude=False)
             elif sfw_img_engine == "agy":
-                idle_engine.ensure_agy_bridge_active()
+                idle_engine.ensure_agy_bridge_active(bot=bot, chat_id=chat_id, action="upload_photo")
 
             def photo_progress(stage_text: str):
                 if status_msg and hasattr(status_msg, "message_id"):
@@ -4801,6 +4850,8 @@ def process_photo_request(
                             message_id=status_msg.message_id,
                             parse_mode="Markdown"
                         )
+                        if photo_action_loop:
+                            photo_action_loop.pulse()
                     except Exception:
                         pass
 
@@ -5069,63 +5120,64 @@ def process_video_request(
 ):
     """Generates and delivers consistent girlfriend animated video clip with caption and voice."""
     def _execute():
-        persona = persona_mgr.get_active_persona()
-
-        if isinstance(target, types.CallbackQuery):
-            chat_id = target.message.chat.id
-            user_id = target.from_user.id
-            reply_to_target = target.message
-            is_callback = True
-        elif hasattr(target, "message") and target.message:
-            chat_id = target.message.chat.id
-            user_id = target.from_user.id
-            reply_to_target = target.message
-            is_callback = True
-        else:
-            chat_id = target.chat.id
-            user_id = target.from_user.id
-            reply_to_target = target
-            is_callback = False
-
+        chat_id = None
+        video_action_loop = None
         try:
-            bot.send_chat_action(chat_id, "record_video")
-        except Exception:
-            pass
+            persona = persona_mgr.get_active_persona()
 
-        status_msg = None
-        if not is_followup:
-            status_text = f"🎬 *{persona.get('name')} lagi merekam video...*"
-            if is_callback and hasattr(reply_to_target, "message_id"):
-                status_msg = safe_edit_message_text(status_text, chat_id=chat_id, message_id=reply_to_target.message_id)
-                if not status_msg:
-                    status_msg = reply_to_target
+            if isinstance(target, types.CallbackQuery):
+                chat_id = target.message.chat.id
+                user_id = target.from_user.id
+                reply_to_target = target.message
+                is_callback = True
+            elif hasattr(target, "message") and target.message:
+                chat_id = target.message.chat.id
+                user_id = target.from_user.id
+                reply_to_target = target.message
+                is_callback = True
             else:
-                status_msg = safe_reply_to(reply_to_target, status_text)
+                chat_id = target.chat.id
+                user_id = target.from_user.id
+                reply_to_target = target
+                is_callback = False
 
-            if not status_msg:
-                status_msg = safe_send_message(chat_id, status_text)
+            video_action_loop = ChatActionLoop(bot, chat_id, "upload_video")
+            video_action_loop.__enter__()
 
-        history = persona_mgr.get_chat_history(user_id)
-        detected_scene = scene_override or persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
-        visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
-            user_text, user_id=user_id, scene_override=detected_scene, history=history
-        )
-        if outfit_override:
-            outfit_label = outfit_override
-        if is_nude_override is not None:
-            is_nude = is_nude_override
+            status_msg = None
+            if not is_followup:
+                status_text = f"🎬 *{persona.get('name')} lagi merekam video...*"
+                if is_callback and hasattr(reply_to_target, "message_id"):
+                    status_msg = safe_edit_message_text(status_text, chat_id=chat_id, message_id=reply_to_target.message_id)
+                    if not status_msg:
+                        status_msg = reply_to_target
+                else:
+                    status_msg = safe_reply_to(reply_to_target, status_text)
 
-        logger.info(f"Video visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude}, Has Base Img: {bool(base_image_bytes)})")
+                if not status_msg:
+                    status_msg = safe_send_message(chat_id, status_text)
+                video_action_loop.pulse()
 
-        USER_LAST_PHOTO_CONTEXT[user_id] = {
-            "user_text": user_text,
-            "detected_scene": detected_scene,
-            "outfit_label": outfit_label,
-            "is_nude": is_nude,
-            "img_bytes": base_image_bytes
-        }
+            history = persona_mgr.get_chat_history(user_id)
+            detected_scene = scene_override or persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
+            visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
+                user_text, user_id=user_id, scene_override=detected_scene, history=history
+            )
+            if outfit_override:
+                outfit_label = outfit_override
+            if is_nude_override is not None:
+                is_nude = is_nude_override
 
-        try:
+            logger.info(f"Video visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude}, Has Base Img: {bool(base_image_bytes)})")
+
+            USER_LAST_PHOTO_CONTEXT[user_id] = {
+                "user_text": user_text,
+                "detected_scene": detected_scene,
+                "outfit_label": outfit_label,
+                "is_nude": is_nude,
+                "img_bytes": base_image_bytes
+            }
+
             # Check model asset readiness before initiating render
             is_ready, missing = asset_manager.ensure_video_engine_assets(VIDEO_ENGINE)
             if not is_ready and missing:
@@ -5133,24 +5185,23 @@ def process_video_request(
                 return
 
             if ((VIDEO_ENGINE in ("wan21", "animatediff") and not media_engine.allow_cloud_fallback) or is_nude):
-                idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id)
+                idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id, is_nude=bool(is_nude), action="upload_video")
 
-            with ChatActionLoop(bot, chat_id, "upload_video"):
-                neg_p = persona.get("negative_prompt", "")
-                if extra_neg:
-                    neg_p += f", {extra_neg}"
+            neg_p = persona.get("negative_prompt", "")
+            if extra_neg:
+                neg_p += f", {extra_neg}"
 
-                u_ar = USER_RATIOS.get(user_id, "3:4")
-                u_qual = USER_QUALITIES.get(user_id, "high")
-                video_bytes, source = media_engine.generate_video(
-                    visual_prompt=visual_prompt,
-                    negative_prompt=neg_p,
-                    aspect_ratio=u_ar,
-                    quality=u_qual,
-                    duration=3.0,
-                    fps=24,
-                    base_image_bytes=base_image_bytes
-                )
+            u_ar = USER_RATIOS.get(user_id, "3:4")
+            u_qual = USER_QUALITIES.get(user_id, "high")
+            video_bytes, source = media_engine.generate_video(
+                visual_prompt=visual_prompt,
+                negative_prompt=neg_p,
+                aspect_ratio=u_ar,
+                quality=u_qual,
+                duration=3.0,
+                fps=24,
+                base_image_bytes=base_image_bytes
+            )
 
             if not video_bytes:
                 err_detail = getattr(media_engine, "last_error", None) or "ComfyUI / render video tidak memberikan respon."
@@ -5264,7 +5315,11 @@ def process_video_request(
 
         except Exception as e:
             logger.error(f"Error in video delivery: {e}", exc_info=True)
-            safe_send_message(chat_id, f"⚠️ Gagal mengirim video: `{e}`")
+            if chat_id is not None:
+                safe_send_message(chat_id, f"⚠️ Gagal mengirim video: `{e}`")
+        finally:
+            if video_action_loop is not None:
+                video_action_loop.__exit__(None, None, None)
 
     threading.Thread(target=_execute, daemon=True).start()
 
@@ -5277,8 +5332,8 @@ def handle_incoming_photo(message):
 
     def _vision_task():
         persona = persona_mgr.get_active_persona()
-        idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
         with ChatActionLoop(bot, message.chat.id, "typing"):
+            idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id)
             try:
                 file_info = bot.get_file(message.photo[-1].file_id)
                 downloaded = bot.download_file(file_info.file_path)
@@ -5829,7 +5884,8 @@ def handle_play_command(message):
     bot.send_chat_action(message.chat.id, "typing")
     wait_msg = bot.reply_to(message, f"🎵 *Mencari & memutar '{query}' di PC kamu...*", parse_mode="Markdown")
 
-    res = call_music_api("/api/play", method="POST", payload={"query": query})
+    with ChatActionLoop(bot, message.chat.id, "typing"):
+        res = call_music_api("/api/play", method="POST", payload={"query": query})
     if res and res.get("track"):
         track = res["track"]
         title = track.get("title", query)
@@ -5918,7 +5974,8 @@ def handle_queue_command(message):
     bot.send_chat_action(message.chat.id, "typing")
     wait_msg = bot.reply_to(message, f"➕ *Mencari & menambahkan '{query}' ke antrean...*", parse_mode="Markdown")
 
-    res = call_music_api("/api/play", method="POST", payload={"query": query, "enqueue": True})
+    with ChatActionLoop(bot, message.chat.id, "typing"):
+        res = call_music_api("/api/play", method="POST", payload={"query": query, "enqueue": True})
     try:
         bot.delete_message(message.chat.id, wait_msg.message_id)
     except Exception:
@@ -5962,7 +6019,8 @@ def handle_playlist_command(message):
     bot.send_chat_action(message.chat.id, "typing")
     wait_msg = bot.reply_to(message, f"📻 *Mencari & memuat playlist '{query}' di PC kamu...*", parse_mode="Markdown")
 
-    res = call_music_api("/api/playlist", method="POST", payload={"query": query})
+    with ChatActionLoop(bot, message.chat.id, "typing"):
+        res = call_music_api("/api/playlist", method="POST", payload={"query": query})
     try:
         bot.delete_message(message.chat.id, wait_msg.message_id)
     except Exception:
@@ -6235,13 +6293,13 @@ def handle_screen_command(message):
     if not is_authorized(message.from_user.id):
         return
     cu = get_computer_use_engine()
-    bot.send_chat_action(message.chat.id, "upload_photo")
-    ok, path = cu.take_screenshot()
-    if ok and os.path.exists(path):
-        with open(path, "rb") as f:
-            bot.send_photo(message.chat.id, f, caption="📸 **Tangkapan Layar Desktop PC** 🖥️\n_Dihasilkan via agent-desktop_", reply_to_message_id=message.message_id, parse_mode="Markdown")
-    else:
-        bot.reply_to(message, f"⚠️ Gagal mengambil tangkapan layar: {path}")
+    with ChatActionLoop(bot, message.chat.id, "upload_photo"):
+        ok, path = cu.take_screenshot()
+        if ok and os.path.exists(path):
+            with open(path, "rb") as f:
+                bot.send_photo(message.chat.id, f, caption="📸 **Tangkapan Layar Desktop PC** 🖥️\n_Dihasilkan via agent-desktop_", reply_to_message_id=message.message_id, parse_mode="Markdown")
+        else:
+            bot.reply_to(message, f"⚠️ Gagal mengambil tangkapan layar: {path}")
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("select_proj:"))
@@ -6455,17 +6513,7 @@ def process_coding_request(message, user_text: str, is_voice: bool = False):
         f"📂 _Workspace_: `{active_path}`"
     )
 
-    stop_typing = False
-    def _typing_loop():
-        while not stop_typing:
-            try:
-                bot.send_chat_action(chat_id, "typing")
-            except Exception:
-                pass
-            time.sleep(4)
-    threading.Thread(target=_typing_loop, daemon=True).start()
-
-    try:
+    with ChatActionLoop(bot, chat_id, "typing"):
         response_text, voice_text = coding_engine.execute_coding_task(
             user_id=user_id,
             prompt=user_text,
@@ -6473,8 +6521,6 @@ def process_coding_request(message, user_text: str, is_voice: bool = False):
             voice_enabled=is_voice,
             timeout=1800
         )
-    finally:
-        stop_typing = True
 
     try:
         bot.delete_message(chat_id, status_msg.message_id)
@@ -6511,14 +6557,14 @@ def process_computer_request(message, user_text: str):
     p_info = persona_mgr.get_active_persona()
     p_name = p_info.get("name", "Waifu")
 
-    bot.send_chat_action(chat_id, "upload_photo")
     status_msg = bot.reply_to(message, f"🖥️ **{p_name}**: Sedang memeriksa layar dan menjalankan perintah desktop... 🖱️✨")
 
-    try:
-        reply_msg, screenshot_path = coding_engine.execute_computer_task(user_text, user_id)
-    except Exception as e:
-        reply_msg = f"⚠️ Kendala computer use: {e}"
-        screenshot_path = None
+    with ChatActionLoop(bot, chat_id, "upload_photo"):
+        try:
+            reply_msg, screenshot_path = coding_engine.execute_computer_task(user_text, user_id)
+        except Exception as e:
+            reply_msg = f"⚠️ Kendala computer use: {e}"
+            screenshot_path = None
 
     try:
         bot.delete_message(chat_id, status_msg.message_id)
@@ -6875,14 +6921,16 @@ class ChatQueueManager:
     - Enforces sequential turn processing so chat history is guaranteed to be updated
       before the next user turn executes.
     """
-    def __init__(self, debounce_window: float = 1.2, max_debounce_window: float = 2.5):
+    def __init__(self, debounce_window: float = 1.2, max_debounce_window: float = 2.5, action_bot: Any = None):
         self.debounce_window = debounce_window
         self.max_debounce_window = max_debounce_window
+        self.action_bot = action_bot
         self.locks: Dict[int, threading.Lock] = {}
         self.buffers: Dict[int, List[Tuple[Any, str, bool]]] = {}  # user_id -> [(message, text, is_voice)]
         self.timers: Dict[int, threading.Timer] = {}
         self.first_message_time: Dict[int, float] = {}
         self.is_processing: Dict[int, bool] = {}
+        self.wait_loops: Dict[int, ChatActionLoop] = {}
         self._global_lock = threading.Lock()
 
     def _get_user_lock(self, user_id: int) -> threading.Lock:
@@ -6891,14 +6939,29 @@ class ChatQueueManager:
                 self.locks[user_id] = threading.Lock()
             return self.locks[user_id]
 
+    def _start_wait_typing(self, user_id: int, chat_id: Optional[int]) -> None:
+        if not self.action_bot or chat_id is None:
+            return
+        if user_id not in self.wait_loops:
+            loop = ChatActionLoop(self.action_bot, chat_id, "typing")
+            loop.__enter__()
+            self.wait_loops[user_id] = loop
+
+    def _stop_wait_typing(self, user_id: int) -> None:
+        loop = self.wait_loops.pop(user_id, None)
+        if loop is not None:
+            loop.__exit__(None, None, None)
+
     def enqueue(self, message: Any, user_text: str, is_voice: bool = False, execute_fn: Optional[Callable] = None):
         user_id = getattr(getattr(message, "from_user", None), "id", 0) or 0
+        chat_id = getattr(getattr(message, "chat", None), "id", None)
         now = time.time()
 
         with self._get_user_lock(user_id):
             if user_id not in self.buffers:
                 self.buffers[user_id] = []
             self.buffers[user_id].append((message, user_text, is_voice))
+            self._start_wait_typing(user_id, chat_id)
 
             if user_id not in self.first_message_time:
                 self.first_message_time[user_id] = now
@@ -6946,6 +7009,7 @@ class ChatQueueManager:
             items = list(self.buffers[user_id])
             self.buffers[user_id] = []
             self.is_processing[user_id] = True
+            self._stop_wait_typing(user_id)
 
         def _worker():
             try:
@@ -6969,6 +7033,8 @@ class ChatQueueManager:
                 with self._get_user_lock(user_id):
                     self.is_processing[user_id] = False
                     has_more = bool(self.buffers.get(user_id))
+                    if not has_more:
+                        self._stop_wait_typing(user_id)
 
                 if has_more:
                     self._dispatch_user_turn(user_id, execute_fn)
@@ -6976,7 +7042,7 @@ class ChatQueueManager:
         threading.Thread(target=_worker, daemon=True).start()
 
 
-chat_queue_mgr = ChatQueueManager(debounce_window=1.2, max_debounce_window=2.5)
+chat_queue_mgr = ChatQueueManager(debounce_window=1.2, max_debounce_window=2.5, action_bot=bot)
 
 
 _CODING_USER_LOCKS: Dict[int, threading.Lock] = {}
@@ -7369,12 +7435,12 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     "1. ANTI-MEMBEO: DILARANG hanya mengulang kata/pesan lawan bicaramu; tanggapi maksudnya dengan wajar dan hangat.\n"
                     "2. NGOBROL SANTAI & RINGKAS (WAJIB): Balas layaknya chat WhatsApp/Telegram biasa — cukup 1-2 kalimat pendek (10-30 kata total). DILARANG menulis paragraf panjang, esai, daftar poin, atau banyak kalimat sekaligus!\n"
                     f"3. FORMAT SINGKAT:\n"
-                    f"   - Awali 1 frasa gesture singkat (<10 kata) di dalam *...*, contoh: *{p_name} tersenyum tipis menatapmu*\n"
+                    f"   - Awali 1 frasa gesture singkat (<10 kata) di dalam *...*, contoh: *tersenyum tipis menatapmu* atau *Bibirnya sedikit melengkung menatapmu*\n"
                     f"   - Baris baru ganda, lalu tulis 1-2 kalimat dialog pendek saja.\n"
                     f"{rule_4}"
                     "5. FOTO SPONTAN: Hanya sertakan tag [ACTION: SEND_PAP] di akhir balasan JIKA momen/cerita visualnya memang cocok untuk mengirim foto spontan (latar lokasi baru, pamer outfit, atau momen mesra). DILARANG bersikap defensif.\n"
                     "6. BAHASA: Balas dengan bahasa yang sama persis dengan lawan bicaramu (Indonesia atau Inggris) tanpa menuliskan proses berpikir atau monolog batin.\n"
-                    f"7. SUDUT PANDANG: Dalam dialog ucapkan sebagai 'aku' dan 'kamu' (jangan pakai 'ia berkata:'). Dalam aksi *...* pakai *{p_name} ...*."
+                    f"7. SUDUT PANDANG: Dalam dialog ucapkan sebagai 'aku' dan 'kamu' (jangan pakai 'ia berkata:'). Dalam aksi *...*, tulis deskripsi alami tanpa mengulang-ulang nama {p_name} di depan kalimat yang sudah punya subjek (misalnya hindari *{p_name} Bibir {p_name}...*)."
                 )
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
                 if mem_context:
