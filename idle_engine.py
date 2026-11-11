@@ -80,10 +80,66 @@ class IdleEngine:
         self.is_voicestudio_sleeping = not is_port_listening(3900)
         self.is_agy_sleeping = False if self.is_agy_active_provider() else (not is_port_listening(8001))
 
-        self.wake_lock = threading.Lock()
+        self.wake_lock = threading.RLock()
         self.state_lock = threading.Lock()
         self._running = False
         self._thread: Optional[threading.Thread] = None
+
+    def _should_exclusive_vram_swap(self) -> bool:
+        """Returns True if GPU VRAM is constrained (<= 6.5 GB) so KoboldCPP and ComfyUI should swap cleanly instead of coexisting."""
+        mode = os.environ.get("VRAM_EXCLUSIVE_SWAP", "auto").strip().lower()
+        if mode in ("0", "false", "no", "off"):
+            return False
+        if mode in ("1", "true", "yes", "on"):
+            return True
+        try:
+            import asset_manager
+            hw = asset_manager.detect_hardware_profile()
+            vram_mb = int(hw.get("vram_mb", 0) or 0)
+            return 0 < vram_mb <= 6656
+        except Exception:
+            return False
+
+    def _resolve_llm_target(self, is_nsfw: bool = False):
+        """Resolves active (provider, base_url, is_split) respecting AI_ENGINE_MODE=unified vs split."""
+        split_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip() in ("split", "hybrid")
+        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
+        sfw_url = os.environ.get("SFW_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", ""))
+        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local").lower().strip()
+        nsfw_url = os.environ.get("NSFW_LLM_BASE_URL", "http://127.0.0.1:5001/v1")
+
+        if split_mode:
+            target_provider = nsfw_p if is_nsfw else sfw_p
+            target_url = nsfw_url if is_nsfw else sfw_url
+        else:
+            target_url = os.environ.get("LLM_BASE_URL") or sfw_url
+            target_provider = "local" if ":5001" in target_url else sfw_p
+
+        return target_provider, target_url, split_mode
+
+    def _targets_local_kobold(self, is_nsfw: bool = False) -> bool:
+        """Returns True if the current chat request routes to local KoboldCPP (port 5001) rather than Cloud/AGY."""
+        target_provider, target_url, split_mode = self._resolve_llm_target(is_nsfw=is_nsfw)
+
+        if target_provider == "agy" or ":8001" in target_url.lower():
+            return False
+        if split_mode and not is_nsfw and target_provider not in ("", "local", "kobold", "ollama", "lm-studio", "locally-uncensored"):
+            return False
+        if target_url and not any(p in target_url for p in ["127.0.0.1", "localhost"]):
+            return False
+        return True
+
+    def _prepare_vram_for_comfyui(self) -> None:
+        """Frees KoboldCPP VRAM before starting or running ComfyUI on <= 6.5 GB GPUs."""
+        if self._should_exclusive_vram_swap() and is_port_listening(5001):
+            logger.info("🔄 VRAM Swap (GPU <= 6.5GB): Menidurkan KoboldCPP sementara sebelum memakai ComfyUI agar bebas OOM...")
+            self.sleep_llm()
+
+    def _prepare_vram_for_llm(self) -> None:
+        """Frees ComfyUI VRAM before starting or running local KoboldCPP on <= 6.5 GB GPUs."""
+        if self._should_exclusive_vram_swap() and is_port_listening(8188):
+            logger.info("🔄 VRAM Swap (GPU <= 6.5GB): Menidurkan ComfyUI sementara sebelum memakai KoboldCPP agar bebas OOM...")
+            self.sleep_comfyui()
 
     def is_agy_active_provider(self) -> bool:
         """Determines if AGY CLI is configured as active provider for LLM or Image generation."""
@@ -140,14 +196,7 @@ class IdleEngine:
 
     def is_llm_ready(self, is_nsfw: bool = False) -> bool:
         """Checks if active LLM service is online and listening."""
-        split_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip() in ("split", "hybrid")
-        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
-        sfw_url = os.environ.get("SFW_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", ""))
-        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local").lower().strip()
-        nsfw_url = os.environ.get("NSFW_LLM_BASE_URL", "http://127.0.0.1:5001/v1")
-
-        target_provider = nsfw_p if (split_mode and is_nsfw) else sfw_p
-        target_url = nsfw_url if (split_mode and is_nsfw) else sfw_url
+        target_provider, target_url, _ = self._resolve_llm_target(is_nsfw=is_nsfw)
 
         # AGY OpenAI Bridge (Port 8001)
         if target_provider == "agy" or ":8001" in target_url:
@@ -309,6 +358,7 @@ class IdleEngine:
                 return True
 
             logger.info("💤 Smart Idle: Terminating KoboldCPP LLM to free VRAM & RAM...")
+            self.is_llm_sleeping = True
             try:
                 if self.health_engine and hasattr(self.health_engine, "kill_all_koboldcpp"):
                     self.health_engine.kill_all_koboldcpp()
@@ -332,6 +382,7 @@ class IdleEngine:
                 return True
 
             logger.info("💤 Smart Idle: Terminating ComfyUI generator to free VRAM...")
+            self.is_comfyui_sleeping = True
             try:
                 if sys.platform == "win32":
                     ps_comfy = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*main.py*" -and $_.CommandLine -like "*8188*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
@@ -425,14 +476,7 @@ class IdleEngine:
         """
         Wakes active LLM on-demand (AGY Bridge or KoboldCPP).
         """
-        split_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower().strip() in ("split", "hybrid")
-        sfw_p = os.environ.get("SFW_LLM_PROVIDER", "").lower().strip()
-        sfw_url = os.environ.get("SFW_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", ""))
-        nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local").lower().strip()
-        nsfw_url = os.environ.get("NSFW_LLM_BASE_URL", "http://127.0.0.1:5001/v1")
-
-        target_provider = nsfw_p if (split_mode and is_nsfw) else sfw_p
-        target_url = nsfw_url if (split_mode and is_nsfw) else sfw_url
+        target_provider, target_url, _ = self._resolve_llm_target(is_nsfw=is_nsfw)
 
         if target_provider == "agy" or ":8001" in target_url:
             ok = self.wake_agy_bridge(timeout_seconds=min(timeout_seconds, 20))
@@ -448,6 +492,7 @@ class IdleEngine:
             return True
 
         with self.wake_lock:
+            self._prepare_vram_for_llm()
             if self.is_llm_ready(is_nsfw=is_nsfw):
                 self.is_llm_sleeping = False
                 self.record_activity()
@@ -505,6 +550,7 @@ class IdleEngine:
         Wakes ComfyUI generator on-demand when a photo/video is requested.
         """
         with self.wake_lock:
+            self._prepare_vram_for_comfyui()
             if self.is_comfyui_ready():
                 self.is_comfyui_sleeping = False
                 self.record_activity(is_media=True)
@@ -565,6 +611,9 @@ class IdleEngine:
             # Cloud SFW engine handles the request, KoboldCPP stays comfortably asleep
             self.record_activity()
             return True
+
+        if self._targets_local_kobold(is_nsfw=is_nsfw):
+            self._prepare_vram_for_llm()
 
         if self.is_llm_ready(is_nsfw=is_nsfw):
             self.is_llm_sleeping = False
@@ -676,12 +725,17 @@ class IdleEngine:
         Ensures ComfyUI is active before generating photos/videos on-demand.
         If user configured AGY or Cloud as active image engine, ComfyUI is bypassed.
         """
-        if not self.enabled or not self.comfyui_on_demand:
+        if not self.enabled:
             return True
 
         # Check if active visual engine actually uses ComfyUI
         sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
         if not is_nude and sfw_img in ("agy", "cloud"):
+            return True
+
+        self._prepare_vram_for_comfyui()
+
+        if not self.comfyui_on_demand and not self.is_comfyui_sleeping:
             return True
 
         if self.is_comfyui_ready():

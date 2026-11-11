@@ -349,13 +349,22 @@ class HealthEngine:
 
         if not spawn_succeeded and os.path.isfile(kcpp_exe) and model_path:
             mm_args = ["--mmproj", mmproj_path] if mmproj_path else []
+            gpu_layers = os.environ.get("LLM_GPU_LAYERS")
+            if not gpu_layers:
+                try:
+                    import asset_manager
+                    gpu_layers = str(asset_manager.detect_hardware_profile().get("recommended_llm_layers", 24))
+                except Exception:
+                    gpu_layers = "24"
+            ctx_size = os.environ.get("LLM_CONTEXT_SIZE", "4096")
+            threads = os.environ.get("LLM_THREADS", "4")
             cmd = [
                 kcpp_exe, "--model", model_path,
                 "--port", "5001",
-                "--gpulayers", "99",
-                "--contextsize", "4096",
+                "--gpulayers", str(gpu_layers),
+                "--contextsize", str(ctx_size),
                 "--smartcontext",
-                "--threads", "4"
+                "--threads", str(threads)
             ] + mm_args
             if sys.platform == "win32":
                 cmd += ["--usecublas", "normal", "--quiet"]

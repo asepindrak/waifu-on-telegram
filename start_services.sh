@@ -40,8 +40,12 @@ if [ -f "$SCRIPT_DIR/tools/koboldcpp" ]; then
 
     if [ -n "$MODEL_PATH" ]; then
         if ! nc -z 127.0.0.1 5001 2>/dev/null && ! (echo >/dev/tcp/127.0.0.1/5001) 2>/dev/null; then
-            echo "Starting KoboldCPP LLM Engine with model: $MODEL_PATH ${MMPROJ_ARG:+(Vision enabled)}..."
-            nohup "$SCRIPT_DIR/tools/koboldcpp" --model "$MODEL_PATH" $MMPROJ_ARG --gpulayers 99 --port 5001 --quiet >/dev/null 2>&1 &
+            GPU_LAYERS=$($PY -c "import os, asset_manager; from dotenv import load_dotenv; load_dotenv(); hw = asset_manager.detect_hardware_profile(); print(os.environ.get('LLM_GPU_LAYERS') or hw.get('recommended_llm_layers', 24))" 2>/dev/null)
+            [ -z "$GPU_LAYERS" ] && GPU_LAYERS=24
+            CTX_SIZE=$($PY -c "import os; from dotenv import load_dotenv; load_dotenv(); print(os.environ.get('LLM_CONTEXT_SIZE', '4096'))" 2>/dev/null)
+            [ -z "$CTX_SIZE" ] && CTX_SIZE=4096
+            echo "Starting KoboldCPP LLM Engine with model: $MODEL_PATH ($GPU_LAYERS GPU layers, ctx $CTX_SIZE) ${MMPROJ_ARG:+(Vision enabled)}..."
+            nohup "$SCRIPT_DIR/tools/koboldcpp" --model "$MODEL_PATH" $MMPROJ_ARG --gpulayers "$GPU_LAYERS" --contextsize "$CTX_SIZE" --smartcontext --port 5001 --quiet >/dev/null 2>&1 &
             sleep 3
         fi
     fi

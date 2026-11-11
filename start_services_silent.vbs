@@ -85,7 +85,13 @@ If smartIdleDisabled And FSO.FileExists(ScriptDir & "\tools\koboldcpp.exe") Then
             Dim portCheck
             portCheck = WshShell.Run("powershell -NoProfile -Command ""$t = New-Object System.Net.Sockets.TcpClient; try { $t.Connect('127.0.0.1', 5001); $t.Close(); exit 0 } catch { exit 1 }""", 0, True)
             If portCheck <> 0 Then
-                WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && tools\koboldcpp.exe --model """ & modelFile & """" & mmprojArg & " --gpulayers 99 --port 5001 --contextsize 4096 --smartcontext --threads 4 --usecublas normal --quiet", 0, False
+                Dim gpuLayers, probeExit
+                gpuLayers = "24"
+                probeExit = WshShell.Run("cmd /c cd /d """ & ScriptDir & """ && """ & pyCmd & """ -c ""import os, asset_manager; from dotenv import load_dotenv; load_dotenv(); hw = asset_manager.detect_hardware_profile(); val = int(os.environ.get('LLM_GPU_LAYERS') or hw.get('recommended_llm_layers', 24)); exit(100 + max(0, min(99, val)))""", 0, True)
+                If probeExit >= 100 And probeExit <= 199 Then
+                    gpuLayers = CStr(probeExit - 100)
+                End If
+                WshShell.Run "cmd /c cd /d """ & ScriptDir & """ && tools\koboldcpp.exe --model """ & modelFile & """" & mmprojArg & " --gpulayers " & gpuLayers & " --port 5001 --contextsize 4096 --smartcontext --threads 4 --usecublas normal --quiet", 0, False
                 WScript.Sleep 4000
             End If
         End If

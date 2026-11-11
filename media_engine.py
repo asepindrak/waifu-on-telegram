@@ -594,8 +594,27 @@ class MediaEngine:
         except Exception as e:
             logger.error(f"ComfyUI generation error: {e}")
             self.last_error = f"Error komunikasi ComfyUI: {e}"
+        finally:
+            self._free_comfyui_vram()
 
         return None
+
+    def _free_comfyui_vram(self, unload_models: bool = True, free_memory: bool = True) -> bool:
+        """Requests ComfyUI to unload cached model weights from VRAM/RAM after rendering."""
+        if not self.comfyui_url:
+            return False
+        enabled = os.environ.get("COMFYUI_FREE_VRAM_AFTER_GEN", "true").strip().lower() in ("1", "true", "yes", "on")
+        if not enabled:
+            return False
+        try:
+            r = requests.post(
+                f"{self.comfyui_url}/free",
+                json={"unload_models": bool(unload_models), "free_memory": bool(free_memory)},
+                timeout=3
+            )
+            return r.status_code == 200
+        except Exception:
+            return False
 
     def generate_image_cloud_fallback(
         self,
@@ -1306,5 +1325,7 @@ class MediaEngine:
         except Exception as e:
             logger.error(f"ComfyUI video workflow exception: {e}")
             self.last_error = f"Error rendering video ComfyUI: {e}"
+        finally:
+            self._free_comfyui_vram()
 
         return None

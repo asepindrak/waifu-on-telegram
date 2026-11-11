@@ -345,6 +345,7 @@ def detect_hardware_profile(refresh: bool = False) -> Dict[str, Any]:
             pass
 
     vram_gb = round(vram_mb / 1024.0, 1) if vram_mb > 0 else 0.0
+    rec_comfy_vram = "lowvram" if (0 < vram_mb <= 6656) else "normal"
 
     # Classification logic
     if vram_mb >= 7800:
@@ -390,6 +391,7 @@ def detect_hardware_profile(refresh: bool = False) -> Dict[str, Any]:
         "recommended_image_file": rec_image_file,
         "recommended_video_engine": rec_video,
         "recommended_llm_layers": rec_layers,
+        "recommended_comfyui_vram_mode": rec_comfy_vram,
         "recommendation_text": recommendation_text,
         "source": source
     }
@@ -676,13 +678,30 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
             _COMFYUI_FORCE_CPU = False
         return _COMFYUI_FORCE_CPU
 
+    def _get_comfyui_vram_args(use_cpu: bool) -> List[str]:
+        if use_cpu:
+            return ["--cpu"]
+        vram_mode = os.environ.get("COMFYUI_VRAM_MODE", "auto").strip().lower()
+        if vram_mode in ("lowvram", "medvram", "novram", "normalvram"):
+            return [f"--{vram_mode}"]
+        if vram_mode in ("highvram", "gpu-only", "none", "off"):
+            return []
+        try:
+            hw = detect_hardware_profile()
+            vram_mb = int(hw.get("vram_mb", 0) or 0)
+            if 0 < vram_mb <= 6656:
+                return ["--lowvram"]
+        except Exception:
+            pass
+        return []
+
     # 1. Check for ComfyUI Windows Portable embedded python
     for base in [cdir, os.path.dirname(cdir), os.path.dirname(os.path.dirname(cdir))]:
         for py_dir in ["python_embeded", "python_embedded", "python"]:
             py_embed = os.path.join(base, py_dir, "python.exe")
             if os.path.isfile(py_embed):
                 check_and_repair_comfyui_environment(py_embed)
-                extra_args = ["--cpu"] if _should_use_cpu(py_embed) else []
+                extra_args = _get_comfyui_vram_args(_should_use_cpu(py_embed))
                 return {
                     "cwd": cdir,
                     "cmd": [py_embed, "-s", main_py, "--windows-standalone-build", "--port", "8188", "--listen", "127.0.0.1", "--disable-auto-launch", "--fast"] + extra_args
@@ -694,14 +713,14 @@ def get_comfyui_launch_spec() -> Optional[Dict[str, Any]]:
             v_py = os.path.join(base, venv_dir, "Scripts", "python.exe") if platform.system() == "Windows" else os.path.join(base, venv_dir, "bin", "python")
             if os.path.isfile(v_py):
                 check_and_repair_comfyui_environment(v_py)
-                extra_args = ["--cpu"] if _should_use_cpu(v_py) else []
+                extra_args = _get_comfyui_vram_args(_should_use_cpu(v_py))
                 return {
                     "cwd": cdir,
                     "cmd": [v_py, main_py, "--port", "8188", "--listen", "127.0.0.1", "--disable-auto-launch", "--fast"] + extra_args
                 }
 
     # 3. Fallback to system python
-    extra_args = ["--cpu"] if _should_use_cpu(sys.executable) else []
+    extra_args = _get_comfyui_vram_args(_should_use_cpu(sys.executable))
     return {
         "cwd": cdir,
         "cmd": [sys.executable, main_py, "--port", "8188", "--listen", "127.0.0.1", "--disable-auto-launch", "--fast"] + extra_args

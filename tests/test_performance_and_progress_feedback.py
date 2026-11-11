@@ -46,7 +46,9 @@ class TestPerformanceAndProgressFeedback(unittest.TestCase):
                 self.assertIsNotNone(img)
 
                 # Verify workflow posted does NOT contain VAELoader for SD 1.5 VAE
-                posted_json = mock_post.call_args[1]["json"]
+                prompt_calls = [c for c in mock_post.call_args_list if "/prompt" in c[0][0]]
+                self.assertTrue(prompt_calls)
+                posted_json = prompt_calls[0][1]["json"]
                 workflow = posted_json["prompt"]
                 self.assertNotIn("10", workflow)
                 self.assertEqual(workflow["8"]["inputs"]["vae"], ["4", 2])

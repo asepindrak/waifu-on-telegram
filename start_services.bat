@@ -56,12 +56,18 @@ if "%KOBOLD_STANDBY%"=="1" (
             ) else (
                 powershell -NoProfile -Command "$tcp = New-Object System.Net.Sockets.TcpClient; try { $tcp.Connect('127.0.0.1', 5001); $tcp.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
                 if errorlevel 1 (
-                    if defined KOBOLD_MMPROJ (
-                        echo [1/4] Starting KoboldCPP LLM Server with auto-loaded model and Vision mmproj...
-                    ) else (
-                        echo [1/4] Starting KoboldCPP LLM Server with auto-loaded model...
+                    set "KOBOLD_GPU_LAYERS=24"
+                    set "KOBOLD_CTX_SIZE=4096"
+                    for /f "tokens=1,2" %%A in ('python -c "import os, asset_manager; from dotenv import load_dotenv; load_dotenv(); hw = asset_manager.detect_hardware_profile(); print(os.environ.get('LLM_GPU_LAYERS') or hw.get('recommended_llm_layers', 24), os.environ.get('LLM_CONTEXT_SIZE', '4096'))" 2^>nul') do (
+                        set "KOBOLD_GPU_LAYERS=%%A"
+                        set "KOBOLD_CTX_SIZE=%%B"
                     )
-                    start "KoboldCPP Brain" /b "%KOBOLD_EXE%" --model "%KOBOLD_MODEL%" %MMPROJ_ARG% --gpulayers 99 --port 5001 --contextsize 4096 --smartcontext --threads 4 --usecublas normal --quiet
+                    if defined KOBOLD_MMPROJ (
+                        echo [1/4] Starting KoboldCPP LLM Server with auto-loaded model and Vision mmproj ^(%KOBOLD_GPU_LAYERS% GPU layers^)...
+                    ) else (
+                        echo [1/4] Starting KoboldCPP LLM Server with auto-loaded model ^(%KOBOLD_GPU_LAYERS% GPU layers^)...
+                    )
+                    start "KoboldCPP Brain" /b "%KOBOLD_EXE%" --model "%KOBOLD_MODEL%" %MMPROJ_ARG% --gpulayers %KOBOLD_GPU_LAYERS% --port 5001 --contextsize %KOBOLD_CTX_SIZE% --smartcontext --threads 4 --usecublas normal --quiet
                     timeout /t 3 >nul
                 ) else (
                     echo [1/4] KoboldCPP LLM is already running on port 5001.
