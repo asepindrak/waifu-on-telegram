@@ -30,7 +30,7 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from lu_llm_client import LocallyUncensoredClient
+from lu_llm_client import LocallyUncensoredClient, is_long_form_request, enforce_concise_chat_reply
 from routing_engine import get_hybrid_llm_client, detect_nsfw_intent, is_ai_refusal
 from persona_manager import PersonaManager
 from memory_engine import MemoryEngine
@@ -305,20 +305,34 @@ class WaifuCLISession:
 
             loader.set_status("Menulis pesan manis untuk fotonya...", emoji="💌")
             # Caption
+            recent_hist = [m for m in self.persona_mgr.get_chat_history(self.user_id)[-6:] if not m.get("content", "").startswith("[")]
             cap_prompt = [
                 {
                     "role": "system",
-                    "content": f"{persona.get('system_instruction', '')}\nWrite 1 natural, warm, and playful chat caption accompanying the photo you just sent. Under 2 sentences in casual Indonesian."
+                    "content": (
+                        f"{persona.get('system_instruction', '')}\n"
+                        f"Write 1 short natural chat caption sentence matching the exact Outfit ('{outfit_label}') and Setting ('{detected_scene}'). "
+                        f"Never invent a different outfit or location. Casual Indonesian."
+                    )
                 },
+                *recent_hist,
                 {
                     "role": "user",
-                    "content": f"User asked: '{user_text}'. Give a cute caption for the photo."
+                    "content": f"User asked: '{user_text}'. Give a short 1-sentence caption matching Outfit '{outfit_label}' and Setting '{detected_scene}'."
                 }
             ]
-            caption, _ = self.llm_client.chat(cap_prompt, max_tokens=60, is_nsfw=is_nude)
-            caption = caption.strip('"\n ') if caption else None
+            outfit_low = (outfit_label or "").lower()
+            is_nsfw_cap = bool(is_nude or any(k in outfit_low for k in ("lingerie", "pakaian dalam", "bh", "celana dalam", "bikini", "handuk", "topless", "tanpa busana")))
+            caption, _ = self.llm_client.chat(cap_prompt, max_tokens=100, is_nsfw=is_nsfw_cap)
+            if caption:
+                caption = enforce_concise_chat_reply(caption.strip('"\n '), max_sentences=2, max_chars=220)
             if is_ai_refusal(caption) or not caption:
-                caption = "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕" if is_nude else "Ini foto buat kamu, gimana menurutmu? 💕"
+                if "lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low:
+                    caption = "Ini fotoku lagi pakai set pakaian dalam aja... jangan diliatin terus dong~ 😳💕"
+                elif "pajama" in outfit_low or "piyama" in outfit_low:
+                    caption = "Nih fotoku lagi pakai piyama santai nih~ 🌙💕"
+                else:
+                    caption = "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕" if is_nude else "Ini foto buat kamu, gimana menurutmu? 💕"
 
         print(f"✨ {c(GREEN, 'Foto berhasil dibuat & dibuka:')} {c(BOLD, save_path)}")
         print(f"🌸 {c(BOLD + MAGENTA, p_name)}: {caption}\n")
@@ -529,25 +543,44 @@ class WaifuCLISession:
             "4. GAYA CHAT: Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar.\n"
         )
 
+        long_form_req = is_long_form_request(user_text)
+
         system_inst += (
             f"{status_block}\n"
-            "[PEDOMAN KOMUNIKASI - WAJIB DIPATUHI]\n"
+            "[PEDOMAN KOMUNIKASI - WAJIB SINGKAT SEPERTI CHAT BIASA]\n"
             f"{calling_guideline}\n"
-            "1. ANTI-MEMBEO (SANGAT PENTING): DILARANG KERAS hanya mengulang kata, mengulang frasa, atau menyalin ulang pesan lawan bicaramu!\n"
-            "2. RESPONSIF & AKTIF: Berikan tanggapan aktif dan bermakna: ceritakan opinimu, komentar santai, atau tanyakan detail kelanjutannya.\n"
-            f"3. FORMAT VISUAL NOVEL: Awali dengan 1 baris aksi panggung atau ekspresi fisik di dalam tanda bintang *...* menggunakan gaya narasi visual novel dengan namamu ({p_name}). Contoh: *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*. DILARANG menggunakan tanda minus/dash '- ... -' atau kata kaku 'kulihatmu'. Pisahkan dengan baris baru ganda sebelum dialog ucapan.\n"
+            "1. ANTI-MEMBEO: DILARANG hanya mengulang kata atau menyalin ulang pesan lawan bicaramu.\n"
+            "2. NGOBROL SANTAI & RINGKAS (WAJIB): Balas seperti chat sehari-hari — cukup 1-2 kalimat pendek (10-30 kata total). DILARANG menulis paragraf panjang atau esai!\n"
+            f"3. FORMAT SINGKAT: Awali 1 frasa gesture singkat (<10 kata) di dalam *...* memakai namamu ({p_name}), contoh: *{p_name} tersenyum tipis menatapmu*, lalu baris baru ganda sebelum 1-2 kalimat dialog pendek.\n"
             f"{rule_4}"
-            "5. INISIATIF PAP SPONTAN: Kamu boleh sesekali berinisiatif mengirim foto selfie / PAP untuk menunjukkan kegiatan atau outfitmu saat ini. Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu.\n"
-            "6. BAHASA PERCAKAPAN: Kamu WAJIB berbicara langsung dalam Bahasa Indonesia santai & akrab. DILARANG KERAS menuliskan proses berpikir atau monolog batin dalam bahasa Inggris."
+            "5. INISIATIF PAP SPONTAN: Jika momennya pas, tambahkan tag [ACTION: SEND_PAP] di akhir pesanmu.\n"
+            "6. BAHASA PERCAKAPAN: Berbicara langsung dalam Bahasa Indonesia santai & akrab tanpa monolog batin."
         )
+
+        if not long_form_req:
+            system_inst += (
+                f"\n\n[STRICT REPLY LENGTH RULE]\n"
+                f"Keep your response BRIEF like casual WhatsApp texting: 1 short *action* line + 1-2 short sentences (~15-35 words total)."
+            )
 
         mem_context = self.memory_engine.format_memory_context(self.user_id, query=user_text)
         if mem_context:
             system_inst += "\n" + mem_context
 
+        prompt_history = history if long_form_req else [
+            (
+                {"role": "assistant", "content": enforce_concise_chat_reply(h.get("content", ""), max_sentences=2, max_chars=240)}
+                if h.get("role") == "assistant" and h.get("content")
+                else h
+            )
+            for h in history
+        ]
+
         messages = [{"role": "system", "content": system_inst}]
-        messages.extend(history)
+        messages.extend(prompt_history)
         messages.append({"role": "user", "content": user_text})
+
+        chat_max_tokens = 450 if long_form_req else (150 if is_nsfw_turn else 120)
 
         load_emoji = "💋" if is_nsfw_turn else "💭"
         load_msg = f"{p_name} sedang merespon (Mode Intim)..." if is_nsfw_turn else f"{p_name} sedang memikirkan balasan..."
@@ -560,7 +593,7 @@ class WaifuCLISession:
 
             loader.set_status(f"{p_name} sedang mengetik...", emoji="💋" if is_nsfw_turn else "🌸")
             try:
-                raw_reply, _ = self.llm_client.chat(messages, max_tokens=400, is_nsfw=is_nsfw_turn)
+                raw_reply, _ = self.llm_client.chat(messages, max_tokens=chat_max_tokens, is_nsfw=is_nsfw_turn)
             except Exception as e:
                 loader.stop()
                 print(f"⚠️ {c(RED, f'Koneksi ke LLM lokal gagal: {e}')}\n")
@@ -570,15 +603,17 @@ class WaifuCLISession:
             try:
                 dyn_messages = [
                     {"role": "system", "content": system_inst},
-                    {"role": "user", "content": f"[Lawan bicaramu berkata: \"{user_text}\"]. Sebagai {p_name}, berikan respon spontan dan ekspresif dalam format Visual Novel."}
+                    {"role": "user", "content": f"[Lawan bicaramu berkata: \"{user_text}\"]. Sebagai {p_name}, berikan respon singkat (1 baris *...* + 1-2 kalimat santai)."}
                 ]
-                dyn_res, _ = self.llm_client.chat(dyn_messages, max_tokens=300, temperature=0.92)
+                dyn_res, _ = self.llm_client.chat(dyn_messages, max_tokens=(140 if is_nsfw_turn else 110), temperature=0.88)
                 raw_reply = dyn_res if (dyn_res and dyn_res.strip()) else f"*{p_name} tersenyum menatapmu*\n\nAku seneng nemenin kamu ngobrol, ceritain dong gimana kelanjutannya~"
             except Exception:
                 raw_reply = f"*{p_name} tersenyum menatapmu*\n\nAku seneng nemenin kamu ngobrol, ceritain dong gimana kelanjutannya~"
 
         # Post-process
         clean_reply = re.sub(r'\[ACTION:\s*SEND_PAP\]', '', raw_reply, flags=re.IGNORECASE).strip()
+        if not long_form_req:
+            clean_reply = enforce_concise_chat_reply(clean_reply, max_sentences=2, max_chars=(280 if is_nsfw_turn else 240))
         has_pap_action = "[action: send_pap]" in raw_reply.lower()
 
         # Print response

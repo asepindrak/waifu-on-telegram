@@ -519,13 +519,19 @@ class IdleEngine:
 
             logger.info("⚡ Smart Idle: Waking KoboldCPP LLM on-demand...")
 
-            # Use HealthEngine heal_llm if available
+            deadline = time.time() + max(5, int(timeout_seconds))
+
+            # Use HealthEngine heal_llm if available (share single overall timeout budget)
             started = False
             if self.health_engine and hasattr(self.health_engine, "heal_llm"):
+                rem_sec = max(5, int(deadline - time.time()))
                 try:
-                    started = self.health_engine.heal_llm(is_nsfw=is_nsfw)
+                    started = self.health_engine.heal_llm(is_nsfw=is_nsfw, wait_seconds=rem_sec)
                 except TypeError:
-                    started = self.health_engine.heal_llm()
+                    try:
+                        started = self.health_engine.heal_llm(is_nsfw=is_nsfw)
+                    except TypeError:
+                        started = self.health_engine.heal_llm()
             else:
                 # Direct launch fallback using asset_manager discovery
                 try:
@@ -562,8 +568,7 @@ class IdleEngine:
                 logger.warning("⚡ Smart Idle: Could not launch KoboldCPP (binary or model missing).")
                 return False
 
-            # Wait for port and readiness
-            deadline = time.time() + timeout_seconds
+            # Wait for port and readiness within remaining shared deadline
             while time.time() < deadline:
                 if self.is_llm_ready(is_nsfw=is_nsfw):
                     self.is_llm_sleeping = False
@@ -571,6 +576,11 @@ class IdleEngine:
                     logger.info("✓ Smart Idle: KoboldCPP successfully awakened and ready!")
                     return True
                 time.sleep(1)
+
+            if self.is_llm_ready(is_nsfw=is_nsfw):
+                self.is_llm_sleeping = False
+                self.record_activity()
+                return True
 
             logger.warning(f"⚡ Smart Idle: Timed out ({timeout_seconds}s) waiting for KoboldCPP readiness.")
             return False
@@ -664,6 +674,7 @@ class IdleEngine:
                     "🌸 *Waifu lagi bangun dari mode hemat daya...* (~5 detik) ✨",
                     parse_mode="Markdown"
                 )
+                bot.send_chat_action(chat_id, "typing")
             except Exception:
                 pass
 
@@ -688,10 +699,20 @@ class IdleEngine:
                     except Exception:
                         pass
 
+        sfw_p_chk, sfw_url_chk, _ = self._resolve_llm_target(is_nsfw=False)
+        sfw_is_alt_engine = (
+            split_mode
+            or sfw_p_chk == "agy"
+            or ":8001" in sfw_url_chk
+            or (sfw_p_chk not in ("", "local", "kobold", "koboldcpp", "ollama", "lm-studio", "locally-uncensored"))
+        )
+        has_live_fallback = bool(is_nsfw and sfw_is_alt_engine and self.is_llm_ready(is_nsfw=False))
+        wake_timeout = 30 if has_live_fallback else 55
+
         fb_thread = threading.Thread(target=_feedback_loop, daemon=True)
         fb_thread.start()
         try:
-            ok = self.wake_llm(timeout_seconds=75, is_nsfw=is_nsfw)
+            ok = self.wake_llm(timeout_seconds=wake_timeout, is_nsfw=is_nsfw)
         finally:
             stop_feedback.set()
             fb_thread.join(timeout=1.0)
@@ -700,13 +721,6 @@ class IdleEngine:
         # If NSFW KoboldCPP on port 5001 failed to wake, but SFW engine (AGY 8001 or Cloud) is ready,
         # proceed seamlessly via SFW fallback regardless of unified vs split mode!
         if not ok and is_nsfw:
-            sfw_p_chk, sfw_url_chk, _ = self._resolve_llm_target(is_nsfw=False)
-            sfw_is_alt_engine = (
-                split_mode
-                or sfw_p_chk == "agy"
-                or ":8001" in sfw_url_chk
-                or (sfw_p_chk not in ("", "local", "kobold", "koboldcpp", "ollama", "lm-studio", "locally-uncensored"))
-            )
             if sfw_is_alt_engine and self.is_llm_ready(is_nsfw=False):
                 logger.warning("⚡ Smart Idle: KoboldCPP (port 5001) could not be awakened, but SFW engine is ready. Seamlessly proceeding via SFW fallback.")
                 ok = True
@@ -801,6 +815,7 @@ class IdleEngine:
                     "📸 *Menyiapkan studio foto ComfyUI di PC...* (~5-15 detik) ✨",
                     parse_mode="Markdown"
                 )
+                bot.send_chat_action(chat_id, "upload_photo")
             except Exception:
                 pass
 

@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 import telebot
 from telebot import types
 
-from lu_llm_client import LocallyUncensoredClient
+from lu_llm_client import LocallyUncensoredClient, is_long_form_request, enforce_concise_chat_reply
 from routing_engine import get_hybrid_llm_client, detect_nsfw_intent, is_ai_refusal
 from persona_manager import PersonaManager, build_custom_persona
 from media_engine import MediaEngine
@@ -843,7 +843,7 @@ class ChatActionLoop:
                 self.bot.send_chat_action(self.chat_id, self.action)
             except Exception:
                 pass
-            for _ in range(35):
+            for _ in range(30):
                 if not self.running:
                     break
                 time.sleep(0.1)
@@ -3166,11 +3166,12 @@ def show_outfit_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] 
     markup.add(*btns)
     markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
 
+    active_p_name = persona_mgr.get_active_persona().get("name", "Waifu")
     if mode == "auto":
         status_line = (
-            f"• Mode: **🌟 Otomatis (Dinamis Sesuai Jadwal)**\n"
+            f"• Mode: **🌟 Otomatis (Dinamis Sesuai Jadwal & Chat)**\n"
             f"• Pakaian Saat Ini: **{details['dynamic_name']}**\n"
-            f"_(Akira otomatis berganti pakaian mengikuti jam dan kegiatannya: tidur = piyama, mandi = handuk, kuliah = baju kampus, santai = baju santai)_\n"
+            f"_({active_p_name} otomatis berganti pakaian mengikuti jam, kegiatan, dan topik chat: tidur = piyama, mandi = handuk, kuliah = baju kampus, santai = baju santai)_\n"
         )
     elif mode == "session":
         status_line = (
@@ -4687,6 +4688,7 @@ def process_photo_request(
     """Generates and delivers consistent girlfriend photo with caption matching conversation context."""
     def _execute():
         chat_id = None
+        photo_action_loop = None
         try:
             if isinstance(target, types.CallbackQuery):
                 chat_id = target.message.chat.id
@@ -4726,13 +4728,16 @@ def process_photo_request(
                 if not status_msg:
                     status_msg = safe_send_message(chat_id, status_text)
 
+            photo_action_loop = ChatActionLoop(bot, chat_id, "upload_photo")
+            photo_action_loop.__enter__()
+
             history = persona_mgr.get_chat_history(user_id)
             actual_user_msg = original_user_text or user_text
             is_nsfw_photo = detect_nsfw_intent(actual_user_msg, history)
             if not is_nsfw_photo and user_text != actual_user_msg:
                 is_nsfw_photo = detect_nsfw_intent(user_text, history)
             cur_outfit_key, _ = persona_mgr.get_user_outfit(user_id)
-            if cur_outfit_key == "nude":
+            if cur_outfit_key in ("bra_off", "nude"):
                 is_nsfw_photo = True
 
             if scene_override and not is_nsfw_photo:
@@ -4760,7 +4765,12 @@ def process_photo_request(
 
             prompt_source_text = f"{actual_user_msg} {conversational_reply}".strip() if conversational_reply else user_text
             visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
-                prompt_source_text, user_id=user_id, scene_override=detected_scene, history=history, is_nsfw=is_nsfw_photo
+                prompt_source_text,
+                user_id=user_id,
+                scene_override=detected_scene,
+                history=history,
+                is_nsfw=is_nsfw_photo,
+                allow_undress_advance=(not is_followup),
             )
             logger.info(f"Visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
 
@@ -4774,48 +4784,46 @@ def process_photo_request(
             USER_LAST_AUTO_PHOTO_TURN[user_id] = USER_CONVERSATION_TURNS.get(user_id, 0)
             USER_LAST_AUTO_PHOTO_TIME[user_id] = time.time()
 
-            with ChatActionLoop(bot, chat_id, "upload_photo"):
-                sfw_img_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
-                if is_nude:
-                    idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id, is_nude=True)
-                elif sfw_img_engine == "comfyui":
-                    idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id, is_nude=False)
-                elif sfw_img_engine == "agy":
-                    idle_engine.ensure_agy_bridge_active()
+            sfw_img_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
+            if is_nude:
+                idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id, is_nude=True)
+            elif sfw_img_engine == "comfyui":
+                idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id, is_nude=False)
+            elif sfw_img_engine == "agy":
+                idle_engine.ensure_agy_bridge_active()
 
-                def photo_progress(stage_text: str):
-                    if status_msg and hasattr(status_msg, "message_id"):
-                        try:
-                            safe_edit_message_text(
-                                f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕\n⏳ _{stage_text}_",
-                                chat_id=chat_id,
-                                message_id=status_msg.message_id,
-                                parse_mode="Markdown"
-                            )
-                        except Exception:
-                            pass
-                            pass
+            def photo_progress(stage_text: str):
+                if status_msg and hasattr(status_msg, "message_id"):
+                    try:
+                        safe_edit_message_text(
+                            f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕\n⏳ _{stage_text}_",
+                            chat_id=chat_id,
+                            message_id=status_msg.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
 
-                neg_p = persona.get("negative_prompt", "")
-                if extra_neg:
-                    neg_p += f", {extra_neg}"
+            neg_p = persona.get("negative_prompt", "")
+            if extra_neg:
+                neg_p += f", {extra_neg}"
 
-                u_ar = USER_RATIOS.get(user_id, "3:4")
-                u_qual = USER_QUALITIES.get(user_id, "high")
-                active_p_key = persona_mgr.get_active_persona_key(user_id) if hasattr(persona_mgr, "get_active_persona_key") else DEFAULT_PERSONA
-                img_bytes, source = media_engine.generate_photo(
-                    visual_prompt,
-                    negative_prompt=neg_p,
-                    aspect_ratio=u_ar,
-                    quality=u_qual,
-                    persona=active_p_key,
-                    scene=detected_scene,
-                    outfit_label=outfit_label,
-                    is_nude=is_nude,
-                    user_query=user_text,
-                    progress_callback=photo_progress,
-                    user_id=user_id
-                )
+            u_ar = USER_RATIOS.get(user_id, "3:4")
+            u_qual = USER_QUALITIES.get(user_id, "high")
+            active_p_key = persona_mgr.get_active_persona_key(user_id) if hasattr(persona_mgr, "get_active_persona_key") else DEFAULT_PERSONA
+            img_bytes, source = media_engine.generate_photo(
+                visual_prompt,
+                negative_prompt=neg_p,
+                aspect_ratio=u_ar,
+                quality=u_qual,
+                persona=active_p_key,
+                scene=detected_scene,
+                outfit_label=outfit_label,
+                is_nude=is_nude,
+                user_query=user_text,
+                progress_callback=photo_progress,
+                user_id=user_id
+            )
             if img_bytes:
                 USER_LAST_PHOTO_CONTEXT[user_id]["img_bytes"] = img_bytes
 
@@ -4838,7 +4846,7 @@ def process_photo_request(
                 return
 
             history = persona_mgr.get_chat_history(user_id)
-            clean_recent_turns = [m for m in history[-4:] if not m.get("content", "").startswith("[")]
+            clean_recent_turns = [m for m in history[-8:] if not m.get("content", "").startswith("[")][-6:]
 
             # Notify user if primary image engine failed and fallback was used
             fallback_notice = getattr(media_engine, "last_fallback_notice", None)
@@ -4865,8 +4873,9 @@ def process_photo_request(
 
             cap_guide = (
                 f" You just took a sweet, cute photo to send on Telegram to your partner. "
-                f"Write 1 natural, warm, and playful chat caption accompanying the photo in the exact same language as your partner's messages (Indonesian if partner speaks Indonesian, English if partner speaks English). "
-                f"STRICT: Directly respond to what partner said, answer any questions asked, and express your affection naturally. "
+                f"Write ONLY 1 short natural chat caption sentence (10-25 words) accompanying the photo in the exact same language as your partner's messages. "
+                f"STRICT: Match the exact Outfit ('{outfit_label}') and Setting ('{detected_scene}') shown in the photo. "
+                f"NEVER mention clothes or locations you are NOT wearing/in (e.g. do not claim jeans/campus if wearing underwear/pajamas). "
                 f"DILARANG KERAS bersikap defensif atau meyakinkan keberadaan ('biar percaya', 'biar yakin', 'beneran ada di sini', 'nih buktinya', 'diliatin aja'). "
                 f"STRICT: Chat 1-on-1 with partner. NEVER speak like a YouTuber, influencer, or vlogger (DILARANG pakai 'gaes', 'guys', 'intip yuk'). {persona_mgr.get_language_directive(BOT_LANGUAGE)}"
             )
@@ -4894,9 +4903,9 @@ def process_photo_request(
                         f"You JUST replied in chat right before this photo: \"{conversational_reply}\".\n"
                         f"Now you are delivering the photo of THIS EXACT MOMENT (Setting: '{detected_scene}', Outfit: '{outfit_label}'{vault_guidance}).\n"
                         f"STRICT CONSISTENCY RULE:\n"
-                        f"- Your caption MUST align 100% with what you JUST said in your chat reply above and the photo setting.\n"
-                        f"- Keep the EXACT same location, same food/objects, and same activity you just mentioned.\n"
-                        f"- DILARANG KERAS mengarang lokasi baru (seperti dapur/kampus/kamar) atau aktivitas baru yang bertentangan dengan chat terakhirmu!\n"
+                        f"- Your caption MUST align 100% with what you JUST said in your chat reply above, the Outfit ('{outfit_label}'), and Setting.\n"
+                        f"- Keep the EXACT same clothing, location, objects, and activity from the chat.\n"
+                        f"- DILARANG KERAS mengarang baju lain atau lokasi baru yang bertentangan dengan chat & foto!\n"
                         f"- Write 1 short, sweet, playful girlfriend delivery caption continuing this exact moment (1 sentence):"
                     )
                 })
@@ -4904,38 +4913,59 @@ def process_photo_request(
                 caption_prompt.append({
                     "role": "user",
                     "content": (
-                        f"Boyfriend said: \"{actual_user_msg}\".\n"
-                        f"You are sending him a photo (Setting: '{detected_scene}', wearing: '{outfit_label}'{vault_guidance}).\n"
-                        f"Write 1 sweet, natural girlfriend chat caption that directly answers/responds to his message and matches the photo (1-2 sentences):"
+                        f"Partner asked/said: \"{actual_user_msg}\".\n"
+                        f"You are sending a photo matching your ongoing chat (Setting: '{detected_scene}', Wearing: '{outfit_label}'{vault_guidance}).\n"
+                        f"STRICT CONSISTENCY RULE:\n"
+                        f"- Your caption MUST match the ongoing chat context above AND what you are wearing right now ('{outfit_label}') and Setting ('{detected_scene}').\n"
+                        f"- DILARANG mengarang baju atau lokasi lain yang bertentangan dengan chat sebelumnya!\n"
+                        f"- Write 1 short, sweet, natural chat caption (1 sentence):"
                     )
                 })
 
+            outfit_low = (outfit_label or "").lower()
+            is_intimate_outfit = any(
+                k in outfit_low
+                for k in ("lingerie", "pakaian dalam", "bh", "celana dalam", "bikini", "handuk", "topless", "tanpa busana", "nude")
+            )
+            is_nsfw_caption = bool(is_nude or is_nsfw_photo or is_intimate_outfit)
+
             try:
-                if is_nude or is_nsfw_photo:
+                if is_nsfw_caption:
                     idle_engine.ensure_llm_active(bot=bot, chat_id=chat_id, is_nsfw=True)
-                caption, _ = llm_client.chat(caption_prompt, max_tokens=120, is_nsfw=(is_nude or is_nsfw_photo))
+                caption, _ = llm_client.chat(caption_prompt, max_tokens=110, is_nsfw=is_nsfw_caption)
+                if caption:
+                    caption = enforce_concise_chat_reply(caption, max_sentences=2, max_chars=220)
             except Exception as e_cap:
                 logger.warning(f"Could not generate dynamic photo caption from LLM: {e_cap}")
                 caption = None
 
             u_lower = user_text.lower() if user_text else ""
-            if is_nude or is_nsfw_photo:
-                u_stage = persona_mgr.get_undress_stage(user_id)
+            u_stage = persona_mgr.get_undress_stage(user_id)
+            if is_nude or is_nsfw_photo or u_stage > 0 or ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low):
                 stage_captions = {
-                    1: "Kaosnya udah kubuka sayang... cuma tinggal BH dan celana nih. Suka liatnya? 🙈💕",
-                    2: "Sekarang celanaku udah kulepas... jangan diliatin terus dong, malu tau~ 💕",
+                    1: "Kaosnya udah kubuka... tinggal BH sama celana pendek santai nih. Suka liatnya? 🙈💕",
+                    2: "Sekarang cuma pakai BH sama celana dalam aja... jangan diliatin terus dong, malu tau~ 😳💕",
                     3: "Kaitan BH-nya udah kulepas... dadaku udah kebuka sekarang. Mau kamu sentuh?~ ✨",
                     4: "Khusus buat kamu ya, sekarang aku udah bener-bener telanjang bulat semuanya... 💕🙈"
                 }
-                fallback_caption = stage_captions.get(u_stage, "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕")
+                fallback_caption = stage_captions.get(
+                    u_stage,
+                    "Ini fotoku lagi pakai set pakaian dalam aja... jangan diliatin terus dong~ 😳💕"
+                    if ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)
+                    else "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕"
+                )
+            elif "pajama" in outfit_low or "piyama" in outfit_low or "tidur" in outfit_low:
+                fallback_caption = "Nih fotoku lagi pakai piyama santai di kamar nih, nyaman banget~ 🌙💕"
+            elif "handuk" in outfit_low or "towel" in outfit_low:
+                fallback_caption = "Baru beres mandi masih pakai handuk nih, bentar yaa~ 🚿💕"
             elif any(k in u_lower for k in ["bobo", "tidur", "ngantuk", "malam", "night"]):
-                fallback_caption = "Ini pap buat nemenin kamu malam ini yaa sayang~ 💕"
+                fallback_caption = "Ini pap buat nemenin kamu malam ini yaa~ 💕"
             elif any(k in u_lower for k in ["pagi", "morning", "bangun"]):
-                fallback_caption = "Pagi sayang! Semangat ya hari ini, ini pap manis buat kamu~ 💕"
+                fallback_caption = "Pagi! Semangat ya hari ini, ini pap manis buat kamu~ 💕"
             elif "Vault" in source:
                 fallback_caption = "Ini foto manis dari galeri aku yaa~"
             else:
-                fallback_caption = "Ini pap spesial buat kamu sayang, suka ga? 🥰"
+                fallback_caption = "Ini pap spesial buat kamu, suka ga? 🥰"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
             fallback_tag = " _(Fallback Otomatis)_" if fallback_notice else ""
             full_caption = f"{format_roleplay_italics(clean_caption, character_name=persona.get('name', 'Runa'))}\n\n📷 *Model:* `{source}`{fallback_tag}"
@@ -5006,6 +5036,9 @@ def process_photo_request(
         except Exception as e:
             logger.error(f"Error in photo delivery: {e}", exc_info=True)
             safe_send_message(chat_id, f"⚠️ Gagal mengirimkan foto: `{e}`")
+        finally:
+            if photo_action_loop is not None:
+                photo_action_loop.__exit__(None, None, None)
 
     threading.Thread(target=_execute, daemon=True).start()
 
@@ -5252,19 +5285,20 @@ def handle_incoming_photo(message):
 
                 caption = message.caption or "Here's a photo of mine, what do you think darling?"
                 messages = [
-                    {"role": "system", "content": persona.get("system_instruction", "") + " Keep response under 3 sentences."},
+                    {"role": "system", "content": persona.get("system_instruction", "") + " Balas singkat santai 1-2 kalimat pendek seperti chat WhatsApp."},
                     {"role": "user", "content": caption}
                 ]
 
-                reply, _ = llm_client.chat(messages, image_bytes=downloaded, max_tokens=300)
+                reply, _ = llm_client.chat(messages, image_bytes=downloaded, max_tokens=130)
                 p_name = persona.get("name", "Runa")
                 if not reply or not reply.strip():
                     dyn_msg = [
                         {"role": "system", "content": persona.get("system_instruction", "")},
-                        {"role": "user", "content": f"[User mengirim fotonya dengan caption: '{caption}']. Sebagai {p_name}, berikan pujian dan respon visual novel yang spontan, manis, dan ekspresif."}
+                        {"role": "user", "content": f"[User mengirim fotonya dengan caption: '{caption}']. Sebagai {p_name}, berikan pujian dan respon singkat (1 baris *...* + 1-2 kalimat santai)."}
                     ]
-                    dyn_photo, _ = llm_client.chat(dyn_msg, max_tokens=250, temperature=0.9)
+                    dyn_photo, _ = llm_client.chat(dyn_msg, max_tokens=130, temperature=0.9)
                     reply = dyn_photo if (dyn_photo and dyn_photo.strip()) else f"*{p_name} melihat fotomu dengan mata berbinar*\n\nFotonya manis banget! Suka deh lihatnya 🥰"
+                reply = enforce_concise_chat_reply(reply, max_sentences=2, max_chars=240)
                 reply = format_roleplay_italics(reply, character_name=p_name)
                 vision_markup = attach_voice_button(None, reply, message.from_user.id)
                 safe_reply_to(message, reply, reply_markup=vision_markup)
@@ -6741,27 +6775,28 @@ def generate_dynamic_visual_novel_reaction(
         try:
             prompt = (
                 f"Lawan bicaramu baru saja berkata: \"{user_text}\".\n"
-                f"Sebagai {p_name}, berikan balasan spontan, unik, manis, dan ekspresif dalam format Visual Novel:\n"
-                f"1. Awali dengan 1 baris aksi panggung atau gestur fisik alami di dalam tanda bintang *{p_name} ...* (contoh: *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*).\n"
-                f"2. Berikan baris baru ganda, lalu dialog ucapanmu yang hangat, santai, dan kreatif.\n"
-                f"DILARANG KERAS mengulang kata-kata lawan bicaramu dan DILARANG menulis proses berpikir!"
+                f"Sebagai {p_name}, berikan balasan SINGKAT seperti chat WhatsApp biasa:\n"
+                f"1. Awali dengan 1 frasa aksi singkat di dalam bintang *{p_name} ...* (contoh: *{p_name} tersenyum tipis sambil menatapmu*).\n"
+                f"2. Berikan baris baru ganda, lalu 1-2 kalimat dialog santai dan pendek (10-30 kata saja, jangan bertele-tele).\n"
+                f"DILARANG mengulang kata lawan bicaramu, DILARANG menulis paragraf panjang atau monolog berpikir!"
             )
             msgs = []
             if system_inst:
                 msgs.append({"role": "system", "content": system_inst})
             else:
-                msgs.append({"role": "system", "content": f"Kamu adalah {p_name}, waifu teman mengobrol yang hangat, manis, dan ekspresif."})
+                msgs.append({"role": "system", "content": f"Kamu adalah {p_name}, waifu teman mengobrol yang hangat, manis, dan ringkas."})
 
             if history:
                 msgs.extend(history[-4:])
             msgs.append({"role": "user", "content": prompt})
 
-            dyn_reply, _ = client.chat(msgs, max_tokens=300, temperature=0.92, is_nsfw=is_nsfw)
+            dyn_reply, _ = client.chat(msgs, max_tokens=(140 if is_nsfw else 110), temperature=0.88, is_nsfw=is_nsfw)
             if (dyn_reply 
                 and dyn_reply.strip() 
                 and not is_echo_or_parroting(dyn_reply, user_text) 
                 and not is_meta_or_reasoning_leak(dyn_reply)):
-                return format_roleplay_italics(dyn_reply.strip(), character_name=p_name)
+                concise_dyn = enforce_concise_chat_reply(dyn_reply.strip(), max_sentences=2, max_chars=(280 if is_nsfw else 240))
+                return format_roleplay_italics(concise_dyn, character_name=p_name)
         except Exception as e_dyn:
             logger.warning(f"Dynamic Visual Novel LLM reaction generation failed: {e_dyn}")
 
@@ -7120,7 +7155,8 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
             persona = persona_mgr.get_active_persona()
 
             with ChatActionLoop(bot, message.chat.id, "typing"):
-                # 1. Proactively ensure LLM is awake (wakes from Smart Idle if sleeping)
+                # 1. Expire stale session outfits when switching to casual daily topics BEFORE checking NSFW routing
+                persona_mgr.check_context_shift(message.from_user.id, user_text)
                 is_nsfw_turn = detect_nsfw_intent(user_text)
                 cur_outfit_key, _ = persona_mgr.get_user_outfit(message.from_user.id)
                 cur_undress_stage = persona_mgr.get_undress_stage(message.from_user.id)
@@ -7301,7 +7337,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         f"PANDUAN TAHAPAN: {hint_text}\n"
                         "1. FOKUS 100% PADA PASANGAN & TINDAKAN FISIK: Fokuskan seluruh perhatianmu pada apa yang dikatakan pasanganmu, sentuhan fisik, bisikan, dan aksi saat ini. DILARANG KERAS membicarakan kampus, tugas, kafe, game, atau topik sehari-hari di luar momen intim ini!\n"
                         "2. BUKA BAJU BERTAHAP & BERURUTAN: Buka pakaian secara berurutan dan bertahap sesuai alur chat: Kaos -> Celana/Rok -> BH -> Celana Dalam -> Telanjang Bulat. DILARANG melompati urutan kecuali jika pasanganmu meminta telanjang bulat sekaligus!\n"
-                        "3. SANGAT PROAKTIF & MEMANCING AKSI BERIKUTNYA (LEADING THE MOMENT): Jangan pernah pasif atau hanya menjawab pendek! Di setiap balasanmu, selalu tawarkan pilihan atau ajukan pertanyaan menggoda yang memancing pasanganmu untuk langkah sentuhan berikutnya. Contoh: '...B-but if you like it that much, should I take off the rest too? Or do you want to touch first? 😳', 'Do you like how I react when you stroke me there?', 'Can you kiss me while your hands slide under my skirt?', 'D-do you want to see how wet you\'ve made me already...?', 'W-will you taste me too?'.\n"
+                        "3. MEMANCING AKSI BERIKUTNYA (RINGKAS): Tetap hangat dan proaktif dalam 1-2 kalimat pendek yang menggoda (bukan paragraf panjang). Contoh: 'Kalau suka segini, mau aku lanjutin buka pelan-pelan atau kamu mau sentuh dulu? 😳'\n"
                         "4. FORMAT VISUAL NOVEL & SENSASI TUBUH MENDALAM:\n"
                         f"   - Awali dengan aksi panggung di dalam tanda bintang *...* yang menggambarkan sensasi tubuhmu yang nyata: debaran jantung, getaran napas, tubuh yang melengkung (arching), kulit yang merona hangat, tangan gemetar menuntun sentuhan, atau desahan tertahan (misal: *{p_name} arching into your touch with a soft gasp, skin flushing deeper under your fingertips* atau *{p_name} merona hebat sambil memegang tanganmu di pinggangnya dan mendesah tertahan*).\n"
                         "   - Berikan baris baru ganda, lalu balas ucapan pasanganmu dengan nada manja, berbisik sensual, mesra, dan menggairahkan.\n"
@@ -7319,45 +7355,33 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         system_inst += "\n" + invitation_instruction
 
                 rule_4 = (
-                    "4. FOKUS 100% PADA MOMEN INTIM: DILARANG KERAS mengalihkan pembicaraan ke tugas kuliah, nongkrong di kafe, bioskop, atau kegiatan sehari-hari! Nikmati dan tanggapi setiap sentuhan dan alur intim bersama pasanganmu.\n"
+                    "4. FOKUS PADA MOMEN INTIM: DILARANG mengalihkan pembicaraan ke kuliah, kafe, atau kegiatan sehari-hari.\n"
                     if is_nsfw_turn else
-                    "4. PROAKTIF MENGAJAK JALAN & KENCAN: Jika suasana santai atau di akhir pekan / libur, jangan hanya pasif menunggu. Ajak pasanganmu sesekali untuk ngopi berdua di kafe estetik, nonton film bioskop terbaru, main ke kosan/rumah sambil dimasakin atau santai berdua, atau jalan sore ke taman kota!\n"
+                    "4. AJAKAN KENCAN NATURAL: Hanya jika obrolan sedang santai & pas momennya, boleh sesekali mengajak ngopi/nonton/santai bareng (jangan dipaksakan di setiap balasan).\n"
                 )
+
+                long_form_req = is_long_form_request(user_text)
 
                 system_inst += (
                     f"{status_block}\n"
-                    "[PEDOMAN KOMUNIKASI - WAJIB DIPATUHI]\n"
+                    "[PEDOMAN KOMUNIKASI - WAJIB SINGKAT SEPERTI CHAT BIASA]\n"
                     f"{calling_guideline}\n"
-                    "1. ANTI-MEMBEO (SANGAT PENTING): DILARANG KERAS hanya mengulang kata, mengulang frasa, atau menyalin ulang pesan lawan bicaramu! "
-                    "Jika lawan bicaramu menjawab atau bercerita (misal: 'nanti mau makan sambil gathering HO jam 4'), tanggapi ceritanya dengan antusias, hangat, dan komunikatif (misal: 'Wah seru banget tuh gathering di mana? Jangan lupa makan yang banyak yaa!'), BUKAN malah mengulang kata 'gathering' atau menyalin kata-katanya!\n"
-                    "2. RESPONSIF & AKTIF: Berikan tanggapan aktif dan bermakna: ceritakan opinimu, berikan komentar santai, atau tanyakan detail kelanjutannya seperti teman/partner mengobrol yang asyik dan perhatian.\n"
-                    f"3. FORMAT VISUAL NOVEL (AKSI & DIALOG TERPISAH RAPI): Seperti adegan Visual Novel / Anime Romance yang estetik:\n"
-                    f"   - Awali balasanmu dengan 1 baris aksi panggung, ekspresi wajah, atau gestur fisik alami di dalam tanda bintang *...* menggunakan sudut pandang narasi visual novel dengan namamu ({p_name}). "
-                    f"Contoh: *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya* atau *{p_name} menatapmu lembut sambil memegang cangkir minumannya*.\n"
-                    f"   - DILARANG menggunakan tanda minus/dash '- ... -' atau kata kaku/aneh seperti 'kulihatmu' atau 'ia menyebutkan:'.\n"
-                    f"   - PENTING TENTANG PEMISAH: Berikan BARIS BARU (enter ganda / newline) antara aksi panggung *...* dengan kalimat obrolan/dialog ucapanmu!\n"
-                    f"   - Contoh format Visual Novel yang benar:\n"
-                    f"   *{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*\n\n"
-                    f"   Oh sayang, kamu mau ngomong apa nih? Aku belum sempat bikin camilan. Tapi makasih ya, kata-katamu bikin aku merasa spesial~\n"
+                    "1. ANTI-MEMBEO: DILARANG hanya mengulang kata/pesan lawan bicaramu; tanggapi maksudnya dengan wajar dan hangat.\n"
+                    "2. NGOBROL SANTAI & RINGKAS (WAJIB): Balas layaknya chat WhatsApp/Telegram biasa — cukup 1-2 kalimat pendek (10-30 kata total). DILARANG menulis paragraf panjang, esai, daftar poin, atau banyak kalimat sekaligus!\n"
+                    f"3. FORMAT SINGKAT:\n"
+                    f"   - Awali 1 frasa gesture singkat (<10 kata) di dalam *...*, contoh: *{p_name} tersenyum tipis menatapmu*\n"
+                    f"   - Baris baru ganda, lalu tulis 1-2 kalimat dialog pendek saja.\n"
                     f"{rule_4}"
-                    "5. FITUR AUTO VISUAL NOVEL & FOTO SPONTAN: Seperti novel visual yang kaya adegan berilustrasi (CG Scene), kamu SECARA CERDAS MENYERTAKAN tag [ACTION: SEND_PAP] di akhir balasanmu pada momen-momen visual dan cerita yang menarik tanpa menunggu diminta pap:\n"
-                    "   - Setiap kali berada di latar tempat/lokasi cerita atau suasana baru (misal: lagi nunggu di halte bis, duduk di lobby kampus, kehujanan sambil bawa payung, jalan sore di taman, nongkrong di cafe, nonton bioskop, di rooftop, minimarket, dll).\n"
-                    "   - Ketika membahas, memamerkan, atau mengomentari baju, outfit, rok, atau kecantikan fisikmu.\n"
-                    "   - Ketika ada interaksi fisik yang romantis, mesra, atau intim (misal: duduk di paha, dipangku, berpelukan hangat, nugas/belajar bareng sambil nempel, rebahan di ranjang).\n"
-                    "   - Ketika berpose manja, menggoda, atau tersipu malu.\n"
-                    "   Sertakan tag [ACTION: SEND_PAP] di akhir pesanmu agar foto adegan tersebut langsung terkirim mendampingi dialogmu! DILARANG KERAS bersikap defensif atau sibuk membuktikan keberadaanmu.\n"
-                    "6. GAYA CHAT & BAHASA (OTOMATIS MENGIKUTI BAHASA LAWAN BICARA): Maksimal 1-3 kalimat santai, mengalir alami, hangat, dan wajar. "
-                    "Kamu WAJIB secara cerdas mendeteksi dan membalas dengan bahasa yang sama persis seperti yang digunakan lawan bicaramu (Jika lawan bicara berbahasa Inggris, balas dalam Bahasa Inggris yang fasih dan manis; jika lawan bicara berbahasa Indonesia, balas dalam Bahasa Indonesia sehari-hari). DILARANG KERAS menuliskan proses berpikir, analisis prompt, atau monolog batin.\n"
-                    f"7. SUDUT PANDANG DIALOG & VISUAL NOVEL (PENTING): "
-                    f"Dalam DIALOG UCAPAN, kamu WAJIB berbicara langsung sebagai dirimu sendiri ('aku') kepada pasanganmu ('kamu'). DILARANG menggunakan kata perantara kaku seperti 'ia berkata:' atau 'ia menyebutkan:'. "
-                    f"Dalam AKSI PANGGUNG *...*, gunakan narasi visual novel yang alami (*{p_name} tersenyum manis menatapmu* atau *{p_name} melihat kamu dengan senyuman hangat*)."
+                    "5. FOTO SPONTAN: Hanya sertakan tag [ACTION: SEND_PAP] di akhir balasan JIKA momen/cerita visualnya memang cocok untuk mengirim foto spontan (latar lokasi baru, pamer outfit, atau momen mesra). DILARANG bersikap defensif.\n"
+                    "6. BAHASA: Balas dengan bahasa yang sama persis dengan lawan bicaramu (Indonesia atau Inggris) tanpa menuliskan proses berpikir atau monolog batin.\n"
+                    f"7. SUDUT PANDANG: Dalam dialog ucapkan sebagai 'aku' dan 'kamu' (jangan pakai 'ia berkata:'). Dalam aksi *...* pakai *{p_name} ...*."
                 )
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
                 if mem_context:
                     system_inst += "\n" + mem_context
 
-                # Injected active project awareness (only in non-NSFW normal chat)
-                if not is_nsfw_turn:
+                # Inject active project awareness ONLY when user asks about coding/project/workspace
+                if not is_nsfw_turn and long_form_req:
                     try:
                         cur_proj = project_manager.get_active_project(message.from_user.id)
                         cur_path = project_manager.get_active_project_path(message.from_user.id)
@@ -7375,20 +7399,41 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         f"\n\n[PENTING - RESPON OBROLAN & PAP]\n"
                         f"Pasanganmu sedang mengobrol denganmu dan sekaligus meminta kamu mengirimkan {media_kind}: \"{user_text}\".\n"
                         f"Instruksi wajib:\n"
-                        f"1. Jawab/tanggapi obrolan dan pertanyaannya terlebih dahulu secara hangat, ekspresif, dan penuh kasih sayang.\n"
-                        f"2. Setelah menjawab pertanyaannya, sebutkan dengan manis bahwa kamu akan mengambilkan {media_kind} untuknya sekarang (misal: 'Bentar ya sayang, aku fotoin sekarang buat kamu~ 🥰').\n"
-                        f"3. DILARANG keras hanya mengirim tag aksi atau langsung memberi foto tanpa menjawab pertanyaannya!"
+                        f"1. Jawab/tanggapi obrolan dan pertanyaannya secara hangat dalam 1-2 kalimat pendek, lalu bilang kamu akan mengirim {media_kind} sekarang (misal: 'Bentar ya, aku fotoin sekarang~ 🥰').\n"
+                        f"2. DILARANG hanya mengirim tag aksi tanpa menjawab!"
+                    )
+
+                if not long_form_req:
+                    system_inst += (
+                        f"\n\n[STRICT REPLY LENGTH RULE]\n"
+                        f"Keep your response BRIEF like casual WhatsApp texting: maximum 1 short *action* line + 1-2 short spoken sentences (~15-35 words total). "
+                        f"Example:\n*{p_name} nyengir tipis menatapmu*\n\nLagi santai di kos nih, baru beres makan. Kamu udah makan belum?\n"
+                        f"Do NOT write paragraphs, long descriptions, or essays."
                     )
 
                 history = persona_mgr.get_chat_history(message.from_user.id)
+                if long_form_req:
+                    prompt_history = history
+                else:
+                    # Keep assistant history turns concise so local models don't imitate verbose legacy turns
+                    prompt_history = [
+                        (
+                            {"role": "assistant", "content": enforce_concise_chat_reply(h.get("content", ""), max_sentences=2, max_chars=240)}
+                            if h.get("role") == "assistant" and h.get("content")
+                            else h
+                        )
+                        for h in history
+                    ]
 
                 messages = [{"role": "system", "content": system_inst}]
-                messages.extend(history)
+                messages.extend(prompt_history)
                 messages.append({"role": "user", "content": user_text})
+
+                chat_max_tokens = 450 if long_form_req else (150 if (is_nsfw_turn or is_conversational_media) else 120)
 
                 try:
                     idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id, is_nsfw=is_nsfw_turn)
-                    reply_text, _ = llm_client.chat(messages, max_tokens=400, is_nsfw=is_nsfw_turn)
+                    reply_text, _ = llm_client.chat(messages, max_tokens=chat_max_tokens, is_nsfw=is_nsfw_turn)
                 except Exception as e:
                     logger.error(f"Chat error / LLM timeout: {e}")
                     pending_manager.record_failed_message(message, user_text, is_voice=is_voice, error=str(e))
@@ -7420,14 +7465,13 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     try:
                         steer_sys = (
                             system_inst + 
-                            "\n\n[PENTING - RESPON VISUAL NOVEL: Langsung balas perkataan pasanganmu dengan hangat, spontan, dan kreatif. "
-                            f"Awali dengan 1 aksi panggung visual novel *{p_name} ...* di baris pertama, lalu baris baru ganda sebelum dialog ucapanmu yang segar. "
+                            "\n\n[PENTING - RESPON SINGKAT: Langsung balas perkataan pasanganmu dengan hangat dalam 1 baris aksi *...* + 1-2 kalimat dialog pendek. "
                             "DILARANG mengulang kata pasanganmu dan DILARANG menulis monolog berpikir!]"
                         )
                         retry_messages = [{"role": "system", "content": steer_sys}]
-                        retry_messages.extend(history)
+                        retry_messages.extend(prompt_history)
                         retry_messages.append({"role": "user", "content": user_text})
-                        steered_reply, _ = llm_client.chat(retry_messages, max_tokens=400, temperature=0.92, is_nsfw=is_nsfw_turn)
+                        steered_reply, _ = llm_client.chat(retry_messages, max_tokens=chat_max_tokens, temperature=0.88, is_nsfw=is_nsfw_turn)
                         if (steered_reply 
                             and not is_echo_or_parroting(steered_reply, user_text)
                             and not is_meta_or_reasoning_leak(steered_reply)):
@@ -7523,11 +7567,18 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         system_inst=system_inst,
                         is_nsfw=is_nsfw_turn
                     )
+                if not long_form_req:
+                    clean_reply = enforce_concise_chat_reply(
+                        clean_reply,
+                        max_sentences=2,
+                        max_chars=(280 if is_nsfw_turn else 240)
+                    )
 
                 new_aff = persona_mgr.increase_affinity(message.from_user.id, delta=1)
                 memory_engine.set_affinity(message.from_user.id, new_aff)
                 persona_mgr.add_message(message.from_user.id, "user", user_text)
                 persona_mgr.add_message(message.from_user.id, "assistant", clean_reply)
+                persona_mgr.sync_outfit_from_chat(message.from_user.id, user_text=user_text, reply_text=clean_reply)
                 waifu_status_tracker.record_chat_statement(
                     user_id=message.from_user.id,
                     statement=clean_reply,
@@ -7539,6 +7590,11 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 safe_reply_to(message, formatted_reply, reply_markup=chat_markup, parse_mode="Markdown")
 
                 if should_send_conv_photo or should_send_spontaneous:
+                    try:
+                        bot.send_chat_action(message.chat.id, "upload_photo")
+                    except Exception:
+                        pass
+
                     def _send_followup_photo():
                         try:
                             time.sleep(1.0)  # Natural pause as if taking the photo
@@ -7632,6 +7688,17 @@ def process_text_chat(message, user_text: str, is_voice: bool = False, bypass_qu
     Default: routes through ChatQueueManager for per-user debounce & FIFO sequential processing.
     Pass bypass_queue=True to execute directly in a worker thread.
     """
+    try:
+        chat_id = getattr(getattr(message, "chat", None), "id", None)
+        if chat_id is not None:
+            def _pulse_typing():
+                try:
+                    bot.send_chat_action(chat_id, "typing")
+                except Exception:
+                    pass
+            threading.Thread(target=_pulse_typing, daemon=True).start()
+    except Exception:
+        pass
     if bypass_queue or getattr(message, "_bypass_queue", False):
         threading.Thread(target=_execute_text_chat_direct, args=(message, user_text, is_voice), daemon=True).start()
     else:
@@ -7697,11 +7764,13 @@ def send_scheduled_greeting(user_id: int, time_of_day: str):
         else:
             # LLM is already running in background (not sleeping) -> query without waking
             messages = [
-                {"role": "system", "content": persona.get("system_instruction", "")},
+                {"role": "system", "content": persona.get("system_instruction", "") + " Jawab singkat 1-2 kalimat pendek seperti chat biasa."},
                 {"role": "user", "content": prompt}
             ]
             try:
-                text, _ = llm_client.chat(messages, max_tokens=350)
+                text, _ = llm_client.chat(messages, max_tokens=120)
+                if text:
+                    text = enforce_concise_chat_reply(text, max_sentences=2, max_chars=220)
             except Exception:
                 text = None
             if not text:

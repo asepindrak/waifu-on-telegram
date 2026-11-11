@@ -119,6 +119,54 @@ class TestPhotoChatCaptionConsistency(unittest.TestCase):
             if role == "user":
                 self.assertNotIn("[Requested photo:", content)
 
+    @patch("bot.safe_send_message")
+    @patch("bot.bot")
+    @patch("bot.llm_client")
+    @patch("bot.media_engine")
+    @patch("bot.idle_engine")
+    def test_caption_matches_bra_panties_chat_when_pap_requested_separately(
+        self, mock_idle, mock_media, mock_llm, mock_bot, mock_safe_send
+    ):
+        """When user asks 'pap dong' separately after chat mentions BH + celana dalam, caption LLM gets outfit + is_nsfw=True and fallback matches."""
+        import bot
+        mock_msg = MagicMock()
+        mock_msg.message = None
+        mock_msg.chat.id = 777222
+        mock_msg.from_user.id = 777222
+
+        mock_media.generate_photo.return_value = (b"fake_jpg_bytes", "ComfyUI")
+        # Return AI refusal to verify outfit-aware fallback triggers cleanly as well
+        mock_llm.chat.return_value = ("I'm sorry, I cannot fulfill this request.", "")
+
+        hist = [
+            {"role": "assistant", "content": "Aku lagi pakai piyama nih."},
+            {"role": "assistant", "content": "Sekarang cuma pake BH sama celana dalam aja nih 😳"},
+        ]
+        with patch.object(bot.persona_mgr, "get_chat_history", return_value=hist), \
+             patch.object(bot.persona_mgr, "get_user_outfit", return_value=("default", "Otomatis")), \
+             patch.object(bot.persona_mgr, "get_undress_stage", return_value=2), \
+             patch.object(bot.persona_mgr, "increase_affinity", return_value=10), \
+             patch.object(bot.persona_mgr, "add_message"), \
+             patch.object(bot.persona_mgr, "notify_photo_delivered"), \
+             patch.object(bot.waifu_status_tracker, "record_photo_event"):
+
+            bot.process_photo_request(mock_msg, user_text="pap dong")
+            import time
+            for _ in range(40):
+                if mock_bot.send_photo.called and mock_llm.chat.called:
+                    break
+                time.sleep(0.05)
+
+        self.assertTrue(mock_llm.chat.called)
+        cap_call = mock_llm.chat.call_args
+        self.assertTrue(cap_call.kwargs.get("is_nsfw"))
+        last_user_prompt = cap_call[0][0][-1]["content"]
+        self.assertIn("BH & Celana Dalam", last_user_prompt)
+        self.assertIn("STRICT CONSISTENCY RULE", last_user_prompt)
+
+        sent_caption = mock_bot.send_photo.call_args.kwargs.get("caption", "")
+        self.assertIn("BH sama celana dalam", sent_caption)
+
 
 if __name__ == "__main__":
     unittest.main()

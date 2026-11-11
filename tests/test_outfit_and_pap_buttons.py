@@ -63,20 +63,23 @@ class TestOutfitAndPapButtons(unittest.TestCase):
         self.assertIn("beach", prompt.lower())
 
     @patch("bot.is_authorized", return_value=True)
+    @patch("bot.idle_engine")
     @patch("bot.media_engine")
     @patch("bot.safe_edit_message_text")
-    def test_process_photo_request_updates_menu_message_instantly(self, mock_safe_edit, mock_media, mock_auth):
+    def test_process_photo_request_updates_menu_message_instantly(self, mock_safe_edit, mock_media, mock_idle, mock_auth):
         """process_photo_request replaces the menu message with loading status without blocking."""
         self.mock_call.data = "pap_sc:beach"
         mock_media.generate_photo.return_value = (None, "Failed")
+        mock_idle.ensure_comfyui_active.return_value = True
 
         # Run process_photo_request
         bot.process_photo_request(self.mock_call, "beach vacation")
         import time
-        for _ in range(20):
-            if mock_safe_edit.called:
+        for _ in range(30):
+            if mock_safe_edit.called and mock_media.generate_photo.called:
                 break
             time.sleep(0.05)
+        time.sleep(0.1)
 
         self.assertTrue(mock_safe_edit.called)
 

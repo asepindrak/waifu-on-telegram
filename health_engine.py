@@ -221,7 +221,7 @@ class HealthEngine:
 
         return True
 
-    def heal_llm(self, is_nsfw: bool = False) -> bool:
+    def heal_llm(self, is_nsfw: bool = False, wait_seconds: int = 45) -> bool:
         """
         Attempts to automatically start or resurrect the active LLM service (AGY Bridge / KoboldCPP / Ollama).
         Guarantees strict singleton execution: prevents multiple KoboldCPP instances from spawning.
@@ -240,7 +240,7 @@ class HealthEngine:
             or ":5001" in str(nsfw_url)
         )
         if is_nsfw and nsfw_targets_local:
-            return self._heal_koboldcpp_instance()
+            return self._heal_koboldcpp_instance(wait_seconds=wait_seconds)
 
         # In split mode, check whichever engine is offline (avoid duplicate 5001 probes)
         if mode in ("split", "hybrid"):
@@ -252,18 +252,18 @@ class HealthEngine:
             else:
                 kobold_checked = True
                 if not is_port_listening(5001):
-                    ok = self._heal_koboldcpp_instance() and ok
+                    ok = self._heal_koboldcpp_instance(wait_seconds=wait_seconds) and ok
 
             if not kobold_checked and (nsfw_p == "local" or ":5001" in str(getattr(self.llm_client, "nsfw_client", ""))):
                 if not is_port_listening(5001):
-                    ok = self._heal_koboldcpp_instance() and ok
+                    ok = self._heal_koboldcpp_instance(wait_seconds=wait_seconds) and ok
             return ok
 
         # If active LLM is AGY OpenAI Bridge (Port 8001)
         if sfw_p == "agy" or ":8001" in str(base_url):
             return self.heal_agy()
 
-        return self._heal_koboldcpp_instance()
+        return self._heal_koboldcpp_instance(wait_seconds=wait_seconds)
 
     def _check_kobold_port_health(self) -> Dict[str, Any]:
         """Checks health specifically against the local KoboldCPP (5001) client if in split mode."""
@@ -273,7 +273,7 @@ class HealthEngine:
             return nsfw_cli.check_health()
         return cli.check_health()
 
-    def _heal_koboldcpp_instance(self) -> bool:
+    def _heal_koboldcpp_instance(self, wait_seconds: int = 45) -> bool:
         with _KOBOLD_SPAWN_LOCK:
             if is_port_listening(5001):
                 stat = self._check_kobold_port_health()
@@ -288,15 +288,16 @@ class HealthEngine:
                 time.sleep(1)
             elif proc_count >= 1:
                 logger.info("KoboldCPP process is already running (loading model weights). Waiting for port 5001...")
-                for sec in range(1, 45):
+                existing_wait = max(5, min(int(wait_seconds), 15))
+                for sec in range(1, existing_wait + 1):
                     time.sleep(1)
                     if is_port_listening(5001):
                         stat = self._check_kobold_port_health()
                         if stat.get("online"):
                             logger.info(f"Existing KoboldCPP became ready in {sec}s.")
                             return True
-                # Process was running but didn't open port 5001 in 45s - terminate before spawning fresh
-                logger.warning("Existing KoboldCPP process timed out binding port 5001. Restarting cleanly...")
+                # Process was running but didn't open port 5001 in time - terminate before spawning fresh
+                logger.warning(f"Existing KoboldCPP process timed out binding port 5001 after {existing_wait}s. Restarting cleanly...")
                 kill_all_koboldcpp()
                 time.sleep(1)
 
@@ -337,8 +338,8 @@ class HealthEngine:
                         logger.error(f"Self-healing shell launcher fallback also failed: {e_shell}")
 
             if spawn_succeeded:
-                # Wait up to 45s for model weights to load into VRAM
-                for sec in range(1, 46):
+                # Wait up to wait_seconds for model weights to load into VRAM
+                for sec in range(1, max(5, int(wait_seconds)) + 1):
                     time.sleep(1)
                     if is_port_listening(5001):
                         # Give KoboldCPP a brief moment to finish binding endpoint

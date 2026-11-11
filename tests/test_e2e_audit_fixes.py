@@ -241,6 +241,166 @@ class TestE2EAuditFixes(unittest.TestCase):
             self.assertFalse(ok)
             mock_sleep_llm.assert_not_called()
 
+    def test_wake_llm_shares_deadline_and_caps_wait_with_agy_fallback(self):
+        mock_cli = MagicMock()
+        mock_cli.base_url = "http://127.0.0.1:8001/v1"
+        he = health_engine.HealthEngine(llm_client=mock_cli, enabled=False)
+        engine = idle_engine.IdleEngine(health_engine=he, enabled=True)
+        env = {
+            "AI_ENGINE_MODE": "unified",
+            "LLM_BASE_URL": "http://127.0.0.1:8001/v1",
+            "SFW_LLM_PROVIDER": "agy",
+            "SFW_LLM_BASE_URL": "http://127.0.0.1:8001/v1",
+            "NSFW_LLM_PROVIDER": "local",
+            "NSFW_LLM_BASE_URL": "http://127.0.0.1:5001/v1",
+        }
+        with patch.dict(os.environ, env, clear=False), \
+             patch("idle_engine.is_port_listening", side_effect=lambda p, timeout=1.0: p == 8001), \
+             patch.object(engine, "wake_llm", return_value=False) as mock_wake:
+            ok = engine.ensure_llm_active(is_user_chat=True, is_nsfw=True)
+            self.assertTrue(ok)
+            mock_wake.assert_called_once()
+            self.assertLessEqual(mock_wake.call_args.kwargs.get("timeout_seconds", 999), 30)
+
+    def test_agy_bridge_enforces_concise_prompt_when_max_tokens_small(self):
+        from fastapi.testclient import TestClient
+        import agy_bridge
+        client = TestClient(agy_bridge.app)
+        with patch("agy_bridge.run_agy_cli", return_value="Hai!") as mock_cli:
+            res = client.post(
+                "/v1/chat/completions",
+                json={
+                    "model": "gemini-3.8-flash-medium",
+                    "max_tokens": 220,
+                    "messages": [{"role": "user", "content": "Halo lagi apa?"}],
+                },
+            )
+            self.assertEqual(res.status_code, 200)
+            sent_prompt = mock_cli.call_args[0][0]
+            self.assertIn("SYSTEM_LENGTH_CONSTRAINT", sent_prompt)
+
+    def test_chat_actions_immediate_typing_and_upload_photo_persist(self):
+        import time as _time
+        mock_msg = MagicMock()
+        mock_msg.message = None
+        mock_msg.chat.id = 777111
+        mock_msg.from_user.id = 777111
+        mock_msg.message_id = 10
+        mock_msg._bypass_queue = False
+
+        with patch.object(bot.bot, "send_chat_action") as mock_action, \
+             patch.object(bot.chat_queue_mgr, "enqueue") as mock_enq:
+            bot.process_text_chat(mock_msg, "Halo!", bypass_queue=False)
+            _time.sleep(0.15)
+            mock_enq.assert_called_once()
+            mock_action.assert_any_call(777111, "typing")
+
+        # Verify process_photo_request starts upload_photo ChatActionLoop before scene extraction & stops after delivery
+        with patch.object(bot.bot, "send_chat_action") as mock_action, \
+             patch.object(bot, "safe_reply_to", return_value=None), \
+             patch.object(bot, "safe_send_message", return_value=None), \
+             patch.object(bot.persona_mgr, "extract_contextual_scene", return_value="cafe") as mock_scene, \
+             patch.object(bot.persona_mgr, "craft_visual_prompt_full", return_value=("1girl", "", False, "Casual")), \
+             patch.object(bot.idle_engine, "ensure_comfyui_active", return_value=True), \
+             patch.object(bot.idle_engine, "ensure_agy_bridge_active", return_value=True), \
+             patch.object(bot.media_engine, "generate_photo", return_value=(None, "None")), \
+             patch.object(bot, "ChatActionLoop", wraps=bot.ChatActionLoop) as spy_loop:
+            bot.process_photo_request(mock_msg, "pap dong", is_followup=True)
+            _time.sleep(0.3)
+            spy_loop.assert_called_with(bot.bot, 777111, "upload_photo")
+            mock_scene.assert_called_once()
+            self.assertTrue(any(c.args == (777111, "upload_photo") for c in mock_action.call_args_list))
+
+    def test_enforce_concise_chat_reply_and_huihui_casual_token_cap(self):
+        from lu_llm_client import enforce_concise_chat_reply, is_long_form_request
+
+        self.assertFalse(is_long_form_request("lagi apa nih?"))
+        self.assertTrue(is_long_form_request("jelasin dong error script python ini"))
+
+        verbose_reply = (
+            "*Hina tersenyum manis sambil merapikan rambutnya*\n\n"
+            "M-mmh... aku lagi santai di kos nih habis beres tugas. "
+            "Tadi sempat minum kopi dulu biar nggak ngantuk pas ngerjain. "
+            "Oh iya, kamu sendiri gimana hari ini? "
+            "Jangan lupa makan malam ya nanti sakit perut!"
+        )
+        concise = enforce_concise_chat_reply(verbose_reply, max_sentences=2, max_chars=240)
+        self.assertTrue(concise.startswith("*Hina tersenyum manis sambil merapikan rambutnya*\n\n"))
+        self.assertIn("M-mmh... aku lagi santai", concise)
+        self.assertIn("minum kopi dulu", concise)
+        self.assertNotIn("Jangan lupa makan malam", concise)
+
+        # Ensure trailing cut-off fragment after complete sentences is dropped cleanly
+        cutoff_reply = "*Hina nyengir*\n\nLagi rebahan aja nih. Kamu udah makan belum? Aku tadi masak mie tapi masih"
+        clean_cutoff = enforce_concise_chat_reply(cutoff_reply, max_sentences=2, max_chars=240)
+        self.assertEqual(clean_cutoff, "*Hina nyengir*\n\nLagi rebahan aja nih. Kamu udah makan belum?")
+
+        # Verify _execute_text_chat_direct caps max_tokens=120 for casual SFW chat and trims local Huihui prose
+        mock_msg = MagicMock()
+        mock_msg.message = None
+        mock_msg.chat.id = 888222
+        mock_msg.from_user.id = 888222
+        mock_msg.message_id = 42
+        mock_msg.text = "lagi apa?"
+
+        with patch.object(bot.bot, "send_chat_action"), \
+             patch.object(bot.idle_engine, "ensure_llm_active", return_value=True), \
+             patch.object(bot.llm_client, "check_health", return_value={"online": True, "engine": "koboldcpp"}), \
+             patch.object(bot.llm_client, "chat", return_value=(verbose_reply, "")) as mock_chat, \
+             patch.object(bot.persona_mgr, "get_chat_history", return_value=[]), \
+             patch.object(bot.persona_mgr, "detect_visual_scene_moment", return_value=(False, "")), \
+             patch.object(bot.persona_mgr, "add_message"), \
+             patch.object(bot.memory_engine, "auto_extract_facts"), \
+             patch.object(bot.pending_manager, "clear_pending"), \
+             patch.object(bot, "safe_reply_to") as mock_send:
+            bot._execute_text_chat_direct(mock_msg, "lagi apa?")
+
+        mock_chat.assert_called_once()
+        self.assertLessEqual(mock_chat.call_args.kwargs.get("max_tokens", 999), 150)
+        sent_text = mock_send.call_args[0][1]
+        self.assertNotIn("Jangan lupa makan malam", sent_text)
+
+    def test_outfit_syncs_from_chat_history_bra_panties_overrides_pajamas_and_jeans(self):
+        from persona_manager import PersonaManager
+        pm = PersonaManager(active_key="hina")
+        uid = 991122
+        pm.reset_undress_stage(uid)
+
+        # User/waifu previously said pajamas, then switched in chat to only BH + celana dalam
+        history = [
+            {"role": "assistant", "content": "Aku lagi rebahan pakai piyama tidur nih."},
+            {"role": "user", "content": "Buka piyama kamu dong, sisain BH sama celana dalam aja"},
+            {"role": "assistant", "content": "Iya deh aku lepas piyamanya, sekarang cuma pake BH sama celana dalam nih."},
+        ]
+        # Even if stale stage=1 (shirt_off) was active, chat explicitly saying BH & celana dalam must produce bra & panties without jeans
+        pm.set_undress_stage(uid, 1)
+        prompt, neg, is_nude, label = pm.craft_visual_prompt_full(
+            "pap dong",
+            user_id=uid,
+            history=history,
+            allow_undress_advance=False,
+        )
+        self.assertIn("bra and panties", prompt.lower())
+        self.assertNotIn("jeans", prompt.lower())
+        self.assertNotIn("camisole", prompt.lower())
+        self.assertIn("jeans", neg.lower())
+        self.assertIn("bedroom", prompt.lower())
+        self.assertFalse(is_nude)
+        self.assertIn("Celana Terlepas", label)
+
+        # Verify sync_outfit_from_chat also updates stage directly from waifu/user chat
+        pm.set_user_outfit(uid, "pajamas")
+        synced = pm.sync_outfit_from_chat(
+            uid,
+            user_text="pap",
+            reply_text="Bentar ya, aku lagi cuma pake BH sama celana dalam kok.",
+        )
+        self.assertEqual(synced, "bottoms_off")
+        self.assertEqual(pm.get_undress_stage(uid), 2)
+
+        # Clean up test state
+        pm.reset_undress_stage(uid)
+
 
 if __name__ == "__main__":
     unittest.main()

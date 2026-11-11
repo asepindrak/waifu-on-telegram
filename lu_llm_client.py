@@ -334,3 +334,98 @@ class LocallyUncensoredClient:
         return clean_reply, reasoning
 
 
+_LONG_FORM_PATTERN = re.compile(
+    r"(```|\b(?:jelaskan|jelasin|cerita|ceritakan|dongeng|rangkum|ringkas|"
+    r"buatkan|tulis(?:kan)?|tutorial|langkah-langkah|tips|kenapa|mengapa|"
+    r"bagaimana cara|coding|kode|script|error|bug|debug|audit|refactor|"
+    r"project|folder|workspace|explain|summarize|story|write a)\b)",
+    re.IGNORECASE,
+)
+
+# Matches a sentence terminator (., !, ?, ~) optionally followed by quotes/emojis,
+# ignoring decimals/versions and lowercase-continued ellipses ("M-mmh... kamu").
+_SENTENCE_END_PATTERN = re.compile(
+    r"(\.{3}|[.!?~]+)(?:[\"'\)\]]+)?(?:\s*[\U00010000-\U0010ffff\u2600-\u27bf\ufe0f]+)*(?=\s+|$)"
+)
+
+
+def is_long_form_request(user_text: str) -> bool:
+    """Returns True when the user asked a technical, coding, or explicitly detailed question."""
+    text = (user_text or "").strip()
+    if not text:
+        return False
+    if len(text) > 180 or text.count("?") >= 3:
+        return True
+    return bool(_LONG_FORM_PATTERN.search(text))
+
+
+def enforce_concise_chat_reply(
+    reply_text: str,
+    max_sentences: int = 2,
+    max_chars: int = 240,
+) -> str:
+    """
+    Trims verbose chat replies down to a leading stage-action cue (*...* / _..._)
+    plus at most `max_sentences` complete sentences so local and cloud models
+    converse naturally like short Telegram/WhatsApp chat without mid-word cutoffs.
+    """
+    text = (reply_text or "").strip()
+    if not text:
+        return text
+
+    stage_cue = ""
+    dialogue = text
+    cue_match = re.match(r"^\s*(\*[^*\n]{2,140}\*|_[^_\n]{2,140}_)\s*(.*)$", text, re.DOTALL)
+    if cue_match:
+        stage_cue = cue_match.group(1).strip()
+        dialogue = cue_match.group(2).strip()
+
+    if not dialogue:
+        return stage_cue
+
+    # Collapse excessive line breaks inside casual dialogue while stripping bullet bloat
+    paras = [p.strip() for p in re.split(r"\n{2,}", dialogue) if p.strip()]
+    collapsed = " ".join(re.sub(r"\s+", " ", p) for p in paras[:2]).strip()
+
+    if len(collapsed) <= max_chars:
+        # Still check sentence count in case multiple terse sentences stack up (> max_sentences + 1)
+        pass
+
+    sentences: List[str] = []
+    start = 0
+    for m in _SENTENCE_END_PATTERN.finditer(collapsed):
+        punct = m.group(1)
+        end_idx = m.end()
+        after = collapsed[end_idx:].lstrip()
+        # Keep ellipsis attached to the same sentence if followed by a lowercase continuation
+        if punct == "..." and after and after[0].islower():
+            continue
+        seg = collapsed[start:end_idx].strip()
+        if seg:
+            sentences.append(seg)
+            start = end_idx
+
+    if sentences:
+        # Allow a 3rd short sentence only if first two together are very brief (< 75 chars)
+        selected: List[str] = []
+        for idx, s in enumerate(sentences):
+            if idx < max_sentences or (idx == max_sentences and len(" ".join(selected)) < 75 and len(" ".join(selected + [s])) <= max_chars):
+                if selected and len(" ".join(selected + [s])) > max_chars:
+                    break
+                selected.append(s)
+            else:
+                break
+        if not selected:
+            selected = [sentences[0]]
+        dialogue_out = " ".join(selected).strip()
+    else:
+        # Unpunctuated single clause: trim only if exceeding max_chars
+        if len(collapsed) > max_chars:
+            cut = collapsed[:max_chars].rsplit(" ", 1)[0].rstrip(",;:-")
+            dialogue_out = (cut or collapsed[:max_chars]) + "~"
+        else:
+            dialogue_out = collapsed
+
+    return f"{stage_cue}\n\n{dialogue_out}".strip() if stage_cue else dialogue_out
+
+

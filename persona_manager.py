@@ -287,62 +287,62 @@ OUTFIT_PRESETS = {
     "pajamas": {
         "name": "🌙 Silk Pajamas",
         "prompt": "(wearing soft pastel silk camisole and sleep shorts:1.35), bedtime loungewear",
-        "negative": "hoodie, jacket, coat, outdoor clothes, jeans"
+        "negative": "hoodie, jacket, coat, outdoor clothes, jeans, denim, trousers, long pants, slacks"
     },
     "bikini": {
         "name": "🏖️ Summer Bikini",
         "prompt": "(wearing fashionable two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
-        "negative": "clothes, casual clothes, hoodie, sweater, jacket, shirt, pants, coat, pajamas"
+        "negative": "clothes, casual clothes, hoodie, sweater, jacket, shirt, pants, jeans, coat, pajamas"
     },
     "school_jk": {
         "name": "🏫 School JK Uniform",
         "prompt": "(wearing japanese anime school uniform, sailor collar, pleated skirt:1.35)",
-        "negative": "bikini, casual clothes, hoodie"
+        "negative": "bikini, casual clothes, hoodie, jeans"
     },
     "gym": {
         "name": "🏋️ Sporty Gym Wear",
         "prompt": "(wearing athletic sports bra and sleek yoga leggings:1.35), fitness activewear",
-        "negative": "dress, hoodie, skirt, coat"
+        "negative": "dress, hoodie, skirt, coat, jeans"
     },
     "dress": {
         "name": "👗 Elegant Evening Dress",
         "prompt": "(wearing gorgeous elegant evening cocktail dress:1.35), glamorous feminine styling",
-        "negative": "hoodie, casual clothes, sportswear, bikini"
+        "negative": "hoodie, casual clothes, sportswear, bikini, jeans, pants"
     },
     "towel": {
         "name": "🚿 Handuk Mandi (After Shower)",
         "prompt": "(wearing only a soft bath towel wrapped around chest:1.4), bare shoulders, bare collarbone, wet skin, damp hair, post-shower bathroom steam, seductive styling",
-        "negative": "clothes, shirt, pants, dress, coat, hoodie, jeans, jacket, sweater"
+        "negative": "clothes, shirt, pants, dress, coat, hoodie, jeans, denim, trousers, jacket, sweater"
     },
     "lingerie": {
         "name": "💋 Sensual Lace Lingerie",
-        "prompt": "(wearing delicate sheer black lace lingerie:1.4), detailed lace bra, matching lace panties, bare midriff, exposed stomach, seductive cleavage, alluring intimate styling",
-        "negative": "clothes, casual clothes, hoodie, pants, coat, jeans, sweater, jacket"
+        "prompt": "(wearing delicate sheer black lace lingerie:1.4), detailed lace bra, matching lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
+        "negative": "clothes, casual clothes, hoodie, pants, long pants, trousers, slacks, denim, shorts, skirt, coat, jeans, sweater, jacket, pajamas"
     },
     "romantic": {
         "name": "💋 Pakaian Romantis (Silk Slip Dress)",
         "prompt": "(wearing alluring romantic silk slip dress with delicate lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
-        "negative": "campus, backpack, casual college clothes, classroom, hoodie, outdoor clothes, jeans, winter clothes"
+        "negative": "campus, backpack, casual college clothes, classroom, hoodie, outdoor clothes, jeans, denim, trousers, winter clothes"
     },
     "shirt_off": {
         "name": "👙 Kaos Terlepas (Tersisa BH & Celana)",
-        "prompt": "(wearing only a delicate lace bra and casual jeans:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
-        "negative": "shirt, t-shirt, top, hoodie, sweater, jacket, coat, fully clothed, topless, naked, panties only"
+        "prompt": "(wearing only a delicate lace bra and relaxed lounge shorts:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "negative": "shirt, t-shirt, top, blouse, hoodie, sweater, jacket, coat, jeans, denim, long pants, trousers, fully clothed, topless, naked, panties only"
     },
     "bottoms_off": {
         "name": "💋 Celana Terlepas (Set Pakaian Dalam: BH & Celana Dalam)",
         "prompt": "(wearing only matching sheer lace bra and panties:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
-        "negative": "shirt, t-shirt, pants, jeans, shorts, skirt, dress, hoodie, coat, naked, topless"
+        "negative": "shirt, t-shirt, blouse, pants, long pants, trousers, slacks, denim, jeans, shorts, skirt, dress, hoodie, coat, jacket, pajamas, naked, topless"
     },
     "bra_off": {
         "name": "🔞 BH Terlepas (Topless & Celana Dalam)",
         "prompt": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny lace panties:1.35, sensual blush, intimate bedroom atmosphere",
-        "negative": "bra, shirt, top, clothes, dress, pants, skirt, jacket, fully naked"
+        "negative": "bra, shirt, top, clothes, dress, pants, jeans, denim, trousers, skirt, jacket, pajamas, fully naked"
     },
     "nude": {
         "name": "🔞 Tanpa Busana (Full Nude)",
         "prompt": "(completely nude:1.45), (bare body:1.4), full body nude, detailed nipples, natural breasts, navel, bare stomach, thighs, intimate bedroom atmosphere, seductive erotic styling",
-        "negative": "clothes, clothing, fabric, dress, shirt, pants, underwear, bra, panties, swimwear, bikini, cover, towel, censored, bar censor"
+        "negative": "clothes, clothing, fabric, dress, shirt, pants, jeans, denim, trousers, underwear, bra, panties, swimwear, bikini, cover, towel, censored, bar censor"
     }
 }
 
@@ -1137,11 +1137,11 @@ class PersonaManager:
         # Keyword mapping for common anime / girlfriend situations & dynamic narrative settings
         # Ordered from most specific outdoor/culinary/public settings to indoor/campus settings
         SCENE_PATTERNS = [
-            (["sensual", "romantic", "romantis", "intimate", "mesra"],
+            (["sensual", "romantic", "romantis", "intimate", "mesra", "lingerie", "pakaian dalam", "celana dalam", "bh", "bra", "panties", "topless", "telanjang", "bugil"],
              "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer"),
             (["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath"],
              "standing in modern bathroom with soft steam, post-shower glow, bathroom mirror"),
-            (["bed", "sleep", "night", "tidur", "kasur", "pajamas", "rebahan", "bangun", "selimut", "bantal", "telentang", "terlentang", "tengkurap"],
+            (["bed", "sleep", "night", "tidur", "kasur", "piyama", "pajamas", "rebahan", "bangun", "selimut", "bantal", "telentang", "terlentang", "tengkurap"],
              "relaxing on bed with fluffy pillows, warm dim night bedroom lamp"),
             (["halte", "bus stop", "shelter", "halte bis", "halte bus", "angkot", "stasiun bis"],
              "waiting at outdoor bus stop shelter, sitting on bench, bus stop sign, atmospheric street perspective, cinematic depth of field"),
@@ -1236,11 +1236,12 @@ class PersonaManager:
                     return "waiting at rainy bus stop shelter, holding umbrella, wet asphalt, rain reflections, atmospheric street lighting, cinematic depth of field"
                 return _resolve_scene_variation(scene_desc)
 
-        # 3. Context from ongoing chat history
-        combined_recent = " ".join(clean_turns).lower()
-        for keywords, scene_desc in SCENE_PATTERNS:
-            if _has_kw(combined_recent, keywords):
-                return _resolve_scene_variation(scene_desc)
+        # 3. Context from ongoing chat history (newest turn first so latest setting wins)
+        for hist_turn in reversed(clean_turns):
+            hist_low = (hist_turn or "").lower()
+            for keywords, scene_desc in SCENE_PATTERNS:
+                if _has_kw(hist_low, keywords):
+                    return _resolve_scene_variation(scene_desc)
 
         # 4. LLM dynamic setting extraction for novel/arbitrary story locations
         if llm_client and hasattr(llm_client, "chat") and len(clean_turns) > 0:
@@ -1280,103 +1281,86 @@ class PersonaManager:
 
         return "sitting comfortably in modern cozy room, soft ambient morning lighting"
 
-    def detect_clothing_intent(
+    def _match_explicit_outfit_text(
         self,
-        user_text: str,
-        user_id: Optional[int] = None,
-        history: Optional[List[Dict[str, str]]] = None,
-        scene_hint: Optional[str] = None,
-        is_nsfw: bool = False
-    ) -> Tuple[str, str, bool, str]:
+        text: str,
+        allow_romantic: bool = True,
+        allow_ambiguous_undress: bool = True
+    ) -> Optional[Tuple[str, bool]]:
         """
-        Dynamically analyzes user request text & recent conversation for clothing intent.
-        Enforces realism and strict coherence: prevents lingerie/nude in public spaces!
+        Matches explicit clothing / undress state mentioned in a single chat message.
+        Ignores negated or undressed items (e.g. 'buka piyama', 'lepas celana dalam')
+        so taking off pajamas to wear only bra & panties resolves cleanly to 'bottoms_off'.
+        Returns: (preset_key, is_nude) or None.
         """
-        lower = user_text.lower()
+        if not text:
+            return None
+        lower = text.lower()
+        neg_prefix = r"(?:buka|lepas|copot|melepas|membuka|turunkan|menanggalkan|tanpa|ga\s+pake|gak\s+pake|ngga\s+pake|tidak\s+pake)\s+(?:\w+\s+){0,2}"
 
-        # Check sequential undress state progression for user
-        if user_id:
-            cur_stage = self.get_undress_stage(user_id)
-            target_stage, action_desc, is_trans = self.detect_undress_intent(user_text, current_stage=cur_stage)
-            if is_trans and target_stage != cur_stage:
-                self.set_undress_stage(user_id, target_stage)
-                cur_stage = target_stage
+        def _has_pos_kw(keywords: List[str]) -> bool:
+            kw_alt = "|".join(re.escape(k) for k in keywords)
+            for m in re.finditer(rf"\b(?:{kw_alt})\b", lower, re.IGNORECASE):
+                prefix = lower[max(0, m.start() - 32):m.start()]
+                if not re.search(rf"{neg_prefix}$", prefix, re.IGNORECASE):
+                    return True
+            return False
 
-            if cur_stage > 0:
-                stage_map = {
-                    1: ("shirt_off", False),
-                    2: ("bottoms_off", False),
-                    3: ("bra_off", True),
-                    4: ("nude", True)
-                }
-                if cur_stage in stage_map:
-                    k, is_n = stage_map[cur_stage]
-                    preset = OUTFIT_PRESETS[k]
-                    return (preset["prompt"], preset["negative"], is_n, preset["name"])
+        # 1. Explicit Topless / Bra Off (BH dilepas -> hanya celana dalam)
+        if re.search(
+            r"\b(topless|bertelanjang\s+dada|tanpa\s+(?:bh|bra)|(?:buka|lepas|copot)\s+(?:bh|bra))\b",
+            lower,
+        ):
+            return ("bra_off", True)
+        if (
+            re.search(r"\b(?:cuma|hanya)\s+(?:pake|pakai|memakai)\s+(?:celana\s+dalam|panties|cd)\b", lower)
+            and not re.search(r"\b(?:bh|bra|kutang)\b", lower)
+        ):
+            return ("bra_off", True)
 
-        # 1. Explicit Full Nude / Tanpa Busana / Intimate Anatomy
-        NUDE_KEYWORDS = [
-            "tanpa busana", "tanpa baju", "tanpa pakaian", "telanjang", "bugil",
-            "nude", "naked", "completely naked", "unclothed", "topless",
-            "bottomless", "no clothes", "lepas baju", "buka baju", "buka pakaian",
+        # 2. Explicit Bra & Panties / Lingerie / Underwear (checked BEFORE 'nude' and BEFORE 'pajamas')
+        if _has_pos_kw(["lingerie"]):
+            return ("lingerie", False)
+        if (
+            _has_pos_kw([
+                "pakaian dalam", "bh", "bra", "kutang", "celana dalam",
+                "panties", "sempak", "kancut", "underwear",
+                "baju tidur seksi", "sexy sleepwear"
+            ])
+            or re.search(r"\b(?:pake|pakai|memakai|tersisa|tinggal|cuma|hanya)\s+cd\b", lower)
+        ):
+            return ("bottoms_off", False)
+
+        # 3. Explicit Full Nude / Intimate Anatomy
+        unambiguous_nude = [
+            "tanpa busana", "tanpa baju", "tanpa pakaian", "telanjang", "telanjang bulat",
+            "bugil", "nude", "naked", "completely naked", "unclothed", "bottomless",
+            "no clothes", "tanpa sehelai benang", "uncensored", "nsfw",
+            "nenen", "toket", "tetek", "payudara", "memek", "vagina",
+            "buka semua", "buka semuanya", "lepas semua", "lepas semuanya",
+            "foto nenen", "pap nenen", "foto toket", "pap toket",
+            "foto telanjang", "pap telanjang", "foto bugil", "pap bugil",
             "gak pake baju", "ngga pake baju", "ga pake baju", "ga pake busana",
-            "gak pake pakaian", "ga pake pakaian", "uncensored", "nsfw",
-            "nenen", "toket", "tetek", "payudara", "telanjang bulat", "tanpa sehelai benang",
-            "buka celana", "buka semua", "lepas semua", "foto nenen", "pap nenen",
-            "foto toket", "pap toket", "foto telanjang", "pap telanjang", "foto bugil", "pap bugil"
+            "gak pake pakaian", "ga pake pakaian",
         ]
-        if any(k in lower for k in NUDE_KEYWORDS):
-            return (
-                OUTFIT_PRESETS["nude"]["prompt"],
-                OUTFIT_PRESETS["nude"]["negative"],
-                True,
-                OUTFIT_PRESETS["nude"]["name"]
-            )
+        if _has_pos_kw(unambiguous_nude):
+            return ("nude", True)
+        if allow_ambiguous_undress and re.search(
+            r"\b(lepas\s+baju|buka\s+baju|buka\s+pakaian|buka\s+celana)\b", lower
+        ):
+            return ("nude", True)
 
-        # 1.5. Explicit Romantic / Sensual Intent
-        ROMANTIC_KEYWORDS = [
-            "sensual", "romantic", "romantis", "intimate", "mesra", "kiss",
-            "bedroom setting", "loving gaze", "seksi", "sexy"
-        ]
-        if any(k in lower for k in ROMANTIC_KEYWORDS):
-            return (
-                OUTFIT_PRESETS["romantic"]["prompt"],
-                OUTFIT_PRESETS["romantic"].get("negative", ""),
-                False,
-                OUTFIT_PRESETS["romantic"]["name"]
-            )
-
-        # 2. Explicit Lingerie / Underwear Intent
-        LINGERIE_KEYWORDS = [
-            "lingerie", "underwear", "pakaian dalam", "bh", "bra", "celana dalam",
-            "panties", "renda", "baju tidur seksi", "sexy sleepwear", "transparan"
-        ]
-        if any(k in lower for k in LINGERIE_KEYWORDS):
-            return (
-                OUTFIT_PRESETS["lingerie"]["prompt"],
-                OUTFIT_PRESETS["lingerie"]["negative"],
-                False,
-                OUTFIT_PRESETS["lingerie"]["name"]
-            )
-
-        # 3. Explicit Towel Intent
-        TOWEL_KEYWORDS = [
+        # 4. Explicit Towel Intent
+        if _has_pos_kw([
             "handuk", "habis mandi", "selesai mandi", "after bath", "after shower",
             "towel", "kamar mandi", "basah", "bathroom", "shower", "bath", "steam"
-        ]
-        if any(k in lower for k in TOWEL_KEYWORDS):
-            return (
-                OUTFIT_PRESETS["towel"]["prompt"],
-                OUTFIT_PRESETS["towel"]["negative"],
-                False,
-                OUTFIT_PRESETS["towel"]["name"]
-            )
+        ]):
+            return ("towel", False)
 
-        # 4. Other Preset Outfits explicitly requested in user_text
+        # 5. Clothed Presets (word-boundary + undress-negation aware so 'buka piyama' won't match pajamas)
         DYNAMIC_PRESET_KEYWORDS = [
-            ("romantic", ["romantic", "romantis", "sensual", "intimate", "mesra"]),
             ("bikini", ["bikini", "swimsuit", "baju renang"]),
-            ("pajamas", ["piyama", "pajamas", "baju tidur", "camisole"]),
+            ("pajamas", ["piyama", "pajamas", "baju tidur", "daster", "camisole"]),
             ("campus_casual", ["baju kuliah", "outfit kuliah", "seragam kampus"]),
             ("mall_casual", ["baju mall", "streetwear"]),
             ("cafe_cozy", ["baju cafe", "cozy knit"]),
@@ -1385,30 +1369,153 @@ class PersonaManager:
             ("school_jk", ["seragam sekolah", "school jk", "sailor uniform", "baju sekolah"]),
             ("gym", ["baju gym", "baju olahraga", "activewear"]),
             ("dress", ["dress", "gaun", "cocktail dress"]),
-            ("sweater", ["sweater", "rajut"])
+            ("sweater", ["sweater", "rajut"]),
         ]
         for key, keywords in DYNAMIC_PRESET_KEYWORDS:
-            if any(k in lower for k in keywords):
-                preset = OUTFIT_PRESETS.get(key, OUTFIT_PRESETS["default"])
-                if user_id:
-                    self.set_user_outfit(user_id, key, is_locked=False, duration_seconds=1800)
-                return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
+            if _has_pos_kw(keywords):
+                return (key, False)
 
-        # 4.5. NSFW Mode Fallback (if turn is NSFW and no clothed preset requested, default to current stage or nude)
+        # 6. Romantic / Sensual Slip Dress (lowest explicit priority)
+        if allow_romantic and _has_pos_kw([
+            "sensual", "romantic", "romantis", "intimate", "mesra",
+            "kiss", "bedroom setting", "loving gaze", "seksi", "sexy"
+        ]):
+            return ("romantic", False)
+
+        return None
+
+    def sync_outfit_from_chat(self, user_id: int, user_text: str = "", reply_text: str = "") -> Optional[str]:
+        """
+        Synchronizes stored outfit/undress state with the newest explicit outfit described
+        in either the waifu's reply or the user's message (unless outfit is locked).
+        """
+        if not user_id:
+            return None
+        details = self.get_user_outfit_details(user_id)
+        if details.get("is_locked"):
+            return None
+
+        # Waifu's latest statement reflects final state in the turn; check reply first, then user_text
+        matched = (
+            self._match_explicit_outfit_text(reply_text, allow_romantic=False, allow_ambiguous_undress=False)
+            or self._match_explicit_outfit_text(user_text, allow_romantic=False, allow_ambiguous_undress=False)
+        )
+        if not matched:
+            return None
+
+        key, _ = matched
+        stage_by_key = {"shirt_off": 1, "bottoms_off": 2, "lingerie": 2, "bra_off": 3, "nude": 4}
+        if key in stage_by_key:
+            target_stage = stage_by_key[key]
+            if self.get_undress_stage(user_id) != target_stage:
+                self.set_undress_stage(user_id, target_stage)
+            if key == "lingerie":
+                uid = int(user_id)
+                rec = self.user_outfits.get(uid, {})
+                rec["key"] = "lingerie"
+                rec["mode"] = "session"
+                self.user_outfits[uid] = rec
+                self._save_user_outfits()
+        else:
+            if self.get_undress_stage(user_id) != 0:
+                self.reset_undress_stage(user_id)
+            self.set_user_outfit(user_id, key, is_locked=False, duration_seconds=1800)
+        return key
+
+    def detect_clothing_intent(
+        self,
+        user_text: str,
+        user_id: Optional[int] = None,
+        history: Optional[List[Dict[str, str]]] = None,
+        scene_hint: Optional[str] = None,
+        is_nsfw: bool = False,
+        allow_undress_advance: bool = True
+    ) -> Tuple[str, str, bool, str]:
+        """
+        Dynamically analyzes user request text & recent conversation for clothing intent.
+        Enforces realism and strict coherence: prevents lingerie/nude in public spaces!
+        """
+        hist = history or (self.get_chat_history(user_id) if user_id else [])
+        clean_turns = [m.get("content", "") for m in hist[-6:] if not m.get("content", "").startswith("[")]
+        outfit_details = self.get_user_outfit_details(user_id) if user_id else {
+            "key": "default", "mode": "auto", "is_locked": False, "is_session": False
+        }
+        outfit_mode = outfit_details.get("mode", "auto")
+        is_locked = bool(outfit_details.get("is_locked"))
+
+        cur_stage = self.get_undress_stage(user_id) if user_id else 0
+
+        # 1. Check explicit clothing description in current user_text first (e.g. 'cuma pake BH sama celana dalam', 'piyama')
+        # Keep romantic keywords disabled when sequential undress stage > 0 so 'seksi banget' stays at active stage.
+        explicit_current = self._match_explicit_outfit_text(
+            user_text,
+            allow_romantic=(cur_stage == 0),
+            allow_ambiguous_undress=(user_id is None),
+        )
+        if explicit_current:
+            exp_key, exp_nude = explicit_current
+            preset = OUTFIT_PRESETS.get(exp_key, OUTFIT_PRESETS["default"])
+            stage_by_key = {"bottoms_off": 2, "lingerie": 2, "bra_off": 3, "nude": 4}
+            if user_id and not is_locked:
+                if exp_key in stage_by_key:
+                    if self.get_undress_stage(user_id) != stage_by_key[exp_key]:
+                        self.set_undress_stage(user_id, stage_by_key[exp_key])
+                elif exp_key not in ("romantic",):
+                    if cur_stage > 0:
+                        self.reset_undress_stage(user_id)
+                    self.set_user_outfit(user_id, exp_key, is_locked=False, duration_seconds=1800)
+            return (preset["prompt"], preset.get("negative", ""), exp_nude, preset["name"])
+
+        # 2. Check sequential undress state progression for user (e.g. 'buka baju', 'buka lagi')
+        if user_id:
+            if allow_undress_advance:
+                target_stage, _, is_trans = self.detect_undress_intent(user_text, current_stage=cur_stage)
+                if is_trans and target_stage != cur_stage:
+                    self.set_undress_stage(user_id, target_stage)
+                    cur_stage = target_stage
+
+        # 3. Scan recent conversation history (newest-first!) BEFORE falling back to stale stage/session
+        #    Skip only when user explicitly changed location/routine in current user_text (e.g. 'pap di mall').
+        current_loc_ctx = detect_contextual_activity_and_outfit(user_text, [], persona_key=self.active_key)
+        has_new_location_in_user_text = bool(current_loc_ctx.get("is_explicit"))
+        if not is_locked and not has_new_location_in_user_text and cur_stage == 0:
+            for turn in reversed(clean_turns):
+                hist_match = self._match_explicit_outfit_text(
+                    turn, allow_romantic=False, allow_ambiguous_undress=False
+                )
+                if hist_match:
+                    h_key, h_nude = hist_match
+                    preset = OUTFIT_PRESETS.get(h_key, OUTFIT_PRESETS["default"])
+                    return (preset["prompt"], preset.get("negative", ""), h_nude, preset["name"])
+
+        # Also: if cur_stage == 1 ('shirt_off') was active but newest chat turn explicitly switched to
+        # underwear ('BH sama celana dalam' / 'bottoms_off' / 'lingerie' / 'bra_off' / 'pajamas'), sync immediately!
+        if not is_locked and cur_stage > 0 and clean_turns:
+            latest_match = self._match_explicit_outfit_text(
+                clean_turns[-1], allow_romantic=False, allow_ambiguous_undress=False
+            )
+            if latest_match:
+                l_key, l_nude = latest_match
+                stage_rank = {"shirt_off": 1, "bottoms_off": 2, "lingerie": 2, "bra_off": 3, "nude": 4}
+                if l_key in stage_rank and stage_rank[l_key] != cur_stage:
+                    preset = OUTFIT_PRESETS.get(l_key, OUTFIT_PRESETS["default"])
+                    return (preset["prompt"], preset.get("negative", ""), l_nude, preset["name"])
+
+        # 4. Active sequential undress stage (Stage 1..4)
+        if user_id and cur_stage > 0:
+            stage_map = {
+                1: ("shirt_off", False),
+                2: ("bottoms_off", False),
+                3: ("bra_off", True),
+                4: ("nude", True)
+            }
+            if cur_stage in stage_map:
+                k, is_n = stage_map[cur_stage]
+                preset = OUTFIT_PRESETS[k]
+                return (preset["prompt"], preset["negative"], is_n, preset["name"])
+
+        # 5. NSFW Mode Fallback (if turn is NSFW and no clothed preset requested, default to nude)
         if is_nsfw:
-            if user_id:
-                stage = self.get_undress_stage(user_id)
-                if stage > 0:
-                    stage_map = {
-                        1: ("shirt_off", False),
-                        2: ("bottoms_off", False),
-                        3: ("bra_off", True),
-                        4: ("nude", True)
-                    }
-                    if stage in stage_map:
-                        k, is_n = stage_map[stage]
-                        preset = OUTFIT_PRESETS[k]
-                        return (preset["prompt"], preset["negative"], is_n, preset["name"])
             return (
                 OUTFIT_PRESETS["nude"]["prompt"],
                 OUTFIT_PRESETS["nude"]["negative"],
@@ -1416,9 +1523,7 @@ class PersonaManager:
                 OUTFIT_PRESETS["nude"]["name"]
             )
 
-        # 5. Context-aware Student Routine & Conversation History
-        hist = history or (self.get_chat_history(user_id) if user_id else [])
-        clean_turns = [m.get("content", "") for m in hist[-5:] if not m.get("content", "").startswith("[")]
+        # 6. Context-aware Student Routine & Conversation History
         ctx = detect_contextual_activity_and_outfit(user_text, clean_turns, persona_key=self.active_key)
 
         # Determine if current venue is public (mall, campus, cafe, etc.)
@@ -1428,12 +1533,7 @@ class PersonaManager:
             if any(k in lower_s for k in ["mall", "campus", "classroom", "library", "cafe", "park", "street", "store"]):
                 is_public = True
 
-        outfit_details = self.get_user_outfit_details(user_id) if user_id else {
-            "key": "default", "mode": "auto", "is_locked": False, "is_session": False,
-            "name": ctx["outfit_name"], "raw_name": ctx["outfit_name"]
-        }
         outfit_key = outfit_details.get("key", "default")
-        outfit_mode = outfit_details.get("mode", "auto")
 
         # Check if conversation has an explicit active scenario that conflicts with current session outfit
         is_explicit = bool(ctx.get("is_explicit", False))
@@ -1493,7 +1593,8 @@ class PersonaManager:
         user_id: Optional[int] = None,
         scene_override: Optional[str] = None,
         history: Optional[List[Dict[str, str]]] = None,
-        is_nsfw: bool = False
+        is_nsfw: bool = False,
+        allow_undress_advance: bool = True
     ) -> Tuple[str, str, bool, str]:
         """
         Builds visual prompt dynamically with student routine & clothing coherence.
@@ -1505,8 +1606,23 @@ class PersonaManager:
         hist = history or (self.get_chat_history(user_id) if user_id else [])
         scene = scene_override or self.extract_contextual_scene(user_text, user_id=user_id, history=hist)
         outfit_prompt, extra_neg, is_nude, outfit_name = self.detect_clothing_intent(
-            user_text, user_id=user_id, history=hist, scene_hint=scene, is_nsfw=is_nsfw
+            user_text,
+            user_id=user_id,
+            history=hist,
+            scene_hint=scene,
+            is_nsfw=is_nsfw,
+            allow_undress_advance=allow_undress_advance,
         )
+
+        # Prevent hardcoded uniform/cardigan clauses in persona traits (e.g. Shiro/Yume) from clashing with dynamic outfits
+        if outfit_prompt and any(k in outfit_prompt.lower() for k in ("nude", "topless", "bra", "lingerie", "bikini", "towel", "pajama", "camisole", "slip dress", "maid", "kimono", "gym")):
+            base_visual = re.sub(
+                r"(?:dark navy jacket over crisp white collared blouse, royal blue ribbon tie with silver star crystal brooch at collar,?\s*|"
+                r"cozy oversized lavender cardigan over white pleated camisole dress with delicate lace trim,?\s*)",
+                "",
+                base_visual,
+                flags=re.IGNORECASE,
+            ).strip()
 
         # Check if user explicitly requested a multi-person photo (e.g. couple with user, berdua, 2 people)
         wants_multi = any(re.search(pat, (user_text or "").lower()) for pat in [

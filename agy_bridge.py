@@ -254,6 +254,11 @@ async def chat_completions(request: ChatCompletionRequest, token: str = Security
         role_label = msg.role.upper()
         content_str = process_message_content(msg.content, temp_dir)
         full_prompt += f"{role_label}: {content_str}\n"
+    if request.max_tokens and request.max_tokens <= 260:
+        full_prompt += (
+            f"\nSYSTEM_LENGTH_CONSTRAINT: Keep your reply very concise, natural, and casual like everyday chat "
+            f"(1-2 short sentences, max ~{request.max_tokens} tokens, no long paragraphs).\n"
+        )
 
     default_model = os.environ.get("AGY_DEFAULT_MODEL", "gemini-3.8-flash-medium")
     effort = os.environ.get("AGY_EFFORT", "")
