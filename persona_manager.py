@@ -1117,15 +1117,25 @@ class PersonaManager:
         user_text: str,
         user_id: Optional[int] = None,
         llm_client: Any = None,
-        history: Optional[List[Dict[str, str]]] = None
+        history: Optional[List[Dict[str, str]]] = None,
+        conversational_reply: Optional[str] = None
     ) -> str:
         """
         Determines the visual scene/location for image generation based on
-        explicit user prompt, recent dialogue, or realistic college student routine.
+        explicit user prompt, waifu's conversational reply, recent dialogue, or college routine.
+        Uses strict word boundaries to prevent substring false-positives (e.g. 'makanannya' -> kitchen).
         """
-        lower = user_text.lower()
+        lower = (user_text or "").lower()
+        reply_lower = (conversational_reply or "").lower()
+
+        def _has_kw(text: str, keywords: List[str]) -> bool:
+            if not text:
+                return False
+            pat = r"\b(?:" + "|".join(re.escape(k) for k in keywords) + r")\b"
+            return bool(re.search(pat, text, re.IGNORECASE))
 
         # Keyword mapping for common anime / girlfriend situations & dynamic narrative settings
+        # Ordered from most specific outdoor/culinary/public settings to indoor/campus settings
         SCENE_PATTERNS = [
             (["sensual", "romantic", "romantis", "intimate", "mesra"],
              "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer"),
@@ -1139,6 +1149,8 @@ class PersonaManager:
              "standing inside modern university campus lobby, open atrium, university building interior, clean bright indoor lighting, soft bokeh"),
             (["kehujanan", "berteduh", "hujan lebat", "hujan deras", "bawa payung", "payung", "gerimis", "hujan", "rain", "rainy", "umbrella"],
              "sheltering from rain under awning, holding transparent umbrella, wet reflections on pavement, cozy romantic rainy day atmosphere, atmospheric street lighting"),
+            (["street food", "jajanan", "jajan", "kaki lima", "pinggir jalan", "angkringan", "warung", "kuliner", "festival makanan", "food stall", "bazaar", "food court", "pasar malam"],
+             "standing outdoors by lively street food stalls, warm evening street lights, holding paper bag of warm snacks, festive outdoor culinary atmosphere"),
             (["rooftop", "balkon", "atap gedung", "skyline", "balcony"],
              "standing on open rooftop terrace at sunset, city skyline background, golden hour sunset lighting, gentle breeze"),
             (["bioskop", "cinema", "nonton film", "teater film", "popcorn"],
@@ -1149,9 +1161,9 @@ class PersonaManager:
              "standing at modern train station platform, train tracks, platform bench, commuter ambiance"),
             (["cafe", "coffee", "tea", "kafe", "kopi", "boba", "matcha", "nongkrong", "starbucks"],
              "sitting at aesthetic cafe table holding a warm beverage, beautiful bokeh background"),
-            (["kitchen", "cook", "baking", "masak", "sarapan", "makan", "dapur", "dinner", "lunch"],
+            (["kitchen", "cook", "cooking", "baking", "masak", "memasak", "masakin", "dapur", "kompor", "nyiapin makan"],
              "standing in modern cozy kitchen preparing food, warm domestic lighting"),
-            (["walk", "park", "garden", "outdoor", "taman", "jalan", "jogging", "sore", "sepeda"],
+            (["taman", "taman kota", "park", "garden", "jogging", "jalan sore", "sepeda", "sepedaan", "piknik", "picnic"],
              "standing in blooming park, natural golden hour sunlight, dynamic selfie perspective"),
             (["beach", "ocean", "sea", "pantai", "laut", "kolam", "renang", "swim"],
              "walking along tropical beach, ocean sunset horizon, gentle sea breeze"),
@@ -1159,7 +1171,7 @@ class PersonaManager:
              "sitting at wooden study desk in quiet university library, bookshelves, open study books, soft lamp"),
             (["kampus", "kuliah", "kelas", "dosen", "makul", "tugas", "skripsi"],
              "sitting at wooden desk inside modern university lecture hall, college campus classroom background"),
-            (["mall", "shopping", "belanja", "bioskop", "nonton", "pameran"],
+            (["mall", "shopping", "belanja", "pameran"],
              "walking in vibrant illuminated shopping mall, modern storefronts, dynamic ambient lighting"),
             (["gym", "workout", "olahraga", "yoga", "fitness"],
              "wearing sporty athletic wear in bright modern gym studio"),
@@ -1173,23 +1185,64 @@ class PersonaManager:
                 return random.choice(BEDROOM_SCENE_VARIATIONS)
             return desc
 
-        # 1. First priority: Explicit scene in user text
+        hist = history or (self.get_chat_history(user_id) if user_id else [])
+        clean_turns = [m.get("content", "") for m in hist[-5:] if not m.get("content", "").startswith("[")]
+
+        # 0. When a follow-up photo accompanies a conversational reply, extract from LLM FIRST
+        #    so complex narratives (e.g. "street food viral dekat kampus") are captured verbatim without false keyword overrides
+        if conversational_reply and llm_client and hasattr(llm_client, "chat"):
+            try:
+                extract_prompt = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an anime visual scene extractor for Stable Diffusion / Danbooru. "
+                            "Given what the user asked and what the waifu JUST replied in chat, output ONLY 8-18 concise English Danbooru-style descriptive visual tokens "
+                            "describing the EXACT physical location, background, weather, and props she just described (e.g. holding a bag of street food, warm stall lights). "
+                            "Do NOT invent a different location (do NOT turn street food into a kitchen or campus into a bedroom). "
+                            "Do NOT include character hair or eye colors."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": f"User said: '{user_text}'.\nWaifu JUST replied: '{conversational_reply}'.\nWhat exact visual scene & props are shown in this photo?"
+                    }
+                ]
+                dyn_scene, _ = llm_client.chat(extract_prompt, max_tokens=45)
+                if (
+                    isinstance(dyn_scene, str)
+                    and len(dyn_scene.strip()) >= 8
+                    and "none" not in dyn_scene.lower()
+                ):
+                    clean_dyn = re.sub(r"^(Setting|Scene|Background|Visuals?)\s*:\s*", "", dyn_scene.strip(), flags=re.I).strip().strip('"\'')
+                    logger.info(f"LLM aligned visual scene from conversational reply: {clean_dyn}")
+                    return clean_dyn
+            except Exception as e_dyn:
+                logger.debug(f"LLM aligned scene extraction skipped: {e_dyn}")
+
+        # 1. Explicit scene in waifu's current conversational reply (when present)
+        if reply_lower:
+            for keywords, scene_desc in SCENE_PATTERNS:
+                if _has_kw(reply_lower, keywords):
+                    if "bus stop" in scene_desc and _has_kw(reply_lower, ["hujan", "gerimis", "rain", "payung"]):
+                        return "waiting at rainy bus stop shelter, holding umbrella, wet asphalt, rain reflections, atmospheric street lighting, cinematic depth of field"
+                    return _resolve_scene_variation(scene_desc)
+
+        # 2. Explicit scene in user text
         for keywords, scene_desc in SCENE_PATTERNS:
-            if any(k in lower for k in keywords):
+            if _has_kw(lower, keywords):
                 # Contextual bonus: if bus stop and rain are mentioned together
-                if "bus stop" in scene_desc and any(r in lower for r in ["hujan", "gerimis", "rain", "payung"]):
+                if "bus stop" in scene_desc and _has_kw(lower, ["hujan", "gerimis", "rain", "payung"]):
                     return "waiting at rainy bus stop shelter, holding umbrella, wet asphalt, rain reflections, atmospheric street lighting, cinematic depth of field"
                 return _resolve_scene_variation(scene_desc)
 
-        # 2. Second priority: Context from ongoing chat history
-        hist = history or (self.get_chat_history(user_id) if user_id else [])
-        clean_turns = [m.get("content", "") for m in hist[-5:] if not m.get("content", "").startswith("[")]
+        # 3. Context from ongoing chat history
         combined_recent = " ".join(clean_turns).lower()
         for keywords, scene_desc in SCENE_PATTERNS:
-            if any(k in combined_recent for k in keywords):
+            if _has_kw(combined_recent, keywords):
                 return _resolve_scene_variation(scene_desc)
 
-        # 3. Third priority: LLM dynamic setting extraction for novel/arbitrary story locations
+        # 4. LLM dynamic setting extraction for novel/arbitrary story locations
         if llm_client and hasattr(llm_client, "chat") and len(clean_turns) > 0:
             try:
                 extract_prompt = [
@@ -1208,15 +1261,19 @@ class PersonaManager:
                     }
                 ]
                 dyn_scene, _ = llm_client.chat(extract_prompt, max_tokens=40)
-                if dyn_scene and len(dyn_scene.strip()) >= 8 and "none" not in dyn_scene.lower():
+                if isinstance(dyn_scene, str) and len(dyn_scene.strip()) >= 8 and "none" not in dyn_scene.lower():
                     clean_dyn = re.sub(r"^(Setting|Scene|Background|Visuals?)\s*:\s*", "", dyn_scene.strip(), flags=re.I).strip().strip('"\'')
                     logger.info(f"LLM dynamically extracted visual scene: {clean_dyn}")
                     return clean_dyn
             except Exception as e_dyn:
                 logger.debug(f"LLM dynamic scene extraction skipped: {e_dyn}")
 
-        # 4. Fourth priority: Routine schedule activity
-        ctx = detect_contextual_activity_and_outfit(user_text, clean_turns, persona_key=self.active_key)
+        # 5. Routine schedule activity
+        ctx = detect_contextual_activity_and_outfit(
+            conversational_reply or user_text,
+            clean_turns,
+            persona_key=self.active_key
+        )
         if ctx.get("scene"):
             logger.info(f"Student routine context extracted scene: {ctx['scene']} ({ctx['activity']})")
             return ctx["scene"]
@@ -1465,13 +1522,13 @@ class PersonaManager:
             extra_neg = f"{extra_neg}, {solo_guard_neg}" if extra_neg else solo_guard_neg
 
         # Check if user explicitly requested a cat/pet/animal in prompt
-        wants_cat = any(k in (user_text or "").lower() for k in ["kucing", "cat", "kitten", "anabul", "pet", "hewan"])
+        wants_cat = bool(re.search(r"\b(kucing|cat|kitten|anabul|pet|hewan)\b", (user_text or "").lower()))
         if not wants_cat:
             cat_neg = "cat, kitten, feline, animal, pet, animal ears, cat ears"
             extra_neg = f"{extra_neg}, {cat_neg}" if extra_neg else cat_neg
 
         # Check if user explicitly requested a phone/device in prompt
-        wants_device = any(k in (user_text or "").lower() for k in ["hp", "handphone", "phone", "smartphone", "mirror selfie", "kaca"])
+        wants_device = bool(re.search(r"\b(hp|handphone|phone|smartphone|mirror\s+selfie|kaca)\b", (user_text or "").lower()))
         if not wants_device:
             device_neg = "phone, smartphone, cellphone, camera, holding phone, holding camera, mirror selfie, mirror, hands holding device, selfie stick"
             extra_neg = f"{extra_neg}, {device_neg}" if extra_neg else device_neg

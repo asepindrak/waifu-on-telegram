@@ -4610,7 +4610,9 @@ def process_photo_request(
     user_text: str,
     is_proof: bool = False,
     conversational_reply: Optional[str] = None,
-    is_followup: bool = False
+    is_followup: bool = False,
+    scene_override: Optional[str] = None,
+    original_user_text: Optional[str] = None
 ):
     """Generates and delivers consistent girlfriend photo with caption matching conversation context."""
     def _execute():
@@ -4655,15 +4657,28 @@ def process_photo_request(
                     status_msg = safe_send_message(chat_id, status_text)
 
             history = persona_mgr.get_chat_history(user_id)
-            is_nsfw_photo = detect_nsfw_intent(user_text, history)
+            actual_user_msg = original_user_text or user_text
+            is_nsfw_photo = detect_nsfw_intent(actual_user_msg, history)
+            if not is_nsfw_photo and user_text != actual_user_msg:
+                is_nsfw_photo = detect_nsfw_intent(user_text, history)
             cur_outfit_key, _ = persona_mgr.get_user_outfit(user_id)
             if cur_outfit_key == "nude":
                 is_nsfw_photo = True
 
-            detected_scene = persona_mgr.extract_contextual_scene(user_text, user_id=user_id, llm_client=llm_client, history=history)
-            if is_nsfw_photo and (not detected_scene or any(pub in detected_scene.lower() for pub in ["cafe", "campus", "classroom", "library", "mall", "park", "gym"])):
+            if scene_override and not is_nsfw_photo:
+                detected_scene = scene_override
+                logger.info(f"Using explicit visual scene override from narrative turn: {detected_scene}")
+            else:
+                detected_scene = persona_mgr.extract_contextual_scene(
+                    actual_user_msg,
+                    user_id=user_id,
+                    llm_client=llm_client,
+                    history=history,
+                    conversational_reply=conversational_reply
+                )
+            if is_nsfw_photo and (not detected_scene or any(pub in detected_scene.lower() for pub in ["cafe", "campus", "classroom", "library", "mall", "park", "gym", "street"])):
                 detected_scene = "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows, warm intimate atmosphere"
-            elif hangout_engine.is_on_date(user_id):
+            elif hangout_engine.is_on_date(user_id) and not scene_override and not conversational_reply:
                 active_date = hangout_engine.get_active_date(user_id)
                 if active_date and active_date.get("scene_prompt"):
                     detected_scene = active_date["scene_prompt"]
@@ -4672,14 +4687,16 @@ def process_photo_request(
                 story_photo = story_engine.get_story_photo_suggestion(persona_mgr.active_key)
                 if story_photo and story_photo.get("danbooru_tags"):
                     detected_scene = story_photo["danbooru_tags"]
+
+            prompt_source_text = f"{actual_user_msg} {conversational_reply}".strip() if conversational_reply else user_text
             visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
-                user_text, user_id=user_id, scene_override=detected_scene, history=history, is_nsfw=is_nsfw_photo
+                prompt_source_text, user_id=user_id, scene_override=detected_scene, history=history, is_nsfw=is_nsfw_photo
             )
             logger.info(f"Visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
 
             # Save exact scenario context so 'Pose Lain' never loses outfit or setting
             USER_LAST_PHOTO_CONTEXT[user_id] = {
-                "user_text": user_text,
+                "user_text": actual_user_msg,
                 "detected_scene": detected_scene,
                 "outfit_label": outfit_label,
                 "is_nude": is_nude
@@ -4803,17 +4820,21 @@ def process_photo_request(
                 caption_prompt.append({
                     "role": "user",
                     "content": (
-                        f"Boyfriend said: \"{user_text}\".\n"
-                        f"You already replied in chat: \"{conversational_reply}\".\n"
-                        f"Now you are delivering the photo you just took (Setting: '{detected_scene}', wearing: '{outfit_label}'{vault_guidance}).\n"
-                        f"Write 1 sweet, natural, playful girlfriend delivery caption for this photo (1-2 short sentences):"
+                        f"Partner asked/said: \"{actual_user_msg}\".\n"
+                        f"You JUST replied in chat right before this photo: \"{conversational_reply}\".\n"
+                        f"Now you are delivering the photo of THIS EXACT MOMENT (Setting: '{detected_scene}', Outfit: '{outfit_label}'{vault_guidance}).\n"
+                        f"STRICT CONSISTENCY RULE:\n"
+                        f"- Your caption MUST align 100% with what you JUST said in your chat reply above and the photo setting.\n"
+                        f"- Keep the EXACT same location, same food/objects, and same activity you just mentioned.\n"
+                        f"- DILARANG KERAS mengarang lokasi baru (seperti dapur/kampus/kamar) atau aktivitas baru yang bertentangan dengan chat terakhirmu!\n"
+                        f"- Write 1 short, sweet, playful girlfriend delivery caption continuing this exact moment (1 sentence):"
                     )
                 })
             else:
                 caption_prompt.append({
                     "role": "user",
                     "content": (
-                        f"Boyfriend said: \"{user_text}\".\n"
+                        f"Boyfriend said: \"{actual_user_msg}\".\n"
                         f"You are sending him a photo (Setting: '{detected_scene}', wearing: '{outfit_label}'{vault_guidance}).\n"
                         f"Write 1 sweet, natural girlfriend chat caption that directly answers/responds to his message and matches the photo (1-2 sentences):"
                     )
@@ -4898,7 +4919,8 @@ def process_photo_request(
 
             new_aff = persona_mgr.increase_affinity(user_id, delta=2)
             memory_engine.set_affinity(user_id, new_aff)
-            persona_mgr.add_message(user_id, "user", f"[Requested photo: {user_text}]")
+            if not is_followup:
+                persona_mgr.add_message(user_id, "user", f"[Requested photo: {actual_user_msg}]")
             persona_mgr.add_message(user_id, "assistant", f"[Sent selfie: {detected_scene}] {clean_caption}")
             persona_mgr.notify_photo_delivered(user_id)
             waifu_status_tracker.record_photo_event(
@@ -7403,17 +7425,14 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                                 action_ctx = undress_desc if undress_desc else ""
                                 photo_prompt = f"{action_ctx}, {user_text}, {clean_reply}".strip(", ")
                             else:
-                                if scene_override_desc:
-                                    photo_prompt = f"{scene_override_desc}, {clean_reply}".strip(", ")
-                                elif should_send_conv_photo:
-                                    photo_prompt = user_text
-                                else:
-                                    photo_prompt = clean_reply if clean_reply else f"{routine['activity_desc']}"
+                                photo_prompt = clean_reply if clean_reply else user_text
                             process_photo_request(
                                 message,
                                 user_text=photo_prompt,
                                 conversational_reply=clean_reply,
-                                is_followup=True
+                                is_followup=True,
+                                scene_override=scene_override_desc if not is_nsfw_turn else None,
+                                original_user_text=user_text
                             )
                         except Exception as e_photo:
                             logger.error(f"Error sending follow-up photo: {e_photo}")

@@ -50,6 +50,20 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
+## 📸 Sinkronisasi Penuh Chat, Scene Foto & Caption (v2.4.33)
+
+Pembaruan v2.4.33 memperbaiki ketidaksesuaian antara isi chat waifu, lokasi foto yang di-generate, dan caption foto:
+
+* **🔗 Pewarisan `scene_override` & Konteks Chat Asli (`bot.py`):**
+  - **Penerusan Scene Terdeteksi**: Hasil ekstraksi adegan (`scene_override_desc` dari `detect_visual_scene_moment`) kini diteruskan langsung ke `process_photo_request(..., scene_override=..., original_user_text=...)` dan tidak lagi ter-timpa oleh deteksi ulang berbasis substring.
+  - **Caption Terkunci pada Momen yang Sama**: `caption_prompt` kini selalu menggunakan pesan asli pengguna dan balasan terakhir waifu dengan aturan konsistensi ketat (*STRICT CONSISTENCY RULE*), mencegah LLM mengarang lokasi atau aktivitas baru yang bertolak belakang dengan chat sebelumnya.
+* **🔍 Word-Boundary Scene Extraction & LLM-First Narrative Alignment (`persona_manager.py` & `student_schedule.py`):**
+  - **Anti Salah-Deteksi Substring**: Pencocokan adegan (`SCENE_PATTERNS`, `match_scenario`, `wants_cat`, `wants_device`) kini memakai batas kata regex `\b...\b`, sehingga kata seperti *"makanannya"* tidak lagi terbaca sebagai *"makan"* ➔ dapur (`kitchen`), *"kosong"* tidak terbaca *"kos"*, dan *"kesibukan sore"* tidak memicu taman (`park`).
+  - **LLM-First Scene Extractor**: Saat foto menyertai balasan chat (`conversational_reply`), ekstraksi visual melalui LLM diprioritaskan terlebih dahulu sebelum keyword statis agar adegan spesifik (misal: *"jajanan street food viral dekat kampus"*) tergambar persis beserta properti dan suasananya.
+  - **Preset Kuliner & Street Food**: Menambahkan dukungan adegan *street food / jajanan / kaki lima / festival kuliner* secara spesifik sebelum pola dapur dan ruang kelas kampus.
+
+---
+
 ## 🛡️ Circuit Breaker Anti-Flapping LLM, Self-Healing Cooldown & Split-Mode Failover (v2.4.32)
 
 Pembaruan v2.4.32 menuntaskan bug fatal *flapping loop* (siklus berulang online-offline dan notifikasi spam ratusan pesan ke Telegram):

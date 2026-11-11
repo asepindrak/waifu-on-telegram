@@ -4,6 +4,7 @@ Manages college student daily schedules, dynamic conversation activities,
 and ensures visual outfits realistically match real-world activities & locations.
 """
 
+import re
 import time
 import logging
 from typing import Dict, Any, Optional, Tuple, List
@@ -264,10 +265,16 @@ def detect_contextual_activity_and_outfit(
     profile = STUDENT_PROFILES.get(persona_key.lower(), STUDENT_PROFILES["runa"])
 
     def match_scenario(text: str) -> Optional[Dict[str, Any]]:
+        if not text:
+            return None
         t = text.lower()
 
+        def _has_kw(keywords: List[str]) -> bool:
+            pat = r"\b(?:" + "|".join(re.escape(k) for k in keywords) + r")\b"
+            return bool(re.search(pat, t, re.IGNORECASE))
+
         # 0. Romantic / Intimate Bedroom Context (Highest Priority for explicit PAP requests)
-        if any(k in t for k in ["sensual", "romantic", "romantis", "intimate", "mesra", "bedroom setting", "loving gaze"]):
+        if _has_kw(["sensual", "romantic", "romantis", "intimate", "mesra", "bedroom setting", "loving gaze"]):
             return {
                 "activity": "lagi santai romantis di kamar",
                 "scene": "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer",
@@ -278,7 +285,7 @@ def detect_contextual_activity_and_outfit(
             }
 
         # 1. Shower / Mandi Context
-        if any(k in t for k in ["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath", "bathroom", "steam"]):
+        if _has_kw(["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath", "bathroom", "steam"]):
             return {
                 "activity": "baru beres mandi / keramas",
                 "scene": "standing in modern bathroom with soft steam, bare shoulders, post-shower glow, damp hair, bathroom mirror",
@@ -289,7 +296,7 @@ def detect_contextual_activity_and_outfit(
             }
 
         # 2. Sleep / Bed / Kamar Context
-        if any(k in t for k in ["tidur", "rebahan", "kasur", "piyama", "pajamas", "ngantuk", "mimpi", "kamar", "bantal"]):
+        if _has_kw(["tidur", "rebahan", "kasur", "piyama", "pajamas", "ngantuk", "mimpi", "kamar", "bantal"]):
             return {
                 "activity": "lagi rebahan di kasur kamar",
                 "scene": "relaxing on bed with fluffy pillows, warm dim night bedroom lamp, cozy intimate bedroom",
@@ -299,8 +306,19 @@ def detect_contextual_activity_and_outfit(
                 "is_public": False
             }
 
-        # 3. Kitchen / Masak Context
-        if any(k in t for k in ["dapur", "masak", "sarapan", "dinner", "lunch", "baking", "kitchen"]):
+        # 2b. Street Food / Night Market / Culinary Hangout Context (BEFORE Kitchen & Campus!)
+        if _has_kw(["street food", "jajanan", "jajan", "kaki lima", "pinggir jalan", "angkringan", "warung", "kuliner", "festival makanan", "food stall", "bazaar", "food court", "pasar malam"]):
+            return {
+                "activity": "lagi jajan street food & kulineran santai",
+                "scene": "standing outdoors by lively street food stalls, warm evening street lights, holding paper bag of warm snacks, festive outdoor culinary atmosphere",
+                "outfit_prompt": profile["mall_outfit"],
+                "outfit_negative": "bikini, lingerie, swimwear, naked, exposed chest, towel, pajama, apron",
+                "outfit_name": "🍡 Streetwear Santai Outdoor",
+                "is_public": True
+            }
+
+        # 3. Kitchen / Masak Context (Explicit cooking/kitchen only, not generic eating out)
+        if _has_kw(["dapur", "masak", "memasak", "masakin", "baking", "cooking", "kitchen", "kompor", "nyiapin makan"]):
             return {
                 "activity": "lagi masak di dapur",
                 "scene": "standing in modern cozy kitchen preparing food, warm domestic lighting",
@@ -311,7 +329,7 @@ def detect_contextual_activity_and_outfit(
             }
 
         # 4. Beach / Pool / Renang Context
-        if any(k in t for k in ["pantai", "beach", "laut", "kolam", "renang", "swimming"]):
+        if _has_kw(["pantai", "beach", "laut", "kolam", "renang", "swimming"]):
             return {
                 "activity": "lagi di pantai / kolam renang",
                 "scene": "walking along tropical beach, ocean sunset horizon, gentle sea breeze",
@@ -322,7 +340,7 @@ def detect_contextual_activity_and_outfit(
             }
 
         # 5. Cafe / Nongkrong / Kopi Context
-        if any(k in t for k in ["cafe", "kafe", "kopi", "coffee", "boba", "matcha", "nongkrong", "starbucks"]):
+        if _has_kw(["cafe", "kafe", "kopi", "coffee", "boba", "matcha", "nongkrong", "starbucks"]):
             return {
                 "activity": "lagi nongkrong santai di cafe",
                 "scene": "sitting at aesthetic cafe table holding a warm beverage, beautiful bokeh background",
@@ -333,7 +351,7 @@ def detect_contextual_activity_and_outfit(
             }
 
         # 6. Shopping Mall / Jalan-jalan Context
-        if any(k in t for k in ["mall", "shopping", "belanja", "bioskop", "nonton", "pameran", "jalan-jalan", "hangout"]):
+        if _has_kw(["mall", "shopping", "belanja", "bioskop", "nonton", "pameran", "jalan-jalan", "hangout"]):
             return {
                 "activity": "lagi jalan-jalan di mall",
                 "scene": "walking in vibrant illuminated shopping mall, modern storefronts, dynamic ambient lighting",
@@ -344,7 +362,7 @@ def detect_contextual_activity_and_outfit(
             }
 
         # 7. Gym / Olahraga Context
-        if any(k in t for k in ["gym", "workout", "olahraga", "fitness", "yoga", "jogging", "lari"]):
+        if _has_kw(["gym", "workout", "olahraga", "fitness", "yoga", "jogging", "lari"]):
             return {
                 "activity": "lagi olahraga / gym",
                 "scene": "bright modern gym studio, fitness training equipment background",
@@ -355,7 +373,7 @@ def detect_contextual_activity_and_outfit(
             }
 
         # 8. Campus / Kuliah Context (Excludes general 'tugas' to avoid overriding home homework)
-        if any(k in t for k in ["kampus", "kuliah", "kelas", "dosen", "makul", "skripsi", "lab", "praktikum"]):
+        if _has_kw(["kampus", "kuliah", "kelas", "dosen", "makul", "skripsi", "lab", "praktikum"]):
             return {
                 "activity": "lagi di kampus kuliah",
                 "scene": "sitting at desk in modern university lecture hall, college campus classroom background",
@@ -366,7 +384,7 @@ def detect_contextual_activity_and_outfit(
             }
 
         # 9. Library / Perpustakaan Context
-        if any(k in t for k in ["perpus", "perpustakaan", "library"]):
+        if _has_kw(["perpus", "perpustakaan", "library"]):
             return {
                 "activity": "lagi belajar di perpustakaan kampus",
                 "scene": "sitting at wooden study desk in quiet university library, bookshelves, open study books, soft lamp",
@@ -377,7 +395,7 @@ def detect_contextual_activity_and_outfit(
             }
 
         # 10. Home / Relaxing / Kos Context
-        if any(k in t for k in ["rumah", "kosan", "kost", "kos", "apartemen", "santai di rumah", "pulang ke rumah"]):
+        if _has_kw(["rumah", "kosan", "kost", "kos", "apartemen", "santai di rumah", "pulang ke rumah"]):
             return {
                 "activity": "lagi santai di rumah / kamar kos",
                 "scene": "relaxing comfortably in cozy modern apartment room, warm ambient lighting",
