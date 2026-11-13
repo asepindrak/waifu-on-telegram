@@ -840,7 +840,15 @@ class IdleEngine:
         sfw_img = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
         uni_img = os.environ.get("IMAGE_ENGINE", sfw_img).lower().strip() if img_mode == "unified" else sfw_img
         if not is_nude and uni_img in ("agy", "cloud"):
-            return True
+            try:
+                from agy_quota_manager import is_agy_image_quota_exhausted, has_local_image_models
+                if uni_img == "agy" and is_agy_image_quota_exhausted() and has_local_image_models():
+                    # AGY quota is exhausted today; Smart Fallback to local ComfyUI is active!
+                    pass
+                else:
+                    return True
+            except Exception:
+                return True
 
         # Avoid killing live KoboldCPP on <= 6.5 GB GPU if ComfyUI is neither running nor installed locally
         ready_before = self.is_comfyui_ready()

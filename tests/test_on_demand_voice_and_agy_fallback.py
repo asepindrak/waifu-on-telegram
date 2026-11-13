@@ -141,10 +141,11 @@ class TestOnDemandVoiceAndAgyFallback(unittest.TestCase):
 
     @patch("requests.post")
     def test_media_engine_falls_back_to_cloud_when_agy_fails(self, mock_post):
-        """When AGY image generation fails, generate_photo seamlessly falls back to cloud so user never gets a broken photo."""
+        """When AGY image generation fails and user has NO local image models, generate_photo falls back to cloud."""
         engine = MediaEngine(comfyui_url="", allow_cloud_fallback=True)
 
         with patch.object(engine, "generate_image_agy", return_value=None), \
+             patch("agy_quota_manager.has_local_image_models", return_value=False), \
              patch("media_engine.photo_vault.find_matching_photo", return_value=None), \
              patch.object(engine, "generate_image_cloud_fallback", return_value=b"FakePNGImageBytes") as mock_cloud:
             
@@ -156,6 +157,25 @@ class TestOnDemandVoiceAndAgyFallback(unittest.TestCase):
                 self.assertEqual(img, b"FakePNGImageBytes")
                 self.assertIn("Cloud Engine", source)
                 self.assertIsNotNone(engine.last_fallback_notice)
+
+    @patch("requests.post")
+    def test_media_engine_does_not_fallback_to_cloud_when_user_has_local_models(self, mock_post):
+        """When AGY image generation fails and user HAS local models, fallback MUST NOT go to Pollinations cloud."""
+        engine = MediaEngine(comfyui_url="http://127.0.0.1:8188", allow_cloud_fallback=True)
+
+        with patch.object(engine, "generate_image_agy", return_value=None), \
+             patch("agy_quota_manager.has_local_image_models", return_value=True), \
+             patch("idle_engine.is_port_listening", return_value=True), \
+             patch.object(engine, "generate_image_comfyui", return_value=b"LocalComfyUIBytes"), \
+             patch.object(engine, "generate_image_cloud_fallback") as mock_cloud:
+
+            with patch.dict(os.environ, {"SFW_IMAGE_ENGINE": "agy", "MEDIA_FALLBACK_CLOUD": "true"}):
+                engine.last_error = "AGY quota exhausted"
+                img, source = engine.generate_photo("solo, 1girl, smiling waifu", persona="runa")
+
+                self.assertEqual(img, b"LocalComfyUIBytes")
+                self.assertIn("Local ComfyUI", source)
+                mock_cloud.assert_not_called()
 
 
 if __name__ == "__main__":

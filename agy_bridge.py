@@ -433,7 +433,9 @@ def run_agy_image_gen(prompt: str) -> Tuple[Optional[str], str]:
             timeout=180
         )
         out = proc.stdout.strip()
-        if any(k in out.lower() for k in ["429", "resource_exhausted", "quota limit", "capacity on the underlying image"]):
+        from agy_quota_manager import is_agy_quota_error, record_agy_image_quota_exhausted
+        if is_agy_quota_error(out):
+            record_agy_image_quota_exhausted(reason=out[:200])
             return None, out
         img_path = extract_image_path_from_agy_output(out)
         if not img_path:
@@ -450,8 +452,10 @@ async def create_image(request: ImageGenerationRequest, token: str = Security(ve
     """OpenAI-compatible Image Generation endpoint powered by AGY image-generator subagent."""
     img_path, raw_out = await asyncio.to_thread(run_agy_image_gen, request.prompt)
     if not img_path or not os.path.isfile(img_path):
+        from agy_quota_manager import is_agy_quota_error
+        err_code = 429 if is_agy_quota_error(raw_out) else 500
         raise HTTPException(
-            status_code=500,
+            status_code=err_code,
             detail=f"AGY image generation failed to produce output file: {raw_out[:200]}"
         )
 

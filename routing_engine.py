@@ -314,7 +314,10 @@ class HybridLLMClient:
         else:
             nsfw_base = os.environ.get("NSFW_LLM_BASE_URL", "http://127.0.0.1:5001/v1")
             nsfw_key = os.environ.get("NSFW_LLM_API_KEY", "auto")
-            nsfw_model = os.environ.get("NSFW_LLM_MODEL", os.environ.get("LOCAL_LLM_MODEL", "default"))
+            raw_nsfw_model = os.environ.get("NSFW_LLM_MODEL", "").strip()
+            if not raw_nsfw_model or raw_nsfw_model == "default":
+                raw_nsfw_model = os.environ.get("LOCAL_LLM_MODEL", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
+            nsfw_model = raw_nsfw_model
 
             # If mode is unified BUT SFW client is AGY (port 8001) or Cloud API,
             # we MUST initialize a dedicated uncensored NSFW client (port 5001 KoboldCPP)
@@ -344,7 +347,8 @@ class HybridLLMClient:
             self.sfw_client.model = val
 
     def is_split_mode(self) -> bool:
-        return self.mode in ("split", "hybrid") and self.sfw_client != self.nsfw_client
+        cur_mode = os.environ.get("AI_ENGINE_MODE", self.mode).lower().strip()
+        return cur_mode in ("split", "hybrid") and self.sfw_client != self.nsfw_client
 
     def is_sfw_cloud(self) -> bool:
         """Returns True if the SFW client connects to an external cloud API."""
@@ -368,14 +372,95 @@ class HybridLLMClient:
         nsfw_h = self.nsfw_client.check_health()
         is_online = sfw_h.get("online", False) or nsfw_h.get("online", False)
 
+        nsfw_model_disp = self.nsfw_client.model
+        if not nsfw_model_disp or nsfw_model_disp == "default":
+            nsfw_model_disp = os.environ.get("LOCAL_LLM_MODEL", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
+
         return {
             "online": is_online,
             "mode": "split",
             "backend": f"Hybrid (SFW: {sfw_h.get('backend', 'Unknown')} | NSFW: {nsfw_h.get('backend', 'Unknown')})",
-            "model": f"{self.sfw_client.model} / {self.nsfw_client.model}",
+            "model": f"{self.sfw_client.model} / {nsfw_model_disp}",
             "sfw": sfw_h,
             "nsfw": nsfw_h
         }
+
+    def _format_engine_badge(self, provider: str, model: str, is_nsfw: bool = False) -> str:
+        """Formats a clean, concise badge displaying the active LLM provider and model."""
+        prov = (provider or "").lower().strip()
+        mod = (model or "").strip()
+
+        if "agy" in prov:
+            prov_display = "AGY"
+        elif "local" in prov or "kobold" in prov:
+            prov_display = "Local KoboldCPP"
+        elif "ollama" in prov:
+            prov_display = "Ollama"
+        elif "groq" in prov:
+            prov_display = "Groq"
+        elif "openrouter" in prov:
+            prov_display = "OpenRouter"
+        elif "deepseek" in prov:
+            prov_display = "DeepSeek"
+        elif "gemini" in prov:
+            prov_display = "Google Gemini"
+        elif "openai" in prov:
+            prov_display = "OpenAI"
+        else:
+            prov_display = provider.capitalize() if provider else "LLM"
+
+        if mod.endswith(".gguf"):
+            match = re.match(r"^([A-Za-z0-9_\-]+?-\d+[Bb])", mod)
+            if match:
+                mod_display = match.group(1)
+            else:
+                mod_display = mod.replace(".gguf", "")[:25]
+        elif not mod or mod == "default":
+            if prov_display == "AGY":
+                mod_display = os.environ.get("AGY_MODEL", "gemini-3.8-flash-medium")
+            elif "Local" in prov_display:
+                mod_display = "Huihui-Qwythos-9B"
+            else:
+                mod_display = "default"
+        else:
+            mod_display = mod
+
+        tag = " • NSFW" if is_nsfw else ""
+        return f"🤖 [{prov_display} • {mod_display}{tag}]"
+
+    def _record_used_engine(self, client: Any, is_nsfw: bool = False, label: str = ""):
+        """Records active engine metadata so bot can badge responses accurately."""
+        url = str(getattr(client, 'base_url', ''))
+        raw_mod = str(getattr(client, 'model', ''))
+        if ":8001" in url:
+            prov = "agy"
+            mod = raw_mod if (raw_mod and raw_mod != "default") else os.environ.get("AGY_MODEL", "gemini-3.8-flash-medium")
+        elif ":5001" in url:
+            prov = "local"
+            mod = os.environ.get("LOCAL_LLM_MODEL", raw_mod or "Huihui-Qwythos-9B")
+        elif client == self.nsfw_client:
+            prov = self.nsfw_provider or "local"
+            mod = os.environ.get("LOCAL_LLM_MODEL", raw_mod or "default")
+        else:
+            prov = self.sfw_provider or "agy"
+            mod = raw_mod or "default"
+
+        badge = self._format_engine_badge(prov, mod, is_nsfw=is_nsfw)
+        self.last_routed_info = {
+            "provider": prov,
+            "model": mod,
+            "is_nsfw": is_nsfw,
+            "label": label,
+            "badge": badge
+        }
+
+    def get_last_engine_badge(self) -> str:
+        """Returns visual indicator badge of the LLM provider and model used for the last turn."""
+        if hasattr(self, "last_routed_info") and self.last_routed_info:
+            return self.last_routed_info.get("badge", "")
+        prov = self.sfw_provider or "agy"
+        mod = getattr(self.sfw_client, "model", "gemini-3.8-flash-medium")
+        return self._format_engine_badge(prov, mod)
 
     def chat(
         self,
@@ -434,7 +519,7 @@ class HybridLLMClient:
                 try:
                     import bot
                     if hasattr(bot, "idle_engine") and bot.idle_engine:
-                        bot.idle_engine.ensure_llm_active(is_nsfw=is_nsfw)
+                        bot.idle_engine.wake_llm(timeout_seconds=45, is_nsfw=is_nsfw)
                 except Exception as e_w:
                     logger.debug(f"Could not auto-wake KoboldCPP on port 5001: {e_w}")
 
@@ -529,9 +614,11 @@ class HybridLLMClient:
                     )
                     backup_text, backup_reasoning = backup_tuple if isinstance(backup_tuple, tuple) else (backup_tuple, "")
                     if not is_ai_refusal(backup_text):
+                        self._record_used_engine(self.nsfw_client, is_nsfw=True, label="NSFW-Redirect")
                         return backup_text, backup_reasoning
                 raise ValueError(f"AI content refusal: {reply_text}")
 
+            self._record_used_engine(target_client, is_nsfw=is_nsfw, label=target_label)
             return reply_text, reasoning
         except Exception as e:
             # Automatic High-Availability Fallback:
@@ -542,12 +629,14 @@ class HybridLLMClient:
 
             if target_client != self.nsfw_client and (is_policy_violation or is_conn_error):
                 logger.warning(f"SFW LLM rejection / failure ({e}). Auto-redirecting to NSFW Uncensored Engine...")
-                return self.nsfw_client.chat(
+                fallback_res = self.nsfw_client.chat(
                     messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     image_bytes=image_bytes
                 )
+                self._record_used_engine(self.nsfw_client, is_nsfw=True, label="NSFW-Fallback")
+                return fallback_res
 
             # High-Availability fallback between port 8001 (AGY) and port 5001 (KoboldCPP)
             if is_conn_error:
@@ -557,12 +646,16 @@ class HybridLLMClient:
                 if "8001" in str(client_url) and is_port_listening(5001):
                     logger.warning(f"AGY Bridge unreachable ({e}). Seamlessly falling back to local KoboldCPP (port 5001)...")
                     backup = LocallyUncensoredClient(base_url="http://127.0.0.1:5001/v1", model="default")
-                    return backup.chat(messages, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
+                    backup_res = backup.chat(messages, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
+                    self._record_used_engine(backup, is_nsfw=is_nsfw, label="Local-Backup")
+                    return backup_res
 
                 elif "5001" in str(client_url) and (is_port_listening(8001) or self.is_sfw_cloud()):
                     logger.warning(f"Local KoboldCPP unreachable ({e}). Seamlessly falling back to SFW engine...")
                     fallback_msgs = sanitize_messages_for_sfw(messages) if self.is_split_mode() else messages
-                    return self.sfw_client.chat(fallback_msgs, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
+                    sfw_res = self.sfw_client.chat(fallback_msgs, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
+                    self._record_used_engine(self.sfw_client, is_nsfw=False, label="SFW-Fallback")
+                    return sfw_res
 
             raise
 

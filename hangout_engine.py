@@ -159,23 +159,24 @@ class HangoutEngine:
     def get_venue(self, venue_key: str) -> Optional[Dict[str, Any]]:
         return HANGOUT_VENUES.get(venue_key.lower().strip())
 
-    def start_date(self, user_id: int, venue_key: str) -> Dict[str, Any]:
+    def start_date(self, user_id: int, venue_key: str, custom_title: Optional[str] = None) -> Dict[str, Any]:
         """Initiates an active shared date session for the user."""
         v_key = venue_key.lower().strip()
         venue = HANGOUT_VENUES.get(v_key, HANGOUT_VENUES["cafe"])
         now = time.time()
 
+        resolved_title = custom_title or venue["title"]
         date_record = {
             "is_active": True,
             "venue_key": venue["key"],
-            "venue_title": venue["title"],
+            "venue_title": resolved_title,
             "started_at": now,
             "last_interaction_at": now,
             "photos_taken": 0
         }
         self.user_hangouts[str(user_id)] = date_record
         self._save_data()
-        logger.info(f"✨ Started shared date with user {user_id} at {venue['title']}")
+        logger.info(f"✨ Started shared date with user {user_id} at {resolved_title}")
         return date_record
 
     def end_date(self, user_id: int) -> Optional[Dict[str, Any]]:
@@ -228,12 +229,46 @@ class HangoutEngine:
             active["last_interaction_at"] = time.time()
             self._save_data()
 
+    def resolve_contextual_venue_title(self, venue_key: str, text: str) -> str:
+        """Derives a realistic, contextually accurate title matching what the user asked."""
+        t = (text or "").lower()
+        if venue_key == "home" or any(k in t for k in ["kosan", "kost", "kamar", "rumah", "apartemen"]):
+            if any(k in t for k in ["nonton", "film", "movie", "netflix"]):
+                return "🎬 Nonton Film di Kosan"
+            if any(k in t for k in ["mabar", "game", "main game"]):
+                return "🎮 Main Game di Kosan"
+            if any(k in t for k in ["masak", "makan"]):
+                return "🍳 Masak & Makan di Kosan"
+            return "🛋️ Main di Kosan"
+        if venue_key == "cinema":
+            return "🎬 Nonton Film di Bioskop"
+        if venue_key == "cafe":
+            return "☕ Nongkrong di Kafe"
+        if venue_key == "park":
+            return "🌸 Jalan Sore di Taman"
+        if venue_key == "mall":
+            return "🛍️ Jalan-jalan di Mall"
+        venue = HANGOUT_VENUES.get(venue_key)
+        return venue["title"] if venue else "Kencan"
+
     def detect_hangout_intent(self, text: str) -> Optional[str]:
         """Analyzes text to detect explicit date/hangout proposal or request."""
         t = text.lower()
+        home_kws = ["kosan", "kost", "kamar", "rumah", "apartemen", "tempatmu", "kasur", "sofa", "home"]
+        has_home = any(k in t for k in home_kws)
+
+        # Home / Kosan activities (watching movies, gaming, hanging out) must never trigger cinema
+        if has_home and (
+            any(k in t for k in ["nonton", "film", "movie", "netflix"])
+            or any(k in t for k in ["main", "mabar", "game", "santai", "rebahan", "ngobrol"])
+        ):
+            return "home"
+
         if any(k in t for k in ["ke kafe", "ke cafe", "ngopi yuk", "ngopi bareng", "ke coffee shop", "starbucks", "nongkrong di kafe", "nongkrong yuk", "nongkrong bareng"]):
             return "cafe"
-        if any(k in t for k in ["nonton bioskop", "ke bioskop", "nonton film", "cinema", "nonton bareng", "movie date", "nonton yuk"]):
+        if any(k in t for k in ["nonton bioskop", "ke bioskop", "cinema", "teater film", "movie date"]) or (
+            any(k in t for k in ["nonton film", "nonton bareng", "nonton yuk"]) and not has_home
+        ):
             return "cinema"
         if any(k in t for k in ["main ke kosan", "ke kosanmu", "ke rumahmu", "ke apartemen", "main ke tempatmu", "ke rumah", "mampir ke kosan", "mabar yuk", "mabar bareng", "main game bareng", "mabar"]):
             return "home"

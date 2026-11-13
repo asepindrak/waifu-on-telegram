@@ -680,30 +680,46 @@ class MediaEngine:
         # SFW External Engine Routing (Independent of local ComfyUI state)
         sfw_engine = os.environ.get("SFW_IMAGE_ENGINE", "comfyui").lower().strip()
         if not is_nude and sfw_engine == "agy":
-            agy_img = self.generate_image_agy(effective_prompt, negative_prompt=negative_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
-            if agy_img:
-                if photo_vault:
-                    try:
-                        ent = photo_vault.save_photo_to_vault(
-                            agy_img,
-                            persona=persona,
-                            scene=scene or user_query,
-                            outfit_label=outfit_label,
-                            is_nude=is_nude,
-                            visual_prompt=effective_prompt,
-                            user_query=user_query,
-                            aspect_ratio=aspect_ratio or "3:4"
-                        )
-                        if ent and user_id and hasattr(photo_vault, "mark_photo_seen_by_user"):
-                            photo_vault.mark_photo_seen_by_user(user_id, ent.get("filename", ""))
-                    except Exception:
-                        pass
-                return agy_img, "Google Antigravity (AGY Image Generator)"
-            else:
+            from agy_quota_manager import (
+                is_agy_image_quota_exhausted,
+                record_agy_image_quota_exhausted,
+                is_agy_quota_error,
+                has_local_image_models
+            )
+            if is_agy_image_quota_exhausted():
+                logger.info("Smart Fallback: Kuota gambar AGY habis hari ini. Langsung menggunakan smart fallback.")
                 self.last_fallback_notice = {
                     "primary_engine": "Google Antigravity (AGY)",
-                    "error": format_agy_error(self.last_error)
+                    "error": "Batas kuota model gambar Google Antigravity habis untuk hari ini (Smart Fallback aktif otomatis hingga besok)."
                 }
+                agy_img = None
+            else:
+                agy_img = self.generate_image_agy(effective_prompt, negative_prompt=negative_prompt, aspect_ratio=aspect_ratio, progress_callback=progress_callback)
+                if agy_img:
+                    if photo_vault:
+                        try:
+                            ent = photo_vault.save_photo_to_vault(
+                                agy_img,
+                                persona=persona,
+                                scene=scene or user_query,
+                                outfit_label=outfit_label,
+                                is_nude=is_nude,
+                                visual_prompt=effective_prompt,
+                                user_query=user_query,
+                                aspect_ratio=aspect_ratio or "3:4"
+                            )
+                            if ent and user_id and hasattr(photo_vault, "mark_photo_seen_by_user"):
+                                photo_vault.mark_photo_seen_by_user(user_id, ent.get("filename", ""))
+                        except Exception:
+                            pass
+                    return agy_img, "Google Antigravity (AGY Image Generator)"
+                else:
+                    if is_agy_quota_error(self.last_error):
+                        record_agy_image_quota_exhausted(reason=self.last_error)
+                    self.last_fallback_notice = {
+                        "primary_engine": "Google Antigravity (AGY)",
+                        "error": format_agy_error(self.last_error)
+                    }
         elif not is_nude and sfw_engine == "cloud":
             cloud_img = self.generate_image_cloud(effective_prompt, negative_prompt=negative_prompt, aspect_ratio=aspect_ratio)
             if cloud_img:
@@ -715,7 +731,25 @@ class MediaEngine:
                 }
 
         # Local ComfyUI (Used for NSFW and for SFW when engine is comfyui or as fallback when primary fails)
+        from agy_quota_manager import has_local_image_models
+        local_models_available = has_local_image_models()
+
         if is_nude or sfw_engine == "comfyui" or self.last_fallback_notice:
+            # If user has local image models, ensure ComfyUI is awake and ready
+            if local_models_available:
+                if not self.comfyui_url:
+                    self.comfyui_url = "http://127.0.0.1:8188"
+                from idle_engine import is_port_listening
+                if not is_port_listening(8188):
+                    try:
+                        import bot
+                        if hasattr(bot, "idle_engine") and bot.idle_engine:
+                            if progress_callback:
+                                progress_callback("Membangunkan studio foto lokal ComfyUI... ⏳")
+                            bot.idle_engine.wake_comfyui()
+                    except Exception as e_wake:
+                        logger.warning(f"Could not wake ComfyUI on-demand: {e_wake}")
+
             if self.comfyui_url:
                 local_img = self.generate_image_comfyui(
                     effective_prompt,
@@ -780,8 +814,15 @@ class MediaEngine:
             except Exception as e_find:
                 logger.warning(f"Error querying photo vault: {e_find}")
 
-        # 3. Live Cloud Fallback (Ensures photos are ALWAYS unique even when AGY / ComfyUI / Vault are exhausted)
-        allow_cloud = (os.environ.get("MEDIA_FALLBACK_CLOUD", "true").lower() in ("true", "1", "yes")) or (self.last_fallback_notice is not None)
+        # 3. Live Cloud Fallback (Pollinations)
+        # CRITICAL USER RULE:
+        # Jika user pilih AGY untuk generate image, maka fallback TIDAK BOLEH ke Pollinations
+        # jika user sudah punya model lokal ComfyUI (hanya boleh ke Pollinations jika memang TIDAK punya model lokal).
+        if sfw_engine == "agy" and local_models_available:
+            allow_cloud = False
+        else:
+            allow_cloud = (os.environ.get("MEDIA_FALLBACK_CLOUD", "true").lower() in ("true", "1", "yes")) or (self.last_fallback_notice is not None)
+
         if not is_nude and allow_cloud:
             cloud_img = self.generate_image_cloud_fallback(effective_prompt, negative_prompt=negative_prompt)
             if cloud_img:
@@ -817,6 +858,16 @@ class MediaEngine:
         First attempts to query local AGY Bridge at http://127.0.0.1:8001/v1/images/generations.
         If Bridge is unreachable, invokes `agy` CLI directly.
         """
+        from agy_quota_manager import (
+            is_agy_image_quota_exhausted,
+            record_agy_image_quota_exhausted,
+            is_agy_quota_error
+        )
+        if is_agy_image_quota_exhausted():
+            logger.info("Smart Fallback: Kuota gambar AGY hari ini habis. Menghindari request ke AGY.")
+            self.last_error = "Batas kuota model gambar Google Antigravity habis untuk hari ini (Smart Fallback aktif otomatis hingga besok)."
+            return None
+
         if progress_callback:
             progress_callback("Menghubungkan ke Google Antigravity (AGY Image Generator)... 🎨")
 
@@ -872,6 +923,12 @@ class MediaEngine:
                 if b64_data:
                     import base64
                     return base64.b64decode(b64_data)
+            else:
+                resp_text = res.text
+                if res.status_code == 429 or is_agy_quota_error(resp_text):
+                    record_agy_image_quota_exhausted(reason=f"HTTP {res.status_code}: {resp_text[:150]}")
+                    self.last_error = f"Batas kuota model gambar Google Antigravity habis ({res.status_code}). Model sedang cooldown."
+                    return None
         except Exception as e_bridge:
             logger.debug(f"AGY Bridge image generation call failed: {e_bridge}. Trying direct CLI...")
 
@@ -903,7 +960,8 @@ class MediaEngine:
                 timeout=180
             )
             out = proc.stdout or ""
-            if any(k in out.lower() for k in ["429", "resource_exhausted", "quota limit", "capacity on the underlying image"]):
+            if is_agy_quota_error(out):
+                record_agy_image_quota_exhausted(reason=out[:200])
                 self.last_error = "Batas kuota model gambar Google Antigravity habis (429 RESOURCE_EXHAUSTED). Model sedang cooldown."
                 return None
 

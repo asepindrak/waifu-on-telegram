@@ -618,9 +618,21 @@ def reload_env_configurations():
             os.environ["BOT_LANGUAGE"] = new_lang
 
     # 4. Engine & Model Settings
-    for k in ("AI_ENGINE_MODE", "SFW_LLM_PROVIDER", "SFW_IMAGE_ENGINE", "COMFYUI_CHECKPOINT", "DEFAULT_PERSONA", "VIDEO_ENGINE"):
+    for k in (
+        "AI_ENGINE_MODE", "SFW_LLM_PROVIDER", "SFW_LLM_BASE_URL", "SFW_LLM_API_KEY", "SFW_LLM_MODEL",
+        "NSFW_LLM_PROVIDER", "NSFW_LLM_BASE_URL", "NSFW_LLM_API_KEY", "NSFW_LLM_MODEL", "LOCAL_LLM_MODEL",
+        "LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY",
+        "SFW_IMAGE_ENGINE", "NSFW_IMAGE_ENGINE", "COMFYUI_CHECKPOINT", "SFW_COMFYUI_CHECKPOINT", "NSFW_COMFYUI_CHECKPOINT",
+        "DEFAULT_PERSONA", "VIDEO_ENGINE"
+    ):
         if k in new_vars and new_vars[k]:
             os.environ[k] = new_vars[k].strip()
+
+    try:
+        from routing_engine import get_hybrid_llm_client
+        get_hybrid_llm_client(force_reload=True)
+    except Exception:
+        pass
 
 
 def start_env_hot_reload_watcher():
@@ -2449,7 +2461,17 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
     sfw_p = os.environ.get("SFW_LLM_PROVIDER", "local").lower().strip()
     sfw_m = os.environ.get("SFW_LLM_MODEL", os.environ.get("LLM_MODEL", "default"))
     nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local").lower().strip()
-    nsfw_m = os.environ.get("NSFW_LLM_MODEL", "default")
+    if nsfw_p == "local":
+        local_cand = os.environ.get("LOCAL_LLM_MODEL", "").strip()
+        if not local_cand or local_cand.lower() in ("default", "none", "gemini-3.8-flash-medium") or not local_cand.endswith(".gguf"):
+            detected_llms = scan_local_llm_models()
+            preferred = [m[1] for m in detected_llms if any(k in m[1].lower() for k in ["huihui", "qwythos", "stheno", "qwen"])]
+            local_cand = preferred[0] if preferred else (detected_llms[0][1] if detected_llms else "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
+        nsfw_m = local_cand
+    elif nsfw_p == "openrouter_uncensored":
+        nsfw_m = os.environ.get("NSFW_LLM_MODEL", "nousresearch/hermes-3-llama-3.1-405b")
+    else:
+        nsfw_m = os.environ.get("NSFW_LLM_MODEL", "default")
     cur_llm = os.environ.get("LLM_MODEL", "default")
     cur_base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
     detected = scan_local_llm_models()
@@ -2578,8 +2600,10 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
         is_anything = ("anything" in cur_ckpt.lower() or "xl" in cur_ckpt.lower())
         is_auto = (not cur_ckpt and bool(cur_url))
         is_agy = (os.environ.get("SFW_IMAGE_ENGINE", "").lower() == "agy")
+        from agy_quota_manager import is_agy_image_quota_exhausted
+        agy_quota_badge = " (Cooldown Besok)" if (is_agy and is_agy_image_quota_exhausted()) else ""
 
-        markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity (AGY Subagent) {'✓' if is_agy else ''}", callback_data="cfg_set_ckpt:agy"))
+        markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity (AGY Subagent){agy_quota_badge} {'✓' if is_agy else ''}", callback_data="cfg_set_ckpt:agy"))
         markup.add(types.InlineKeyboardButton(f"🍊 AbyssOrangeMix3 (AOM3A1B SD 1.5 - Uncensored) {'✓' if is_aom and not is_agy else ''}", callback_data="cfg_set_ckpt:aom3"))
         markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - Cepat & Hemat VRAM) {'✓' if is_meina and not is_agy and not is_aom else ''}", callback_data="cfg_set_ckpt:meinamix"))
         markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - Ultra Jernih) {'✓' if is_anything else ''}", callback_data="cfg_set_ckpt:anything_xl"))
@@ -2934,11 +2958,22 @@ def build_system_diagnostics_report(user_id: int) -> str:
 
     # Resolve AI Architecture
     ai_mode = os.environ.get("AI_ENGINE_MODE", "unified").lower()
-    ai_mode_str = "Split Hybrid (SFW + NSFW Khusus)" if ai_mode == "split" else "Unified (Model Tunggal)"
-    sfw_p = os.environ.get("SFW_LLM_PROVIDER", "local")
+    ai_mode_str = "Split Hybrid (SFW + NSFW Khusus)" if ai_mode in ("split", "hybrid") else "Unified (Model Tunggal)"
+    sfw_p = os.environ.get("SFW_LLM_PROVIDER", "local").lower().strip()
     sfw_m = os.environ.get("SFW_LLM_MODEL", os.environ.get("LLM_MODEL", "default"))
-    nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local")
-    nsfw_m = os.environ.get("LOCAL_LLM_MODEL", llm_model_name)
+    nsfw_p = os.environ.get("NSFW_LLM_PROVIDER", "local").lower().strip()
+
+    if nsfw_p == "local":
+        local_cand = os.environ.get("LOCAL_LLM_MODEL", "").strip()
+        if not local_cand or local_cand.lower() in ("default", "none", "gemini-3.8-flash-medium") or not local_cand.endswith(".gguf"):
+            detected_llms = scan_local_llm_models()
+            preferred = [m[1] for m in detected_llms if any(k in m[1].lower() for k in ["huihui", "qwythos", "stheno", "qwen"])]
+            local_cand = preferred[0] if preferred else (detected_llms[0][1] if detected_llms else "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf")
+        nsfw_m = local_cand
+    elif nsfw_p == "openrouter_uncensored":
+        nsfw_m = os.environ.get("NSFW_LLM_MODEL", "nousresearch/hermes-3-llama-3.1-405b")
+    else:
+        nsfw_m = os.environ.get("NSFW_LLM_MODEL", "default")
 
     # Resolve Photo model checkpoint and installation status
     cur_ckpt = media_stat.get("active_checkpoint") or media_engine.get_active_checkpoint(is_nude=(raw_outfit_key == "nude"))
@@ -4989,7 +5024,11 @@ def process_photo_request(
             elif sfw_img_engine == "comfyui":
                 idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id, is_nude=False)
             elif sfw_img_engine == "agy":
-                idle_engine.ensure_agy_bridge_active(bot=bot, chat_id=chat_id, action="upload_photo")
+                from agy_quota_manager import is_agy_image_quota_exhausted, has_local_image_models
+                if is_agy_image_quota_exhausted() and has_local_image_models():
+                    idle_engine.ensure_comfyui_active(bot=bot, chat_id=chat_id, is_nude=False)
+                else:
+                    idle_engine.ensure_agy_bridge_active(bot=bot, chat_id=chat_id, action="upload_photo")
 
             def photo_progress(stage_text: str):
                 if status_msg and hasattr(status_msg, "message_id"):
@@ -5188,7 +5227,7 @@ def process_photo_request(
                 active_date = hangout_engine.get_active_date(user_id)
                 v_title = active_date.get("venue_title", "Kencan") if active_date else "Kencan"
                 markup.add(
-                    types.InlineKeyboardButton(f"🚪 Selesai Kencan ({v_title})", callback_data="end_hangout")
+                    types.InlineKeyboardButton(f"🚪 Akhiri {v_title}", callback_data="end_hangout")
                 )
 
             markup = attach_voice_button(markup, clean_caption or full_caption, user_id)
@@ -5510,6 +5549,14 @@ def handle_incoming_photo(message):
                 reply = sanitize_waifu_tone_and_pronouns(reply)
                 reply = enforce_concise_chat_reply(reply, max_sentences=2, max_chars=240)
                 reply = format_roleplay_italics(reply, character_name=p_name)
+                engine_badge = ""
+                if hasattr(llm_client, "get_last_engine_badge"):
+                    try:
+                        engine_badge = llm_client.get_last_engine_badge()
+                    except Exception:
+                        pass
+                if engine_badge:
+                    reply = f"{reply}\n\n`{engine_badge}`"
                 vision_markup = attach_voice_button(None, reply, message.from_user.id)
                 safe_reply_to(message, reply, reply_markup=vision_markup)
 
@@ -7614,13 +7661,14 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 else:
                     detected_venue = hangout_engine.detect_hangout_intent(user_text)
                     if detected_venue:
-                        hangout_engine.start_date(message.from_user.id, detected_venue)
+                        custom_title = hangout_engine.resolve_contextual_venue_title(detected_venue, user_text)
+                        hangout_engine.start_date(message.from_user.id, detected_venue, custom_title=custom_title)
                         venue_info = hangout_engine.HANGOUT_VENUES.get(detected_venue, {})
-                        v_name = venue_info.get("name", "Tempat Main")
+                        v_name = custom_title or venue_info.get("name", "Tempat Main")
                         waifu_status_tracker.update_status(
                             message.from_user.id,
                             location=v_name,
-                            activity=f"Lagi main dan menghabiskan waktu bersama di {v_name}",
+                            activity=f"Lagi main dan menghabiskan waktu bersama ({v_name})",
                             persona_name=p_name
                         )
                     elif is_inviting_out:
@@ -7961,6 +8009,15 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 )
 
                 formatted_reply = format_roleplay_italics(clean_reply, character_name=persona.get("name", "Runa"))
+                engine_badge = ""
+                if hasattr(llm_client, "get_last_engine_badge"):
+                    try:
+                        engine_badge = llm_client.get_last_engine_badge()
+                    except Exception:
+                        pass
+                if engine_badge:
+                    formatted_reply = f"{formatted_reply}\n\n`{engine_badge}`"
+
                 chat_markup = attach_voice_button(None, clean_reply, message.from_user.id)
                 typing_loop.stop()
                 safe_reply_to(message, formatted_reply, reply_markup=chat_markup, parse_mode="Markdown")

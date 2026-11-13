@@ -1277,9 +1277,11 @@ class PersonaManager:
              "sheltering from rain under awning, holding transparent umbrella, wet reflections on pavement, cozy romantic rainy day atmosphere, atmospheric street lighting"),
             (["street food", "jajanan", "jajan", "kaki lima", "pinggir jalan", "angkringan", "warung", "kuliner", "festival makanan", "food stall", "bazaar", "food court", "pasar malam"],
              "standing outdoors by lively street food stalls, warm evening street lights, holding paper bag of warm snacks, festive outdoor culinary atmosphere"),
+            (["nonton di kosan", "nonton di kamar", "nonton di rumah", "nonton netflix", "film di kosan", "nonton film di kosan", "nonton film di kamar", "nonton film di rumah", "nonton bareng di kosan", "nonton bareng di kamar", "nonton laptop"],
+             "relaxing comfortably in cozy modern apartment room, watching movie on screen, cozy soft room lighting, intimate relaxed atmosphere"),
             (["rooftop", "balkon", "atap gedung", "skyline", "balcony"],
              "standing on open rooftop terrace at sunset, city skyline background, golden hour sunset lighting, gentle breeze"),
-            (["bioskop", "cinema", "nonton film", "teater film", "popcorn"],
+            (["bioskop", "cinema", "teater film", "popcorn"],
              "sitting in cinema lobby holding cinema ticket, movie posters in soft blur background, cozy dim ambient lighting"),
             (["minimarket", "indomaret", "alfamart", "konbini", "convenience store", "supermarket"],
              "standing in modern Japanese-style convenience store aisle, shelves with snacks and drinks, bright clean fluorescent lighting"),
@@ -1782,6 +1784,62 @@ class PersonaManager:
         # Default fallback: Perfectly match current contextual activity & student routine!
         return _finalize(ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
 
+    def get_realtime_lighting_and_atmosphere(
+        self,
+        user_text: str = "",
+        scene_desc: str = ""
+    ) -> Tuple[str, str]:
+        """
+        Synchronizes photo lighting and ambient atmosphere with real-world local time.
+        Ensures night photos don't generate daylight, and daytime photos look naturally lit.
+        Explicit user lighting requests override real-time defaults.
+        Returns: (positive_lighting_prompt, negative_lighting_prompt)
+        """
+        lower = (user_text or "").lower()
+        scene_lower = (scene_desc or "").lower()
+
+        # Check explicit user requests first
+        has_night = bool(re.search(r"\b(malam|night|midnight|tengah malam|dini hari|gelap|subuh)\b", lower))
+        has_day = bool(re.search(r"\b(siang|day|daylight|midday|terik|siang bolong)\b", lower))
+        has_morning = bool(re.search(r"\b(pagi|morning|sunrise|fajar)\b", lower))
+        has_sunset = bool(re.search(r"\b(senja|sunset|golden hour|petang|sore)\b", lower))
+
+        # Determine time-of-day category from local clock
+        cur_hour = time.localtime().tm_hour
+
+        is_indoor = bool(re.search(
+            r"\b(bedroom|bed|room|kosan|kost|kamar|apartemen|apartment|sofa|indoor|dapur|kitchen|bathroom|mandi|perpustakaan|library|cafe|kafe|kelas|classroom|mall|gym|lobby)\b",
+            f"{scene_lower} {lower}"
+        ))
+
+        if has_night or (not (has_day or has_morning or has_sunset) and (cur_hour >= 20 or cur_hour < 5)):
+            # Night time / Dini hari (20:00 - 04:59)
+            if is_indoor:
+                pos = "(nighttime ambient:1.25), warm dim cozy indoor room lamp lighting, soft night mood, dark outside window"
+                neg = "(bright daylight:1.5), (daytime:1.5), (sunlight:1.5), (sunshine:1.5), (bright sun:1.5), sunny morning, sunbeams through window, midday"
+            else:
+                pos = "(night:1.35), (nighttime:1.35), dark night sky, atmospheric street lamps, soft night illumination, gentle night shadows"
+                neg = "(day:1.5), (daytime:1.5), (bright daylight:1.5), (sunlight:1.5), (sunshine:1.5), (bright sun:1.5), sunny sky, clear blue sky, midday sun"
+            return (pos, neg)
+
+        elif has_morning or (not (has_day or has_night or has_sunset) and (5 <= cur_hour < 9)):
+            # Early morning (05:00 - 08:59)
+            pos = "soft early morning sunrise light, gentle dawn glow, fresh morning ambience"
+            neg = "(pitch black night:1.4), dark night sky, harsh night shadows"
+            return (pos, neg)
+
+        elif has_sunset or (not (has_day or has_night or has_morning) and (17 <= cur_hour < 20)):
+            # Sunset / Senja / Sore (17:00 - 19:59)
+            pos = "golden hour sunset glow, warm orange twilight lighting, beautiful evening ambience"
+            neg = "(harsh midday sun:1.4), (pitch black night:1.4)"
+            return (pos, neg)
+
+        else:
+            # Daytime (09:00 - 16:59)
+            pos = "clear natural daylight, bright daytime lighting"
+            neg = "(nighttime:1.4), (night:1.4), dark night sky, pitch black, night street lamps"
+            return (pos, neg)
+
     def craft_visual_prompt_full(
         self,
         user_text: str,
@@ -1889,7 +1947,20 @@ class PersonaManager:
             anti_censor = "censored, mosaic, mosaic censor, bar censor, panties, underwear"
             extra_neg = f"{extra_neg}, {anti_censor}" if extra_neg else anti_censor
 
-        prompt_elements = [base_visual, outfit_prompt, scene, chosen_angle]
+        # Synchronize photo lighting and atmosphere with real-world local time
+        lighting_pos, lighting_neg = self.get_realtime_lighting_and_atmosphere(user_text, scene)
+        if lighting_neg:
+            extra_neg = f"{extra_neg}, {lighting_neg}" if extra_neg else lighting_neg
+            if "(bright daylight:1.5)" in lighting_neg:
+                # Clean daytime / sunlight clauses from scene so it doesn't contradict nighttime
+                scene = re.sub(
+                    r"\b(natural golden hour sunlight|natural daylight|bright clean fluorescent lighting|golden hour sunlight|sunlight)\b",
+                    "dim cozy ambient evening lighting",
+                    scene,
+                    flags=re.IGNORECASE
+                )
+
+        prompt_elements = [base_visual, outfit_prompt, scene, lighting_pos, chosen_angle]
         if anatomy_cue:
             prompt_elements.append(anatomy_cue)
             logger.info(f"Intimate anatomy cues injected: {anatomy_cue}")

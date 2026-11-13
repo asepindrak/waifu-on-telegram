@@ -139,6 +139,26 @@ class LocallyUncensoredClient:
 
         return "locally-uncensored"
 
+    def get_last_engine_badge(self) -> str:
+        """Returns visual indicator badge of the LLM provider and model used."""
+        url = str(self.base_url)
+        mod = str(self.model)
+        if ":8001" in url:
+            prov = "AGY"
+            mod_display = mod if (mod and mod != "default") else os.environ.get("AGY_MODEL", "gemini-3.8-flash-medium")
+        elif ":5001" in url:
+            prov = "Local KoboldCPP"
+            local_mod = os.environ.get("LOCAL_LLM_MODEL", mod)
+            if local_mod.endswith(".gguf"):
+                match = re.match(r"^([A-Za-z0-9_\-]+?-\d+[Bb])", local_mod)
+                mod_display = match.group(1) if match else local_mod.replace(".gguf", "")[:25]
+            else:
+                mod_display = local_mod if local_mod != "default" else "Huihui-Qwythos-9B"
+        else:
+            prov = "Local LLM"
+            mod_display = mod
+        return f"🤖 [{prov} • {mod_display}]"
+
     def check_health(self) -> Dict[str, Any]:
         """Checks if local LLM service is active and responsive."""
         key = self.get_api_key()
