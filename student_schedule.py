@@ -19,9 +19,15 @@ STUDENT_PROFILES = {
         "campus": "Kampus Fakultas Ilmu Komputer",
         "hobbies": "main game, ngoding santai di cafe, nonton anime, jalan-jalan ke mall cari gadget/camilan",
         "style": "gothic-kawaii playful girlfriend, oversized off-shoulder black hoodie with cat graphics, delicate white camisole with black lace and pink bow, black choker with silver heart ring",
-        "campus_outfit": "(wearing cute pastel college outfit, oversized light jacket over casual white tee, pleated skirt, canvas tote bag:1.35)",
-        "mall_outfit": "(wearing trendy modern streetwear, stylish cropped jacket, high-waist pants, small shoulder bag:1.35)",
-        "cafe_outfit": "(wearing cozy oversized pastel sweater, cute denim skirt, stylish choker:1.35)",
+        "campus_outfit": "(wearing cute pastel college outfit, oversized light pastel pink jacket over casual white tee, pleated black skirt, canvas tote bag:1.35)",
+        "mall_outfit": "(wearing trendy modern streetwear, stylish cropped black jacket, high-waist pants, small shoulder bag:1.35)",
+        "cafe_outfit": "(wearing cozy oversized pastel pink sweater, cute dark denim skirt, stylish black choker:1.35)",
+        "pajamas_outfit": "(wearing soft baby pink silk camisole and matching baby pink sleep shorts with black lace trim:1.35), cozy bedtime sleepwear",
+        "morning_outfit": "(wearing cozy oversized white morning graphic t-shirt and comfy black loungewear shorts:1.35)",
+        "loungewear_outfit": "(wearing cute comfortable casual loungewear, oversized baby pink tee, relaxed black shorts:1.35)",
+        "sweater_outfit": "(wearing cute oversized pastel pink knitted sweater, black choker:1.35), cozy comfy style",
+        "bikini_outfit": "(wearing fashionable black and pastel pink two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "romantic_outfit": "(wearing alluring romantic black silk slip dress with delicate pink lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
     },
     "akira": {
         "name": "Akira",
@@ -30,9 +36,15 @@ STUDENT_PROFILES = {
         "campus": "Kampus Fakultas Hukum",
         "hobbies": "baca buku di perpustakaan, ngopi di cafe estetik, magang kantor hukum, diskusi santai",
         "style": "gothic elegance, elaborate black Gothic dress with dark burgundy accents, black lace, choker with ruby gemstone",
-        "campus_outfit": "(wearing elegant university student attire, tailored dark blazer over silk blouse, neat pleated dark skirt:1.35)",
-        "mall_outfit": "(wearing fashionable elegant cocktail-casual dress, dark trench coat, sophisticated jewelry:1.35)",
-        "cafe_outfit": "(wearing chic fitted dark turtleneck sweater, stylish plaid midi skirt:1.35)",
+        "campus_outfit": "(wearing elegant university student attire, tailored dark charcoal blazer over cream silk blouse, neat pleated dark burgundy skirt:1.35)",
+        "mall_outfit": "(wearing fashionable elegant dark crimson cocktail-casual dress, dark black trench coat, sophisticated jewelry:1.35)",
+        "cafe_outfit": "(wearing chic fitted dark burgundy turtleneck sweater, stylish plaid midi skirt:1.35)",
+        "pajamas_outfit": "(wearing luxurious wine-red silk camisole and matching wine-red sleep shorts with black lace trim:1.35), cozy bedtime sleepwear",
+        "morning_outfit": "(wearing cozy oversized dark charcoal morning t-shirt and comfy burgundy loungewear shorts:1.35)",
+        "loungewear_outfit": "(wearing elegant comfortable loungewear, dark burgundy silk top, relaxed black shorts:1.35)",
+        "sweater_outfit": "(wearing chic fitted dark burgundy knit sweater:1.35), cozy comfy style",
+        "bikini_outfit": "(wearing sophisticated deep burgundy and black two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "romantic_outfit": "(wearing alluring romantic wine-red silk slip dress with delicate black lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
     },
     "hina": {
         "name": "Hina",
@@ -41,9 +53,15 @@ STUDENT_PROFILES = {
         "campus": "Kampus FISIP",
         "hobbies": "organisasi kampus, jogging sore di taman, jajan street food/boba, foto-foto cafe",
         "style": "cheerful hangout girlfriend, oversized cream ribbed sweater with yellow accents, headphones around neck, beige pleated skirt",
-        "campus_outfit": "(wearing bright college student casual, cozy cream sweater with yellow accents, denim skirt, canvas backpack:1.35)",
-        "mall_outfit": "(wearing fashionable cute sunny streetwear, pastel jacket, white sneakers, cute bag:1.35)",
-        "cafe_outfit": "(wearing oversized cozy knit cardigan, aesthetic hair clips, holding iced drink:1.35)",
+        "campus_outfit": "(wearing bright college student casual, cozy cream sweater with warm yellow accents, blue denim skirt, canvas backpack:1.35)",
+        "mall_outfit": "(wearing fashionable cute sunny streetwear, pastel yellow jacket, white sneakers, cute bag:1.35)",
+        "cafe_outfit": "(wearing oversized cozy cream and yellow knit cardigan, aesthetic hair clips, holding iced drink:1.35)",
+        "pajamas_outfit": "(wearing soft pastel yellow silk camisole and matching pastel yellow sleep shorts with white lace trim:1.35), cozy bedtime sleepwear",
+        "morning_outfit": "(wearing cozy oversized cream morning t-shirt and comfy light yellow loungewear shorts:1.35)",
+        "loungewear_outfit": "(wearing cute comfortable casual loungewear, oversized cream tee with yellow accents, relaxed shorts:1.35)",
+        "sweater_outfit": "(wearing oversized cozy cream ribbed knit sweater with warm yellow accents:1.35), cozy comfy style",
+        "bikini_outfit": "(wearing cheerful sunny pastel yellow and white two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "romantic_outfit": "(wearing alluring romantic cream silk slip dress with delicate light yellow lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
     },
     "shiro": {
         "name": "Shiro",
@@ -52,9 +70,15 @@ STUDENT_PROFILES = {
         "campus": "Kampus Fakultas Farmasi & Lab Sains",
         "hobbies": "praktikum lab, membaca jurnal di perpustakaan, nonton anime, main game, suasana hening malam hari",
         "style": "kuudere girlfriend, navy cardigan over white collared blouse, royal blue ribbon tie with star crystal brooch, crescent-moon clip",
-        "campus_outfit": "(wearing neat college student outfit, crisp collared white blouse, dark navy cardigan, crescent-moon clip:1.35)",
-        "mall_outfit": "(wearing understated minimalist modern chic, clean tailored coat, sleek dark trousers:1.35)",
-        "cafe_outfit": "(wearing cozy soft grey knit turtleneck, calm serene aesthetic:1.35)",
+        "campus_outfit": "(wearing neat college student outfit, crisp collared white blouse, dark navy cardigan, crescent-moon clip, pleated navy skirt:1.35)",
+        "mall_outfit": "(wearing understated minimalist modern chic, clean tailored charcoal coat, sleek dark navy trousers:1.35)",
+        "cafe_outfit": "(wearing cozy soft grey-blue knit turtleneck, calm serene aesthetic:1.35)",
+        "pajamas_outfit": "(wearing soft cool ice-blue silk camisole and matching ice-blue sleep shorts with white trim:1.35), cozy bedtime sleepwear",
+        "morning_outfit": "(wearing cozy oversized clean white morning t-shirt and comfy navy loungewear shorts:1.35)",
+        "loungewear_outfit": "(wearing calm comfortable loungewear, oversized ice-blue tee, relaxed navy shorts:1.35)",
+        "sweater_outfit": "(wearing cozy soft grey-blue knit sweater:1.35), cozy comfy style",
+        "bikini_outfit": "(wearing clean dark navy and white two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "romantic_outfit": "(wearing alluring romantic cool ice-blue silk slip dress with delicate white lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
     },
     "yume": {
         "name": "Yume",
@@ -64,8 +88,31 @@ STUDENT_PROFILES = {
         "hobbies": "melukis di studio/taman, membaca buku, mengagumi bintang malam, mendengarkan musik lo-fi, jalan sore",
         "style": "dreamy girlfriend, cozy lavender cardigan, white pleated camisole dress with lace, silver crescent-moon necklace",
         "campus_outfit": "(wearing artistic college student attire, soft lavender cardigan over simple white sundress, canvas tote bag with art brushes:1.35)",
-        "mall_outfit": "(wearing dreamy elegant pastel dress, delicate lace details, small cross-body bag:1.35)",
-        "cafe_outfit": "(wearing soft knit lavender sweater, comfortable flowy skirt, peaceful artistic aura:1.35)",
+        "mall_outfit": "(wearing dreamy elegant soft lavender dress, delicate white lace details, small cross-body bag:1.35)",
+        "cafe_outfit": "(wearing soft knit lavender sweater, comfortable flowy white skirt, peaceful artistic aura:1.35)",
+        "pajamas_outfit": "(wearing soft lavender silk camisole and matching lavender sleep shorts with delicate white lace trim:1.35), cozy bedtime sleepwear",
+        "morning_outfit": "(wearing cozy oversized white morning t-shirt and comfy soft lavender loungewear shorts:1.35)",
+        "loungewear_outfit": "(wearing dreamy comfortable casual loungewear, oversized soft lavender tee, relaxed white shorts:1.35)",
+        "sweater_outfit": "(wearing cozy oversized soft lavender knitted sweater:1.35), cozy comfy style",
+        "bikini_outfit": "(wearing dreamy pastel lavender and white two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "romantic_outfit": "(wearing alluring romantic soft lavender silk slip dress with delicate white lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+    },
+    "asunayuuki": {
+        "name": "Asuna Yuuki",
+        "age": 21,
+        "major": "Sastra & Bahasa Jepang (Semester 5)",
+        "campus": "Kampus Universitas",
+        "hobbies": "memasak resep lezat, jalan-jalan santai, nonton film seru, menemani pasangan mengobrol santai",
+        "style": "cheerful loving girlfriend, elegant white knit sweater with cherry-red accents, pleated skirt",
+        "campus_outfit": "(wearing stylish cream cardigan with red trim over white collared shirt, red pleated skirt, canvas tote bag:1.35)",
+        "mall_outfit": "(wearing fashionable chic white and cherry-red streetwear, cropped jacket, high-waist pants:1.35)",
+        "cafe_outfit": "(wearing cozy warm cream knit sweater with red accents, cute skirt:1.35)",
+        "pajamas_outfit": "(wearing soft cherry-red and white silk camisole and matching sleep shorts:1.35), cozy bedtime sleepwear",
+        "morning_outfit": "(wearing cozy oversized white morning t-shirt with red accents and comfy sleep shorts:1.35)",
+        "loungewear_outfit": "(wearing cute comfortable casual loungewear, oversized white tee with red accents, relaxed shorts:1.35)",
+        "sweater_outfit": "(wearing cozy warm cream knit sweater with cherry-red accents:1.35), cozy comfy style",
+        "bikini_outfit": "(wearing vibrant white and cherry-red two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "romantic_outfit": "(wearing alluring romantic crimson and white silk slip dress with delicate lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
     }
 }
 
@@ -101,7 +148,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
                 "activity_name": "Bangun pagi santai akhir pekan",
                 "activity_desc": "lagi bangun agak siang di kasur kamar kos, menikmati hari libur kuliah sambil main HP santai",
                 "scene": "relaxing on bed with fluffy pillows and soft blanket, bright sunny morning bedroom window",
-                "outfit_prompt": "(wearing cozy oversized morning t-shirt and comfy loungewear shorts:1.35)",
+                "outfit_prompt": profile.get("morning_outfit", "(wearing cozy oversized morning t-shirt and comfy loungewear shorts:1.35)"),
                 "outfit_name": "☀️ Kaos Pagi Santai",
                 "is_public": False,
                 "is_weekend": True
@@ -111,7 +158,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
                 "activity_name": "Sarapan & bebersih kamar kos",
                 "activity_desc": "lagi santai bebersih kamar kos, seduh kopi/matcha pagi, dan sarapan santai menikmati libur",
                 "scene": "standing in cozy apartment room, sipping warm morning coffee, natural sunlight through window",
-                "outfit_prompt": "(wearing cute comfortable casual loungewear, oversized pastel tee, relaxed shorts:1.35)",
+                "outfit_prompt": profile.get("loungewear_outfit", "(wearing cute comfortable casual loungewear, oversized tee, relaxed shorts:1.35)"),
                 "outfit_name": "🛋️ Pakaian Santai Kos",
                 "is_public": False,
                 "is_weekend": True
@@ -141,7 +188,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
                 "activity_name": "Makan malam santai & santai di kosan",
                 "activity_desc": "udah balik ke kosan sehabis jalan-jalan sore, lagi makan malam santai sambil istirahat",
                 "scene": "relaxing inside warm cozy apartment room, warm ambient lamp lighting",
-                "outfit_prompt": "(wearing cute comfortable casual loungewear, oversized pastel tee, relaxed shorts:1.35)",
+                "outfit_prompt": profile.get("loungewear_outfit", "(wearing cute comfortable casual loungewear, oversized tee, relaxed shorts:1.35)"),
                 "outfit_name": "🛋️ Pakaian Santai Kos",
                 "is_public": False,
                 "is_weekend": True
@@ -151,7 +198,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
                 "activity_name": "Santai malam minggu di kamar kos",
                 "activity_desc": "lagi santai rebahan di kasur kamar kos, dengerin musik lo-fi dan nonton series favorit",
                 "scene": "sitting comfortably on plush bed in cozy bedroom, glowing fairy lights, intimate relaxed evening ambiance",
-                "outfit_prompt": "(wearing soft comfortable camisole and loungewear shorts:1.35), cozy evening style",
+                "outfit_prompt": profile.get("loungewear_outfit", "(wearing soft comfortable camisole and loungewear shorts:1.35), cozy evening style"),
                 "outfit_name": "🌙 Loungewear Malam",
                 "is_public": False,
                 "is_weekend": True
@@ -161,7 +208,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
                 "activity_name": "Tidur lelap akhir pekan",
                 "activity_desc": "udah rebahan di kasur di bawah selimut, skincare-an dan siap-siap tidur nyenyak",
                 "scene": "lying comfortably on bed with fluffy pillows and soft blanket, dim cozy night bedroom lamp",
-                "outfit_prompt": "(wearing soft pastel silk pajamas:1.35), cozy bedtime sleepwear",
+                "outfit_prompt": profile.get("pajamas_outfit", "(wearing soft pastel silk pajamas:1.35), cozy bedtime sleepwear"),
                 "outfit_name": "🌙 Piyama Tidur",
                 "is_public": False,
                 "is_weekend": True
@@ -173,7 +220,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
             "activity_name": "Bangun pagi & siap-siap ke kampus",
             "activity_desc": "baru bangun tidur, cuci muka, mandi pagi, dan siap-siap berangkat kuliah pagi",
             "scene": "sitting in cozy bright morning apartment room, soft morning sunlight through window",
-            "outfit_prompt": "(wearing cozy oversized morning t-shirt and comfy loungewear shorts:1.35)",
+            "outfit_prompt": profile.get("morning_outfit", "(wearing cozy oversized morning t-shirt and comfy loungewear shorts:1.35)"),
             "outfit_name": "☀️ Kaos Pagi Santai",
             "is_public": False,
             "is_weekend": False
@@ -223,7 +270,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
             "activity_name": "Balik ke kosan & makan malam santai",
             "activity_desc": "udah balik ke kosan, lagi makan malam santai sambil istirahat",
             "scene": "relaxing inside warm cozy apartment room, warm ambient lamp lighting",
-            "outfit_prompt": "(wearing cute comfortable casual loungewear, oversized pastel tee, relaxed shorts:1.35)",
+            "outfit_prompt": profile.get("loungewear_outfit", "(wearing cute comfortable casual loungewear, oversized tee, relaxed shorts:1.35)"),
             "outfit_name": "🛋️ Pakaian Santai Kos",
             "is_public": False,
             "is_weekend": False
@@ -233,7 +280,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
             "activity_name": "Mandi malam & santai di kamar kos",
             "activity_desc": "baru beres mandi malam, lagi santai rebahan di kasur sambil dengerin musik / main game",
             "scene": "sitting comfortably on plush bed in cozy bedroom, glowing fairy lights, intimate relaxed evening ambiance",
-            "outfit_prompt": "(wearing soft comfortable camisole and loungewear shorts:1.35), cozy evening style",
+            "outfit_prompt": profile.get("loungewear_outfit", "(wearing soft comfortable camisole and loungewear shorts:1.35), cozy evening style"),
             "outfit_name": "🌙 Loungewear Malam",
             "is_public": False,
             "is_weekend": False
@@ -243,7 +290,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
             "activity_name": "Rebahan di kasur siap-siap tidur",
             "activity_desc": "udah rebahan di kasur di bawah selimut, skincare-an dan siap-siap tidur nyenyak",
             "scene": "lying comfortably on bed with fluffy pillows and soft blanket, dim cozy night bedroom lamp",
-            "outfit_prompt": "(wearing soft pastel silk pajamas:1.35), cozy bedtime sleepwear",
+            "outfit_prompt": profile.get("pajamas_outfit", "(wearing soft pastel silk pajamas:1.35), cozy bedtime sleepwear"),
             "outfit_name": "🌙 Piyama Tidur",
             "is_public": False,
             "is_weekend": False
@@ -278,7 +325,7 @@ def detect_contextual_activity_and_outfit(
             return {
                 "activity": "lagi santai romantis di kamar",
                 "scene": "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer",
-                "outfit_prompt": "(wearing alluring romantic silk slip dress with delicate lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+                "outfit_prompt": profile.get("romantic_outfit", "(wearing alluring romantic silk slip dress with delicate lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling"),
                 "outfit_negative": "campus, backpack, casual college clothes, classroom, hoodie, outdoor clothes, jeans, winter clothes",
                 "outfit_name": "💋 Pakaian Romantis (Silk Slip Dress)",
                 "is_public": False
@@ -289,7 +336,7 @@ def detect_contextual_activity_and_outfit(
             return {
                 "activity": "baru beres mandi / keramas",
                 "scene": "standing in modern bathroom with soft steam, bare shoulders, post-shower glow, damp hair, bathroom mirror",
-                "outfit_prompt": "(wearing only a soft bath towel wrapped around chest:1.4), bare shoulders, wet skin, damp hair",
+                "outfit_prompt": "(wearing only a soft clean white bath towel wrapped around chest:1.4), bare shoulders, wet skin, damp hair",
                 "outfit_negative": "clothes, shirt, pants, coat, hoodie, jeans, jacket, sweater",
                 "outfit_name": "🚿 Handuk Mandi (After Shower)",
                 "is_public": False
@@ -300,7 +347,7 @@ def detect_contextual_activity_and_outfit(
             return {
                 "activity": "lagi rebahan di kasur kamar",
                 "scene": "relaxing on bed with fluffy pillows, warm dim night bedroom lamp, cozy intimate bedroom",
-                "outfit_prompt": "(wearing soft pastel silk camisole and sleep shorts:1.35), bedtime loungewear",
+                "outfit_prompt": profile.get("pajamas_outfit", "(wearing soft pastel silk camisole and sleep shorts:1.35), bedtime loungewear"),
                 "outfit_negative": "hoodie, jacket, coat, outdoor clothes, jeans, campus",
                 "outfit_name": "🌙 Silk Pajamas",
                 "is_public": False
@@ -322,7 +369,7 @@ def detect_contextual_activity_and_outfit(
             return {
                 "activity": "lagi masak di dapur",
                 "scene": "standing in modern cozy kitchen preparing food, warm domestic lighting",
-                "outfit_prompt": "(wearing cute oversized pastel knitted sweater:1.35), cozy comfy style",
+                "outfit_prompt": profile.get("sweater_outfit", "(wearing cute oversized pastel knitted sweater:1.35), cozy comfy style"),
                 "outfit_negative": "bikini, lingerie, swimwear, naked",
                 "outfit_name": "🍳 Cozy Kitchen Sweater",
                 "is_public": False
@@ -333,7 +380,7 @@ def detect_contextual_activity_and_outfit(
             return {
                 "activity": "lagi di pantai / kolam renang",
                 "scene": "walking along tropical beach, ocean sunset horizon, gentle sea breeze",
-                "outfit_prompt": "(wearing fashionable two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel",
+                "outfit_prompt": profile.get("bikini_outfit", "(wearing fashionable two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel"),
                 "outfit_negative": "clothes, casual clothes, hoodie, sweater, jacket, shirt, pants, coat, pajamas",
                 "outfit_name": "🏖️ Summer Bikini",
                 "is_public": True
@@ -399,7 +446,7 @@ def detect_contextual_activity_and_outfit(
             return {
                 "activity": "lagi santai di rumah / kamar kos",
                 "scene": "relaxing comfortably in cozy modern apartment room, warm ambient lighting",
-                "outfit_prompt": "(wearing cute comfortable casual loungewear, oversized pastel tee, relaxed shorts:1.35)",
+                "outfit_prompt": profile.get("loungewear_outfit", "(wearing cute comfortable casual loungewear, oversized tee, relaxed shorts:1.35)"),
                 "outfit_negative": "bikini, lingerie, swimwear, naked, uniform, coat",
                 "outfit_name": "🛋️ Pakaian Santai Rumahan",
                 "is_public": False

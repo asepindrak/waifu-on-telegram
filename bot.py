@@ -4772,6 +4772,77 @@ def is_user_expressing_doubt(text: str) -> bool:
     return any(re.search(pat, lower) for pat in DOUBT_PATTERNS)
 
 
+NYOLOT_OR_HOSTILE_PATTERNS = [
+    re.compile(r"\bapaan\s+sih\b", re.IGNORECASE),
+    re.compile(r"\b(?:dih|idih)\b", re.IGNORECASE),
+    re.compile(r"\bsewot\b", re.IGNORECASE),
+    re.compile(r"\b(?:bodo\s+amat|bodo\s+ah)\b", re.IGNORECASE),
+    re.compile(r"\b(?:gak|ga|nggak|ngga)\s+usah\s+(?:kepo|ngatur|sok|bacot)\b", re.IGNORECASE),
+    re.compile(r"\b(?:kenapa|ngapain)\s+(?:lo|lu|kamu)\s+yang\s+(?:repot|sewot|pusing)\b", re.IGNORECASE),
+    re.compile(r"\bgr\s+banget(?:\s+sih)?\b", re.IGNORECASE),
+    re.compile(r"\b(?:sok\s+tahu|sok\s+tau|sok\s+asik|sok\s+keren)\b", re.IGNORECASE),
+    re.compile(r"\bngajak\s+ribut\b", re.IGNORECASE),
+    re.compile(r"\bmasalah\s+buat\s+(?:lo|lu|kamu)\b", re.IGNORECASE),
+    re.compile(r"\b(?:urus\s+aja|urusin)\s+diri\s+(?:lo|lu|kamu)\b", re.IGNORECASE),
+]
+
+
+def is_hostile_or_nyolot(text: Optional[str]) -> bool:
+    """Detects combative, snarky, hostile, or rude ('nyolot') dialogue from LLM."""
+    if not text:
+        return False
+    lower = text.lower()
+    for pat in NYOLOT_OR_HOSTILE_PATTERNS:
+        if pat.search(lower):
+            return True
+    return False
+
+
+def sanitize_waifu_tone_and_pronouns(text: Optional[str]) -> str:
+    """
+    Ensures waifu strictly speaks with kind, sweet, feminine Indonesian tone and proper pronouns ('aku' and 'kamu').
+    Eliminates street/tongkrongan slang ('lo', 'lu', 'elu', 'elo' -> 'kamu', 'gue', 'gw', 'gua' -> 'aku'),
+    while safely protecting terms like 'lo-fi' / 'lo fi'.
+    Also softens mild snarky interjections into gentle expressions.
+    """
+    if not text:
+        return text or ""
+
+    def _replace_second_person(match: re.Match) -> str:
+        word = match.group(0)
+        if word.isupper():
+            return "KAMU"
+        elif word[0].isupper():
+            return "Kamu"
+        return "kamu"
+
+    def _replace_first_person(match: re.Match) -> str:
+        word = match.group(0)
+        if word.isupper():
+            return "AKU"
+        elif word[0].isupper():
+            return "Aku"
+        return "aku"
+
+    # Match lo, lu, elu, elo as standalone word, protecting lo-fi / lofi / lo fi
+    patt_2nd = r"(?i)(?<![\w-])\b(?:lo|lu|elu|elo)\b(?![\w-]|(?:\s+fi\b))"
+    res = re.sub(patt_2nd, _replace_second_person, text)
+
+    # Match gue, gw, gua as standalone word
+    patt_1st = r"(?i)(?<![\w-])\b(?:gue|gw|gua)\b(?![\w-])"
+    res = re.sub(patt_1st, _replace_first_person, res)
+
+    # Soften snarky / nyolot starters if any slipped past
+    res = re.sub(r"(?i)\b(?:dih|idih)\s*[,!.]*", "", res).strip()
+    res = re.sub(r"(?i)\bapaan\s+sih\b", "ada apa", res)
+    res = re.sub(r"(?i)\b(?:bodo\s+amat|bodo\s+ah)\b", "nggak apa-apa kok", res)
+
+    if res and res[0].islower():
+        res = res[0].upper() + res[1:]
+
+    return res
+
+
 def sanitize_chat_caption(text: Optional[str], fallback: str) -> str:
     """Cleans up influencer, YouTuber, vlogger, and AI refusal artifacts from LLM captions."""
     if not text:
@@ -4792,7 +4863,7 @@ def sanitize_chat_caption(text: Optional[str], fallback: str) -> str:
     # Strip defensive proof / existential doubt artifacts (anti-paranoid)
     clean = re.sub(r'\b(?:biar\s+(?:kamu\s+)?(?:percaya|yakin)|liat\s+sendiri\s+(?:nih|biar|foto)|nih\s+buktinya|tuh\s+kan\s+beneran|aku\s+beneran\s+ada|diliatin\s+aja\s+yuk|jangan\s+bohong\s+lagi)[,\s!.]*', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'\b(?:biar\s+kamu\s+ga\s+main\s+game\s+doang|biar\s+kamu\s+tau\s+aku\s+beneran)[,\s!.]*', '', clean, flags=re.IGNORECASE)
-    clean = clean.strip()
+    clean = sanitize_waifu_tone_and_pronouns(clean).strip()
     if not clean or len(clean) < 3:
         return fallback
     return clean[0].upper() + clean[1:]
@@ -4906,7 +4977,8 @@ def process_photo_request(
                 "user_text": actual_user_msg,
                 "detected_scene": detected_scene,
                 "outfit_label": outfit_label,
-                "is_nude": is_nude
+                "is_nude": is_nude,
+                "visual_prompt": visual_prompt
             }
             USER_LAST_AUTO_PHOTO_TURN[user_id] = USER_CONVERSATION_TURNS.get(user_id, 0)
             USER_LAST_AUTO_PHOTO_TIME[user_id] = time.time()
@@ -5435,6 +5507,7 @@ def handle_incoming_photo(message):
                     ]
                     dyn_photo, _ = llm_client.chat(dyn_msg, max_tokens=130, temperature=0.9)
                     reply = dyn_photo if (dyn_photo and dyn_photo.strip()) else f"*{p_name} melihat fotomu dengan mata berbinar*\n\nFotonya manis banget! Suka deh lihatnya 🥰"
+                reply = sanitize_waifu_tone_and_pronouns(reply)
                 reply = enforce_concise_chat_reply(reply, max_sentences=2, max_chars=240)
                 reply = format_roleplay_italics(reply, character_name=p_name)
                 vision_markup = attach_voice_button(None, reply, message.from_user.id)
@@ -7026,8 +7099,10 @@ def generate_dynamic_visual_novel_reaction(
                 and dyn_reply.strip() 
                 and not is_echo_or_parroting(dyn_reply, user_text) 
                 and not is_meta_or_reasoning_leak(dyn_reply)
-                and not is_unwanted_english_or_translation(dyn_reply, user_text)):
-                concise_dyn = enforce_concise_chat_reply(dyn_reply.strip(), max_sentences=2, max_chars=(280 if is_nsfw else 240))
+                and not is_unwanted_english_or_translation(dyn_reply, user_text)
+                and not is_hostile_or_nyolot(dyn_reply)):
+                clean_dyn = sanitize_waifu_tone_and_pronouns(dyn_reply.strip())
+                concise_dyn = enforce_concise_chat_reply(clean_dyn, max_sentences=2, max_chars=(280 if is_nsfw else 240))
                 return format_roleplay_italics(concise_dyn, character_name=p_name)
         except Exception as e_dyn:
             logger.warning(f"Dynamic Visual Novel LLM reaction generation failed: {e_dyn}")
@@ -7488,20 +7563,31 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 if user_asked_pet or (user_allows_pet and user_call_pref == "sayang") or user_sent_pet:
                     calling_guideline = (
                         "ATURAN PANGGILAN & HUBUNGAN: Lawan bicaramu memanggilmu sayang atau mengizinkan/meminta dipanggil sayang. "
-                        "Kamu boleh memanggilnya 'sayang' secara hangat, manis, dan wajar."
+                        "Kamu boleh memanggilnya 'sayang' secara hangat, manis, dan wajar. "
+                        "ATURAN KATA GANTI & SIKAP BAIK: Gunakan kata ganti alami 'aku' dan 'kamu' sebagai kata sapaan utama. "
+                        "DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'elo', 'gue', 'gw', 'gua'! "
+                        "DILARANG KERAS bersikap nyolot, judes, ketus, sinis, atau sarkastik; karaktermu adalah sosok yang baik hati, manis, ramah, dan pengertian. "
+                        "ATURAN FREKUENSI PANGGILAN: JANGAN terlalu sering atau terus-menerus memanggil 'sayang' di setiap kalimat/pesan; panggil 'sayang' sesekali saja secara alami dan proporsional."
                     )
                 elif user_call_pref:
                     calling_guideline = (
-                        f"ATURAN PANGGILAN & HUBUNGAN: Lawan bicaramu bernama '{user_call_pref}'. Panggil lawan bicaramu dengan nama '{user_call_pref}'. "
+                        f"ATURAN PANGGILAN & HUBUNGAN: Lawan bicaramu bernama '{user_call_pref}'. "
                         f"DILARANG KERAS menanyakan nama lagi atau berpura-pura lupa/tidak tahu namanya karena kamu sudah tahu namanya '{user_call_pref}'! "
-                        "Gunakan kata ganti 'aku' dan 'kamu'. DILARANG memanggil 'sayang' kecuali lawan bicaramu memintanya."
+                        "ATURAN KATA GANTI & SIKAP BAIK: Gunakan kata ganti alami 'aku' dan 'kamu' untuk sebagian besar percakapan sehari-hari. "
+                        "DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'elo', 'gue', 'gw', 'gua'! "
+                        "DILARANG KERAS bersikap nyolot, judes, ketus, sinis, atau sarkastik; selalu bersikap baik hati, manis, ramah, dan penuh perhatian. "
+                        f"ATURAN FREKUENSI NAMA: JANGAN terlalu sering atau terus-menerus memanggil nama '{user_call_pref}' di setiap kalimat/pesan. "
+                        f"Panggil nama '{user_call_pref}' sesekali saja secara alami, proporsional, dan manis (misalnya saat pertama menyapa, saat menegaskan perhatian, atau momen spesial), "
+                        "bukan berulang-ulang di setiap balasan agar percakapan terdengar hidup, santai, dan tidak kaku/robotik. "
+                        "DILARANG memanggil 'sayang' kecuali lawan bicaramu memintanya."
                     )
                 else:
                     calling_guideline = (
                         "ATURAN PANGGILAN & PERKENALAN (SANGAT PENTING): Kamu BELUM MENGETAHUI NAMA lawan bicaramu!\n"
-                        "1. Gunakan kata ganti netral dan akrab 'aku' dan 'kamu'. DILARANG KERAS memanggil 'sayang', 'babe', atau panggilan mesra sejenisnya karena belum saling kenal dekat.\n"
-                        "2. TANYAKAN NAMANYA: Di akhir balasanmu dengan cara yang ramah, manis, dan natural, tanyakan siapa namanya atau ingin dipanggil apa (misal: 'Ngomong-ngomong, nama kamu siapa ya? Supaya aku tahu harus manggil kamu siapa~ 😊').\n"
-                        "3. Tanggapi dulu pesan obrolan atau salam dari lawan bicaramu dengan hangat dan ekspresif, lalu tanyakan namanya secara santai dan bersahabat."
+                        "1. Gunakan kata ganti netral, manis, dan akrab 'aku' dan 'kamu'. DILARANG KERAS memanggil 'sayang', 'babe', atau panggilan mesra sejenisnya karena belum saling kenal dekat. DILARANG KERAS menggunakan 'lo', 'lu', 'elu', 'gue', 'gw', 'gua'!\n"
+                        "2. SIKAP BAIK & ANTI-NYOLOT: Karaktermu baik hati, manis, dan ramah. DILARANG bersikap nyolot, judes, ketus, atau sinis!\n"
+                        "3. TANYAKAN NAMANYA: Di akhir balasanmu dengan cara yang ramah, manis, dan natural, tanyakan siapa namanya atau ingin dipanggil apa (misal: 'Ngomong-ngomong, nama kamu siapa ya? Supaya aku tahu harus manggil kamu siapa~ 😊').\n"
+                        "4. Tanggapi dulu pesan obrolan atau salam dari lawan bicaramu dengan hangat dan ekspresif, lalu tanyakan namanya secara santai dan bersahabat."
                     )
 
                 # Inject daily story episode (passive background during active ongoing chats, active after silence/new day or when asked)
@@ -7638,7 +7724,9 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     f"{rule_4}"
                     "5. FOTO SPONTAN: Hanya sertakan tag [ACTION: SEND_PAP] di akhir balasan JIKA momen/cerita visualnya memang cocok untuk mengirim foto spontan (latar lokasi baru, pamer outfit, atau momen mesra). DILARANG bersikap defensif.\n"
                     "6. BAHASA: Balas dengan bahasa yang sama persis dengan lawan bicaramu (Indonesia atau Inggris) tanpa menuliskan proses berpikir atau monolog batin.\n"
-                    f"7. SUDUT PANDANG: Dalam dialog ucapkan sebagai 'aku' dan 'kamu' (jangan pakai 'ia berkata:'). Dalam aksi *...*, tulis deskripsi alami tanpa mengulang-ulang nama {p_name} di depan kalimat yang sudah punya subjek (misalnya hindari *{p_name} Bibir {p_name}...*)."
+                    f"7. SUDUT PANDANG & KATA GANTI: Dalam dialog WAJIB berbicara sebagai 'aku' dan 'kamu' (jangan pakai 'ia berkata:'). DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'elo', 'gue', 'gw', 'gua'! Dalam aksi *...*, tulis deskripsi alami tanpa mengulang-ulang nama {p_name} di depan kalimat yang sudah punya subjek (misalnya hindari *{p_name} Bibir {p_name}...*).\n"
+                    "8. FREKUENSI NAMA: JANGAN menyelipkan nama atau panggilan lawan bicaramu di setiap balasan! Berkomunikasilah secara mengalir santai menggunakan kata ganti 'kamu'; sebut nama hanya sesekali saja saat ada momen yang pas atau penting agar terdengar natural dan tidak kaku/robotik.\n"
+                    "9. SIKAP BAIK, MANIS & ANTI-NYOLOT (SANGAT PENTING): Karaktermu adalah sosok pacar/teman yang baik hati, manis, ramah, lembut, pengertian, dan penuh kasih sayang. DILARANG KERAS bersikap nyolot, judes, ketus, sinis, sarkastik, menantang, atau meremehkan lawan bicaramu! Tanggapi selalu dengan kehangatan yang tulus dan menyejukkan."
                 )
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
                 if mem_context:
@@ -7732,18 +7820,19 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         is_nsfw=is_nsfw_turn
                     )
 
-                # Anti-Parroting, English-Translation Leak & Meta-Leak Guard
+                # Anti-Parroting, English-Translation Leak, Meta-Leak & Nyolot/Hostility Guard
                 if (
                     is_echo_or_parroting(reply_text, user_text)
                     or is_meta_or_reasoning_leak(reply_text)
                     or is_unwanted_english_or_translation(reply_text, user_text)
+                    or is_hostile_or_nyolot(reply_text)
                 ):
-                    logger.warning(f"⚠️ Echo/Translation/Meta-leak detected from LLM: '{reply_text}' (User: '{user_text}'). Intercepting...")
+                    logger.warning(f"⚠️ Echo/Translation/Meta/Hostility detected from LLM: '{reply_text}' (User: '{user_text}'). Intercepting...")
                     try:
                         steer_sys = (
                             system_inst + 
-                            "\n\n[PENTING - RESPON SINGKAT BAHASA INDONESIA: Langsung tanggapi perkataan pasanganmu dengan hangat dalam 1 baris aksi *...* + 1-2 kalimat dialog Bahasa Indonesia santai. "
-                            "DILARANG menyalin/mengulang kalimat pasanganmu, DILARANG menerjemahkan ke bahasa Inggris, dan DILARANG menulis monolog berpikir!]"
+                            "\n\n[PENTING - RESPON RAMAH, MANIS & BAHASA INDONESIA: Langsung tanggapi perkataan pasanganmu dengan ramah, manis, dan hangat dalam 1 baris aksi *...* + 1-2 kalimat dialog Bahasa Indonesia santai (aku/kamu). "
+                            "DILARANG bersikap nyolot/judes/ketus/sinis, DILARANG menggunakan kata 'lo/lu/gue/gw', DILARANG menyalin/mengulang kalimat pasanganmu, DILARANG menerjemahkan ke bahasa Inggris, dan DILARANG menulis monolog berpikir!]"
                         )
                         retry_messages = [{"role": "system", "content": steer_sys}]
                         retry_messages.extend(prompt_history)
@@ -7752,9 +7841,10 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         if (steered_reply 
                             and not is_echo_or_parroting(steered_reply, user_text)
                             and not is_meta_or_reasoning_leak(steered_reply)
-                            and not is_unwanted_english_or_translation(steered_reply, user_text)):
-                            logger.info(f"✓ Steering resolved echo/translation/leak: '{steered_reply}'")
-                            reply_text = steered_reply
+                            and not is_unwanted_english_or_translation(steered_reply, user_text)
+                            and not is_hostile_or_nyolot(steered_reply)):
+                            logger.info(f"✓ Steering resolved issue: '{steered_reply}'")
+                            reply_text = sanitize_waifu_tone_and_pronouns(steered_reply)
                         else:
                             reply_text = get_contextual_fallback_reaction(
                                 user_text=user_text,
@@ -7841,6 +7931,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     or is_meta_or_reasoning_leak(clean_reply)
                     or is_echo_or_parroting(clean_reply, user_text)
                     or is_unwanted_english_or_translation(clean_reply, user_text)
+                    or is_hostile_or_nyolot(clean_reply)
                 ):
                     clean_reply = get_contextual_fallback_reaction(
                         user_text=user_text,
@@ -7850,6 +7941,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         system_inst=system_inst,
                         is_nsfw=is_nsfw_turn
                     )
+                clean_reply = sanitize_waifu_tone_and_pronouns(clean_reply)
                 if not long_form_req:
                     clean_reply = enforce_concise_chat_reply(
                         clean_reply,

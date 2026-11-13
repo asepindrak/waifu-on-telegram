@@ -156,6 +156,15 @@ class TestUserNameOnboarding(unittest.TestCase):
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    def test_calling_frequency_guideline_in_context(self):
+        """Verify memory context directs waifu to call user by name occasionally, not in every turn."""
+        self.memory_engine.update_profile(self.test_user_id, name="Adens", call_name="Adens")
+        ctx = self.memory_engine.format_memory_context(self.test_user_id)
+        self.assertIn("Adens", ctx)
+        self.assertIn("DILARANG KERAS menanyakan namanya lagi", ctx)
+        self.assertIn("JANGAN terlalu sering", ctx)
+        self.assertIn("Gunakan kata ganti wajar 'kamu'", ctx)
+
     def test_pet_name_management(self):
         # Request to be called sayang
         self.memory_engine.auto_extract_facts("Panggil aku sayang aja", self.test_user_id)

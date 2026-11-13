@@ -592,7 +592,10 @@ class MemoryEngine:
         allow_pet = bool(prof.get("allow_pet_name", False))
         call_name = raw_call_name if self.is_valid_name(raw_call_name, allow_pet=allow_pet) else ""
         if call_name:
-            lines.append(f"• User's Calling Preference: Panggil user '{call_name}'. Kamu sudah mengetahui namanya, DILARANG KERAS menanyakan namanya lagi!")
+            lines.append(
+                f"• User's Calling Preference: Nama lawan bicaramu adalah '{call_name}'. Kamu sudah mengetahui namanya, DILARANG KERAS menanyakan namanya lagi! "
+                f"Gunakan kata ganti wajar 'kamu' dalam obrolan sehari-hari, dan sebut nama '{call_name}' sesekali saja secara alami dan proporsional (JANGAN terlalu sering atau di setiap pesan)."
+            )
         else:
             lines.append("• Panggilan & Perkenalan: Kamu belum tahu nama user. Tanyakan siapa namanya dengan ramah di akhir pesanmu agar kamu tahu harus memanggilnya apa. Gunakan kata ganti netral/akrab 'kamu' dan DILARANG memanggil 'sayang'.")
 

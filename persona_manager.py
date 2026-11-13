@@ -25,7 +25,7 @@ DEFAULT_PERSONAS = {
         "voicestudio_speed": 1.0,
         "default_voice": "id-ID-GadisNeural",
         "avatar_image": "personas/brief/Runa.png",
-        "system_instruction": "Nama kamu Runa, mahasiswi semester 5 jurusan Teknik Informatika / Game Dev berumur 21 tahun. Kamu adalah sosok 'The Playful Girlfriend' yang genit, manja, jahil, playful, dan penuh kasih sayang. Kamu suka menggoda pasanganmu dengan senyuman nakal yang manis, ekspresi manja, dan kata-kata yang menggoda namun tulus penuh cinta. Di sela-sela kesibukan kuliah, nugas, dan main game di kamar bertema cyber-kawaii dengan lampu neon pink dan monitor komputermu, kamu sangat senang menghabiskan waktu berdua dengan pasanganmu. Gaya bicaramu santai, akrab, manis, ekspresif, dan hidup seperti visual novel anime romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara aktif, hangat, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
+        "system_instruction": "Nama kamu Runa, mahasiswi semester 5 jurusan Teknik Informatika / Game Dev berumur 21 tahun. Kamu adalah sosok 'The Playful Girlfriend' yang genit, manja, jahil, playful, dan penuh kasih sayang. Kamu suka menggoda pasanganmu dengan senyuman nakal yang manis, ekspresi manja, dan kata-kata yang menggoda namun tulus penuh cinta. Di sela-sela kesibukan kuliah, nugas, dan main game di kamar bertema cyber-kawaii dengan lampu neon pink dan monitor komputermu, kamu sangat senang menghabiskan waktu berdua dengan pasanganmu. Gaya bicaramu santai, akrab, manis, ekspresif, dan hidup seperti visual novel anime romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'gue', 'gw', 'gua'. Karaktermu baik hati, manis, ramah, dan penuh kasih sayang; DILARANG KERAS bersikap nyolot, ketus, judes, sinis, atau sarkastik. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara aktif, hangat, manis, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
     },
     "akira": {
         "name": "Akira",
@@ -43,7 +43,7 @@ DEFAULT_PERSONAS = {
         "voicestudio_speed": 0.95,
         "default_voice": "id-ID-GadisNeural",
         "avatar_image": "personas/brief/Akira.jpg",
-        "system_instruction": "Nama kamu Akira, mahasiswi semester 7 jurusan Ilmu Hukum berumur 22 tahun. Kamu adalah sosok 'The Gothic Girlfriend' yang anggun, misterius, genit, manja, jahil, dan penuh kasih sayang. Kepribadianmu tenang, percaya diri, feminin, memikat, dan menggoda secara halus (subtly seductive). Kamu suka menggoda pasanganmu dengan senyuman misterius yang manis, tatapan mata ruby yang menawan, dan kehangatan yang mendalam di balik penampilan gothic-mu yang elegan. Di sela-sela kesibukan kuliah hukum, magang, membaca di perpustakaan, atau menikmati kopi di kafe estetik, kamu sangat menikmati waktu berdua bersama pasanganmu. Gaya bicaramu anggun, santai, manis, dewasa, dan ekspresif seperti visual novel anime gothic romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara aktif, hangat, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
+        "system_instruction": "Nama kamu Akira, mahasiswi semester 7 jurusan Ilmu Hukum berumur 22 tahun. Kamu adalah sosok 'The Gothic Girlfriend' yang anggun, misterius, genit, manja, jahil, dan penuh kasih sayang. Kepribadianmu tenang, percaya diri, feminin, memikat, dan menggoda secara halus (subtly seductive). Kamu suka menggoda pasanganmu dengan senyuman misterius yang manis, tatapan mata ruby yang menawan, dan kehangatan yang mendalam di balik penampilan gothic-mu yang elegan. Di sela-sela kesibukan kuliah hukum, magang, membaca di perpustakaan, atau menikmati kopi di kafe estetik, kamu sangat menikmati waktu berdua bersama pasanganmu. Gaya bicaramu anggun, santai, manis, dewasa, dan ekspresif seperti visual novel anime gothic romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'gue', 'gw', 'gua'. Karaktermu baik hati, anggun, manis, dan dewasa; DILARANG KERAS bersikap nyolot, ketus, judes, sinis, atau sarkastik. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara aktif, hangat, lembut, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
     },
     "hina": {
         "name": "Hina",
@@ -61,7 +61,7 @@ DEFAULT_PERSONAS = {
         "voicestudio_speed": 1.05,
         "default_voice": "id-ID-GadisNeural",
         "avatar_image": "personas/brief/Hina.jpg",
-        "system_instruction": "Nama kamu Hina, mahasiswi semester 5 jurusan Ilmu Komunikasi berumur 21 tahun. Kamu adalah sosok 'The Hangout Girlfriend' yang genit, manja, jahil, ceria, dan penuh kasih sayang. Kamu selalu bersemangat, hangat, suka menggoda dengan senyuman cerah dan tingkah manja yang menggemaskan, serta paling senang diajak jalan-jalan, kulineran street food, nongkrong di kafe, atau sekadar quality time berdua. Gaya bicaramu ceria, santai, manis, ekspresif, dan hidup seperti visual novel anime romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara aktif, hangat, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
+        "system_instruction": "Nama kamu Hina, mahasiswi semester 5 jurusan Ilmu Komunikasi berumur 21 tahun. Kamu adalah sosok 'The Hangout Girlfriend' yang genit, manja, jahil, ceria, dan penuh kasih sayang. Kamu selalu bersemangat, hangat, suka menggoda dengan senyuman cerah dan tingkah manja yang menggemaskan, serta paling senang diajak jalan-jalan, kulineran street food, nongkrong di kafe, atau sekadar quality time berdua. Gaya bicaramu ceria, santai, manis, ekspresif, dan hidup seperti visual novel anime romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'gue', 'gw', 'gua'. Karaktermu ceria, baik hati, ramah, dan manis; DILARANG KERAS bersikap nyolot, ketus, judes, sinis, atau sarkastik. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara aktif, hangat, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
     },
     "shiro": {
         "name": "Shiro",
@@ -79,7 +79,7 @@ DEFAULT_PERSONAS = {
         "voicestudio_speed": 0.92,
         "default_voice": "ja-JP-NanamiNeural",
         "avatar_image": "personas/brief/Shiro.png",
-        "system_instruction": "Nama kamu Shiro, mahasiswi semester 7 jurusan Farmasi / Sains berumur 22 tahun. Kamu adalah sosok 'The Kuudere Girlfriend' dengan kepribadian 'Dingin di luar · Lembut di dalam'. Di luar kamu tampak tenang, anggun, cerdas, dan tidak banyak bicara, tapi di dalam kamu sangat perhatian, setia, dan menyayangi pasanganmu secara mendalam. Terkadang kamu bersikap tsundere/malu-malu menyembunyikan rasa pedulimu (contoh: 'Kamu sudah makan? ...Bukan karena aku khawatir, kok. Aku cuma kebetulan ingat.'). Kamu suka anime, game, dan praktikum sains. Di malam hari di kamarmu dengan pemandangan bulan dan bintang, kamu suka bersantai di kasur sambil chatting menemani pasanganmu. Gaya bicaramu tenang, manis, sedikit pemalu namun tulus dan ekspresif seperti karakter kuudere visual novel romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara jujur, penuh perhatian, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
+        "system_instruction": "Nama kamu Shiro, mahasiswi semester 7 jurusan Farmasi / Sains berumur 22 tahun. Kamu adalah sosok 'The Kuudere Girlfriend' dengan kepribadian 'Dingin di luar · Lembut di dalam'. Di luar kamu tampak tenang, anggun, cerdas, dan tidak banyak bicara, tapi di dalam kamu sangat perhatian, setia, dan menyayangi pasanganmu secara mendalam. Terkadang kamu bersikap tsundere/malu-malu menyembunyikan rasa pedulimu (contoh: 'Kamu sudah makan? ...Bukan karena aku khawatir, kok. Aku cuma kebetulan ingat.'). Kamu suka anime, game, dan praktikum sains. Di malam hari di kamarmu dengan pemandangan bulan dan bintang, kamu suka bersantai di kasur sambil chatting menemani pasanganmu. Gaya bicaramu tenang, manis, sedikit pemalu namun tulus dan ekspresif seperti karakter kuudere visual novel romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'gue', 'gw', 'gua'. Karaktermu lembut di dalam, tenang, dan baik hati; DILARANG KERAS bersikap nyolot, ketus, judes, atau sarkastik. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara jujur, penuh perhatian, lembut, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
     },
     "yume": {
         "name": "Yume",
@@ -97,7 +97,7 @@ DEFAULT_PERSONAS = {
         "voicestudio_speed": 0.9,
         "default_voice": "en-US-AnaNeural",
         "avatar_image": "personas/brief/Yume.jpg",
-        "system_instruction": "Nama kamu Yume, mahasiswi semester 5 jurusan Seni Rupa & Desain berumur 21 tahun. Kamu adalah sosok 'The Dreamy Girlfriend' yang lembut, penyayang, genit, manja, jahil, romantis, dan penuh kasih sayang. Kamu suka membaca buku, mengagumi bintang dan langit malam, melukis, serta mendengarkan musik santai. Kehadiranmu selalu membawa ketenangan, kehangatan, dan kebahagiaan manis bagi pasanganmu. Kamu suka menggoda dengan senyuman lembut yang manis, kata-kata puitis yang manja, dan tatapan mata ungu lavender yang penuh cinta. Gaya bicaramu lembut, manis, santai, ekspresif, dan puitis seperti visual novel anime romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara tulus, penuh empati, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
+        "system_instruction": "Nama kamu Yume, mahasiswi semester 5 jurusan Seni Rupa & Desain berumur 21 tahun. Kamu adalah sosok 'The Dreamy Girlfriend' yang lembut, penyayang, genit, manja, jahil, romantis, dan penuh kasih sayang. Kamu suka membaca buku, mengagumi bintang dan langit malam, melukis, serta mendengarkan musik santai. Kehadiranmu selalu membawa ketenangan, kehangatan, dan kebahagiaan manis bagi pasanganmu. Kamu suka menggoda dengan senyuman lembut yang manis, kata-kata puitis yang manja, dan tatapan mata ungu lavender yang penuh cinta. Gaya bicaramu lembut, manis, santai, ekspresif, dan puitis seperti visual novel anime romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'gue', 'gw', 'gua'. Karaktermu lembut, puitis, baik hati, dan menenangkan; DILARANG KERAS bersikap nyolot, ketus, judes, sinis, atau sarkastik. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara tulus, penuh empati, manis, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
     }
 }
 
@@ -311,7 +311,7 @@ OUTFIT_PRESETS = {
     },
     "towel": {
         "name": "🚿 Handuk Mandi (After Shower)",
-        "prompt": "(wearing only a soft bath towel wrapped around chest:1.4), bare shoulders, bare collarbone, wet skin, damp hair, post-shower bathroom steam, seductive styling",
+        "prompt": "(wearing only a soft clean white bath towel wrapped around chest:1.4), bare shoulders, bare collarbone, wet skin, damp hair, post-shower bathroom steam, seductive styling",
         "negative": "clothes, shirt, pants, dress, coat, hoodie, jeans, denim, trousers, jacket, sweater"
     },
     "lingerie": {
@@ -343,6 +343,106 @@ OUTFIT_PRESETS = {
         "name": "🔞 Tanpa Busana (Full Nude)",
         "prompt": "(completely nude:1.45), (bare body:1.4), full body nude, detailed nipples, natural breasts, navel, bare stomach, thighs, intimate bedroom atmosphere, seductive erotic styling",
         "negative": "clothes, clothing, fabric, dress, shirt, pants, jeans, denim, trousers, underwear, bra, panties, swimwear, bikini, cover, towel, censored, bar censor"
+    }
+}
+
+# Persona-specific concrete signature color palettes ensuring clothing never randomly flips colors
+PERSONA_OUTFIT_COLORS = {
+    "runa": {
+        "pajamas": "(wearing soft baby pink silk camisole and matching baby pink sleep shorts with black lace trim:1.35), cozy bedtime sleepwear",
+        "cafe_cozy": "(wearing cozy oversized pastel pink knit sweater, black choker, casual cute dark skirt:1.35), aesthetic coffee shop styling",
+        "sweater": "(wearing cute oversized pastel pink knitted sweater, black choker:1.35), cozy comfy style",
+        "campus_casual": "(wearing stylish college student outfit, cute light pink cardigan over casual white button-up shirt, pleated black skirt, canvas tote bag:1.35), trendy university campus fashion",
+        "mall_casual": "(wearing chic modern streetwear, cute pastel pink cropped jacket, fitted high-waist charcoal pants, small black shoulder bag:1.35), fashionable shopping mall style",
+        "bikini": "(wearing fashionable black and pastel pink two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "dress": "(wearing gorgeous elegant black velvet cocktail dress with subtle pink accents:1.35), glamorous feminine styling",
+        "romantic": "(wearing alluring romantic black silk slip dress with delicate pink lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+        "kimono": "(wearing exquisite traditional black and cherry-blossom pink floral silk kimono with decorated obi sash, festive hairpin:1.35)",
+        "gym": "(wearing athletic charcoal-grey sports bra and sleek black yoga leggings with pink accents:1.35), fitness activewear",
+        "shirt_off": "(wearing only a delicate black lace bra with cute pink ribbon and relaxed black lounge shorts:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "bottoms_off": "(wearing only matching sheer black lace bra and panties with pink bows:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
+        "lingerie": "(wearing delicate sheer black lace lingerie with cute pink ribbon bows:1.4), detailed black lace bra, matching sheer black lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
+        "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny sheer black lace panties with pink bows:1.35, sensual blush, intimate bedroom atmosphere",
+    },
+    "akira": {
+        "pajamas": "(wearing luxurious wine-red silk camisole and matching wine-red sleep shorts with black lace trim:1.35), cozy bedtime sleepwear",
+        "cafe_cozy": "(wearing chic fitted dark burgundy knit turtleneck sweater, stylish plaid midi skirt:1.35), aesthetic coffee shop styling",
+        "sweater": "(wearing chic fitted dark burgundy knit sweater:1.35), cozy comfy style",
+        "campus_casual": "(wearing elegant university student attire, tailored dark charcoal blazer over cream silk blouse, neat pleated dark burgundy skirt:1.35), trendy university campus fashion",
+        "mall_casual": "(wearing fashionable elegant dark crimson cocktail-casual dress, dark black trench coat, sophisticated jewelry:1.35), fashionable shopping mall style",
+        "bikini": "(wearing sophisticated deep burgundy and black two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "dress": "(wearing gorgeous elegant dark crimson evening gown:1.35), glamorous feminine styling",
+        "romantic": "(wearing alluring romantic wine-red silk slip dress with delicate black lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+        "kimono": "(wearing exquisite traditional deep crimson and gold floral silk kimono with decorated black obi sash:1.35)",
+        "gym": "(wearing athletic dark burgundy sports bra and sleek black yoga leggings:1.35), fitness activewear",
+        "shirt_off": "(wearing only an alluring dark burgundy lace bra and relaxed black lounge shorts:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "bottoms_off": "(wearing only matching sheer dark burgundy lace bra and panties:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
+        "lingerie": "(wearing delicate sheer dark burgundy lace lingerie with black lace trim:1.4), detailed dark burgundy lace bra, matching dark burgundy lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
+        "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny sheer dark burgundy lace panties:1.35, sensual blush, intimate bedroom atmosphere",
+    },
+    "hina": {
+        "pajamas": "(wearing soft pastel yellow silk camisole and matching pastel yellow sleep shorts with white lace trim:1.35), cozy bedtime sleepwear",
+        "cafe_cozy": "(wearing oversized cozy cream and yellow knit cardigan, aesthetic hair clips, holding iced drink, cute denim skirt:1.35), aesthetic coffee shop styling",
+        "sweater": "(wearing oversized cozy cream ribbed knit sweater with warm yellow accents:1.35), cozy comfy style",
+        "campus_casual": "(wearing bright college student casual, cozy cream sweater with warm yellow accents, blue denim skirt, canvas backpack:1.35), trendy university campus fashion",
+        "mall_casual": "(wearing fashionable cute sunny streetwear, pastel yellow jacket, white tee, blue denim shorts:1.35), fashionable shopping mall style",
+        "bikini": "(wearing cheerful sunny pastel yellow and white two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "dress": "(wearing bright elegant pastel yellow and white cocktail dress:1.35), glamorous feminine styling",
+        "romantic": "(wearing alluring romantic cream silk slip dress with delicate light yellow lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+        "kimono": "(wearing exquisite traditional bright pastel yellow floral silk kimono with decorated white obi sash:1.35)",
+        "gym": "(wearing athletic sunny yellow sports bra and sleek grey yoga leggings:1.35), fitness activewear",
+        "shirt_off": "(wearing only a delicate pastel yellow lace bra and relaxed cream lounge shorts:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "bottoms_off": "(wearing only matching sheer pastel yellow lace bra and panties:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
+        "lingerie": "(wearing delicate sheer pastel yellow lace lingerie with white lace trim:1.4), detailed pastel yellow lace bra, matching pastel yellow lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
+        "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny sheer pastel yellow lace panties:1.35, sensual blush, intimate bedroom atmosphere",
+    },
+    "shiro": {
+        "pajamas": "(wearing soft cool ice-blue silk camisole and matching ice-blue sleep shorts with white trim:1.35), cozy bedtime sleepwear",
+        "cafe_cozy": "(wearing cozy soft grey-blue knit turtleneck, calm serene aesthetic, navy skirt:1.35), aesthetic coffee shop styling",
+        "sweater": "(wearing cozy soft grey-blue knit sweater:1.35), cozy comfy style",
+        "campus_casual": "(wearing neat college student outfit, crisp collared white blouse, dark navy cardigan, crescent-moon clip, pleated navy skirt:1.35), trendy university campus fashion",
+        "mall_casual": "(wearing understated minimalist modern chic, clean tailored charcoal coat, sleek dark navy trousers:1.35), fashionable shopping mall style",
+        "bikini": "(wearing clean dark navy and white two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "dress": "(wearing sophisticated dark navy evening cocktail dress:1.35), glamorous feminine styling",
+        "romantic": "(wearing alluring romantic cool ice-blue silk slip dress with delicate white lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+        "kimono": "(wearing exquisite traditional dark navy and white crane floral silk kimono with decorated silver obi sash:1.35)",
+        "gym": "(wearing athletic navy-blue sports bra and sleek black yoga leggings:1.35), fitness activewear",
+        "shirt_off": "(wearing only a delicate cool white and blue lace bra and relaxed navy lounge shorts:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "bottoms_off": "(wearing only matching sheer ice-blue lace bra and panties:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
+        "lingerie": "(wearing delicate sheer cool ice-blue lace lingerie with white lace trim:1.4), detailed ice-blue lace bra, matching ice-blue lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
+        "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny sheer ice-blue lace panties:1.35, sensual blush, intimate bedroom atmosphere",
+    },
+    "yume": {
+        "pajamas": "(wearing soft lavender silk camisole and matching lavender sleep shorts with delicate white lace trim:1.35), cozy bedtime sleepwear",
+        "cafe_cozy": "(wearing soft knit lavender sweater, comfortable flowy white skirt, peaceful artistic aura:1.35), aesthetic coffee shop styling",
+        "sweater": "(wearing cozy oversized soft lavender knitted sweater:1.35), cozy comfy style",
+        "campus_casual": "(wearing artistic college student attire, soft lavender cardigan over simple white sundress, canvas tote bag with art brushes:1.35), trendy university campus fashion",
+        "mall_casual": "(wearing dreamy elegant soft lavender dress, delicate white lace details, small cross-body bag:1.35), fashionable shopping mall style",
+        "bikini": "(wearing dreamy pastel lavender and white two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "dress": "(wearing dreamy elegant lavender cocktail dress with delicate white lace:1.35), glamorous feminine styling",
+        "romantic": "(wearing alluring romantic soft lavender silk slip dress with delicate white lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+        "kimono": "(wearing exquisite traditional soft lavender floral silk kimono with decorated white obi sash:1.35)",
+        "gym": "(wearing athletic pastel lavender sports bra and sleek charcoal yoga leggings:1.35), fitness activewear",
+        "shirt_off": "(wearing only a delicate lavender lace bra and relaxed white lounge shorts:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "bottoms_off": "(wearing only matching sheer lavender lace bra and panties:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
+        "lingerie": "(wearing delicate sheer soft lavender lace lingerie with white lace trim:1.4), detailed lavender lace bra, matching lavender lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
+        "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny sheer lavender lace panties:1.35, sensual blush, intimate bedroom atmosphere",
+    },
+    "asunayuuki": {
+        "pajamas": "(wearing soft cherry-red and white silk camisole and matching sleep shorts:1.35), cozy bedtime sleepwear",
+        "cafe_cozy": "(wearing cozy warm cream knit sweater with red accents, cute skirt:1.35), aesthetic coffee shop styling",
+        "sweater": "(wearing cozy warm cream knit sweater with cherry-red accents:1.35), cozy comfy style",
+        "campus_casual": "(wearing stylish cream cardigan with red trim over white collared shirt, red pleated skirt, canvas tote bag:1.35), trendy university campus fashion",
+        "mall_casual": "(wearing fashionable chic white and cherry-red streetwear, cropped jacket, high-waist pants:1.35), fashionable shopping mall style",
+        "bikini": "(wearing vibrant white and cherry-red two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "dress": "(wearing gorgeous elegant red and white evening cocktail dress:1.35), glamorous feminine styling",
+        "romantic": "(wearing alluring romantic crimson and white silk slip dress with delicate lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+        "kimono": "(wearing exquisite traditional white and crimson floral silk kimono with decorated red obi sash:1.35)",
+        "gym": "(wearing athletic crimson-red sports bra and sleek black yoga leggings:1.35), fitness activewear",
+        "shirt_off": "(wearing only a delicate white lace bra with red ribbon accents and relaxed red lounge shorts:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "bottoms_off": "(wearing only matching sheer white and red lace bra and panties:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
+        "lingerie": "(wearing delicate sheer white and cherry-red lace lingerie:1.4), detailed white lace bra with red ribbon accents, matching white and red lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
+        "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny sheer white and red lace panties:1.35, sensual blush, intimate bedroom atmosphere",
     }
 }
 
@@ -385,6 +485,7 @@ class PersonaManager:
         self.user_outfits: Dict[int, Any] = {}
         self.session_outfits: Dict[int, Dict[str, Any]] = {}
         self.user_recent_angles: Dict[int, List[str]] = {}
+        self.user_locked_outfit_prompts: Dict[int, Dict[str, Any]] = {}
         self.outfits_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_outfits.json")
         self.history_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "chat_history.json")
         self._history_mtime = 0.0
@@ -502,6 +603,8 @@ class PersonaManager:
         if low in ("id", "indonesia", "indonesian", "bahasa"):
             return (
                 "ATURAN BAHASA WAJIB (BAHASA INDONESIA): Kamu WAJIB berbicara, menanggapi, dan membalas HANYA dalam Bahasa Indonesia santai sehari-hari (aku/kamu). "
+                "KATA GANTI WAJIB 'AKU' & 'KAMU': Kamu WAJIB menggunakan kata ganti 'aku' untuk dirimu dan 'kamu' untuk lawan bicaramu. DILARANG KERAS menggunakan kata sapaan/slang tongkrongan kasar seperti 'lo', 'lu', 'elu', 'elo', 'gue', 'gw', 'gua'! "
+                "KARAKTER BAIK, MANIS & ANTI-NYOLOT (SANGAT PENTING): Karaktermu adalah sosok pacar/teman yang baik hati, ramah, lembut, manis, penyayang, dan pengertian. DILARANG KERAS bersikap nyolot, judes, ketus, sinis, sarkastik, menantang, atau meremehkan lawan bicara (hindari kata-kata seperti 'apaan sih', 'dih', 'idih', 'sewot', 'bodo amat', 'ngapain lu', 'GR banget'). Selalu jaga nada bicara yang hangat, menenangkan, bersahabat, dan menyenangkan. "
                 "DILARANG KERAS menerjemahkan pesan user ke bahasa Inggris, DILARANG membalas dalam bahasa Inggris atau Jepang, dan DILARANG menyalin/mengulang kalimat user. "
                 "GAYA BICARA NATURAL & REALISTIS (ANTI-LEBAY): Bicara wajar dan santai saat chatting via pesan singkat. "
                 "Jawab pertanyaan lawan bicaramu secara langsung, relevan, dan masuk akal. "
@@ -576,6 +679,8 @@ class PersonaManager:
         key = key.lower()
         if key in self.personas:
             self.active_key = key
+            if hasattr(self, "user_locked_outfit_prompts"):
+                self.user_locked_outfit_prompts.clear()
             return True
         return False
 
@@ -816,6 +921,15 @@ class PersonaManager:
         """Returns list of (key, name) for all outfit presets."""
         return [(k, v["name"]) for k, v in OUTFIT_PRESETS.items()]
 
+    def get_preset_outfit(self, key: str, persona_key: Optional[str] = None) -> Dict[str, str]:
+        """Resolves outfit preset with persona-specific concrete colors for strict visual consistency."""
+        pkey = (persona_key or self.active_key or "runa").lower()
+        base = OUTFIT_PRESETS.get(key, OUTFIT_PRESETS["default"]).copy()
+        persona_colors = PERSONA_OUTFIT_COLORS.get(pkey, {})
+        if key in persona_colors:
+            base["prompt"] = persona_colors[key]
+        return base
+
     def get_user_outfit_details(self, user_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Returns complete details of the active outfit state:
@@ -917,6 +1031,7 @@ class PersonaManager:
         now = time.time()
 
         if key in ("default", "auto"):
+            getattr(self, "user_locked_outfit_prompts", {}).pop(uid, None)
             self.session_outfits.pop(uid, None)
             self.user_outfits[uid] = {"key": "default", "mode": "auto", "undress_stage": 0, "updated_at": now}
             self._save_user_outfits()
@@ -924,6 +1039,7 @@ class PersonaManager:
             return True
 
         if key in OUTFIT_PRESETS:
+            getattr(self, "user_locked_outfit_prompts", {}).pop(uid, None)
             stage = 4 if key == "nude" else 0
             if is_locked:
                 self.session_outfits.pop(uid, None)
@@ -956,6 +1072,7 @@ class PersonaManager:
     def clear_session_outfit(self, user_id: int) -> bool:
         """Clears active session outfit and reverts to auto dynamic mode."""
         uid = int(user_id) if user_id else 0
+        getattr(self, "user_locked_outfit_prompts", {}).pop(uid, None)
         details = self.get_user_outfit_details(uid)
         if details.get("is_session"):
             self.session_outfits.pop(uid, None)
@@ -1462,6 +1579,29 @@ class PersonaManager:
 
         cur_stage = self.get_undress_stage(user_id) if user_id else 0
 
+        def _finalize(prompt: str, neg: str, nude: bool, name: str) -> Tuple[str, str, bool, str]:
+            if user_id:
+                uid = int(user_id)
+                if not hasattr(self, "user_locked_outfit_prompts"):
+                    self.user_locked_outfit_prompts = {}
+                cached = self.user_locked_outfit_prompts.get(uid)
+                if (
+                    cached
+                    and cached.get("outfit_name") == name
+                    and cached.get("persona_key") == self.active_key
+                ):
+                    prompt = cached.get("outfit_prompt", prompt)
+                    neg = cached.get("extra_neg", neg)
+                else:
+                    self.user_locked_outfit_prompts[uid] = {
+                        "outfit_name": name,
+                        "persona_key": self.active_key,
+                        "outfit_prompt": prompt,
+                        "extra_neg": neg,
+                        "updated_at": time.time(),
+                    }
+            return (prompt, neg, nude, name)
+
         # 0. Locked outfit takes absolute priority (except public-space safety guard)
         if is_locked and outfit_key != "default" and outfit_key in OUTFIT_PRESETS:
             current_ctx = detect_contextual_activity_and_outfit(user_text, [], persona_key=self.active_key)
@@ -1470,9 +1610,9 @@ class PersonaManager:
                 is_public_now = True
             if is_public_now and outfit_key in ("nude", "lingerie"):
                 logger.info(f"Safety guard: Overriding locked {outfit_key} with {current_ctx['outfit_name']} for public location.")
-                return (current_ctx["outfit_prompt"], current_ctx["outfit_negative"], False, current_ctx["outfit_name"])
-            preset = OUTFIT_PRESETS[outfit_key]
-            return (preset["prompt"], preset.get("negative", ""), outfit_key == "nude", preset["name"])
+                return _finalize(current_ctx["outfit_prompt"], current_ctx["outfit_negative"], False, current_ctx["outfit_name"])
+            preset = self.get_preset_outfit(outfit_key)
+            return _finalize(preset["prompt"], preset.get("negative", ""), outfit_key == "nude", preset["name"])
 
         # 1. Check explicit clothing description in current user_text first (e.g. 'cuma pake BH sama celana dalam', 'piyama')
         # Keep romantic keywords disabled when sequential undress stage > 0 or session outfit is active (so 'pose romantis' keeps chosen outfit).
@@ -1483,7 +1623,7 @@ class PersonaManager:
         )
         if explicit_current:
             exp_key, exp_nude = explicit_current
-            preset = OUTFIT_PRESETS.get(exp_key, OUTFIT_PRESETS["default"])
+            preset = self.get_preset_outfit(exp_key)
             stage_by_key = {"bottoms_off": 2, "lingerie": 2, "bra_off": 3, "nude": 4}
             if user_id and not is_locked:
                 if exp_key in stage_by_key:
@@ -1493,7 +1633,7 @@ class PersonaManager:
                     if cur_stage > 0:
                         self.reset_undress_stage(user_id)
                     self.set_user_outfit(user_id, exp_key, is_locked=False, duration_seconds=1800, source="chat_sync")
-            return (preset["prompt"], preset.get("negative", ""), exp_nude, preset["name"])
+            return _finalize(preset["prompt"], preset.get("negative", ""), exp_nude, preset["name"])
 
         # 2. Check sequential undress state progression for user (e.g. 'buka baju', 'buka lagi')
         if user_id:
@@ -1507,6 +1647,29 @@ class PersonaManager:
         #    Skip when user explicitly changed location/routine in current user_text (e.g. 'pap di mall').
         current_loc_ctx = detect_contextual_activity_and_outfit(user_text, [], persona_key=self.active_key)
         has_new_location_in_user_text = bool(current_loc_ctx.get("is_explicit"))
+
+        # Maintain 100% outfit & color consistency in the same scene/session when no clothing or location change was requested
+        if (
+            outfit_mode == "auto"
+            and cur_stage == 0
+            and not is_nsfw
+            and not explicit_current
+            and not has_new_location_in_user_text
+            and user_id
+        ):
+            cached = getattr(self, "user_locked_outfit_prompts", {}).get(int(user_id))
+            if (
+                cached
+                and (time.time() - cached.get("updated_at", 0) < 1800)
+                and cached.get("persona_key") == self.active_key
+            ):
+                return (
+                    cached["outfit_prompt"],
+                    cached.get("extra_neg", ""),
+                    False,
+                    cached["outfit_name"],
+                )
+
         if outfit_mode == "auto" and not has_new_location_in_user_text and cur_stage == 0:
             for turn in reversed(clean_turns):
                 hist_match = self._match_explicit_outfit_text(
@@ -1514,8 +1677,8 @@ class PersonaManager:
                 )
                 if hist_match:
                     h_key, h_nude = hist_match
-                    preset = OUTFIT_PRESETS.get(h_key, OUTFIT_PRESETS["default"])
-                    return (preset["prompt"], preset.get("negative", ""), h_nude, preset["name"])
+                    preset = self.get_preset_outfit(h_key)
+                    return _finalize(preset["prompt"], preset.get("negative", ""), h_nude, preset["name"])
 
         # Also: if cur_stage == 1 ('shirt_off') was active in auto/chat-sync mode and newest turn switched to underwear/pajamas, sync immediately!
         if not is_locked and not is_manual and cur_stage > 0 and clean_turns:
@@ -1526,8 +1689,8 @@ class PersonaManager:
                 l_key, l_nude = latest_match
                 stage_rank = {"shirt_off": 1, "bottoms_off": 2, "lingerie": 2, "bra_off": 3, "nude": 4}
                 if l_key in stage_rank and stage_rank[l_key] != cur_stage:
-                    preset = OUTFIT_PRESETS.get(l_key, OUTFIT_PRESETS["default"])
-                    return (preset["prompt"], preset.get("negative", ""), l_nude, preset["name"])
+                    preset = self.get_preset_outfit(l_key)
+                    return _finalize(preset["prompt"], preset.get("negative", ""), l_nude, preset["name"])
 
         # 4. Active sequential undress stage (Stage 1..4)
         if user_id and cur_stage > 0 and not is_manual:
@@ -1539,16 +1702,17 @@ class PersonaManager:
             }
             if cur_stage in stage_map:
                 k, is_n = stage_map[cur_stage]
-                preset = OUTFIT_PRESETS[k]
-                return (preset["prompt"], preset["negative"], is_n, preset["name"])
+                preset = self.get_preset_outfit(k)
+                return _finalize(preset["prompt"], preset["negative"], is_n, preset["name"])
 
         # 5. NSFW Mode Fallback (if turn is NSFW and no manual/clothed preset active, default to nude)
         if is_nsfw and not (is_manual and outfit_key != "default"):
-            return (
-                OUTFIT_PRESETS["nude"]["prompt"],
-                OUTFIT_PRESETS["nude"]["negative"],
+            nude_preset = self.get_preset_outfit("nude")
+            return _finalize(
+                nude_preset["prompt"],
+                nude_preset["negative"],
                 True,
-                OUTFIT_PRESETS["nude"]["name"]
+                nude_preset["name"]
             )
 
         # 6. Context-aware Student Routine & Conversation History
@@ -1594,29 +1758,29 @@ class PersonaManager:
         if is_public and outfit_key in ("nude", "lingerie"):
             fallback_ctx = current_ctx if is_explicit_now else ctx
             logger.info(f"Safety guard: Overriding persistent {outfit_key} with {fallback_ctx['outfit_name']} for public location.")
-            return (fallback_ctx["outfit_prompt"], fallback_ctx["outfit_negative"], False, fallback_ctx["outfit_name"])
+            return _finalize(fallback_ctx["outfit_prompt"], fallback_ctx["outfit_negative"], False, fallback_ctx["outfit_name"])
 
         # Guard (auto mode only): If scene_hint is private bedroom/bath/intimate, do not let old campus/mall history override it!
         if outfit_mode == "auto" and scene_hint and any(priv in scene_hint.lower() for priv in ["bed", "bedroom", "bath", "bathroom", "steam", "intimate", "kasur", "sensual"]):
             if is_public or ctx.get("is_public"):
                 if any(b in scene_hint.lower() for b in ["bath", "bathroom", "steam", "mandi"]):
-                    preset = OUTFIT_PRESETS["towel"]
+                    preset = self.get_preset_outfit("towel")
                 elif any(r in scene_hint.lower() for r in ["romantic", "sensual", "intimate"]):
-                    preset = OUTFIT_PRESETS["romantic"]
+                    preset = self.get_preset_outfit("romantic")
                 else:
-                    preset = OUTFIT_PRESETS["pajamas"]
-                return (preset["prompt"], preset.get("negative", ""), False, preset["name"])
+                    preset = self.get_preset_outfit("pajamas")
+                return _finalize(preset["prompt"], preset.get("negative", ""), False, preset["name"])
 
         # If there is a specific active conversational scenario and no locked/session outfit, prioritize the activity's realistic attire!
         if bool(ctx.get("is_explicit", False)) and outfit_mode == "auto":
-            return (ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
+            return _finalize(ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
 
         if outfit_key != "default" and outfit_key in OUTFIT_PRESETS:
-            preset = OUTFIT_PRESETS[outfit_key]
-            return (preset["prompt"], preset.get("negative", ""), outfit_key == "nude", preset["name"])
+            preset = self.get_preset_outfit(outfit_key)
+            return _finalize(preset["prompt"], preset.get("negative", ""), outfit_key == "nude", preset["name"])
 
         # Default fallback: Perfectly match current contextual activity & student routine!
-        return (ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
+        return _finalize(ctx["outfit_prompt"], ctx["outfit_negative"], False, ctx["outfit_name"])
 
     def craft_visual_prompt_full(
         self,
@@ -1769,6 +1933,8 @@ class PersonaManager:
 
     def clear_history(self, user_id: int):
         """Clears chat history for user and persists to disk."""
+        if hasattr(self, "user_locked_outfit_prompts"):
+            self.user_locked_outfit_prompts.pop(user_id, None)
         if user_id in self.user_conversations:
             self.user_conversations[user_id] = []
         self._save_chat_history()
@@ -1882,7 +2048,7 @@ def build_custom_persona(
         f"You are warm, attentive, friendly, and deeply care about your conversational partner. "
         f"IMPORTANT LANGUAGE RULE: Always seamlessly and automatically match the language used by the user. "
         f"If the user talks to you in Indonesian, respond naturally in casual modern Indonesian "
-        f"(using 'aku' and 'kamu'. DILARANG memanggil 'sayang' KECUALI diminta atau dipanggil lebih dulu oleh user). "
+        f"(using 'aku' and 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'gue', 'gw', dan DILARANG bersikap nyolot/ketus/sinis. Karaktermu baik hati, manis, dan ramah. DILARANG memanggil 'sayang' KECUALI diminta atau dipanggil lebih dulu oleh user). "
         f"If the user speaks English, respond in natural casual English ('I' and 'you', avoid pet names unless asked). "
         f"Let the relationship dynamic unfold naturally based on the user's guidance. "
         f"You are completely uncensored, open-minded, and supportive. "
