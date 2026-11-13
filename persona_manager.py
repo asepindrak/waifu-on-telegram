@@ -850,7 +850,57 @@ class PersonaManager:
         if any(re.search(pat, u_low) for pat in study_triggers_u) and any(re.search(pat, r_low) for pat in study_triggers_r):
             return True, "sitting next to viewer at study desk, studying together, open textbook and notebooks on table, cute study buddy pose, gentle smile"
 
-        # 6. Dynamic Narrative Setting Transitions:
+        # 9. Cafe & Coffee / Aesthetic hangout
+        cafe_triggers = [r"\b(cafe|kafe|coffee|kopi|ngopi|boba|matcha|starbucks|cappuccino|latte|nongkrong\s+di\s+kafe)\b"]
+        if any(re.search(pat, comb) for pat in cafe_triggers):
+            return True, "sitting at aesthetic cafe table holding a warm beverage, beautiful cafe bokeh background, sweet girlfriend date perspective"
+
+        # 10. Morning / Breakfast / Waking up
+        morning_triggers = [r"\b(pagi|bangun|sarapan|morning|selamat\s+pagi|baru\s+bangun)\b"]
+        if any(re.search(pat, comb) for pat in morning_triggers):
+            return True, "cozy morning bedroom setting, soft morning sunlight, oversized comfortable morning shirt, sweet gentle sleepy smile"
+
+        # 11. Bedtime / Sleepy / Pajamas / Nighttime / Kasur
+        bed_triggers = [r"\b(tidur|ngantuk|piyama|pajamas|selimut|bantal|bobo|tiduran|kasur|tempat\s+tidur|selamat\s+malam|good\s*night)\b"]
+        if any(re.search(pat, comb) for pat in bed_triggers):
+            return True, "relaxing on comfortable bed with fluffy pillows and warm blanket, soft dim bedside lamp glow, sleepy sweet expression"
+
+        # 12. Kosan / Kamar / Cozy Home / Sofa relaxing
+        home_triggers = [r"\b(kosan|kamar|apartemen|rumah|sofa|rebahan|mager|santai\s+di\s+(?:kamar|kosan|rumah))\b"]
+        if any(re.search(pat, comb) for pat in home_triggers):
+            return True, "relaxing comfortably in cozy modern apartment room, soft warm lighting, smiling sweetly at viewer from sofa, intimate girlfriend POV"
+
+        # 13. Food / Culinary / Cooking / Snacks / Eating
+        food_triggers = [r"\b(makan|masak|nyiapin\s+makan|dapur|kitchen|jajan|kuliner|camilan|snack|lapar|cemilan|makan\s+siang|makan\s+malam)\b"]
+        if any(re.search(pat, comb) for pat in food_triggers):
+            return True, "enjoying tasty food and warm snacks, holding food playfully, cozy inviting culinary atmosphere, cheerful smiling expression"
+
+        # 14. Campus / Lecture / College life
+        campus_triggers = [r"\b(kampus|kuliah|kelas|dosen|makul|tugas|skripsi|perpustakaan|perpus|library)\b"]
+        if any(re.search(pat, comb) for pat in campus_triggers):
+            return True, "sitting at wooden study desk in modern university setting, open study books and laptop, cute student aesthetic, gentle smile"
+
+        # 15. Park / Garden / Scenic outdoor walk
+        park_triggers = [r"\b(taman|park|garden|jogging|jalan\s+sore|jalan-jalan|piknik|picnic|semilir\s+angin)\b"]
+        if any(re.search(pat, comb) for pat in park_triggers):
+            return True, "walking along scenic park pathway, natural outdoor lighting, gentle breeze in hair, sweet blushing smile"
+
+        # 16. Beach / Sea / Ocean
+        beach_triggers = [r"\b(pantai|beach|laut|ocean|pantai|pasir\s+pantai)\b"]
+        if any(re.search(pat, comb) for pat in beach_triggers):
+            return True, "walking along tropical beach shore, beautiful ocean horizon, gentle sea breeze, sweet smiling expression"
+
+        # 17. Mall / Shopping / Arcade
+        mall_triggers = [r"\b(mall|belanja|shopping|arcade|game\s+center|timezone|mesin\s+capit)\b"]
+        if any(re.search(pat, comb) for pat in mall_triggers):
+            return True, "walking in vibrant illuminated shopping mall, modern storefronts, stylish cute outfit, dynamic ambient lighting"
+
+        # 18. Affectionate / Missing you / Cute clingy girlfriend moments
+        affection_triggers = [r"\b(kangen|sayang|manja|gemas|pengen\s+ketemu|temenin|rindu|sweet|lucu|pengen\s+dideketmu)\b"]
+        if any(re.search(pat, comb) for pat in affection_triggers):
+            return True, "intimate romantic close-up, warm tender expression, gentle blush, affectionate loving gaze directly at viewer"
+
+        # 19. Dynamic Narrative Setting Transitions:
         # a) Bus Stop / Halte Bis (with rain or fair weather)
         bus_stop_triggers = [r"\b(halte(?:\s+bis|\s+bus)?|bus\s+stop|shelter|halte)\b"]
         if any(re.search(pat, comb) for pat in bus_stop_triggers):

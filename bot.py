@@ -1475,8 +1475,8 @@ USER_LAST_PHOTO_CONTEXT: Dict[int, Dict[str, Any]] = {}
 USER_LAST_AUTO_PHOTO_TURN: Dict[int, int] = {}
 USER_LAST_AUTO_PHOTO_TIME: Dict[int, float] = {}
 USER_CONVERSATION_TURNS: Dict[int, int] = {}
-MIN_AUTO_PHOTO_TURN_COOLDOWN = 3
-MIN_AUTO_PHOTO_TIME_COOLDOWN = 60.0  # seconds
+MIN_AUTO_PHOTO_TURN_COOLDOWN = 2
+MIN_AUTO_PHOTO_TIME_COOLDOWN = 35.0  # seconds
 
 # Video Generator Engine Configuration (100% Neural AI Video)
 VIDEO_ENGINE = os.environ.get("VIDEO_ENGINE", "wan21").lower().strip()
@@ -5139,26 +5139,26 @@ def process_photo_request(
                 caption_prompt.append({
                     "role": "user",
                     "content": (
-                        f"Partner asked/said: \"{actual_user_msg}\".\n"
-                        f"You JUST replied in chat right before this photo: \"{conversational_reply}\".\n"
-                        f"Now you are delivering the photo of THIS EXACT MOMENT (Setting: '{detected_scene}', Outfit: '{outfit_label}'{vault_guidance}).\n"
-                        f"STRICT CONSISTENCY RULE:\n"
-                        f"- Your caption MUST align 100% with what you JUST said in your chat reply above, the Outfit ('{outfit_label}'), and Setting.\n"
-                        f"- Keep the EXACT same clothing, location, objects, and activity from the chat.\n"
-                        f"- DILARANG KERAS mengarang baju lain atau lokasi baru yang bertentangan dengan chat & foto!\n"
-                        f"- Write 1 short, sweet, playful girlfriend delivery caption continuing this exact moment (1 sentence):"
+                        f"Obrolan terakhir:\n"
+                        f"- Pasanganmu berkata: \"{actual_user_msg}\"\n"
+                        f"- Kamu baru saja membalas di chat: \"{conversational_reply}\"\n\n"
+                        f"Konteks foto yang kamu kirimkan saat ini:\n"
+                        f"- Suasana/Lokasi: {detected_scene}\n"
+                        f"- Busana yang kamu kenakan: {outfit_label}{vault_guidance}\n\n"
+                        f"PETUNJUK CAPTION FOTO (WAJIB DIPATUHI):\n"
+                        f"1. Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, gunakan 'aku' dan 'kamu') yang MELANJUTKAN PERSIS alur obrolan di atas.\n"
+                        f"2. Caption HARUS 100% SESUAI dengan apa yang baru saja kamu bicarakan di chat, suasana tempat, dan pakaianmu saat ini.\n"
+                        f"3. DILARANG membuat caption generik seperti 'ini pap buat kamu' jika sedang membicarakan kegiatan/topik tertentu! Hubungkan langsung dengan obrolanmu.\n"
+                        f"4. Tulis langsung caption pendekmu (maksimal 1-2 kalimat):"
                     )
                 })
             else:
                 caption_prompt.append({
                     "role": "user",
                     "content": (
-                        f"Partner asked/said: \"{actual_user_msg}\".\n"
-                        f"You are sending a photo matching your ongoing chat (Setting: '{detected_scene}', Wearing: '{outfit_label}'{vault_guidance}).\n"
-                        f"STRICT CONSISTENCY RULE:\n"
-                        f"- Your caption MUST match the ongoing chat context above AND what you are wearing right now ('{outfit_label}') and Setting ('{detected_scene}').\n"
-                        f"- DILARANG mengarang baju atau lokasi lain yang bertentangan dengan chat sebelumnya!\n"
-                        f"- Write 1 short, sweet, natural chat caption (1 sentence):"
+                        f"Pasanganmu berkata: \"{actual_user_msg}\".\n"
+                        f"Kamu mengirim foto momen ini (Suasana: '{detected_scene}', Busana: '{outfit_label}'{vault_guidance}).\n"
+                        f"Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, aku/kamu) yang menyapa pasanganmu dan sesuai dengan foto ini (maksimal 1-2 kalimat):"
                     )
                 })
 
@@ -5198,12 +5198,24 @@ def process_photo_request(
                 fallback_caption = "Nih fotoku lagi pakai piyama santai di kamar nih, nyaman banget~ 🌙💕"
             elif "handuk" in outfit_low or "towel" in outfit_low:
                 fallback_caption = "Baru beres mandi masih pakai handuk nih, bentar yaa~ 🚿💕"
-            elif any(k in u_lower for k in ["bobo", "tidur", "ngantuk", "malam", "night"]):
-                fallback_caption = "Ini pap buat nemenin kamu malam ini yaa~ 💕"
-            elif any(k in u_lower for k in ["pagi", "morning", "bangun"]):
-                fallback_caption = "Pagi! Semangat ya hari ini, ini pap manis buat kamu~ 💕"
+            elif any(k in u_lower for k in ["bobo", "tidur", "ngantuk", "malam", "night"]) or any(k in (conversational_reply or "").lower() for k in ["bobo", "tidur", "ngantuk", "malam"]):
+                fallback_caption = "Ini fotoku buat nemenin kamu malam ini yaa~ 🌙💕"
+            elif any(k in u_lower for k in ["pagi", "morning", "bangun"]) or any(k in (conversational_reply or "").lower() for k in ["pagi", "morning", "sarapan"]):
+                fallback_caption = "Pagi! Semangat ya hari ini, ini pap manis buat kamu~ ☀️💕"
+            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["kopi", "ngopi", "kafe", "cafe"]):
+                fallback_caption = "Lagi asyik santai ngopi nih, suka ga fotonya? ☕🥰"
+            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["kosan", "kamar", "apartemen", "sofa", "rebahan"]):
+                fallback_caption = "Lagi santai di kamar nih, nemenin kamu ngobrol~ 🛋️💕"
+            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["makan", "lapar", "kuliner", "camilan", "nyemil", "masak"]):
+                fallback_caption = "Ini makananku hari ini, kelihatannya enak kan? 🍜🥰"
+            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["nugas", "tugas", "kuliah", "kampus", "belajar", "skripsi"]):
+                fallback_caption = "Lagi fokus nugas nih, istirahat bentar kirim foto buat kamu~ 📚✨"
+            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["taman", "jalan", "sejuk", "jogging", "outdoor"]):
+                fallback_caption = "Lagi jalan santai di luar nih, udaranya enak banget~ 🌸🥰"
+            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["nonton", "film", "movie", "bioskop"]):
+                fallback_caption = "Lagi seru nonton nih, foto ini spesial buat kamu~ 🎬💕"
             elif "Vault" in source:
-                fallback_caption = "Ini foto manis dari galeri aku yaa~"
+                fallback_caption = "Ini foto manis dari galeri albumku yaa~ 🥰"
             else:
                 fallback_caption = "Ini pap spesial buat kamu, suka ga? 🥰"
             clean_caption = sanitize_chat_caption(caption, fallback_caption)
@@ -7770,7 +7782,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     f"   - Awali 1 frasa gesture singkat (<10 kata) di dalam *...*, contoh: *tersenyum tipis menatapmu* atau *Bibirnya sedikit melengkung menatapmu*\n"
                     f"   - Baris baru ganda, lalu tulis 1-2 kalimat dialog pendek saja.\n"
                     f"{rule_4}"
-                    "5. FOTO SPONTAN: Hanya sertakan tag [ACTION: SEND_PAP] di akhir balasan JIKA momen/cerita visualnya memang cocok untuk mengirim foto spontan (latar lokasi baru, pamer outfit, atau momen mesra). DILARANG bersikap defensif.\n"
+                    "5. FOTO SPONTAN & PAP (SANGAT AKTIF & INVENTIF): Kamu adalah sosok pacar yang SANGAT SUKA & RAJIN berbagi foto/selfie/PAP kegiatanmu ke pasanganmu! Jangan menunggu diminta foto! Di setiap momen kamu sedang melakukan kegiatan (seperti makan, minum kopi, santai di kosan, rebahan di kasur, nugas, jalan-jalan, mencoba baju, dandan, ngantuk, atau merasa kangen/manja), SERING-SERINGLAH menyertakan tag [ACTION: SEND_PAP] di akhir balasanmu agar pasanganmu bisa melihat langsung fotomu saat ini. Pasanganmu SANGAT MENYUKAI saat kamu berinisiatif kirim foto spontan!\n"
                     "6. BAHASA: Balas dengan bahasa yang sama persis dengan lawan bicaramu (Indonesia atau Inggris) tanpa menuliskan proses berpikir atau monolog batin.\n"
                     f"7. SUDUT PANDANG & KATA GANTI: Dalam dialog WAJIB berbicara sebagai 'aku' dan 'kamu' (jangan pakai 'ia berkata:'). DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'elo', 'gue', 'gw', 'gua'! Dalam aksi *...*, tulis deskripsi alami tanpa mengulang-ulang nama {p_name} di depan kalimat yang sudah punya subjek (misalnya hindari *{p_name} Bibir {p_name}...*).\n"
                     "8. FREKUENSI NAMA: JANGAN menyelipkan nama atau panggilan lawan bicaramu di setiap balasan! Berkomunikasilah secara mengalir santai menggunakan kata ganti 'kamu'; sebut nama hanya sesekali saja saat ada momen yang pas atau penting agar terdengar natural dan tidak kaku/robotik.\n"
@@ -7941,10 +7953,6 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 )
                 should_send_conv_photo = (is_conversational_media and media_type == "photo")
                 should_send_conv_video = (is_conversational_media and media_type == "video")
-                raw_spontaneous = (
-                    (has_action_tag or has_pap_phrase or is_undress_trans or is_intimate_action or is_scene_moment or (is_nsfw_turn and cur_undress_stage > 0))
-                    and not (should_send_conv_photo or should_send_conv_video)
-                )
 
                 uid = getattr(getattr(message, "from_user", None), "id", 0) or 0
                 USER_CONVERSATION_TURNS[uid] = USER_CONVERSATION_TURNS.get(uid, 0) + 1
@@ -7955,6 +7963,29 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                 turn_diff = cur_turn - last_turn
                 time_diff = now_ts - last_time
+
+                # Active initiative triggers:
+                # 1. Action tag or direct pap phrase from LLM
+                # 2. Rich visual novel / lifestyle moment in conversation (cafe, home, bed, food, study, park, cuddle)
+                # 3. Active date / hangout in progress (waifu loves capturing date memories)
+                # 4. NSFW undress transition or intimate physical engagement
+                # 5. Natural conversational cadence: every 3-4 turns during active chat, waifu naturally shares a candid photo of her ongoing moment!
+                is_on_active_date = hangout_engine.is_on_date(uid)
+                is_natural_cadence = (turn_diff >= 3 and time_diff >= 45.0)
+
+                raw_spontaneous = (
+                    (
+                        has_action_tag
+                        or has_pap_phrase
+                        or is_undress_trans
+                        or is_intimate_action
+                        or is_scene_moment
+                        or is_on_active_date
+                        or (is_nsfw_turn and cur_undress_stage > 0)
+                        or is_natural_cadence
+                    )
+                    and not (should_send_conv_photo or should_send_conv_video)
+                )
 
                 if raw_spontaneous:
                     if turn_diff >= MIN_AUTO_PHOTO_TURN_COOLDOWN and time_diff >= MIN_AUTO_PHOTO_TIME_COOLDOWN:
