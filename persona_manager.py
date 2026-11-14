@@ -350,7 +350,7 @@ OUTFIT_PRESETS = {
     },
     "towel": {
         "name": "🚿 Handuk Mandi (After Shower)",
-        "prompt": "(wearing only a soft clean white bath towel wrapped around chest:1.4), bare shoulders, bare collarbone, wet skin, damp hair, post-shower bathroom steam, seductive styling",
+        "prompt": "(wearing only a soft clean white bath towel wrapped around chest:1.4), bare shoulders, bare collarbone, wet skin, damp hair, post-shower glow, seductive styling",
         "negative": "clothes, shirt, pants, dress, coat, hoodie, jeans, denim, trousers, jacket, sweater"
     },
     "lingerie": {
@@ -528,14 +528,17 @@ LOCATION_PRESETS: Dict[str, Dict[str, Any]] = {
     },
     "bedroom": {
         "name": "Kamar Tidur / Kasur",
-        "patterns": [r"\b(kamar\s+tidur|kamar\s+kos|di\s+kamar|di\s+kasur|tempat\s+tidur|ranjang|rebahan\s+di\s+kasur|bantal|guling|bedroom|di\s+ranjang|rebahan)\b"],
+        "patterns": [r"\b(kamar\s+tidur|kamar\s+kos|di\s+kamar|di\s+kasur|tempat\s+tidur|ranjang|rebahan\s+di\s+kasur|bantal|guling|bedroom|di\s+ranjang|rebahan|(?:habis|selesai|beres|udah)\s+mandi)\b"],
         "prompt": "relaxing comfortably on bed with fluffy pillows, cozy warm modern bedroom, soft room lamp lighting",
         "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows, warm intimate atmosphere",
         "is_public": False,
     },
     "bathroom": {
         "name": "Kamar Mandi",
-        "patterns": [r"\b(kamar\s+mandi|bathroom|shower|bathtub|bak\s+mandi|wastafel|mandi|keramas|berendam)\b"],
+        "patterns": [
+            r"\b(?<!habis\s)(?<!selesai\s)(?<!beres\s)(?<!udah\s)(?:kamar\s+mandi|bathroom|shower|bathtub|bak\s+mandi|wastafel|keramas|berendam)\b",
+            r"\b(?<!habis\s)(?<!selesai\s)(?<!beres\s)(?<!udah\s)mandi\b"
+        ],
         "prompt": "standing in modern bathroom with soft steam, post-shower glow, bathroom mirror, clean tiles, warm soft lighting",
         "nsfw_prompt": "steamy modern bathroom, glass shower cabin, soft water droplets on skin, sensual mirror reflection, intimate bathroom ambiance",
         "is_public": False,
@@ -1688,10 +1691,10 @@ class PersonaManager:
         SCENE_PATTERNS = [
             (["sensual", "romantic", "romantis", "intimate", "mesra", "lingerie", "pakaian dalam", "celana dalam", "bh", "bra", "panties", "topless", "telanjang", "bugil"],
              "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer"),
-            (["mandi", "keramas", "handuk", "kamar mandi", "shower", "bath"],
-             "standing in modern bathroom with soft steam, post-shower glow, bathroom mirror"),
-            (["bed", "sleep", "night", "tidur", "kasur", "piyama", "pajamas", "rebahan", "bangun", "selimut", "bantal", "telentang", "terlentang", "tengkurap"],
+            (["bed", "sleep", "night", "tidur", "kasur", "piyama", "pajamas", "rebahan", "bangun", "selimut", "bantal", "telentang", "terlentang", "tengkurap", "habis mandi", "selesai mandi", "beres mandi"],
              "relaxing on bed with fluffy pillows, warm dim night bedroom lamp"),
+            (["kamar mandi", "shower", "bath", "bathtub", "sedang mandi", "lagi mandi", "keramas", "berendam"],
+             "standing in modern bathroom with soft steam, post-shower glow, bathroom mirror"),
             (["halte", "bus stop", "shelter", "halte bis", "halte bus", "angkot", "stasiun bis"],
              "waiting at outdoor bus stop shelter, sitting on bench, bus stop sign, atmospheric street perspective, cinematic depth of field"),
             (["lobby kampus", "lobi kampus", "lobby", "lobi", "atrium", "lorong kampus", "gedung fakultas", "hallway", "campus lobby"],
@@ -1868,6 +1871,10 @@ class PersonaManager:
             "no clothes", "tanpa sehelai benang", "uncensored", "nsfw",
             "nenen", "toket", "tetek", "payudara", "memek", "vagina",
             "buka semua", "buka semuanya", "lepas semua", "lepas semuanya",
+            "buka handuk", "buka handuknya", "lepas handuk", "lepas handuknya",
+            "copot handuk", "copot handuknya", "tarik handuk", "tarik handuknya",
+            "jatuhkan handuk", "jatuhkan handuknya", "drop towel", "drop your towel",
+            "take off towel", "take off your towel", "remove towel", "remove your towel",
             "foto nenen", "pap nenen", "foto toket", "pap toket",
             "foto telanjang", "pap telanjang", "foto bugil", "pap bugil",
             "gak pake baju", "ngga pake baju", "ga pake baju", "ga pake busana",
@@ -1876,14 +1883,13 @@ class PersonaManager:
         if _has_pos_kw(unambiguous_nude):
             return ("nude", True)
         if allow_ambiguous_undress and re.search(
-            r"\b(lepas\s+baju|buka\s+baju|buka\s+pakaian|buka\s+celana)\b", lower
+            r"\b(lepas\s+baju|buka\s+baju|buka\s+pakaian|buka\s+celana|buka\s+handuk(?:nya)?|lepas\s+handuk(?:nya)?)\b", lower
         ):
             return ("nude", True)
 
         # 4. Explicit Towel Intent
         if _has_pos_kw([
-            "handuk", "habis mandi", "selesai mandi", "after bath", "after shower",
-            "towel", "kamar mandi", "basah", "bathroom", "shower", "bath", "steam"
+            "handuk", "pake handuk", "pakai handuk", "memakai handuk", "towel", "bath towel"
         ]):
             return ("towel", False)
 

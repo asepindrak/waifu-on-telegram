@@ -130,6 +130,34 @@ class TestSpontaneousPhotoAndCaptionAlignment(unittest.TestCase):
         self.assertIn("kafe", PersonaManager.get_indonesian_scene_desc("sitting at cozy cafe coffee shop").lower())
 
 
+    def test_post_shower_bed_scene_not_forced_to_bathroom(self):
+        """Verify that 'selesai mandi duduk di kasur' resolves to bed/bedroom, NOT bathroom."""
+        from persona_manager import PersonaManager
+        pm = PersonaManager()
+        scene = pm.extract_contextual_scene(
+            user_text="cantik banget, coba buka handuknya mau lihat donk",
+            conversational_reply="Aku baru beres mandi nih, sekarang lagi santai duduk di kasur kamar kos"
+        )
+        self.assertNotIn("bathroom", scene.lower())
+        self.assertIn("bed", scene.lower())
+
+    def test_open_towel_undress_intent(self):
+        """Verify that 'buka handuknya' resolves to nude undress intent."""
+        from persona_manager import PersonaManager
+        pm = PersonaManager()
+        outfit_prompt, extra_neg, is_nude, name = pm.detect_clothing_intent(
+            "cantik banget, coba buka handuknya mau lihat donk"
+        )
+        self.assertTrue(is_nude)
+        self.assertEqual(name, pm.get_preset_outfit("nude")["name"])
+
+    def test_towel_prompt_has_no_forced_bathroom_steam(self):
+        """Verify towel prompt does not force bathroom steam into non-bathroom rooms."""
+        from persona_manager import OUTFIT_PRESETS
+        towel_prompt = OUTFIT_PRESETS["towel"]["prompt"]
+        self.assertNotIn("bathroom", towel_prompt.lower())
+
+
 if __name__ == "__main__":
     unittest.main()
 

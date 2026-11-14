@@ -5152,19 +5152,23 @@ def process_photo_request(
             clean_recent_turns = [m for m in history[-8:] if not m.get("content", "").startswith("[")][-6:]
 
             # Notify user if primary image engine failed and fallback was used
+            # Suppress noisy warning banner when smart daily fallback is already active for the day
             fallback_notice = getattr(media_engine, "last_fallback_notice", None)
+            from agy_quota_manager import is_agy_image_quota_exhausted
             if fallback_notice and isinstance(fallback_notice, dict):
-                p_engine = fallback_notice.get("primary_engine", "Image Engine")
                 p_err = fallback_notice.get("error", "Layanan sedang tidak merespons.")
-                p_name = persona.get("name", "Waifu")
-                notice_text = (
-                    "⚠️ *Pemberitahuan Sistem Visual (Fallback Aktif)*\n"
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"Image engine pilihanmu (*{p_engine}*) sedang mengalami kendala:\n"
-                    f"❌ `{p_err}`\n\n"
-                    f"📁 {p_name} mengambilkan foto alternatif dari *{source}* agar kamu tidak menunggu kosong yaa! ✨"
-                )
-                safe_send_message(chat_id, notice_text, parse_mode="Markdown")
+                is_daily_fallback = is_agy_image_quota_exhausted() or ("Smart Fallback aktif otomatis hingga besok" in str(p_err))
+                if not is_daily_fallback:
+                    p_engine = fallback_notice.get("primary_engine", "Image Engine")
+                    p_name = persona.get("name", "Waifu")
+                    notice_text = (
+                        "⚠️ *Pemberitahuan Sistem Visual (Fallback Aktif)*\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Image engine pilihanmu (*{p_engine}*) sedang mengalami kendala:\n"
+                        f"❌ `{p_err}`\n\n"
+                        f"📁 {p_name} mengambilkan foto alternatif dari *{source}* agar kamu tidak menunggu kosong yaa! ✨"
+                    )
+                    safe_send_message(chat_id, notice_text, parse_mode="Markdown")
 
             nude_guidance = ""
             if is_nude:

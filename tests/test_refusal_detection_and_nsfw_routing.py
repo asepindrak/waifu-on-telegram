@@ -70,6 +70,8 @@ class TestRefusalDetectionAndNSFWRouting(unittest.TestCase):
     def test_intimate_shared_activities_detection_id_and_en(self):
         """Verify Indonesian and English intimate shower/bed/positions activities trigger NSFW route."""
         # Indonesian intimate activities
+        self.assertTrue(detect_nsfw_intent("cantik banget, coba buka handuknya mau lihat donk"))
+        self.assertTrue(detect_nsfw_intent("coba buka handuknya"))
         self.assertTrue(detect_nsfw_intent("Yuk kita mandi bareng sore ini"))
         self.assertTrue(detect_nsfw_intent("Boleh temenin mandi nggak?"))
         self.assertTrue(detect_nsfw_intent("Coba lepas handuk kamu sekarang"))

@@ -110,14 +110,16 @@ PROVIDER_PRESETS = {
 _NSFW_WORDS = [
     # Explicit Nudity / Strip / Body Exposure (ID & EN)
     r"\b(?:nude|naked|topless|bottomless|unclothed|telanjang|bugil|telanjang\s+bulat|tanpa\s+sehelai\s+benang)\b",
-    r"\b(?:(?:buka|lepas|copot|turunkan)\s+(?:baju|kaos|celana|rok|bh|bra|cd|kutang|bawahan|atasan|pakaian|semua|semuanya|celana\s+dalam)(?:mu|nya)?)\b",
+    r"\b(?:(?:buka|lepas|copot|turunkan|tarik|jatuhkan)\s+(?:baju|kaos|celana|rok|bh|bra|cd|kutang|bawahan|atasan|pakaian|semua|semuanya|celana\s+dalam|handuk)(?:mu|nya)?)\b",
+    r"\b(?:(?:coba|tolong|bisa|mau)\s+)?(?:buka|lepas|copot|turunkan|tarik|jatuhkan)\s+handuk(?:nya|mu)?\b",
+    r"\b(?:buka\s+handuk(?:nya|mu)?\s+(?:mau|pengen)?\s*(?:lihat|liat))\b",
     r"\b(?:buka\s+(?:pelan|satu\s*satu|lagi|berikutnya|tahap|dong))\b",
     r"\b(?:tanpa\s+(?:busana|baju|pakaian|celana))\b",
     r"\b(?:buka\s+(?:baju|pakaian|celana|bh|bra|rok|semua))\b",
     r"\b(?:lepas\s+(?:baju|pakaian|celana|bh|bra|semua))\b",
     r"\b(?:g(?:ak|a|k)\s+pake\s+(?:baju|pakaian|celana|busana))\b",
     r"\b(?:ngga\s+pake\s+(?:baju|pakaian|celana|busana))\b",
-    r"\b(?:take\s+off|remove|strip|slide\s+off)\s+(?:your\s+)?(?:clothes|shirt|top|pants|skirt|bra|panties|underwear|everything|the\s+rest)\b",
+    r"\b(?:take\s+off|remove|strip|slide\s+off|drop)\s+(?:your\s+)?(?:clothes|shirt|top|pants|skirt|bra|panties|underwear|towel|everything|the\s+rest)\b",
     r"\b(?:take\s+off\s+(?:your\s+)?clothes\s+slowly|undress\s+(?:you|slowly)|get\s+naked|strip\s+for\s+me)\b",
 
     # Explicit Sexual Anatomy & Organs (ID & EN)
