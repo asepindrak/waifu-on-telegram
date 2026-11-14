@@ -98,12 +98,164 @@ if not BOT_TOKEN:
     logger.error("TELEGRAM_BOT_TOKEN is not configured in .env! Run 'waifu setup' to configure.")
     sys.exit(1)
 
-bot = telebot.TeleBot(BOT_TOKEN, num_threads=8)
+bot = telebot.TeleBot(BOT_TOKEN, num_threads=8, use_class_middlewares=True)
 
 # Configure Telegram API timeouts for fast, resilient uploads
 from telebot import apihelper
+from telebot.handler_backends import BaseMiddleware, CancelUpdate
 apihelper.READ_TIMEOUT = 120
 apihelper.CONNECT_TIMEOUT = 30
+
+
+class PhotoGenerationTracker:
+    """
+    Enforces strict single-flight execution for image and video generation:
+    - Guarantees at most 1 photo/video generation running at a time per user.
+    - Prevents repeated button spamming (e.g. rapid taps on 'Pose Lain' or 'Kirim Ulang Foto').
+    - Disallows duplicate photo requests from piling up in background queues.
+    - Includes automatic timeout self-healing (recovers if a generation hangs for > 120s).
+    """
+    def __init__(self, timeout: float = 120.0):
+        self._lock = threading.Lock()
+        self._active_generating: Dict[int, float] = {}  # user_id -> start_time
+        self._active_resending: Set[int] = set()        # user_id currently in resend
+        self.timeout = timeout
+
+    def is_generating(self, user_id: int) -> bool:
+        if not user_id:
+            return False
+        with self._lock:
+            if user_id not in self._active_generating:
+                return False
+            now = time.time()
+            if now - self._active_generating[user_id] > self.timeout:
+                logger.warning(f"Photo generation for user {user_id} timed out after {self.timeout}s. Automatically clearing lock.")
+                self._active_generating.pop(user_id, None)
+                return False
+            return True
+
+    def acquire_generation(self, user_id: int) -> bool:
+        """Atomically acquires the photo generation slot for user_id. Returns True if granted, False if already busy."""
+        if not user_id:
+            return True
+        with self._lock:
+            now = time.time()
+            if user_id in self._active_generating:
+                if now - self._active_generating[user_id] < self.timeout:
+                    return False
+                logger.warning(f"Releasing stale photo generation lock for user {user_id}")
+            self._active_generating[user_id] = now
+            return True
+
+    def release_generation(self, user_id: int):
+        """Releases the photo generation slot."""
+        if not user_id:
+            return
+        with self._lock:
+            self._active_generating.pop(user_id, None)
+
+    def is_resending(self, user_id: int) -> bool:
+        if not user_id:
+            return False
+        with self._lock:
+            return user_id in self._active_resending
+
+    def acquire_resend(self, user_id: int) -> bool:
+        if not user_id:
+            return True
+        with self._lock:
+            if user_id in self._active_resending:
+                return False
+            self._active_resending.add(user_id)
+            return True
+
+    def release_resend(self, user_id: int):
+        if not user_id:
+            return
+        with self._lock:
+            self._active_resending.discard(user_id)
+
+
+class CallbackAntiSpamMiddleware(BaseMiddleware):
+    """
+    Universal Callback Query Debouncer & Concurrency Protection.
+    - Prevents double-taps and rapid repeated clicks across ALL Telegram inline buttons.
+    - Intercepts photo/video action buttons when generation is already in-progress.
+    - Gracefully notifies the user via Telegram callback alert/toast without throwing errors.
+    """
+    def __init__(self, bot_instance, tracker: PhotoGenerationTracker, debounce_seconds: float = 1.5):
+        self.bot = bot_instance
+        self.tracker = tracker
+        self.debounce_seconds = debounce_seconds
+        self.update_types = ['callback_query']
+        self._lock = threading.Lock()
+        self._recent_clicks: Dict[str, float] = {}
+
+    def pre_process(self, call: types.CallbackQuery, data: dict):
+        if not call or not getattr(call, "data", None):
+            return
+
+        user_id = getattr(getattr(call, "from_user", None), "id", 0) or 0
+        msg_id = getattr(getattr(call, "message", None), "message_id", 0) or 0
+        cb_data = call.data
+        now = time.time()
+
+        # 1. Specialized Guard for Photo/Video Generation Buttons
+        PHOTO_BUTTON_PREFIXES = ('regen_photo:', 'resend_photo:', 'pap_sc:', 'vid_generate_now', 'regen_video:')
+        if any(cb_data.startswith(p) for p in PHOTO_BUTTON_PREFIXES):
+            if self.tracker.is_generating(user_id):
+                try:
+                    self.bot.answer_callback_query(
+                        call.id,
+                        text="Sabar ya sayang, fotonya lagi diambil nih... Tunggu sampai selesai ya! 💕",
+                        show_alert=False
+                    )
+                except Exception:
+                    pass
+                return CancelUpdate()
+
+            if cb_data.startswith('resend_photo:') and self.tracker.is_resending(user_id):
+                try:
+                    self.bot.answer_callback_query(
+                        call.id,
+                        text="Foto sedang dikirimkan ulang, tunggu sebentar ya sayang... 💕",
+                        show_alert=False
+                    )
+                except Exception:
+                    pass
+                return CancelUpdate()
+
+        # 2. Universal Rapid Double-Tap / Spam Protection for ALL buttons
+        click_key = f"{user_id}:{msg_id}:{cb_data}"
+        with self._lock:
+            # Clean up clicks older than 30s
+            stale = [k for k, ts in self._recent_clicks.items() if now - ts > 30.0]
+            for k in stale:
+                self._recent_clicks.pop(k, None)
+
+            last_time = self._recent_clicks.get(click_key, 0.0)
+            window = 3.0 if any(cb_data.startswith(p) for p in PHOTO_BUTTON_PREFIXES) else self.debounce_seconds
+
+            if (now - last_time) < window:
+                logger.info(f"AntiSpam: Blocked duplicate button click from user {user_id} on '{cb_data}' ({now - last_time:.2f}s < {window}s)")
+                try:
+                    self.bot.answer_callback_query(
+                        call.id,
+                        text="Permintaan sedang diproses, mohon tunggu sebentar ya... 💕",
+                        show_alert=False
+                    )
+                except Exception:
+                    pass
+                return CancelUpdate()
+
+            self._recent_clicks[click_key] = now
+
+    def post_process(self, call: types.CallbackQuery, data: dict, exception):
+        pass
+
+
+photo_tracker = PhotoGenerationTracker(timeout=120.0)
+bot.setup_middleware(CallbackAntiSpamMiddleware(bot, photo_tracker, debounce_seconds=1.5))
 
 # Initialize engines
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
@@ -1493,6 +1645,7 @@ def callback_memory_actions(call):
 
 # Context cache for regenerating exact photo/video scenes with pose variations
 USER_LAST_PHOTO_CONTEXT: Dict[int, Dict[str, Any]] = {}
+USER_PENDING_RESEND_MSG_ID: Dict[int, int] = {}
 
 # Auto-photo cooldown tracking per user (prevents repetitive photo spamming)
 USER_LAST_AUTO_PHOTO_TURN: Dict[int, int] = {}
@@ -4312,8 +4465,20 @@ def callback_regen_photo(call):
         bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
         return
 
-    scenario = call.data.split(":", 1)[1]
     user_id = call.from_user.id
+    if photo_tracker.is_generating(user_id):
+        bot.answer_callback_query(call.id, "Sabar ya sayang, fotonya lagi diambil nih... Tunggu sampai selesai ya! 💕", show_alert=False)
+        return
+
+    scenario = call.data.split(":", 1)[1]
+
+    # If clicked from an error/retry prompt, remove its buttons so it cannot be re-clicked
+    if call.data == "regen_photo:last":
+        try:
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+            USER_PENDING_RESEND_MSG_ID.pop(user_id, None)
+        except Exception:
+            pass
 
     if scenario == "last" and user_id in USER_LAST_PHOTO_CONTEXT:
         last = USER_LAST_PHOTO_CONTEXT[user_id]
@@ -4344,43 +4509,62 @@ def callback_resend_photo(call):
 
     user_id = call.from_user.id
     chat_id = call.message.chat.id
-    last = USER_LAST_PHOTO_CONTEXT.get(user_id)
 
-    if not last or not last.get("img_bytes"):
-        bot.answer_callback_query(call.id, "Foto di cache sudah kedaluwarsa, membuat foto baru...", show_alert=False)
-        process_photo_request(call, "last")
+    if photo_tracker.is_generating(user_id):
+        bot.answer_callback_query(call.id, "Fotonya lagi disiapkan nih sayang, tunggu sebentar ya... 💕", show_alert=False)
         return
 
-    bot.answer_callback_query(call.id, "🚀 Mengirimkan ulang foto dari memori...", show_alert=False)
-    img_bytes = last.get("img_bytes")
-    full_caption = last.get("full_caption") or "Ini fotoku untukmu yaa~ 💕"
-    clean_caption = last.get("clean_caption") or full_caption
+    if not photo_tracker.acquire_resend(user_id):
+        bot.answer_callback_query(call.id, "Foto sedang dikirimkan ulang sayang, tunggu sebentar ya... 💕", show_alert=False)
+        return
 
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("🔄 Pose Lain", callback_data="regen_photo:last"),
-        types.InlineKeyboardButton("🎬 Bikin Video Gerak", callback_data="regen_video:last")
-    )
-    markup = attach_voice_button(markup, clean_caption, user_id)
-
-    img_to_send = optimize_image_for_telegram(img_bytes, max_dimension=1280, quality=85)
+    # Immediately remove buttons from prompt message so user CANNOT click again!
     try:
-        bot.send_photo(chat_id, img_to_send, caption=full_caption, reply_markup=markup, parse_mode="Markdown", timeout=60)
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+
+    try:
+        last = USER_LAST_PHOTO_CONTEXT.get(user_id)
+        if not last or not last.get("img_bytes"):
+            bot.answer_callback_query(call.id, "Foto di cache sudah kedaluwarsa, membuat foto baru...", show_alert=False)
+            process_photo_request(call, "last")
+            return
+
+        bot.answer_callback_query(call.id, "🚀 Mengirimkan ulang foto dari memori...", show_alert=False)
+        img_bytes = last.get("img_bytes")
+        full_caption = last.get("full_caption") or "Ini fotoku untukmu yaa~ 💕"
+        clean_caption = last.get("clean_caption") or full_caption
+
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            types.InlineKeyboardButton("🔄 Pose Lain", callback_data="regen_photo:last"),
+            types.InlineKeyboardButton("🎬 Bikin Video Gerak", callback_data="regen_video:last")
+        )
+        markup = attach_voice_button(markup, clean_caption, user_id)
+
+        img_to_send = optimize_image_for_telegram(img_bytes, max_dimension=1280, quality=85)
         try:
-            bot.delete_message(chat_id, call.message.message_id)
-        except Exception:
-            pass
-    except Exception as e_send:
-        if "can't parse entities" in str(e_send).lower():
-            plain_caption = full_caption.replace("*", "").replace("`", "").replace("_", "")
-            bot.send_photo(chat_id, img_to_send, caption=plain_caption, reply_markup=markup, timeout=60)
+            bot.send_photo(chat_id, img_to_send, caption=full_caption, reply_markup=markup, parse_mode="Markdown", timeout=60)
             try:
                 bot.delete_message(chat_id, call.message.message_id)
             except Exception:
                 pass
-        else:
-            logger.error(f"Error in resend_photo callback: {e_send}", exc_info=True)
-            safe_send_message(chat_id, f"⚠️ Masih belum berhasil mengirimkan foto: `{e_send}`")
+            USER_PENDING_RESEND_MSG_ID.pop(user_id, None)
+        except Exception as e_send:
+            if "can't parse entities" in str(e_send).lower():
+                plain_caption = full_caption.replace("*", "").replace("`", "").replace("_", "")
+                bot.send_photo(chat_id, img_to_send, caption=plain_caption, reply_markup=markup, timeout=60)
+                try:
+                    bot.delete_message(chat_id, call.message.message_id)
+                except Exception:
+                    pass
+                USER_PENDING_RESEND_MSG_ID.pop(user_id, None)
+            else:
+                logger.error(f"Error in resend_photo callback: {e_send}", exc_info=True)
+                safe_send_message(chat_id, f"⚠️ Masih belum berhasil mengirimkan foto: `{e_send}`")
+    finally:
+        photo_tracker.release_resend(user_id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('regen_video:'))
@@ -4890,6 +5074,11 @@ def handle_photo_command(message):
     if not is_authorized(message.from_user.id):
         return
 
+    if photo_tracker.is_generating(message.from_user.id):
+        p_name = persona_mgr.get_active_persona().get("name", "Aku")
+        safe_reply_to(message, f"🌸 *{p_name}*: Sabar ya sayang, foto sebelumnya lagi aku siapkan nih... Ditunggu sampai selesai yaa! 💕")
+        return
+
     scenario = message.text.replace("/photo", "").replace("/pap", "").strip()
     if not scenario:
         show_pap_scenario_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
@@ -5087,8 +5276,35 @@ def process_photo_request(
     is_nude_override: Optional[bool] = None
 ):
     """Generates and delivers consistent girlfriend photo with caption matching conversation context."""
+    if isinstance(target, types.CallbackQuery):
+        chat_id = target.message.chat.id
+        user_id = target.from_user.id
+        reply_to_target = target.message
+        is_callback = True
+    elif not isinstance(target, types.Message) and hasattr(target, "message") and target.message:
+        chat_id = target.message.chat.id
+        user_id = target.from_user.id
+        reply_to_target = target.message
+        is_callback = True
+    else:
+        chat_id = getattr(target, "chat", None) and target.chat.id
+        user_id = getattr(target, "from_user", None) and target.from_user.id
+        reply_to_target = target
+        is_callback = False
+
+    if not photo_tracker.acquire_generation(user_id):
+        logger.info(f"Photo generation already in-progress for user {user_id}. Blocked duplicate request: '{user_text[:40]}'")
+        p_name = persona_mgr.get_active_persona().get("name", "Aku")
+        if is_callback:
+            try:
+                bot.answer_callback_query(target.id, text=f"Sabar ya sayang, {p_name} lagi menyiapkan foto nih... Tunggu sampai selesai ya! 💕", show_alert=False)
+            except Exception:
+                pass
+        else:
+            safe_reply_to(reply_to_target, f"🌸 *{p_name}*: Sabar ya sayang, foto sebelumnya lagi aku siapkan nih... Tunggu sampai selesai yaa! 💕")
+        return
+
     def _execute():
-        chat_id = None
         photo_action_loop = None
         try:
             if isinstance(target, types.CallbackQuery):
@@ -5527,14 +5743,25 @@ def process_photo_request(
                 types.InlineKeyboardButton("🔄 Kirim Ulang Foto", callback_data="resend_photo:last"),
                 types.InlineKeyboardButton("📸 Pose Lain", callback_data="regen_photo:last")
             )
-            safe_send_message(
+            # Remove buttons from any older unhandled resend prompt for this user
+            old_mid = USER_PENDING_RESEND_MSG_ID.pop(user_id, None)
+            if old_mid and chat_id:
+                try:
+                    bot.edit_message_reply_markup(chat_id, old_mid, reply_markup=None)
+                except Exception:
+                    pass
+
+            sent_msg = safe_send_message(
                 chat_id,
                 f"🌸 *{p_name}*: Aduh sayang, koneksiku ke Telegram sepertinya lagi agak lemot nih... 🥺\n"
                 f"Fotonya belum sempat terkirim tadi. Mau aku kirimkan ulang sekarang?",
                 reply_markup=resend_markup,
                 parse_mode="Markdown"
             )
+            if sent_msg and hasattr(sent_msg, "message_id"):
+                USER_PENDING_RESEND_MSG_ID[user_id] = sent_msg.message_id
         finally:
+            photo_tracker.release_generation(user_id)
             if photo_action_loop is not None:
                 photo_action_loop.__exit__(None, None, None)
 
@@ -5544,6 +5771,11 @@ def process_photo_request(
 @bot.message_handler(commands=['video', 'anim', 'animate', 'klip'])
 def handle_video_command(message):
     if not is_authorized(message.from_user.id):
+        return
+
+    if photo_tracker.is_generating(message.from_user.id):
+        p_name = persona_mgr.get_active_persona().get("name", "Aku")
+        safe_reply_to(message, f"🌸 *{p_name}*: Sabar ya sayang, video/foto sebelumnya lagi aku siapkan nih... Ditunggu sampai selesai yaa! 💕")
         return
 
     scenario = message.text.replace("/video", "").replace("/anim", "").replace("/animate", "").replace("/klip", "").strip()
@@ -5566,27 +5798,38 @@ def process_video_request(
     is_followup: bool = False
 ):
     """Generates and delivers consistent girlfriend animated video clip with caption and voice."""
+    if isinstance(target, types.CallbackQuery):
+        chat_id = target.message.chat.id
+        user_id = target.from_user.id
+        reply_to_target = target.message
+        is_callback = True
+    elif not isinstance(target, types.Message) and hasattr(target, "message") and target.message:
+        chat_id = target.message.chat.id
+        user_id = target.from_user.id
+        reply_to_target = target.message
+        is_callback = True
+    else:
+        chat_id = getattr(target, "chat", None) and target.chat.id
+        user_id = getattr(target, "from_user", None) and target.from_user.id
+        reply_to_target = target
+        is_callback = False
+
+    if not photo_tracker.acquire_generation(user_id):
+        logger.info(f"Video/photo generation already in-progress for user {user_id}. Blocked duplicate request: '{user_text[:40]}'")
+        p_name = persona_mgr.get_active_persona().get("name", "Aku")
+        if is_callback:
+            try:
+                bot.answer_callback_query(target.id, text=f"Sabar ya sayang, {p_name} lagi menyiapkan video/foto nih... Tunggu sebentar ya! 💕", show_alert=False)
+            except Exception:
+                pass
+        else:
+            safe_reply_to(reply_to_target, f"🌸 *{p_name}*: Sabar ya sayang, video/foto sebelumnya lagi aku siapkan nih... Tunggu sebentar yaa! 💕")
+        return
+
     def _execute():
-        chat_id = None
         video_action_loop = None
         try:
             persona = persona_mgr.get_active_persona()
-
-            if isinstance(target, types.CallbackQuery):
-                chat_id = target.message.chat.id
-                user_id = target.from_user.id
-                reply_to_target = target.message
-                is_callback = True
-            elif hasattr(target, "message") and target.message:
-                chat_id = target.message.chat.id
-                user_id = target.from_user.id
-                reply_to_target = target.message
-                is_callback = True
-            else:
-                chat_id = target.chat.id
-                user_id = target.from_user.id
-                reply_to_target = target
-                is_callback = False
 
             video_action_loop = ChatActionLoop(bot, chat_id, "upload_video")
             video_action_loop.__enter__()
@@ -5767,6 +6010,7 @@ def process_video_request(
             if chat_id is not None:
                 safe_send_message(chat_id, f"⚠️ Gagal mengirim video: `{e}`")
         finally:
+            photo_tracker.release_generation(user_id)
             if video_action_loop is not None:
                 video_action_loop.__exit__(None, None, None)
 
@@ -7755,6 +7999,11 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
             # If it is purely a direct photo/video command (not conversational), process immediately
             if is_media and not is_conversational_media:
+                uid = message.from_user.id if message and hasattr(message, "from_user") and message.from_user else 0
+                if uid and photo_tracker.is_generating(uid):
+                    p_name = persona_mgr.get_active_persona().get("name", "Aku")
+                    safe_reply_to(message, f"🌸 *{p_name}*: Sabar ya sayang, foto/video sebelumnya lagi aku siapkan nih... Ditunggu sampai selesai yaa! 💕")
+                    return
                 if media_type == "video":
                     process_video_request(message, user_text)
                     return
