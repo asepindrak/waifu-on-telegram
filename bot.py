@@ -5071,7 +5071,8 @@ def process_photo_request(
     conversational_reply: Optional[str] = None,
     is_followup: bool = False,
     scene_override: Optional[str] = None,
-    original_user_text: Optional[str] = None
+    original_user_text: Optional[str] = None,
+    is_nude_override: Optional[bool] = None
 ):
     """Generates and delivers consistent girlfriend photo with caption matching conversation context."""
     def _execute():
@@ -5120,8 +5121,18 @@ def process_photo_request(
             is_nsfw_photo = detect_nsfw_intent(actual_user_msg, history)
             if not is_nsfw_photo and user_text != actual_user_msg:
                 is_nsfw_photo = detect_nsfw_intent(user_text, history)
+
+            # If this is a spontaneous/followup photo and user didn't explicitly request NSFW, enforce SFW
+            if is_followup and not is_nsfw_photo:
+                is_nsfw_photo = False
+                if is_nude_override is None:
+                    is_nude_override = False
+
+            if is_nude_override is False:
+                is_nsfw_photo = False
+
             cur_outfit_key, _ = persona_mgr.get_user_outfit(user_id)
-            if cur_outfit_key in ("bra_off", "nude"):
+            if cur_outfit_key in ("bra_off", "nude") and (is_nude_override is not False):
                 is_nsfw_photo = True
 
             if scene_override and not is_nsfw_photo:
@@ -5136,7 +5147,7 @@ def process_photo_request(
                     conversational_reply=conversational_reply,
                     is_nsfw=is_nsfw_photo
                 )
-            if is_nsfw_photo and (not detected_scene or any(pub in detected_scene.lower() for pub in ["cafe", "campus", "classroom", "library", "mall", "park", "gym", "street"])):
+            if is_nsfw_photo and (not detected_scene or any(pub in detected_scene.lower() for pub in ["lab", "laboratorium", "office", "kantor", "cafe", "campus", "classroom", "library", "mall", "park", "gym", "street"])):
                 detected_scene = "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows, warm intimate atmosphere"
             elif hangout_engine.is_on_date(user_id) and not scene_override and not conversational_reply:
                 active_date = hangout_engine.get_active_date(user_id)
@@ -5167,6 +5178,12 @@ def process_photo_request(
                 is_nsfw=is_nsfw_photo,
                 allow_undress_advance=(not is_followup),
             )
+            if is_nude_override is not None:
+                is_nude = is_nude_override
+                if not is_nude and any(nud_kw in outfit_label.lower() for nud_kw in ["telanjang", "nude", "topless", "bra_off"]):
+                    ctx_clothed = student_schedule.detect_contextual_activity_and_outfit(user_text, [], persona_key=persona_mgr.active_key)
+                    outfit_label = ctx_clothed.get("outfit_name", "🌸 Pakaian Kasual Santai") if ctx_clothed else "🌸 Pakaian Kasual Santai"
+
             logger.info(f"Visual prompt crafted: {visual_prompt} (Outfit: {outfit_label}, Nude: {is_nude})")
 
             # Save exact scenario context so 'Pose Lain' never loses outfit or setting
@@ -5361,7 +5378,7 @@ def process_photo_request(
 
             u_lower = user_text.lower() if user_text else ""
             u_stage = persona_mgr.get_undress_stage(user_id)
-            if is_nude or is_nsfw_photo or u_stage > 0 or ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low):
+            if (is_nude or is_nsfw_photo or u_stage > 0 or ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)) and (is_nude_override is not False):
                 stage_captions = {
                     1: "Kaosnya udah kubuka... tinggal BH sama celana pendek santai nih. Suka liatnya? 🙈💕",
                     2: "Sekarang cuma pakai BH sama celana dalam aja... jangan diliatin terus dong, malu tau~ 😳💕",
@@ -5374,6 +5391,10 @@ def process_photo_request(
                     if ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)
                     else "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕"
                 )
+            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["lab", "laboratorium", "ekstraksi", "sampel", "nimbang", "praktikum"]):
+                fallback_caption = "Lagi fokus praktikum di laboratorium sains nih, istirahat bentar kirim pap buat kamu~ 🥼✨"
+            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["kantor", "office", "kerja", "meeting", "kantoran"]):
+                fallback_caption = "Lagi di kantor nih nyelesein pekerjaan, foto ini spesial buat kamu~ 💼💕"
             elif "pajama" in outfit_low or "piyama" in outfit_low or "tidur" in outfit_low:
                 fallback_caption = "Udah nyaman banget santai rebahan di kasur kamar nih~ 🌙💕"
             elif "handuk" in outfit_low or "towel" in outfit_low:
@@ -7480,23 +7501,9 @@ def generate_dynamic_visual_novel_reaction(
                 return format_roleplay_italics(concise_dyn, character_name=p_name)
         except Exception as e_dyn:
             logger.warning(f"Dynamic Visual Novel LLM reaction generation failed: {e_dyn}")
+            return None
 
-    # Fallback only when LLM client is completely unreachable (e.g. offline / mock unit tests)
-    u_low = user_text.lower()
-    import random
-    actions = [
-        f"*{p_name} melihat kamu dengan senyuman hangat sambil merapikan rambutnya*",
-        f"*{p_name} menatapmu lembut dengan mata berbinar*",
-        f"*{p_name} tersenyum manis mendekatkan diri ke arahmu*",
-        f"*{p_name} mengangguk antusias mendengarkanmu*",
-        f"*{p_name} tertawa kecil tersipu malu*"
-    ]
-    chosen_act = random.choice(actions)
-    if any(k in u_low for k in ["makan", "lunch", "sarapan", "martabak", "nasgor", "camilan"]):
-        return format_roleplay_italics(f"{chosen_act}\n\nWah kedengeran enak banget makanannya! Jangan lupa makan yang banyak yaa biar selalu semangat 💕", character_name=p_name)
-    if any(k in u_low for k in ["kantor", "gathering", "kerja", "meeting", "tugas", "kuliah"]):
-        return format_roleplay_italics(f"{chosen_act}\n\nSemangat yaa buat aktivitas dan acaranya di kantor! Nanti ceritain lagi yaa ke aku 🥰", character_name=p_name)
-    return format_roleplay_italics(f"{chosen_act}\n\nAku selalu seneng nemenin kamu ngobrol kayak gini. Ceritain lebih banyak dong~ 💕", character_name=p_name)
+    return None
 
 
 def get_contextual_fallback_reaction(
@@ -7506,8 +7513,8 @@ def get_contextual_fallback_reaction(
     history: Optional[List[Dict[str, str]]] = None,
     system_inst: Optional[str] = None,
     is_nsfw: bool = False
-) -> str:
-    """Wrapper ensuring backward compatibility while delegating to dynamic LLM reaction generator."""
+) -> Optional[str]:
+    """Wrapper delegating to dynamic LLM reaction generator. Returns None when LLM is unreachable (no fake static dialogue)."""
     return generate_dynamic_visual_novel_reaction(
         user_text=user_text,
         persona_name=persona_name,
@@ -7857,7 +7864,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
             persona = persona_mgr.get_active_persona()
 
             with ChatActionLoop(bot, message.chat.id, "typing") as typing_loop:
-                # 1. Expire stale session outfits when switching to casual daily topics BEFORE checking NSFW routing
+                # 1. Expire stale session outfits and undress stage when switching to casual daily topics
                 persona_mgr.check_context_shift(message.from_user.id, user_text)
                 is_nsfw_turn = detect_nsfw_intent(user_text)
                 cur_outfit_key, _ = persona_mgr.get_user_outfit(message.from_user.id)
@@ -7868,9 +7875,22 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     cur_undress_stage = next_stage
                     if next_stage > 0:
                         is_nsfw_turn = True
+                elif cur_undress_stage > 0 and not is_nsfw_turn:
+                    # Inactivity / Casual Topic Recovery:
+                    # If current user message is casual daily conversation without NSFW intent,
+                    # the previous intimate moment has ended. Restore clothes automatically!
+                    logger.info(f"Casual conversation turn ('{user_text[:30]}') during undressed state. Resetting undress stage {cur_undress_stage} -> 0 (clothed).")
+                    persona_mgr.reset_undress_stage(message.from_user.id)
+                    cur_undress_stage = 0
+                    if cur_outfit_key in ("shirt_off", "bottoms_off", "bra_off", "nude"):
+                        cur_outfit_key = "default"
 
-                if (cur_outfit_key == "nude" or cur_undress_stage > 0) and not any(k in user_text.lower() for k in ["selesai", "sudah dulu", "pake baju", "pakai baju", "berpakaian"]):
-                    is_nsfw_turn = True
+                # Check explicit clothing reset
+                if any(k in user_text.lower() for k in ["selesai", "sudah dulu", "pake baju", "pakai baju", "berpakaian"]):
+                    persona_mgr.reset_undress_stage(message.from_user.id)
+                    cur_undress_stage = 0
+                    cur_outfit_key = "default"
+                    is_nsfw_turn = False
                 llm_active = idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id, is_nsfw=is_nsfw_turn)
                 if not llm_active:
                     logger.warning("Local LLM engine could not be awakened.")
@@ -8179,16 +8199,32 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                 chat_max_tokens = 450 if long_form_req else (150 if (is_nsfw_turn or is_conversational_media) else 120)
 
-                try:
-                    idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id, is_nsfw=is_nsfw_turn)
-                    reply_text, _ = llm_client.chat(messages, max_tokens=chat_max_tokens, is_nsfw=is_nsfw_turn)
-                except Exception as e:
-                    logger.error(f"Chat error / LLM timeout: {e}")
-                    pending_manager.record_failed_message(message, user_text, is_voice=is_voice, error=str(e))
-                    health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=str(e))
+                reply_text = None
+                max_retries = 3
+                retry_delays = [3, 5, 8]
+                last_chat_err = None
+
+                for attempt in range(max_retries):
+                    try:
+                        idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id, is_nsfw=is_nsfw_turn)
+                        res_chat, _ = llm_client.chat(messages, max_tokens=chat_max_tokens, is_nsfw=is_nsfw_turn)
+                        if res_chat and res_chat.strip():
+                            reply_text = res_chat.strip()
+                            break
+                    except Exception as e:
+                        last_chat_err = e
+                        logger.warning(f"LLM chat attempt {attempt + 1}/{max_retries} failed: {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delays[attempt])
+
+                if not reply_text or not reply_text.strip():
+                    err_str = str(last_chat_err or "Server LLM tidak merespons balasan chat.")
+                    logger.error(f"Chat error / LLM exhausted retries: {err_str}")
+                    pending_manager.record_failed_message(message, user_text, is_voice=is_voice, error=err_str)
+                    health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=err_str)
                     err_msg = (
-                        f"⚠️ *Service LLM Mengalami Gangguan / Timeout!*\n\n"
-                        f"Koneksi ke service LLM lokal (`{LLM_BASE_URL}`) gagal atau tidak merespon: `{e}`\n\n"
+                        f"⚠️ *Service LLM Sedang Offline / Menyiapkan Respon!*\n\n"
+                        f"Server LLM lokal (`{LLM_BASE_URL}`) belum merespon permintaan chat: `{err_str}`\n\n"
                         f"🩹 **Self-healing otomatis aktif!** Pesan kamu sudah aku catat dan **akan langsung aku balas otomatis begitu server LLM online kembali** yaa~ Tunggu sebentar 🥰⏳"
                     )
                     safe_reply_to(message, err_msg)
@@ -8196,16 +8232,6 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                 # Successfully obtained reply: clear any pending retry for this chat
                 pending_manager.clear_pending(message.chat.id)
-
-                if not reply_text or not reply_text.strip():
-                    reply_text = get_contextual_fallback_reaction(
-                        user_text=user_text,
-                        persona_name=p_name,
-                        llm_client=llm_client,
-                        history=history,
-                        system_inst=system_inst,
-                        is_nsfw=is_nsfw_turn
-                    )
 
                 # Anti-Parroting, English-Translation Leak, Meta-Leak & Nyolot/Hostility Guard
                 if (
@@ -8233,24 +8259,10 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                             logger.info(f"✓ Steering resolved issue: '{steered_reply}'")
                             reply_text = sanitize_waifu_tone_and_pronouns(steered_reply)
                         else:
-                            reply_text = get_contextual_fallback_reaction(
-                                user_text=user_text,
-                                persona_name=p_name,
-                                llm_client=llm_client,
-                                history=history,
-                                system_inst=system_inst,
-                                is_nsfw=is_nsfw_turn
-                            )
+                            reply_text = sanitize_waifu_tone_and_pronouns(reply_text)
                     except Exception as e_steer:
                         logger.debug(f"Steering error: {e_steer}")
-                        reply_text = get_contextual_fallback_reaction(
-                            user_text=user_text,
-                            persona_name=p_name,
-                            llm_client=llm_client,
-                            history=history,
-                            system_inst=system_inst,
-                            is_nsfw=is_nsfw_turn
-                        )
+                        reply_text = sanitize_waifu_tone_and_pronouns(reply_text)
 
                 # Check if waifu takes initiative to send spontaneous PAP photo
                 has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
@@ -8298,7 +8310,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 # 1. Action tag or direct pap phrase from LLM
                 # 2. Rich visual novel / lifestyle moment in conversation (cafe, home, bed, food, study, park, cuddle)
                 # 3. Active date / hangout in progress (waifu loves capturing date memories)
-                # 4. NSFW undress transition or intimate physical engagement
+                # 4. NSFW undress transition or intimate physical engagement (only explicit undress actions)
                 # 5. Natural conversational cadence: every 3-4 turns during active chat, waifu naturally shares a candid photo of her ongoing moment!
                 is_on_active_date = hangout_engine.is_on_date(uid)
                 is_natural_cadence = (turn_diff >= 3 and time_diff >= 45.0)
@@ -8311,7 +8323,6 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         or is_intimate_action
                         or is_scene_moment
                         or is_on_active_date
-                        or (is_nsfw_turn and cur_undress_stage > 0)
                         or is_natural_cadence
                     )
                     and not (should_send_conv_photo or should_send_conv_video)
@@ -8342,7 +8353,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     or is_unwanted_english_or_translation(clean_reply, user_text)
                     or is_hostile_or_nyolot(clean_reply)
                 ):
-                    clean_reply = get_contextual_fallback_reaction(
+                    dyn_clean = get_contextual_fallback_reaction(
                         user_text=user_text,
                         persona_name=p_name,
                         llm_client=llm_client,
@@ -8350,6 +8361,10 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         system_inst=system_inst,
                         is_nsfw=is_nsfw_turn
                     )
+                    if dyn_clean:
+                        clean_reply = dyn_clean
+                    else:
+                        clean_reply = sanitize_waifu_tone_and_pronouns(clean_reply or reply_text)
                 clean_reply = sanitize_waifu_tone_and_pronouns(clean_reply)
                 if not long_form_req:
                     clean_reply = enforce_concise_chat_reply(
@@ -8391,7 +8406,11 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                     def _send_followup_photo():
                         try:
-                            if is_nsfw_turn:
+                            # Explicit intimate actions or undress transitions keep NSFW; casual cadence/lifestyle is forced SFW
+                            is_explicit_intimate = is_nsfw_turn and (is_undress_trans or is_intimate_action)
+                            nude_override = True if is_explicit_intimate else False
+
+                            if is_nsfw_turn and is_explicit_intimate:
                                 action_ctx = undress_desc if undress_desc else ""
                                 photo_prompt = f"{action_ctx}, {user_text}, {clean_reply}".strip(", ")
                             else:
@@ -8401,8 +8420,9 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                                 user_text=photo_prompt,
                                 conversational_reply=clean_reply,
                                 is_followup=True,
-                                scene_override=scene_override_desc if not is_nsfw_turn else None,
-                                original_user_text=user_text
+                                scene_override=scene_override_desc if not (is_nsfw_turn and is_explicit_intimate) else None,
+                                original_user_text=user_text,
+                                is_nude_override=nude_override
                             )
                         except Exception as e_photo:
                             logger.error(f"Error sending follow-up photo: {e_photo}")
@@ -8509,6 +8529,7 @@ health_engine.register_recovery_callback(_handle_service_recovery_callback)
 def send_scheduled_greeting(user_id: int, time_of_day: str):
     """Sends sweet spontaneous morning/lunch/bedtime greeting."""
     try:
+        persona_mgr.reset_undress_stage(user_id)
         persona = persona_mgr.get_active_persona()
         cur_lang = os.environ.get("BOT_LANGUAGE", "id").lower()
         lang_dir = persona_mgr.get_language_directive(cur_lang)
@@ -8641,6 +8662,7 @@ def schedule_daily_greetings():
             for uid in ALLOWED_USER_IDS:
                 if proactive_engine.should_send_checkin(uid):
                     try:
+                        persona_mgr.reset_undress_stage(uid)
                         persona = persona_mgr.get_active_persona()
                         p_msg = scheduled_buffer.get_message(uid, "proactive")
                         if not p_msg:

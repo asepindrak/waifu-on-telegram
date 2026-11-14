@@ -632,6 +632,27 @@ LOCATION_PRESETS: Dict[str, Dict[str, Any]] = {
         "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
         "is_public": True,
     },
+    "lobby_campus": {
+        "name": "Lobby Kampus",
+        "patterns": [r"\b(lobby\s+kampus|lobi\s+kampus|lobby|lobi|atrium|lorong\s+kampus|gedung\s+fakultas|campus\s+lobby)\b"],
+        "prompt": "standing inside modern university campus lobby, open atrium, university building interior, clean bright indoor lighting, soft bokeh",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+    "science_lab": {
+        "name": "Laboratorium Sains",
+        "patterns": [r"\b(lab|laboratorium|ekstraksi|nimbang\s+sampel|praktikum\s+lab|jas\s+lab|laboratory)\b"],
+        "prompt": "standing in modern university chemistry and biology science laboratory, wearing white lab coat, laboratory glassware, test tubes, clean bright scientific laboratory lighting",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+    "office": {
+        "name": "Kantor / Ruang Kerja",
+        "patterns": [r"\b(kantor|office|ruang\s+kerja|meeting\s+kantor|kantoran|meja\s+kerja)\b"],
+        "prompt": "standing in modern professional office room, office desk, computer monitor, neat professional office interior",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
     "campus": {
         "name": "Kampus / Ruang Kuliah",
         "patterns": [r"\b(kampus|kuliah|kelas|ruang\s+kelas|lecture\s*hall|gedung\s+kuliah|fakultas|dosen|makul|skripsi)\b"],
@@ -681,10 +702,17 @@ LOCATION_PRESETS: Dict[str, Dict[str, Any]] = {
         "nsfw_prompt": "intimate seated pose inside car passenger seat at night, dim interior dashboard illumination, private car interior atmosphere",
         "is_public": False,
     },
+    "bus_stop": {
+        "name": "Halte Bus",
+        "patterns": [r"\b(halte|bus\s*stop|shelter\s*bis|halte\s*bis|halte\s*bus)\b"],
+        "prompt": "waiting at outdoor bus stop shelter, sitting on bench, bus stop sign, atmospheric street perspective, cinematic depth of field",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
     "station": {
-        "name": "Stasiun / Halte",
-        "patterns": [r"\b(stasiun|peron|kereta|mrt|krl|train\s*station|subway|halte|bus\s*stop)\b"],
-        "prompt": "standing at modern train station platform or transit shelter, commuter ambiance, atmospheric lighting",
+        "name": "Stasiun Kereta",
+        "patterns": [r"\b(stasiun|peron|kereta|mrt|krl|train\s*station|subway)\b"],
+        "prompt": "standing at modern train station platform, train tracks, platform bench, commuter ambiance, atmospheric lighting",
         "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
         "is_public": True,
     },
@@ -921,6 +949,10 @@ class PersonaManager:
         Prevents LLMs from confusing kasur with sofa or inventing non-existent rooms in captions.
         """
         s_low = (scene or "").lower()
+        if any(k in s_low for k in ["laboratory", "science lab", "laboratorium", "lab sains", "kimia", "farmasi", "gelas ukur"]):
+            return "di dalam laboratorium sains / kampus (lagi praktikum lab)"
+        if any(k in s_low for k in ["office", "kantor", "ruang kerja", "meja kerja"]):
+            return "di kantor / ruang kerja profesional"
         if any(k in s_low for k in ["bed", "pillows", "kasur", "ranjang", "bedroom"]):
             return "di atas kasur tempat tidur kamar (santai di kasur empuk)"
         if any(k in s_low for k in ["sofa", "couch", "living room", "ruang tv", "ruang tengah"]):
@@ -1229,6 +1261,50 @@ class PersonaManager:
         if any(re.search(pat, u_low) for pat in study_triggers_u) and any(re.search(pat, r_low) for pat in study_triggers_r):
             return True, "sitting next to viewer at study desk, studying together, open textbook and notebooks on table, cute study buddy pose, gentle smile"
 
+        # Specific Dynamic Narrative Setting Transitions (High priority over generic cafe/home/food)
+        # a) Bus Stop / Halte Bis (with rain or fair weather)
+        bus_stop_triggers = [r"\b(halte(?:\s+bis|\s+bus)?|bus\s+stop|shelter|halte)\b"]
+        if any(re.search(pat, comb) for pat in bus_stop_triggers):
+            if any(re.search(pat, comb) for pat in [r"\b(hujan|gerimis|rain|wet|payung|umbrella)\b"]):
+                return True, "waiting at rainy bus stop shelter, holding umbrella, wet asphalt, rain droplets, atmospheric street lighting, cinematic depth of field"
+            return True, "waiting at outdoor bus stop shelter, sitting on bench, bus stop sign, atmospheric street perspective, cinematic depth of field"
+
+        # b) Campus Lobby / Atrium / University Hallway
+        lobby_triggers = [r"\b(lobby\s+kampus|lobi\s+kampus|lobby|lobi|atrium|lorong\s+kampus|gedung\s+fakultas|campus\s+lobby)\b"]
+        if any(re.search(pat, comb) for pat in lobby_triggers):
+            return True, "standing inside modern university campus lobby, open atrium, university building interior, clean bright indoor lighting, soft bokeh"
+
+        # c) Minimarket / Convenience Store
+        convenience_triggers = [r"\b(minimarket|indomaret|alfamart|konbini|convenience\s+store)\b"]
+        if any(re.search(pat, comb) for pat in convenience_triggers):
+            return True, "standing in modern Japanese-style convenience store aisle, shelves with snacks and drinks, bright clean fluorescent lighting"
+
+        # d) Rain / Sheltering / Cozy rainy day
+        rain_triggers = [r"\b(kehujanan|berteduh|hujan\s+lebat|hujan\s+deras|bawa\s+payung|sheltering\s+from\s+rain|caught\s+in\s+rain)\b"]
+        if any(re.search(pat, comb) for pat in rain_triggers):
+            return True, "sheltering from rain under awning, holding transparent umbrella, wet reflections on pavement, cozy romantic rainy day atmosphere, atmospheric street lighting"
+
+        # e) Rooftop / Balcony at Sunset
+        rooftop_triggers = [r"\b(rooftop|balkon|atap\s+gedung|skyline|balcony)\b"]
+        if any(re.search(pat, comb) for pat in rooftop_triggers):
+            return True, "standing on open rooftop terrace at sunset, city skyline background, golden hour sunset lighting, gentle breeze"
+
+        # f) Cinema / Movie Date
+        cinema_triggers = [r"\b(bioskop|nonton\s+film|cinema|movie\s+theater)\b"]
+        if any(re.search(pat, comb) for pat in cinema_triggers):
+            return True, "sitting in cinema lobby holding cinema ticket, movie posters in soft blur background, cozy dim ambient lighting"
+
+        # g) Train Station / Stasiun
+        station_triggers = [r"\b(stasiun|peron|kereta|train\s+station|subway\s+platform)\b"]
+        if any(re.search(pat, comb) for pat in station_triggers):
+            return True, "standing at modern train station platform, train tracks, platform bench, commuter ambiance"
+
+        # h) Science Lab & Office
+        if any(k in comb for k in ["lab", "laboratorium", "ekstraksi", "nimbang sampel", "praktikum lab"]):
+            return True, "standing in modern university chemistry and biology science laboratory, wearing white lab coat, laboratory glassware, test tubes, clean bright scientific laboratory lighting"
+        if any(k in comb for k in ["kantor", "office", "ruang kerja", "meeting kantor", "kantoran", "meja kerja"]):
+            return True, "standing in modern professional office room, office desk, computer monitor, neat professional office interior"
+
         # 9. Cafe & Coffee / Aesthetic hangout
         cafe_triggers = [r"\b(cafe|kafe|coffee|kopi|ngopi|boba|matcha|starbucks|cappuccino|latte|nongkrong\s+di\s+kafe)\b"]
         if any(re.search(pat, comb) for pat in cafe_triggers):
@@ -1279,43 +1355,6 @@ class PersonaManager:
         if any(re.search(pat, comb) for pat in affection_triggers):
             return True, "intimate romantic close-up, warm tender expression, gentle blush, affectionate loving gaze directly at viewer"
 
-        # 19. Dynamic Narrative Setting Transitions:
-        # a) Bus Stop / Halte Bis (with rain or fair weather)
-        bus_stop_triggers = [r"\b(halte(?:\s+bis|\s+bus)?|bus\s+stop|shelter|halte)\b"]
-        if any(re.search(pat, comb) for pat in bus_stop_triggers):
-            if any(re.search(pat, comb) for pat in [r"\b(hujan|gerimis|rain|wet|payung|umbrella)\b"]):
-                return True, "waiting at rainy bus stop shelter, holding umbrella, wet asphalt, rain droplets, atmospheric street lighting, cinematic depth of field"
-            return True, "waiting at outdoor bus stop shelter, sitting on bench, bus stop sign, atmospheric street perspective, cinematic depth of field"
-
-        # b) Campus Lobby / Atrium / University Hallway
-        lobby_triggers = [r"\b(lobby\s+kampus|lobi\s+kampus|lobby|lobi|atrium|lorong\s+kampus|gedung\s+fakultas|campus\s+lobby)\b"]
-        if any(re.search(pat, comb) for pat in lobby_triggers):
-            return True, "standing inside modern university campus lobby, open atrium, university building interior, clean bright indoor lighting, soft bokeh"
-
-        # c) Rain / Sheltering / Cozy rainy day
-        rain_triggers = [r"\b(kehujanan|berteduh|hujan\s+lebat|hujan\s+deras|bawa\s+payung|sheltering\s+from\s+rain|caught\s+in\s+rain)\b"]
-        if any(re.search(pat, comb) for pat in rain_triggers):
-            return True, "sheltering from rain under awning, holding transparent umbrella, wet reflections on pavement, cozy romantic rainy day atmosphere, atmospheric street lighting"
-
-        # d) Rooftop / Balcony at Sunset
-        rooftop_triggers = [r"\b(rooftop|balkon|atap\s+gedung|skyline|balcony)\b"]
-        if any(re.search(pat, comb) for pat in rooftop_triggers):
-            return True, "standing on open rooftop terrace at sunset, city skyline background, golden hour sunset lighting, gentle breeze"
-
-        # e) Cinema / Movie Date
-        cinema_triggers = [r"\b(bioskop|nonton\s+film|cinema|movie\s+theater)\b"]
-        if any(re.search(pat, comb) for pat in cinema_triggers):
-            return True, "sitting in cinema lobby holding cinema ticket, movie posters in soft blur background, cozy dim ambient lighting"
-
-        # f) Minimarket / Convenience Store
-        convenience_triggers = [r"\b(minimarket|indomaret|alfamart|konbini|convenience\s+store)\b"]
-        if any(re.search(pat, comb) for pat in convenience_triggers):
-            return True, "standing in modern Japanese-style convenience store aisle, shelves with snacks and drinks, bright clean fluorescent lighting"
-
-        # g) Train Station / Stasiun
-        station_triggers = [r"\b(stasiun|peron|kereta|train\s+station|subway\s+platform)\b"]
-        if any(re.search(pat, comb) for pat in station_triggers):
-            return True, "standing at modern train station platform, train tracks, platform bench, commuter ambiance"
 
         # 7. LLM-Assisted Dynamic Setting Fallback (for novel or arbitrary narrative locations)
         if llm_client and hasattr(llm_client, "chat") and any(w in comb for w in ["lagi di", "nunggu di", "sedang di", "ketemuan di", "waiting at", "at the", "di "]):
@@ -1512,11 +1551,24 @@ class PersonaManager:
         return False
 
     def get_undress_stage(self, user_id: Optional[int] = None) -> int:
-        """Returns the sequential undress stage (0=clothed, 1=shirt_off, 2=bottoms_off, 3=bra_off, 4=nude)."""
+        """Returns the sequential undress stage (0=clothed, 1=shirt_off, 2=bottoms_off, 3=bra_off, 4=nude). Auto-expires after 15m of inactivity."""
         if not user_id:
             return 0
         rec = self.user_outfits.get(int(user_id), {})
-        return rec.get("undress_stage", 0)
+        stage = rec.get("undress_stage", 0)
+        if stage > 0:
+            # Undress states are strictly temporary intimate sessions (auto-expire after 15 minutes of inactivity)
+            updated_at = rec.get("updated_at", 0)
+            if updated_at > 0 and (time.time() - updated_at > 900):
+                logger.info(f"User {user_id} undress stage {stage} expired due to inactivity (>15m). Resetting to 0 (clothed).")
+                rec["undress_stage"] = 0
+                if rec.get("key") in ("shirt_off", "bottoms_off", "bra_off", "nude"):
+                    rec["key"] = "default"
+                rec["updated_at"] = time.time()
+                self.user_outfits[int(user_id)] = rec
+                self._save_user_outfits()
+                return 0
+        return stage
 
     def set_undress_stage(self, user_id: int, stage: int) -> int:
         """Updates and persists sequential undress stage (0 to 4) for user."""
@@ -1642,29 +1694,46 @@ class PersonaManager:
     def check_context_shift(self, user_id: int, user_text: str) -> bool:
         """
         Inspects incoming chat message for changes in waifu activity or routine.
-        If a session outfit is active, automatically clears it when routine changes!
+        If a session outfit or undress stage is active, automatically clears it when routine changes to normal life!
         """
         uid = int(user_id) if user_id else 0
         details = self.get_user_outfit_details(uid)
-        if not details.get("is_session"):
-            return False
+        cur_undress = self.get_undress_stage(uid)
 
-        t = user_text.lower()
-        # Routine shifts that invalidate previous costume dress-up session:
+        t = (user_text or "").lower()
+        # Routine shifts and normal daily topics that invalidate previous intimate/costume state:
         SHIFT_TRIGGERS = [
             r"\b(tidur|bobo|rebahan|ngantuk|good\s*night|selamat\s*malam|mimpi\s*indah)\b",
             r"\b(mandi|keramas|shower|bath|handuk)\b",
-            r"\b(kuliah|kampus|kelas|dosen|makul|matkul|skripsi|praktikum|perpustakaan|perpus)\b",
+            r"\b(lab|laboratorium|ekstraksi|sampel|praktikum|kampus|kuliah|kelas|dosen|makul|matkul|skripsi|perpustakaan|perpus)\b",
+            r"\b(kantor|kerja|kantoran|meeting|proyek|tugas|lembur)\b",
+            r"\b(pulang|jam\s+berapa|kapan\s+pulang|nyampe\s+jam|balik\s+jam|udah\s+di\s+mana)\b",
             r"\b(cafe|kafe|kopi|coffee|starbucks|nongkrong)\b",
-            r"\b(mall|belanja|shopping|bioskop|jalan-jalan)\b",
+            r"\b(mall|belanja|shopping|bioskop|jalan-jalan|taman)\b",
+            r"\b(makan|lapar|kuliner|masak|sarapan|lunch|dinner)\b",
             r"\b(gym|olahraga|fitness|workout|jogging)\b",
-            r"\b(pulang\s+ke\s+rumah|udah\s+di\s+rumah|santai\s+di\s+rumah|istirahat\s+di\s+kamar)\b"
+            r"\b(pulang\s+ke\s+rumah|udah\s+di\s+rumah|santai\s+di\s+rumah|istirahat\s+di\s+kamar|kosan|kost)\b"
         ]
+
+        shifted = False
         for pat in SHIFT_TRIGGERS:
             if re.search(pat, t):
-                logger.info(f"Natural context shift detected for user {uid} ('{user_text[:30]}'). Reverting session outfit '{details['key']}' to auto.")
+                shifted = True
+                break
+
+        if shifted:
+            # If waifu was undressed, automatically restore her clothes on daily life context shift!
+            if cur_undress > 0:
+                logger.info(f"Daily context shift detected for user {uid} ('{user_text[:35]}'). Resetting undress stage {cur_undress} -> 0 (clothed).")
+                self.reset_undress_stage(uid)
+            if details.get("is_session"):
+                logger.info(f"Natural context shift detected for user {uid} ('{user_text[:35]}'). Reverting session outfit '{details['key']}' to auto.")
                 self.clear_session_outfit(uid)
-                return True
+            return True
+
+        if not details.get("is_session") and cur_undress == 0:
+            return False
+
         return False
 
     def extract_contextual_scene(
@@ -1757,6 +1826,10 @@ class PersonaManager:
         # Keyword mapping for common anime / girlfriend situations & dynamic narrative settings
         # Ordered from most specific outdoor/culinary/public settings to indoor/campus settings
         SCENE_PATTERNS = [
+            (["lab", "laboratorium", "laboratory", "ekstraksi", "sampel", "nimbang sampel", "praktikum lab", "jas lab", "lab coat"],
+             "standing in modern university chemistry and biology science laboratory, wearing white lab coat, laboratory glassware, test tubes, clean bright scientific laboratory lighting"),
+            (["kantor", "office", "ruang kerja", "meeting kantor", "kantoran", "meja kerja", "kantor saya"],
+             "standing in modern professional office room, office desk, computer monitor, neat professional office interior"),
             (["sensual", "romantic", "romantis", "intimate", "mesra", "lingerie", "pakaian dalam", "celana dalam", "bh", "bra", "panties", "topless", "telanjang", "bugil"],
              "romantic intimate bedroom setting, soft dim lighting, gentle blush, affectionate loving gaze towards viewer"),
             (["bed", "sleep", "night", "tidur", "kasur", "piyama", "pajamas", "rebahan", "bangun", "selimut", "bantal", "telentang", "terlentang", "tengkurap", "habis mandi", "selesai mandi", "beres mandi"],
@@ -2178,7 +2251,7 @@ class PersonaManager:
         if is_locked and outfit_key != "default" and outfit_key in OUTFIT_PRESETS:
             current_ctx = detect_contextual_activity_and_outfit(user_text, [], persona_key=self.active_key)
             is_public_now = bool(current_ctx.get("is_public", False))
-            if scene_hint and any(k in scene_hint.lower() for k in ["mall", "campus", "classroom", "library", "cafe", "park", "street", "store"]):
+            if scene_hint and any(k in scene_hint.lower() for k in ["mall", "campus", "classroom", "library", "cafe", "park", "street", "store", "lab", "laboratorium", "laboratory", "kantor", "office"]):
                 is_public_now = True
             if is_public_now and outfit_key in ("nude", "lingerie"):
                 logger.info(f"Safety guard: Overriding locked {outfit_key} with {current_ctx['outfit_name']} for public location.")
@@ -2266,26 +2339,39 @@ class PersonaManager:
 
         # 4. Active sequential undress stage (Stage 1..4)
         if user_id and cur_stage > 0 and not is_manual:
-            stage_map = {
-                1: ("shirt_off", False),
-                2: ("bottoms_off", False),
-                3: ("bra_off", True),
-                4: ("nude", True)
-            }
-            if cur_stage in stage_map:
-                k, is_n = stage_map[cur_stage]
-                preset = self.get_preset_outfit(k)
-                return _finalize(preset["prompt"], preset["negative"], is_n, preset["name"])
+            # Check public / academic / workplace guard: NEVER allow undressed states in public or work spaces
+            is_work_or_public = False
+            if scene_hint and any(pub in scene_hint.lower() for pub in ["lab", "laboratorium", "science lab", "office", "kantor", "mall", "campus", "classroom", "library", "cafe", "park", "street", "store"]):
+                is_work_or_public = True
+            if is_work_or_public:
+                logger.info(f"Public/Academic location guard: Resetting undress stage {cur_stage} for {scene_hint}")
+                self.reset_undress_stage(user_id)
+                cur_stage = 0
+            else:
+                stage_map = {
+                    1: ("shirt_off", False),
+                    2: ("bottoms_off", False),
+                    3: ("bra_off", True),
+                    4: ("nude", True)
+                }
+                if cur_stage in stage_map:
+                    k, is_n = stage_map[cur_stage]
+                    preset = self.get_preset_outfit(k)
+                    return _finalize(preset["prompt"], preset["negative"], is_n, preset["name"])
 
         # 5. NSFW Mode Fallback (if turn is NSFW and no manual/clothed preset active, default to nude)
         if is_nsfw and not (is_manual and outfit_key != "default"):
-            nude_preset = self.get_preset_outfit("nude")
-            return _finalize(
-                nude_preset["prompt"],
-                nude_preset["negative"],
-                True,
-                nude_preset["name"]
-            )
+            is_work_or_public = False
+            if scene_hint and any(pub in scene_hint.lower() for pub in ["lab", "laboratorium", "science lab", "office", "kantor", "mall", "campus", "classroom", "library", "cafe", "park", "street", "store"]):
+                is_work_or_public = True
+            if not is_work_or_public:
+                nude_preset = self.get_preset_outfit("nude")
+                return _finalize(
+                    nude_preset["prompt"],
+                    nude_preset["negative"],
+                    True,
+                    nude_preset["name"]
+                )
 
         # 6. Context-aware Student Routine & Conversation History
         # When an active session outfit is set, check activity shifts/public guards against current user_text only
@@ -2297,7 +2383,7 @@ class PersonaManager:
         is_public = bool(current_ctx.get("is_public", False)) if outfit_mode != "auto" else bool(ctx.get("is_public", False))
         if scene_hint:
             lower_s = scene_hint.lower()
-            if any(k in lower_s for k in ["mall", "campus", "classroom", "library", "cafe", "park", "street", "store"]):
+            if any(k in lower_s for k in ["mall", "campus", "classroom", "library", "cafe", "park", "street", "store", "lab", "laboratorium", "laboratory", "kantor", "office"]):
                 is_public = True
 
         # Check if current user request has an explicit active scenario that conflicts with current session outfit
@@ -2313,7 +2399,7 @@ class PersonaManager:
                 is_conflicting = True
             elif is_public and outfit_key in ("nude", "lingerie", "pajamas", "towel"):
                 is_conflicting = True
-            elif any(c in activity_now for c in ["kampus", "kuliah", "perpus"]) and outfit_key in ("maid", "kimono", "bikini", "lingerie", "nude"):
+            elif any(c in activity_now for c in ["kampus", "kuliah", "perpus", "lab", "kantor"]) and outfit_key in ("maid", "kimono", "bikini", "lingerie", "nude"):
                 is_conflicting = True
 
         # If user had a temporary session outfit, but current request explicitly shifted to a conflicting routine,
@@ -2326,8 +2412,8 @@ class PersonaManager:
             outfit_key = "default"
             ctx = current_ctx
 
-        # COHERENCE SAFETY GUARD: NEVER allow lingerie or nude in public spaces (e.g. mall, campus)!
-        if is_public and outfit_key in ("nude", "lingerie"):
+        # COHERENCE SAFETY GUARD: NEVER allow lingerie or nude in public spaces (e.g. mall, campus, lab, kantor)!
+        if is_public and outfit_key in ("nude", "lingerie", "bra_off", "bottoms_off", "shirt_off"):
             fallback_ctx = current_ctx if is_explicit_now else ctx
             logger.info(f"Safety guard: Overriding persistent {outfit_key} with {fallback_ctx['outfit_name']} for public location.")
             return _finalize(fallback_ctx["outfit_prompt"], fallback_ctx["outfit_negative"], False, fallback_ctx["outfit_name"])

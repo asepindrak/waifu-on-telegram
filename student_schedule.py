@@ -419,6 +419,28 @@ def detect_contextual_activity_and_outfit(
                 "is_public": True
             }
 
+        # 7.5. Science Laboratory / Praktikum Lab Context
+        if _has_kw(["lab", "laboratorium", "laboratory", "ekstraksi", "sampel", "nimbang sampel", "praktikum lab", "jas lab"]):
+            return {
+                "activity": "lagi praktikum di laboratorium sains / farmasi",
+                "scene": "standing in modern university chemistry and biology science laboratory, wearing white lab coat, laboratory glassware, test tubes, clean bright scientific laboratory lighting",
+                "outfit_prompt": "(wearing professional white lab coat over smart casual inner clothes:1.35), lab coat, neat student attire",
+                "outfit_negative": "bikini, lingerie, swimwear, naked, exposed chest, towel, sleepwear, pajamas",
+                "outfit_name": "🥼 Jas Laboratorium Praktikum",
+                "is_public": True
+            }
+
+        # 7.6. Office / Kantor Context
+        if _has_kw(["kantor", "office", "ruang kerja", "meeting kantor", "kantoran", "meja kantor"]):
+            return {
+                "activity": "lagi di kantor urusan pekerjaan",
+                "scene": "standing in modern professional office room, office desk, computer monitor, neat professional office interior",
+                "outfit_prompt": "(wearing elegant smart casual office blouse and tailored pants:1.35), office attire",
+                "outfit_negative": "bikini, lingerie, swimwear, naked, exposed chest, towel, sleepwear, pajamas",
+                "outfit_name": "💼 Pakaian Kantor Profesional",
+                "is_public": True
+            }
+
         # 8. Campus / Kuliah Context (Excludes general 'tugas' to avoid overriding home homework)
         if _has_kw(["kampus", "kuliah", "kelas", "dosen", "makul", "skripsi", "lab", "praktikum"]):
             return {
