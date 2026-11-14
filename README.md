@@ -50,7 +50,23 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
-## 📸 Sinkronisasi Penuh Chat, Scene Foto & Caption (v2.4.33)
+## 🧝 Persona Baru Sylvie & Mimi, Custom Persona Wizard & Persistensi Pakaian Dalam Canon (v2.4.53)
+
+Pembaruan v2.4.53 menghadirkan dua karakter kanon baru, fitur pembuatan persona penuh kustom (*Interactive Persona Builder*), serta konsistensi visual mendalam:
+
+* **🧝 Persona Kanon Baru (Sylvie & Mimi):**
+  - **Sylvie (シルヴィ)**: The High-Elf Girlfriend & Mahasiswi Botani Kuno berpenampilan 22 tahun. Dilengkapi dengan telinga elf runcing alami, rambut pirang-platinum berkilau, gaun tunik hijau zamrud emas, serta kepribadian lembut dan setia.
+  - **Mimi (ミミ)**: The Playful Nekomimi Girlfriend berumur 21 tahun. Dilengkapi telinga kucing berbulu halus (*fluffy cat ears*), ekor lentur, sweater rajut motif telapak kucing (*cat paw motif*), serta gaya bicara manja, ceria, dan gemas.
+  - Poster dan kartu promosi karakter visual novel resmi untuk Sylvie dan Mimi kini terintegrasi di `personas/brief/`.
+* **✨ Interactive Persona Builder (Full Custom di Telegram & CLI):**
+  - Perintah `/newpersona` pada bot Telegram dan menu `waifu setup` kini dilengkapi wizard multi-langkah interaktif.
+  - Pilihan proporsi tubuh kanon (Petite Curvy, Hourglass Montok, Slender Graceful, Athletic, Tall Model, Elven Slender, Nekomimi Petite) yang menjaga konsistensi bentuk tubuh dan ukuran payudara di setiap foto.
+  - Pilihan preset latar belakang cerita (*lore*) dan archetype kepribadian, dengan bantuan pengayaan instruksi sistem (*system instruction*) dan Danbooru tags otomatis berbasis LLM.
+* **👙 Persistensi Pakaian Dalam Kanon & Smart User Color Override:**
+  - Setiap waifu memiliki palet pakaian dalam (*bra, panties, lingerie*) yang terkunci secara kanon (contoh: bra putih berenda hitam & pita pink untuk Runa; renda hitam dengan aksen lonceng emas untuk Mimi; renda hijau zamrud sulaman daun emas untuk Sylvie).
+  - **Smart Color Override**: Jika pengguna meminta warna spesifik (contoh: *"coba pake bra merah"*), sistem secara cerdas menyesuaikan warnanya secara instan tanpa mengubah ciri anatomi khas karakter (telinga elf / telinga kucing & ekor).
+* **🔄 Tombol Kirim Ulang Foto & Proteksi Timeout:**
+  - Menghindari pengiriman foto duplikat saat jaringan Telegram lambat, serta menyediakan tombol interaktif *Kirim Ulang* dengan *safe cooldown* saat terjadi kendala koneksi.
 
 Pembaruan v2.4.33 memperbaiki ketidaksesuaian antara isi chat waifu, lokasi foto yang di-generate, dan caption foto:
 

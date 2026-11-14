@@ -655,20 +655,224 @@ def config_image_model(env_vars):
                     asset_manager.download_asset(chosen_mode)
 
 
+def interactive_create_persona_cli(env_vars):
+    """Interactive CLI wizard for creating a fully custom Waifu with anatomy, lore, and AI enrichment."""
+    from persona_manager import ARCHETYPE_PRESETS, BODY_PRESETS, LORE_PRESETS, CUSTOM_PERSONA_OUTFIT_PRESETS, build_custom_persona, PersonaManager
+
+    print(c(BOLD + MAGENTA, "\n" + "=" * 60))
+    print(c(BOLD + MAGENTA, "  ✨ INTERACTIVE WAIFU PERSONA BUILDER (FULL CUSTOM) ✨"))
+    print(c(BOLD + MAGENTA, "=" * 60))
+    print("Bangun karakter waifu impianmu dengan bentuk tubuh canon & latar belakang kisah.\n")
+
+    # 1. Nama
+    while True:
+        name = input("1️⃣  Nama Waifu: ").strip()
+        clean_name = re.sub(r'[^\w\s-]', '', name).strip()
+        if clean_name and len(clean_name) >= 2:
+            name = clean_name
+            break
+        print(c(YELLOW, "   ⚠️ Nama minimal 2 huruf dan tanpa simbol aneh."))
+
+    # 2. Usia
+    age_in = input("2️⃣  Usia (tahun) [default: 21]: ").strip()
+    try:
+        age = int(age_in) if age_in else 21
+    except ValueError:
+        age = 21
+
+    # 3. Sifat & Kepribadian (Archetype)
+    print("\n3️⃣  Pilih Kepribadian & Sifat Utama:")
+    arch_options = list(ARCHETYPE_PRESETS.items())
+    for idx, (k, (lbl, desc)) in enumerate(arch_options, 1):
+        print(f"   {idx}) {lbl} ({desc})")
+    manual_arch_idx = len(arch_options) + 1
+    print(f"   {manual_arch_idx}) ✏️  Tulis Sifat Sendiri (Manual)")
+
+    arch_choice = input(f"   Pilihan [1-{manual_arch_idx}, default: 1]: ").strip()
+    if arch_choice == str(manual_arch_idx):
+        archetype = input("   Ketik sifat/kepribadian waifu: ").strip() or "Loving Companion"
+    elif arch_choice.isdigit() and 1 <= int(arch_choice) <= len(arch_options):
+        archetype = arch_options[int(arch_choice) - 1][0]
+    else:
+        archetype = "tsundere"
+
+    # 4. Bentuk Tubuh & Ukuran Dada (Canon Proportions)
+    print("\n4️⃣  Pilih Bentuk Tubuh & Postur Tubuh (Canon):")
+    body_options = list(BODY_PRESETS.items())
+    for idx, (k, (lbl, desc)) in enumerate(body_options, 1):
+        print(f"   {idx}) {lbl}")
+    manual_body_idx = len(body_options) + 1
+    print(f"   {manual_body_idx}) ✏️  Tulis Bentuk Tubuh Sendiri (Manual)")
+
+    body_choice = input(f"   Pilihan [1-{manual_body_idx}, default: 1]: ").strip()
+    if body_choice == str(manual_body_idx):
+        body_type = input("   Ketik deskripsi bentuk tubuh: ").strip() or "slender feminine body, natural medium breasts"
+    elif body_choice.isdigit() and 1 <= int(body_choice) <= len(body_options):
+        body_type = body_options[int(body_choice) - 1][0]
+    else:
+        body_type = "petite_curvy"
+
+    # 5. Ciri Fisik (Wajah, Rambut & Aksesoris)
+    print("\n5️⃣  Ciri-ciri Penampilan Fisik Wajah & Rambut:")
+    print("   (Contoh: rambut perak panjang bergelombang, mata biru kristal, kulit putih merona, pita hitam)")
+    visual_input = input("   Ketik deskripsi fisik: ").strip()
+    if not visual_input:
+        visual_input = "silky long layered pastel hair, beautiful sparkling anime eyes, porcelain skin, sweet gentle smile"
+
+    # 6. Latar Belakang Cerita (Lore) & Awal Pertemuan
+    print("\n6️⃣  Pilih Latar Belakang Kisah (Lore) & Awal Hubungan:")
+    lore_options = list(LORE_PRESETS.items())
+    for idx, (k, (lbl, desc)) in enumerate(lore_options, 1):
+        print(f"   {idx}) {lbl} ({desc})")
+    manual_lore_idx = len(lore_options) + 1
+    print(f"   {manual_lore_idx}) ✏️  Tulis Kisah Latar Belakang Sendiri (Manual)")
+
+    lore_choice = input(f"   Pilihan [1-{manual_lore_idx}, default: 1]: ").strip()
+    if lore_choice == str(manual_lore_idx):
+        lore = input("   Ketik latar belakang cerita: ").strip() or "Teman mengobrol yang manis dan peduli."
+    elif lore_choice.isdigit() and 1 <= int(lore_choice) <= len(lore_options):
+        lore = lore_options[int(lore_choice) - 1][0]
+    else:
+        lore = "roommate"
+
+    # 7. Pakaian Sehari-hari (Default Outfit)
+    print("\n7️⃣  Pilih Pakaian Sehari-hari Favorit:")
+    outfit_options = list(CUSTOM_PERSONA_OUTFIT_PRESETS.items())
+    for idx, (k, (lbl, desc)) in enumerate(outfit_options, 1):
+        print(f"   {idx}) {lbl}")
+    manual_outfit_idx = len(outfit_options) + 1
+    print(f"   {manual_outfit_idx}) ✏️  Tulis Pakaian Sendiri (Manual)")
+
+    outfit_choice = input(f"   Pilihan [1-{manual_outfit_idx}, default: 1]: ").strip()
+    if outfit_choice == str(manual_outfit_idx):
+        outfit = input("   Ketik gaya pakaian favorit: ").strip() or "cute comfortable casual clothing"
+    elif outfit_choice.isdigit() and 1 <= int(outfit_choice) <= len(outfit_options):
+        outfit = outfit_options[int(outfit_choice) - 1][0]
+    else:
+        outfit = "casual"
+
+    # Preview & Konfirmasi
+    key = re.sub(r'[^a-zA-Z0-9_]', '', name).lower().strip()
+    if not key:
+        key = f"waifu_{int(time.time())}"
+
+    print(c(BOLD + CYAN, "\n" + "-" * 60))
+    print(c(BOLD + CYAN, f"  📋 RINGKASAN WAIFU BARU: {name.upper()} ({age} th)"))
+    print(c(BOLD + CYAN, "-" * 60))
+    print(f"  • Nama            : {name}")
+    print(f"  • Kepribadian     : {archetype}")
+    print(f"  • Bentuk Tubuh    : {body_type}")
+    print(f"  • Ciri Visual     : {visual_input}")
+    print(f"  • Latar Belakang  : {lore}")
+    print(f"  • Busana Favorit  : {outfit}")
+    print("-" * 60)
+
+    confirm = input("Simpan dan jadikan karakter aktif sekarang? [Y/n, default: Y]: ").strip().lower()
+    if confirm == "n":
+        print(c(YELLOW, "  ❌ Pembuatan persona dibatalkan.\n"))
+        return
+
+    print(c(CYAN, "\n  🪄 Menyusun profil persona & instruksi AI..."))
+    try:
+        from persona_manager import build_custom_persona, PersonaManager
+        pm = PersonaManager()
+        persona_data = build_custom_persona(
+            name=name,
+            archetype=archetype,
+            visual_traits=visual_input,
+            outfit=outfit,
+            body_type=body_type,
+            lore=lore,
+            age=age
+        )
+        ok = pm.save_custom_persona(key, persona_data)
+        if ok:
+            env_vars["DEFAULT_PERSONA"] = key
+            print(c(BOLD + GREEN, f"\n  🎉 SELAMAT! Waifu baru '{name}' berhasil dibuat dan aktif! 💖"))
+            greet = persona_data.get("initial_greeting")
+            if greet:
+                print(c(CYAN, f"  💌 Pesan perdana dari {name}: \"{greet}\"\n"))
+        else:
+            print(c(RED, "  ⚠️ Gagal menyimpan file persona.\n"))
+    except Exception as e_bld:
+        print(c(RED, f"  ⚠️ Terjadi kesalahan saat membangun persona: {e_bld}\n"))
+
+
+def interactive_delete_persona_cli(env_vars):
+    """CLI helper to delete custom personas."""
+    from persona_manager import PersonaManager, DEFAULT_PERSONAS
+    pm = PersonaManager()
+    all_personas = pm.personas
+    custom_keys = [k for k in all_personas.keys() if k not in DEFAULT_PERSONAS]
+
+    if not custom_keys:
+        print(c(YELLOW, "\n  ℹ Belum ada custom persona yang dibuat (hanya ada persona bawaan).\n"))
+        return
+
+    print(c(BOLD + RED, "\n[Step: Hapus Custom Persona]"))
+    print("-" * 60)
+    for idx, k in enumerate(custom_keys, 1):
+        p_name = all_personas[k].get("name", k.title())
+        p_arch = all_personas[k].get("archetype", "")
+        print(f"  {idx}) 🗑️ {p_name} ({p_arch}) - key: '{k}'")
+    print("  0) ❌ Batal")
+
+    del_choice = input(f"Pilih persona yang ingin dihapus [1-{len(custom_keys)}, 0=Batal]: ").strip()
+    if del_choice.isdigit() and 1 <= int(del_choice) <= len(custom_keys):
+        del_key = custom_keys[int(del_choice) - 1]
+        confirm = input(f"Yakin ingin menghapus '{del_key}' secara permanen? [y/N]: ").strip().lower()
+        if confirm == "y":
+            ok = pm.delete_custom_persona(del_key)
+            if ok:
+                if env_vars.get("DEFAULT_PERSONA") == del_key:
+                    env_vars["DEFAULT_PERSONA"] = "runa"
+                    print(c(YELLOW, f"  ℹ Persona aktif di-reset ke 'Runa'."))
+                print(c(GREEN, f"  ✓ Persona '{del_key}' berhasil dihapus.\n"))
+            else:
+                print(c(RED, f"  ⚠️ Gagal menghapus persona '{del_key}'.\n"))
+    else:
+        print(c(YELLOW, "  Dibatalkan.\n"))
+
+
 def config_persona(env_vars):
     print(c(BOLD + CYAN, "\n[Step: AI Girlfriend Persona Selection]"))
     print("-" * 60)
     print("Pilih kepribadian & karakter utama Waifu:")
-    print("  1) 🌸 Runa  - Mahasiswi Game Dev Ceria (Santai, perhatian, gamer aesthetic)")
-    print("  2) 🖤 Akira - The Seductive Tease (Percaya diri, cerdas, gothic elegance)")
-    print("  3) ☀️ Hina  - The Sunshine Girlfriend (Penuh energi, ceria, hangat, bubbly)")
-    print("  4) ❄️ Shiro - The Kuudere Girlfriend (Tenang, pintar, sejuk, moonlit gentle)")
-    print("  5) 🌙 Yume  - The Dreamy Soulmate (Lembut, puitis, celestial romantic)")
+
+    try:
+        from persona_manager import PersonaManager
+        pm = PersonaManager()
+        available_personas = pm.list_personas()
+    except Exception:
+        available_personas = [
+            ("runa", "Runa", "Mahasiswi Game Dev Ceria (Santai, perhatian, gamer aesthetic)"),
+            ("akira", "Akira", "The Seductive Tease (Percaya diri, cerdas, gothic elegance)"),
+            ("hina", "Hina", "The Sunshine Girlfriend (Penuh energi, ceria, hangat, bubbly)"),
+            ("shiro", "Shiro", "The Kuudere Girlfriend (Tenang, pintar, sejuk, moonlit gentle)"),
+            ("yume", "Yume", "The Dreamy Soulmate (Lembut, puitis, celestial romantic)")
+        ]
+
+    for idx, (k, name, desc) in enumerate(available_personas, 1):
+        clean_desc = desc.split(".")[0] if desc else ""
+        print(f"  {idx}) 💖 {name:<8} - {clean_desc}")
+
+    print(c(BOLD + MAGENTA, f"  [+] ✨ Buat Waifu / Persona Baru (Interactive Custom Builder)"))
+    print(c(BOLD + RED,     f"  [-] 🗑️ Hapus Custom Persona"))
+
     cur_p = env_vars.get("DEFAULT_PERSONA", "runa")
-    p_choice = input(f"Select character [1-5, default saat ini '{cur_p}']: ").strip()
-    mapping = {"1": "runa", "2": "akira", "3": "hina", "4": "shiro", "5": "yume"}
-    if p_choice in mapping:
-        env_vars["DEFAULT_PERSONA"] = mapping[p_choice]
+    p_choice = input(f"\nPilihan [1-{len(available_personas)}, +, -, default saat ini '{cur_p}']: ").strip().lower()
+
+    if p_choice in ("+", "n", "new", "tambah"):
+        interactive_create_persona_cli(env_vars)
+        return
+    elif p_choice in ("-", "d", "del", "delete", "hapus"):
+        interactive_delete_persona_cli(env_vars)
+        return
+
+    if p_choice.isdigit() and 1 <= int(p_choice) <= len(available_personas):
+        env_vars["DEFAULT_PERSONA"] = available_personas[int(p_choice) - 1][0]
+    elif p_choice in [k for k, _, _ in available_personas]:
+        env_vars["DEFAULT_PERSONA"] = p_choice
     elif not p_choice:
         env_vars["DEFAULT_PERSONA"] = cur_p
     print(c(GREEN, f"  ✓ Persona aktif: {env_vars['DEFAULT_PERSONA'].title()}\n"))

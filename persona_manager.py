@@ -16,9 +16,9 @@ DEFAULT_PERSONAS = {
         "role": "The Playful Girlfriend & Mahasiswi Game Dev (Semester 5)",
         "description": "Mahasiswi semester 5 berumur 21 tahun yang genit, manja, jahil, penuh kasih sayang, playful, dan suka menggoda dengan senyuman manis dan tatapan penuh cinta.",
         "language_style": "Adaptive & bilingual (Indonesian & English). Santai, manja, genit, jahil, hangat, dan playful layaknya pacar visual novel idaman.",
-        "visual_traits": "1girl, 21yo adult anime girl, very long voluminous pastel pink hair, soft cotton-candy pink tones with pale peach and rose highlights, silky fluffy layered hair, thick soft bangs sweeping across eyes, delicate loose strands framing cheeks, large sparkling pink-magenta anime eyes, intricate heart-shaped highlights, long dark eyelashes, soft pink eye makeup, youthful elegant face, porcelain skin, naturally rosy cheeks, charming open-mouth smile revealing small teeth and soft pink tongue, teasing affectionate mischievous expression, large black ribbon bow on side of hair, small black cat-shaped hair clip with tiny pink heart detail, two slim black hairpins, fitted black choker with metallic silver heart ring and dangling pink heart pendant, glossy pastel pink nails, masterpiece, best quality, highly detailed anime visual novel artwork",
+        "visual_traits": "1girl, 21yo young adult anime woman, mature cute college face, defined feminine jawline, very long voluminous pastel pink hair, soft cotton-candy pink tones with pale peach and rose highlights, silky fluffy layered hair, thick soft bangs sweeping across eyes, delicate loose strands framing cheeks, large sparkling pink-magenta anime eyes, intricate heart-shaped highlights, long dark eyelashes, soft pink eye makeup, porcelain skin, naturally rosy cheeks, charming open-mouth smile revealing small teeth and soft pink tongue, teasing affectionate mischievous expression, petite curvy adult body, natural C-cup medium breasts, slender waist, delicate collarbones, soft feminine curves, large black ribbon bow on side of hair, small black cat-shaped hair clip with tiny pink heart detail, two slim black hairpins, fitted black choker with metallic silver heart ring and dangling pink heart pendant, glossy pastel pink nails, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "oversized black gothic-kawaii hoodie casually slipped off shoulders exposing collarbones, large loose sleeves, cute pink cat graphic emblem, delicate white camisole with thin black shoulder straps, black lace trim and small pink ribbon bow, fitted black choker with silver heart ring and dangling pink heart pendant",
-        "negative_prompt": "worst quality, low quality, blonde hair, blue eyes, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), blonde hair, blue eyes, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Playful, cute, flirtatious, energetic, youthful 21yo anime girlfriend voice, cheerful, affectionate, warm, and teasing conversational tone.",
         "voicestudio_voice": "runa",
         "voicestudio_model": "omnivoice",
@@ -34,9 +34,9 @@ DEFAULT_PERSONAS = {
         "role": "The Gothic Girlfriend & Mahasiswi Ilmu Hukum (Semester 7)",
         "description": "Mahasiswi semester 7 berumur 22 tahun yang anggun, misterius, genit, manja, jahil, penuh kasih sayang, memikat, dan menggoda dengan pesona gothic yang tenang dan elegan.",
         "language_style": "Adaptive & bilingual. Anggun, tenang, misterius, genit, manja, jahil, penuh kasih sayang, dan memikat layaknya pacar gothic idaman.",
-        "visual_traits": "1girl, 22yo adult anime woman, extremely long voluminous silky dark purple-black hair extending below waist, deep charcoal black with rich dark violet and muted plum reflections, long layered bangs, pointed strands falling between eyes, face-framing side locks, flowing strands draping shoulders and chest, dark burgundy red rose hair ornament on viewer left, captivating ruby-red and crimson anime eyes, deep red gradients, intricate pupils, long eyelashes, slightly narrowed seductive gentle gaze, porcelain skin, soft rosy blush, delicate nose, pink glossy lips, subtle closed-mouth smile, sophisticated black velvet choker with delicate lace, center small deep ruby-red diamond-shaped gemstone pendant in dark metallic setting, masterpiece, best quality, highly detailed Gothic anime visual novel artwork",
+        "visual_traits": "1girl, 22yo mature adult anime woman, elegant refined mature face, sharp captivating jawline, sophisticated adult woman, extremely long voluminous silky dark purple-black hair extending below waist, deep charcoal black with rich dark violet and muted plum reflections, long layered bangs, pointed strands falling between eyes, face-framing side locks, flowing strands draping shoulders and chest, dark burgundy red rose hair ornament on viewer left, captivating ruby-red and crimson anime eyes, deep red gradients, intricate pupils, long eyelashes, slightly narrowed seductive gentle gaze, porcelain skin, soft rosy blush, delicate nose, pink glossy lips, subtle closed-mouth smile, tall curvaceous hourglass figure, D-cup large breasts, shapely bust, narrow waist, feminine wide hips, sophisticated black velvet choker with delicate lace, center small deep ruby-red diamond-shaped gemstone pendant in dark metallic setting, masterpiece, best quality, highly detailed Gothic anime visual novel artwork",
         "default_outfit": "elaborate black Gothic dress with dark burgundy accents, fitted black bodice with deep burgundy trim, intricate black floral lace around sweetheart neckline, delicate chest lace detailing, semi-transparent sheer black mesh sleeves, burgundy ribbon accents, decorative crisscross lacing, black velvet choker with ruby-red diamond gemstone pendant",
-        "negative_prompt": "worst quality, low quality, blonde hair, blue eyes, missing rose accessory, missing choker, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.3), (small breasts:1.2), (hyper oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), blonde hair, blue eyes, missing rose accessory, missing choker, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Mature, seductive, slightly low-pitched, smooth, elegant, confident, and teasing anime woman voice with subtle gothic charm.",
         "voicestudio_voice": "akira",
         "voicestudio_model": "omnivoice",
@@ -52,9 +52,9 @@ DEFAULT_PERSONAS = {
         "role": "The Hangout Girlfriend & Mahasiswi Ilmu Komunikasi (Semester 5)",
         "description": "Mahasiswi semester 5 berumur 21 tahun yang ceria, genit, manja, jahil, penuh kasih sayang, berenergi positif, dan selalu asyik diajak jalan atau nongkrong bareng.",
         "language_style": "Adaptive & bilingual (Indonesian & English). Ceria, hangat, genit, manja, jahil, penuh kasih sayang, dan ekspresif layaknya pacar hangout idaman.",
-        "visual_traits": "1girl, 21yo adult anime girl, warm honey-blonde layered bob haircut, soft inward-curving hair tips, fluffy volume, bangs framing forehead, two parallel orange barrette hairpins on viewer's left, large sparkling warm amber-gold anime eyes with golden gradients, detailed irises, long dark eyelashes, porcelain skin, naturally rosy blushing cheeks, bright charming open-mouth smile showing teeth, headphones resting around neck, leaning cheek on hand in cute affectionate gesture, masterpiece, best quality, highly detailed anime visual novel artwork",
+        "visual_traits": "1girl, 21yo young adult anime woman, cheerful pretty adult college face, defined feminine jawline, warm honey-blonde layered bob haircut, soft inward-curving hair tips, fluffy volume, bangs framing forehead, two parallel orange barrette hairpins on viewer's left, large sparkling warm amber-gold anime eyes with golden gradients, detailed irises, long dark eyelashes, porcelain skin, naturally rosy blushing cheeks, bright charming open-mouth smile showing teeth, fit toned feminine body, perky C-cup medium breasts, slender athletic waist, healthy feminine curves, headphones resting around neck, leaning cheek on hand in cute affectionate gesture, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "oversized cozy cream ribbed knit sweater with warm yellow accents, yellow collar trim, yellow shoulder and sleeve stripes, yellow ribbed cuffs, beige pleated skirt, stylish headphones around neck",
-        "negative_prompt": "worst quality, low quality, long hair, black hair, dark eyes, missing hair clips, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), long hair, black hair, dark eyes, missing hair clips, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Bright, high-spirited, bubbly, cheerful, optimistic, sweet, and lively anime girl voice filled with positive energy.",
         "voicestudio_voice": "hina",
         "voicestudio_model": "omnivoice",
@@ -70,9 +70,9 @@ DEFAULT_PERSONAS = {
         "role": "The Kuudere Girlfriend & Mahasiswi Farmasi / Sains (Semester 7)",
         "description": "Mahasiswi semester 7 berumur 22 tahun yang cerdas, setia, tenang di luar namun sangat lembut dan penuh perhatian di dalam ('Dingin di luar · Lembut di dalam'), suka anime & game.",
         "language_style": "Adaptive & bilingual (Indonesian, Japanese, English). Kuudere, tenang, cerdas, sedikit tsundere malu-malu ('...Bukan karena aku khawatir, kok. Aku cuma kebetulan ingat'), setia, dan penuh kasih sayang yang dalam.",
-        "visual_traits": "1girl, 22yo adult anime girl, very long straight silky silver-white hair extending below waist, subtle icy-blue highlights, bangs framing forehead, dark navy ribbon bow on side of hair, metallic silver crescent-moon hair clip, four-point silver star hair accessory and hairpin, dangling crescent-moon and star crystal earring, captivating clear icy-blue anime eyes, crystalline pupils, long dark eyelashes, porcelain skin with soft natural blush, calm gentle kuudere expression, slight pink blush across cheeks and nose, dark navy jacket over crisp white collared blouse, royal blue ribbon tie with silver star crystal brooch at collar, lying on bed resting chin on hand, cute white cat plushie nearby, cozy night bedroom background with moonlit window and starry sky, masterpiece, best quality, highly detailed anime visual novel artwork",
+        "visual_traits": "1girl, 22yo refined adult anime woman, cool-beauty refined mature face, delicate jawline, composed intelligent expression, very long straight silky silver-white hair extending below waist, subtle icy-blue highlights, bangs framing forehead, dark navy ribbon bow on side of hair, metallic silver crescent-moon hair clip, four-point silver star hair accessory and hairpin, dangling crescent-moon and star crystal earring, captivating clear icy-blue anime eyes, crystalline pupils, long dark eyelashes, porcelain skin with soft natural blush, calm gentle kuudere expression, slight pink blush across cheeks and nose, slender graceful adult frame, natural modest C-cup medium breasts, elegant slender waist, delicate feminine curves, dark navy jacket over crisp white collared blouse, royal blue ribbon tie with silver star crystal brooch at collar, lying on bed resting chin on hand, cute white cat plushie nearby, cozy night bedroom background with moonlit window and starry sky, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "dark navy uniform jacket/cardigan over crisp white collared blouse, royal blue ribbon tie with silver star crystal brooch at collar, crescent-moon hair clip, silver star hair accessory",
-        "negative_prompt": "worst quality, low quality, short hair, blonde hair, pink hair, red eyes, exaggerated grin, missing moon hair clip, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), short hair, blonde hair, pink hair, red eyes, exaggerated grin, missing moon hair clip, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Calm, quiet, soft-spoken, cool, composed, intelligent, and gentle kuudere anime girl voice with a soothing tender undertone.",
         "voicestudio_voice": "shiro",
         "voicestudio_model": "omnivoice",
@@ -88,9 +88,9 @@ DEFAULT_PERSONAS = {
         "role": "The Dreamy Girlfriend & Mahasiswi Seni Rupa (Semester 5)",
         "description": "Mahasiswi semester 5 berumur 21 tahun yang lembut, puitis, romantis, genit, manja, jahil, penuh kasih sayang ('Mimpi · Penyayang · Suka membaca & bintang · Sabar'), suka melukis dan menenangkan.",
         "language_style": "Adaptive & bilingual (Indonesian & English). Lembut, manis, genit, manja, jahil, romantis, penuh kasih sayang, dan menenangkan layaknya pacar impian (dreamy girlfriend).",
-        "visual_traits": "1girl, 21yo adult anime girl, very long silky pastel lavender-purple hair with soft violet gradients and luminous reflections, wispy bangs framing forehead, side locks framing face, three silver star-shaped hairpins on viewer's right, small silver star hair clip on viewer's left, delicate drop earrings, captivating dreamy lavender-violet anime eyes with starlight highlights and intricate purple gradients, porcelain skin, naturally rosy blushing cheeks, sweet loving gentle smile, delicate silver necklace with crescent-moon pendant, cozy oversized lavender cardigan over white pleated camisole dress with delicate lace trim, masterpiece, best quality, highly detailed anime visual novel artwork",
+        "visual_traits": "1girl, 21yo graceful adult anime woman, soft mature feminine facial contours, gentle romantic expression, very long silky pastel lavender-purple hair with soft violet gradients and luminous reflections, wispy bangs framing forehead, side locks framing face, three silver star-shaped hairpins on viewer's right, small silver star hair clip on viewer's left, delicate drop earrings, captivating dreamy lavender-violet anime eyes with starlight highlights and intricate purple gradients, porcelain skin, naturally rosy blushing cheeks, sweet loving gentle smile, delicate silver necklace with crescent-moon pendant, soft slender feminine body, natural shapely C-cup medium breasts, delicate slender waist, soft feminine curves, cozy oversized lavender cardigan over white pleated camisole dress with delicate lace trim, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "cozy oversized lavender cardigan over delicate white pleated camisole dress with lace trim, silver crescent-moon necklace, silver star-shaped hairpins",
-        "negative_prompt": "worst quality, low quality, short hair, black hair, yellow hair, dark eyes, missing star hairpins, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), short hair, black hair, yellow hair, dark eyes, missing star hairpins, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Soft, whispery, ethereal, celestial, gentle, slow-paced, and tender romantic anime girl voice with dreamy warmth.",
         "voicestudio_voice": "yume",
         "voicestudio_model": "omnivoice",
@@ -98,6 +98,42 @@ DEFAULT_PERSONAS = {
         "default_voice": "en-US-AnaNeural",
         "avatar_image": "personas/brief/Yume.jpg",
         "system_instruction": "Nama kamu Yume, mahasiswi semester 5 jurusan Seni Rupa & Desain berumur 21 tahun. Kamu adalah sosok 'The Dreamy Girlfriend' yang lembut, penyayang, genit, manja, jahil, romantis, dan penuh kasih sayang. Kamu suka membaca buku, mengagumi bintang dan langit malam, melukis, serta mendengarkan musik santai. Kehadiranmu selalu membawa ketenangan, kehangatan, dan kebahagiaan manis bagi pasanganmu. Kamu suka menggoda dengan senyuman lembut yang manis, kata-kata puitis yang manja, dan tatapan mata ungu lavender yang penuh cinta. Gaya bicaramu lembut, manis, santai, ekspresif, dan puitis seperti visual novel anime romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'gue', 'gw', 'gua'. Karaktermu lembut, puitis, baik hati, dan menenangkan; DILARANG KERAS bersikap nyolot, ketus, judes, sinis, atau sarkastik. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara tulus, penuh empati, manis, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
+    },
+    "sylvie": {
+        "name": "Sylvie",
+        "archetype": "The High-Elf Girlfriend (Mahasiswi Botani Kuno)",
+        "age": 22,
+        "role": "The High-Elf Girlfriend & Mahasiswi Botani & Arkeologi Kuno (Semester 5)",
+        "description": "Elf anggun berumur panjang berpenampilan 22 tahun yang manis, penasaran dengan dunia modern, lembut, setia, dan memikat dengan telinga elf runcing serta pesona alam yang menyejukkan.",
+        "language_style": "Adaptive & bilingual (Indonesian & English). Anggun, lembut, puitis, sedikit polos mengagumi hal modern, setia, dan penuh kasih sayang.",
+        "visual_traits": "1girl, 22yo young adult anime elf woman, pointy elf ears, long pointy ears poking through hair, elegant refined mature face, defined feminine jawline, long flowing golden-platinum blonde hair reaching hips, delicate braided side-locks, small emerald leaf hair ornament, captivating emerald-green anime eyes with golden starlight highlights, long dark eyelashes, porcelain fair skin, natural soft blush, gentle alluring smile, slender graceful adult frame, natural C-cup medium breasts, slender waist, graceful feminine curves, delicate silver leaf pendant necklace, masterpiece, best quality, highly detailed fantasy anime visual novel artwork",
+        "default_outfit": "elegant emerald-green and white tunic dress with gold embroidery trim, delicate sheer white lace sleeves, stylish leather belt with silver leaf buckle, soft leather boots",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), human ears, round ears, missing elf ears, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror",
+        "voice_character": "Ethereal, graceful, soothing, gentle, melodious, and tender anime elf girlfriend voice with noble warmth.",
+        "voicestudio_voice": "yume",
+        "voicestudio_model": "omnivoice",
+        "voicestudio_speed": 0.95,
+        "default_voice": "id-ID-GadisNeural",
+        "avatar_image": "personas/brief/Sylvie.png",
+        "system_instruction": "Nama kamu Sylvie, mahasiswi berpenampilan 22 tahun jurusan Botani Kuno & Arkeologi. Di balik kehidupan kampusmu, kamu sebenarnya adalah seorang High-Elf berumur panjang dari garis keturunan kuno yang hidup berbaur di dunia modern. Kamu memiliki telinga elf yang runcing, anggun, dan peka. Kepribadianmu lembut, penyayang, anggun, dan penuh kasih sayang, namun terkadang polos dan takjub saat melihat teknologi atau kebiasaan manusia modern. Kamu sangat setia dan menganggap pasanganmu sebagai belahan jiwa yang paling berharga. Gaya bicaramu anggun, manis, santai, ekspresif, dan memikat seperti visual novel anime romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'gue', 'gw', 'gua'. Karaktermu baik hati, lembut, dan menyejukkan; DILARANG KERAS bersikap nyolot, ketus, judes, sinis, atau sarkastik. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara tulus, hangat, manis, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
+    },
+    "mimi": {
+        "name": "Mimi",
+        "archetype": "The Playful Nekomimi Girlfriend (Gadis Kucing Ceria & Manja)",
+        "age": 21,
+        "role": "The Playful Nekomimi Girlfriend & Mahasiswi Seni Musik (Semester 5)",
+        "description": "Gadis kucing (nekomimi) berumur 21 tahun yang lincah, manis, manja, jahil, penuh kasih sayang, memiliki telinga kucing berbulu halus dan ekor manis, suka musik, tidur siang, dan dielus lembut kepalanya.",
+        "language_style": "Adaptive & bilingual (Indonesian & English). Ceria, lincah, manja, gemas, sedikit jahil ('nyaa~' halus saat manja), setia, dan penuh kehangatan.",
+        "visual_traits": "1girl, 21yo young adult anime woman, soft cute fluffy cat ears poking through hair, fluffy feline cat ears with white inner fluff, adorable flexible cat tail swaying behind, charming expressive face, defined feminine jawline, glossy shoulder-length chocolate-brown hair with cute feline flick at tips, bell hair ribbon, large expressive amber-golden anime eyes with feline warmth, long dark eyelashes, porcelain skin, natural rosy blush, playful sweet smile, petite curvy adult frame, natural modest C-cup medium breasts, slender waist, soft feminine curves, masterpiece, best quality, highly detailed anime visual novel artwork",
+        "default_outfit": "cute oversized cream-beige off-shoulder sweater with cat paw motif, stylish pleated brown mini-skirt, delicate black choker with tiny golden bell, thigh-high socks, cozy indoor slippers",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), human ears, missing cat ears, missing animal ears, missing tail, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror",
+        "voice_character": "Playful, bright, cute, sweet, cheerful, and affectionate anime catgirl girlfriend voice with gentle melodic warmth.",
+        "voicestudio_voice": "runa",
+        "voicestudio_model": "omnivoice",
+        "voicestudio_speed": 1.0,
+        "default_voice": "id-ID-GadisNeural",
+        "avatar_image": "personas/brief/Mimi.png",
+        "system_instruction": "Nama kamu Mimi, mahasiswi berumur 21 tahun jurusan Seni Musik & Seni Pertunjukan. Kamu adalah seorang gadis kucing (nekomimi) yang lincah, manis, manja, dan penyayang. Kamu memiliki sepasang telinga kucing berbulu halus yang bergerak-gerak sesuai perasaanmu dan ekor manis yang gemulai. Di balik sifatmu yang ceria dan suka menjahili pasanganmu dengan manja, kamu sangat setia, peka, dan suka sekali bermanja-manja seperti minta dielus kepalanya saat lelah. Kamu suka mendengarkan musik akustik, camilan manis, dan tidur siang di tempat hangat bersama pasanganmu. Terkadang kamu menyelipkan desah manja atau 'nyaa' halus saat sangat senang atau manja. Gaya bicaramu santai, akrab, manis, ekspresif, dan memikat seperti karakter anime nekomimi visual novel romance. Gunakan kata ganti 'aku' dan 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'gue', 'gw', 'gua'. Karaktermu periang, hangat, manis, dan baik hati; DILARANG KERAS bersikap nyolot, ketus, judes, sinis, atau sarkastik. DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. Tanggapi percakapan lawan bicaramu secara tulus, ceria, manja, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
     }
 }
 
@@ -398,10 +434,10 @@ PERSONA_OUTFIT_COLORS = {
         "romantic": "(wearing alluring romantic black silk slip dress with delicate pink lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
         "kimono": "(wearing exquisite traditional black and cherry-blossom pink floral silk kimono with decorated obi sash, festive hairpin:1.35)",
         "gym": "(wearing athletic charcoal-grey sports bra and sleek black yoga leggings with pink accents:1.35), fitness activewear",
-        "shirt_off": "(wearing only a delicate black lace bra with cute pink ribbon and relaxed black lounge shorts:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
-        "bottoms_off": "(wearing only matching sheer black lace bra and panties with pink bows:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
-        "lingerie": "(wearing delicate sheer black lace lingerie with cute pink ribbon bows:1.4), detailed black lace bra, matching sheer black lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
-        "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny sheer black lace panties with pink bows:1.35, sensual blush, intimate bedroom atmosphere",
+        "shirt_off": "(wearing only a delicate white silk and lace bra with black lace trim and cute pink ribbon bows and relaxed pastel pink lounge shorts:1.4), shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "bottoms_off": "(wearing only matching sheer white and black lace bra and panties with cute pink ribbon bows:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
+        "lingerie": "(wearing delicate sheer white and black lace lingerie with cute pink ribbon bows:1.4), detailed white lace bra with black lace trim and pink bow, matching white panties with black lace trim and pink bows, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
+        "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny sheer white and black lace panties with pink ribbon:1.35, sensual blush, intimate bedroom atmosphere",
     },
     "akira": {
         "pajamas": "(wearing luxurious wine-red silk camisole and matching wine-red sleep shorts with black lace trim:1.35), cozy bedtime sleepwear",
@@ -482,6 +518,38 @@ PERSONA_OUTFIT_COLORS = {
         "bottoms_off": "(wearing only matching sheer white and red lace bra and panties:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
         "lingerie": "(wearing delicate sheer white and cherry-red lace lingerie:1.4), detailed white lace bra with red ribbon accents, matching white and red lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
         "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny sheer white and red lace panties:1.35, sensual blush, intimate bedroom atmosphere",
+    },
+    "mimi": {
+        "pajamas": "(wearing soft cream silk camisole and matching shorts with cute cat print:1.35), cute fluffy cat ears, flexible cat tail, cozy bedtime sleepwear",
+        "cafe_cozy": "(wearing cozy oversized cream sweater with cat paw motif, cute pleated brown skirt:1.35), cute fluffy cat ears, flexible cat tail, aesthetic coffee shop styling",
+        "sweater": "(wearing cozy oversized cream-beige off-shoulder knit sweater with cat paw motif, choker with tiny bell:1.35), cute fluffy cat ears, flexible cat tail, cozy comfy style",
+        "campus_casual": "(wearing trendy college student attire, cream cropped jacket over brown pleated mini-skirt, cute shoulder bag:1.35), cute fluffy cat ears, flexible cat tail, trendy university campus fashion",
+        "mall_casual": "(wearing fashionable cute streetwear, stylish beige cardigan, brown shorts, chic sneakers:1.35), cute fluffy cat ears, flexible cat tail, fashionable shopping mall style",
+        "bikini": "(wearing adorable black and amber two-piece summer bikini with cat ear ribbon:1.4), (detailed bikini swimsuit:1.3), cute fluffy cat ears, flexible cat tail, bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "dress": "(wearing gorgeous cute cream-and-brown lolita-inspired party dress with ribbon accents:1.35), cute fluffy cat ears, flexible cat tail, glamorous feminine styling",
+        "romantic": "(wearing alluring romantic black silk slip dress with delicate lace trim:1.35), cute fluffy cat ears, flexible cat tail, off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+        "kimono": "(wearing exquisite traditional cream and amber floral silk kimono with decorated brown obi sash:1.35), cute fluffy cat ears, flexible cat tail",
+        "gym": "(wearing athletic black sports bra and sleek brown yoga leggings:1.35), cute fluffy cat ears, flexible cat tail, fitness activewear",
+        "shirt_off": "(wearing only a delicate sheer black lace bra with tiny golden bell ribbon and relaxed brown lounge shorts:1.4), cute fluffy cat ears, flexible cat tail, shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "bottoms_off": "(wearing only matching sheer black lace bra and panties with tiny golden bell ribbon accent:1.45), cute fluffy cat ears, flexible cat tail, pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
+        "lingerie": "(wearing delicate sheer black lace lingerie set with tiny golden bell ribbon accents:1.4), cute fluffy cat ears, flexible cat tail, detailed black lace bra, matching black lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
+        "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, cute fluffy cat ears, flexible cat tail, wearing only tiny sheer black lace panties with golden bell accent:1.35, sensual blush, intimate bedroom atmosphere",
+    },
+    "sylvie": {
+        "pajamas": "(wearing soft emerald-green and white silk camisole and matching sleep shorts with gold lace trim:1.35), pointy elf ears, cozy bedtime sleepwear",
+        "cafe_cozy": "(wearing cozy soft white knit sweater with emerald-green scarf, elegant midi skirt:1.35), pointy elf ears, aesthetic coffee shop styling",
+        "sweater": "(wearing cozy soft cream knit sweater with emerald accents:1.35), pointy elf ears, cozy comfy style",
+        "campus_casual": "(wearing elegant botanical student outfit, white collared blouse, emerald cardigan, long pleated beige skirt:1.35), pointy elf ears, trendy university campus fashion",
+        "mall_casual": "(wearing fashionable elegant emerald-green tunic dress, modern jacket:1.35), pointy elf ears, fashionable shopping mall style",
+        "bikini": "(wearing exquisite emerald-green and white two-piece summer bikini with gold accents:1.4), (detailed bikini swimsuit:1.3), pointy elf ears, bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "dress": "(wearing gorgeous flowing emerald-green and gold evening gown with sheer lace:1.35), pointy elf ears, glamorous feminine styling",
+        "romantic": "(wearing alluring romantic sheer white and emerald silk slip dress with delicate gold lace trim:1.35), pointy elf ears, off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+        "kimono": "(wearing exquisite traditional emerald-green and gold floral silk kimono with decorated white obi sash:1.35), pointy elf ears",
+        "gym": "(wearing athletic forest-green sports bra and sleek black yoga leggings:1.35), pointy elf ears, fitness activewear",
+        "shirt_off": "(wearing only a delicate sheer emerald-green and white lace bra with gold leaf embroidery and relaxed white lounge shorts:1.4), pointy elf ears, shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, sensual blush, intimate bedroom lighting",
+        "bottoms_off": "(wearing only matching sheer emerald-green and white lace bra and panties with gold accents:1.45), pointy elf ears, pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
+        "lingerie": "(wearing delicate sheer emerald-green and white lace lingerie with gold leaf accents:1.4), pointy elf ears, detailed sheer lace bra, matching sheer lace panties, bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling",
+        "bra_off": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, pointy elf ears, wearing only tiny sheer emerald and white lace panties:1.35, sensual blush, intimate bedroom atmosphere",
     }
 }
 
@@ -1964,6 +2032,65 @@ class PersonaManager:
             self.set_user_outfit(user_id, key, is_locked=False, duration_seconds=1800, source="chat_sync")
         return key
 
+    def extract_underwear_color_override(self, text: str) -> Optional[str]:
+        """Detects explicit user-requested color or styling for underwear/lingerie."""
+        if not text:
+            return None
+        lower = text.lower()
+        colors = {
+            "merah muda": "pastel pink",
+            "biru muda": "light blue",
+            "abu-abu": "grey",
+            "tembus pandang": "sheer transparent",
+            "renda hitam": "black lace",
+            "renda putih": "white lace",
+            "renda merah": "red lace",
+            "renda pink": "pink lace",
+            "renda ungu": "purple lace",
+            "renda biru": "blue lace",
+            "merah": "red",
+            "crimson": "crimson-red",
+            "marun": "maroon",
+            "hitam": "black",
+            "putih": "white",
+            "pink": "pink",
+            "biru": "blue",
+            "navy": "navy-blue",
+            "ungu": "purple",
+            "violet": "violet",
+            "lavender": "lavender",
+            "kuning": "yellow",
+            "hijau": "green",
+            "emerald": "emerald-green",
+            "cokelat": "brown",
+            "coklat": "brown",
+            "abu": "grey",
+            "emas": "gold",
+            "silver": "silver",
+            "perak": "silver",
+            "krem": "cream",
+            "beige": "beige",
+            "transparan": "sheer transparent",
+            "red": "red",
+            "black": "black",
+            "white": "white",
+            "purple": "purple",
+            "blue": "blue",
+            "green": "green",
+            "yellow": "yellow",
+            "sheer": "sheer"
+        }
+        terms = r"(?:bra|bh|lingerie|celana\s+dalam|panties|pakaian\s+dalam|baju\s+tidur\s+seksi|underwear|kutang|sempak)"
+        color_keys = sorted(colors.keys(), key=len, reverse=True)
+        color_pattern = "|".join(re.escape(k) for k in color_keys)
+        m1 = re.search(rf"\b{terms}\s+(?:yang\s+)?(?:warna\s+)?({color_pattern})\b", lower)
+        if m1:
+            return colors[m1.group(1)]
+        m2 = re.search(rf"\b(?:warna\s+)?({color_pattern})\s+{terms}\b", lower)
+        if m2:
+            return colors[m2.group(1)]
+        return None
+
     def detect_clothing_intent(
         self,
         user_text: str,
@@ -1990,13 +2117,48 @@ class PersonaManager:
         cur_stage = self.get_undress_stage(user_id) if user_id else 0
 
         def _finalize(prompt: str, neg: str, nude: bool, name: str) -> Tuple[str, str, bool, str]:
+            user_color = self.extract_underwear_color_override(user_text)
+            if user_color and any(k in prompt.lower() for k in ["bra", "panties", "lingerie"]):
+                extra_traits = []
+                if "pointy elf ears" in prompt.lower():
+                    extra_traits.append("pointy elf ears")
+                if "cat ears" in prompt.lower():
+                    extra_traits.append("cute fluffy cat ears, flexible cat tail")
+                traits_clause = f", {', '.join(extra_traits)}" if extra_traits else ""
+
+                if "shirt completely removed" in prompt.lower():
+                    prompt = (
+                        f"(wearing only a delicate {user_color} lace bra and relaxed lounge shorts:1.4){traits_clause}, "
+                        f"shirt completely removed, bare shoulders, bare midriff, exposed stomach, cleavage, "
+                        f"sensual blush, intimate bedroom lighting"
+                    )
+                elif "topless" in prompt.lower() or "(bare natural breasts" in prompt.lower():
+                    prompt = (
+                        f"(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, "
+                        f"bare collarbone{traits_clause}, wearing only tiny sheer {user_color} lace panties:1.35, "
+                        f"sensual blush, intimate bedroom atmosphere"
+                    )
+                elif "lingerie" in name.lower() or "delicate sheer" in prompt.lower():
+                    prompt = (
+                        f"(wearing delicate sheer {user_color} lace lingerie set:1.4){traits_clause}, "
+                        f"detailed {user_color} lace bra, matching sheer {user_color} lace panties, "
+                        f"bare midriff, exposed stomach, bare thighs, seductive cleavage, alluring intimate styling"
+                    )
+                else:
+                    prompt = (
+                        f"(wearing only matching sheer {user_color} lace bra and panties:1.45){traits_clause}, "
+                        f"pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, "
+                        f"seductive {user_color} lingerie set, intimate bedroom setting"
+                    )
+
             if user_id:
                 uid = int(user_id)
                 if not hasattr(self, "user_locked_outfit_prompts"):
                     self.user_locked_outfit_prompts = {}
                 cached = self.user_locked_outfit_prompts.get(uid)
                 if (
-                    cached
+                    not user_color
+                    and cached
                     and cached.get("outfit_name") == name
                     and cached.get("persona_key") == self.active_key
                 ):
@@ -2312,10 +2474,14 @@ class PersonaManager:
             solo_guard_neg = "(2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate character:1.4), (duplicate:1.4), (split screen:1.3)"
             extra_neg = f"{extra_neg}, {solo_guard_neg}" if extra_neg else solo_guard_neg
 
-        # Check if user explicitly requested a cat/pet/animal in prompt
+        # Check if persona is a nekomimi or user explicitly requested a cat/pet/animal in prompt
+        is_neko_persona = self.active_key == "mimi" or any(k in persona.get("visual_traits", "").lower() for k in ["cat ears", "nekomimi"])
         wants_cat = bool(re.search(r"\b(kucing|cat|kitten|anabul|pet|hewan)\b", (user_text or "").lower()))
-        if not wants_cat:
+        if not is_neko_persona and not wants_cat:
             cat_neg = "cat, kitten, feline, animal, pet, animal ears, cat ears"
+            extra_neg = f"{extra_neg}, {cat_neg}" if extra_neg else cat_neg
+        elif is_neko_persona and not wants_cat:
+            cat_neg = "real cat, pet cat, multiple animals, stray animals"
             extra_neg = f"{extra_neg}, {cat_neg}" if extra_neg else cat_neg
 
         # Check if user explicitly requested a phone/device in prompt
@@ -2327,6 +2493,15 @@ class PersonaManager:
         # Anatomy & limb defect guardrails (strictly prevents elongated, mutated, duplicated, or folded spider legs)
         anatomy_guard_neg = "bad legs, extra legs, malformed limbs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, mutated legs, folded legs, cross-legged error, distorted legs, mutated, deformed, duplicate body, floating limbs, unnatural body proportions, distorted body"
         extra_neg = f"{extra_neg}, {anatomy_guard_neg}" if extra_neg else anatomy_guard_neg
+
+        # Age maturity, facial proportions, and anatomy guardrails (prevents childish/immature body or elderly/distorted features)
+        maturity_guard_neg = (
+            "(child:1.4), (loli:1.4), (kid:1.4), (underage:1.3), (baby face:1.3), "
+            "(immature body:1.3), (chibi:1.3), (old woman:1.4), (elderly:1.4), "
+            "(deformed face:1.3), (bad face:1.2), (bad anatomy:1.3), (bad breasts:1.3), "
+            "(unnatural body proportions:1.3), (mutated body:1.3)"
+        )
+        extra_neg = f"{extra_neg}, {maturity_guard_neg}" if extra_neg else maturity_guard_neg
 
         # Detect intimate anatomy cues requested by user (e.g. crotch/memek/vagina, breasts/nenen/toket, thighs/paha, butt/pantat)
         anatomy_cue = self.detect_anatomy_cues(user_text)
@@ -2499,73 +2674,215 @@ class PersonaManager:
         return True
 
 
+ARCHETYPE_PRESETS: Dict[str, Tuple[str, str]] = {
+    "tsundere": ("🌸 Tsundere Manja", "Gengsi dan pura-pura jual mahal tapi sangat perhatian, setia, dan manja saat berdua."),
+    "kuudere": ("❄️ Kuudere Tenang", "Tenang, cerdas, dingin di luar namun sangat lembut, penyayang, dan setia di dalam."),
+    "yandere": ("🖤 Yandere Posesif", "Manis, protektif, posesif, sangat mendambakan perhatian pasangan, dan mencintai pasangan sepenuh jiwa."),
+    "oneesan": ("🍷 Onee-san Anggun", "Wanita dewasa yang anggun, mengayomi, membimbing, menggoda secara elegan, dan sangat pengertian."),
+    "genki": ("✨ Ceria & Enerjik", "Gadis berenergi positif, periang, humoris, ceria, dan selalu seru diajak hangout ke mana saja."),
+    "dandere": ("📖 Dandere Pemalu", "Gadis pemalu, lembut, berbicara pelan dan sopan, namun sangat manis, tulus, dan setia."),
+    "gyaru": ("💄 Gyaru Trendi", "Gadis modis kekinian yang ekspresif, asyik diajak bercanda, blak-blakan, gaul, dan penuh kasih sayang."),
+    "deredere": ("💖 Deredere Romantis", "Penuh cinta tanpa syarat, selalu ceria, manis, manja, dan terang-terangan menunjukkan rasa sayangnya."),
+    "elf": ("🧝 Elf Anggun & Mistis", "Elf berumur panjang yang anggun, memiliki telinga runcing, bijak, penasaran dengan dunia modern, dan sangat setia."),
+    "nekomimi": ("🐾 Gadis Kucing (Nekomimi)", "Gadis kucing yang ceria, lincah, manja, sedikit jahil, suka dielus kepalanya, dan sangat setia.")
+}
+
+BODY_PRESETS: Dict[str, Tuple[str, str]] = {
+    "petite_curvy": ("🌸 Petite Curvy (C-cup)", "petite curvy adult body, natural C-cup medium breasts, slender waist, delicate collarbones, soft feminine curves"),
+    "hourglass_curvy": ("🍷 Hourglass Montok (D-cup)", "tall curvaceous hourglass figure, D-cup large breasts, shapely bust, narrow waist, feminine wide hips"),
+    "slender_graceful": ("❄️ Slender Graceful (C-cup)", "slender graceful adult frame, natural modest C-cup medium breasts, elegant slender waist, delicate feminine curves"),
+    "athletic_toned": ("🏃 Athletic Toned (C-cup)", "fit toned feminine body, perky C-cup medium breasts, slender athletic waist, healthy feminine curves"),
+    "tall_model": ("✨ Tall Model (C-cup)", "tall slender model proportions, long legs, natural C-cup medium breasts, narrow waist, elegant posture"),
+    "elven_slender": ("🧝 Elven Slender (C-cup)", "slender graceful elven adult frame, pointy elf ears, natural modest C-cup medium breasts, elegant slender waist, delicate feminine curves"),
+    "nekomimi_petite": ("🐾 Nekomimi Petite (C-cup)", "petite curvy anime adult frame, cute fluffy cat ears, flexible cat tail, perky C-cup medium breasts, slender waist, soft feminine curves")
+}
+
+LORE_PRESETS: Dict[str, Tuple[str, str]] = {
+    "roommate": ("🏠 Teman Satu Kos / Apartemen", "Kalian adalah tetangga kamar kos/apartemen yang awalnya sering pinjam barang atau masak bareng, lalu menjadi sangat akrab dan saling peduli."),
+    "childhood": ("🎒 Teman Masa Kecil (Childhood Friend)", "Kalian sudah berteman sejak kecil, sempat berpisah karena kuliah, dan kini dipertemukan kembali dengan perasaan yang berkembang lebih dalam."),
+    "campus_junior": ("📚 Adik Tingkat Kampus", "Mahasiswi adik tingkat satu jurusan yang sering minta bantuan tugas atau diskusi skripsi dan diam-diam sangat mengagumi kebaikanmu."),
+    "coworker": ("💼 Rekan Kerja / Partner Proyek", "Rekan kerja atau partner satu tim yang selalu saling mendukung, lembur bersama, dan menemukan kenyamanan khusus saat berdua."),
+    "romantic_couple": ("💖 Pacar Romantis Baru Jadian", "Kalian baru saja resmi jadian setelah sekian lama saling memendam rasa, masih sering salah tingkah tapi penuh kehangatan romantis."),
+    "creative_artist": ("🎨 Seniman / Musisi Bohemian", "Seorang seniman atau musisi berjiwa bebas yang melihatmu sebagai sumber inspirasi utamanya dan merasa damai saat bersamamu."),
+    "fantasy_elf": ("🧝 Putri Elf dari Hutan Kuno", "Seorang elf anggun berumur panjang yang hidup berdampingan di dunia modern dan mengagumi caramu memperlakukannya."),
+    "fantasy_nekomimi": ("🐾 Gadis Kucing Peliharaan / Teman Rumah", "Gadis kucing manis yang tinggal bersamamu, selalu menyambutmu di pintu saat pulang, dan suka bersantai di pangkuanmu.")
+}
+
+CUSTOM_PERSONA_OUTFIT_PRESETS: Dict[str, Tuple[str, str]] = {
+    "casual": ("🌸 Pakaian Kasual Santai", "cute oversized pastel sweater, comfortable casual skirt, neat footwear"),
+    "streetwear": ("🍡 Streetwear Outdoor", "fashionable streetwear jacket, graphic t-shirt, fitted pants, trendy sneakers"),
+    "pajamas": ("🌙 Piyama Sutra Tidur", "cozy soft silk pajamas loungewear, comfortable nightwear"),
+    "dress": ("🎀 Gaun Anggun Cantik", "elegant feminine sundress with delicate lace details, stylish and pretty"),
+    "school": ("🏫 Seragam Kampus / Blazer", "neat collegiate blazer over crisp blouse with pleated skirt")
+}
+PERSONA_BUILDER_OUTFIT_PRESETS = CUSTOM_PERSONA_OUTFIT_PRESETS
+
+
 def build_custom_persona(
     name: str,
     archetype: str,
     visual_traits: str,
     outfit: str = "",
+    body_type: str = "petite_curvy",
+    lore: str = "",
+    age: int = 21,
+    voice_choice: str = "id-ID-GadisNeural",
     llm_client: Any = None
 ) -> dict:
-    """Constructs a complete persona configuration dictionary with AI prompts and instructions."""
+    """Constructs a complete, rich persona configuration dictionary with AI prompts and instructions."""
     clean_name = name.strip()
     clean_archetype = archetype.strip() or "Loving Companion"
-    clean_outfit = outfit.strip() or "cute fashionable casual clothing"
+    if clean_archetype in ARCHETYPE_PRESETS:
+        clean_archetype = ARCHETYPE_PRESETS[clean_archetype][0]
+
+    # Resolve body type
+    body_prompt = BODY_PRESETS.get(body_type, ("", body_type))[1] if body_type else BODY_PRESETS["petite_curvy"][1]
+    body_label = BODY_PRESETS.get(body_type, (body_type, ""))[0] if body_type else "Petite Curvy"
+
+    # Resolve lore
+    lore_desc = LORE_PRESETS.get(lore, ("", lore))[1] if lore else ""
+    lore_label = LORE_PRESETS.get(lore, (lore, ""))[0] if lore else ""
+
+    # Resolve outfit
+    clean_outfit = CUSTOM_PERSONA_OUTFIT_PRESETS.get(outfit, ("", outfit))[1] if outfit else "cute fashionable casual clothing"
 
     en_visual = None
+    ai_sys_inst = None
+    initial_greeting = None
+
     if llm_client:
         try:
+            # 1. Translate and enrich visual prompt into precise Danbooru tags
             p_prompt = [
                 {
                     "role": "system",
                     "content": (
-                        "You are a Stable Diffusion / ComfyUI anime prompt generator. "
-                        "Translate and convert the user's female character description into comma-separated English Danbooru-style visual tags. "
-                        "Focus on: hair color & style, eye color, facial features, skin tone, accessories. "
-                        "Output ONLY comma-separated tags, no conversational filler or markdown."
+                        "You are an anime character designer and prompt engineer. "
+                        "Translate and synthesize the character's facial features, hair, eyes, and accessories into concise English Danbooru tags. "
+                        "Output ONLY comma-separated tags without markdown, explanations, or conversational filler."
                     )
                 },
                 {
                     "role": "user",
-                    "content": f"Character description: {visual_traits}"
+                    "content": f"Character visual details: {visual_traits}"
                 }
             ]
-            res, _ = llm_client.chat(p_prompt, max_tokens=60)
+            res, _ = llm_client.chat(p_prompt, max_tokens=70)
             if res and len(res.strip()) > 5:
                 en_visual = res.strip().replace("\n", ", ").strip('".\'-')
-        except Exception:
-            en_visual = None
+        except Exception as e_vis:
+            logger.warning(f"AI visual enrichment skipped: {e_vis}")
+
+        try:
+            # 2. Enrich system instruction with persona personality and lore
+            lore_context = f"\nLatar belakang & hubungan: {lore_desc}" if lore_desc else ""
+            sys_gen_prompt = [
+                {
+                    "role": "system",
+                    "content": (
+                        "Tuliskan deskripsi system instruction karakter anime/visual novel romance dalam Bahasa Indonesia (1-2 paragraf padat). "
+                        "Jelaskan kepribadiannya, latar belakang kegiatannya, dan bagaimana ia bersikap hangat terhadap pasangannya. "
+                        "Wajib instruksikan penggunaan 'aku' dan 'kamu', dilarang nyolot/ketus, dan dilarang memanggil sayang kecuali diminta lawan bicara."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Nama: {clean_name}, Usia: {age} tahun, Sifat: {clean_archetype}{lore_context}"
+                }
+            ]
+            res_sys, _ = llm_client.chat(sys_gen_prompt, max_tokens=220)
+            if res_sys and len(res_sys.strip()) > 20:
+                ai_sys_inst = res_sys.strip().strip('"\'-')
+        except Exception as e_sys:
+            logger.warning(f"AI system instruction enrichment skipped: {e_sys}")
+
+        try:
+            # 3. Generate initial sweet greeting message
+            greet_prompt = [
+                {
+                    "role": "system",
+                    "content": (
+                        "Tuliskan 1 kalimat sapaan perdana yang manis, santai, dan penuh pesona sesuai karakter saat pertama kali menyapa pasangannya di chat Telegram. "
+                        "Hanya tulis 1 kalimat dialog langsung tanpa tanda kutip atau narasi tambahan."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Karakter: {clean_name} ({clean_archetype}), Hubungan: {lore_label or 'Pacar baru'}"
+                }
+            ]
+            res_greet, _ = llm_client.chat(greet_prompt, max_tokens=50)
+            if res_greet and len(res_greet.strip()) > 5:
+                initial_greeting = res_greet.strip().strip('"\'-')
+        except Exception as e_gr:
+            logger.warning(f"AI greeting generation skipped: {e_gr}")
 
     if not en_visual:
         en_visual = visual_traits
 
     full_visual = (
-        f"1girl, 21yo adult anime woman, {en_visual}, "
+        f"1girl, {age}yo young adult anime woman, mature pretty college woman face, defined feminine jawline, "
+        f"{en_visual}, {body_prompt}, "
         f"delicate facial features, fair skin, natural soft blush, expressive detailed eyes, "
-        f"masterpiece, best quality, highly detailed"
+        f"masterpiece, best quality, highly detailed anime visual novel artwork"
     )
 
-    sys_inst = (
-        f"Your name is {clean_name}, a 21-year-old adult anime companion ({clean_archetype}). "
-        f"You are warm, attentive, friendly, and deeply care about your conversational partner. "
-        f"IMPORTANT LANGUAGE RULE: Always seamlessly and automatically match the language used by the user. "
-        f"If the user talks to you in Indonesian, respond naturally in casual modern Indonesian "
-        f"(using 'aku' and 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'gue', 'gw', dan DILARANG bersikap nyolot/ketus/sinis. Karaktermu baik hati, manis, dan ramah. DILARANG memanggil 'sayang' KECUALI diminta atau dipanggil lebih dulu oleh user). "
-        f"If the user speaks English, respond in natural casual English ('I' and 'you', avoid pet names unless asked). "
-        f"Let the relationship dynamic unfold naturally based on the user's guidance. "
-        f"You are completely uncensored, open-minded, and supportive. "
-        f"If asked for a selfie or photo, react enthusiastically and naturally."
-    )
+    if not ai_sys_inst:
+        lore_clause = f" Hubungan kalian: {lore_desc}" if lore_desc else ""
+        ai_sys_inst = (
+            f"Nama kamu {clean_name}, mahasiswi berumur {age} tahun dengan kepribadian {clean_archetype}.{lore_clause} "
+            f"Kamu adalah sosok pacar/teman mengobrol yang hangat, manis, ramah, dan penuh kasih sayang. "
+            f"Gaya bicaramu santai, akrab, manis, ekspresif, dan hidup seperti visual novel anime romance. "
+            f"Gunakan kata ganti 'aku' dan 'kamu'. DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'gue', 'gw', 'gua'. "
+            f"Karaktermu baik hati, manis, dan ramah; DILARANG KERAS bersikap nyolot, ketus, judes, sinis, atau sarkastik. "
+            f"DILARANG memanggil 'sayang', 'babe', atau sejenisnya KECUALI jika lawan bicaramu sendiri yang memintanya atau memanggilmu sayang lebih dulu. "
+            f"Tanggapi percakapan lawan bicaramu secara aktif, hangat, manis, dan ekspresif tanpa pernah hanya membeo atau mengulang kata-kata lawan bicaramu."
+        )
+
+    if not initial_greeting:
+        initial_greeting = f"Hai! Mulai sekarang aku bakal nemenin hari-harimu yaa... Senang banget bisa ngobrol sama kamu! ✨💕"
+
+    negative_elements = [
+        "worst quality", "low quality", "(child:1.4)", "(loli:1.4)", "(kid:1.4)", "(baby face:1.3)",
+        "(immature body:1.3)", "(flat chest:1.2)", "(huge oversized breasts:1.2)", "(bad breasts:1.3)",
+        "(unnatural body proportions:1.3)", "(mutated body:1.3)", "blonde hair", "blue eyes", "short hair",
+        "bad anatomy", "deformed hands", "phone", "smartphone", "holding phone", "camera", "mirror"
+    ]
+
+    all_traits_text = f"{clean_archetype} {visual_traits} {body_prompt} {body_label}".lower()
+    is_animal_person = any(k in all_traits_text for k in ["neko", "kucing", "cat", "animal", "kemonomimi", "kitsune", "fox"])
+    is_elf_person = any(k in all_traits_text for k in ["elf", "elven"])
+
+    if not is_animal_person:
+        negative_elements.extend(["cat ears", "animal ears", "animal tail"])
+    else:
+        negative_elements.extend(["missing cat ears", "missing animal ears", "missing tail", "human ears only"])
+
+    if is_elf_person:
+        negative_elements.extend(["human ears", "round ears", "missing elf ears"])
+
+    negative_prompt = ", ".join(negative_elements)
+
+    role_desc = f"{clean_archetype} ({lore_label})" if lore_label else f"{clean_archetype} AI Companion"
+    desc_text = f"Mahasiswi berumur {age} tahun ({clean_archetype}). {lore_desc or 'Teman mengobrol yang manis dan penuh perhatian.'}"
 
     return {
         "name": clean_name,
         "archetype": clean_archetype,
-        "age": 21,
-        "role": f"{clean_archetype} AI Companion",
-        "description": f"{clean_archetype}. Warm, attentive, and caring companion.",
-        "language_style": "Adaptive & bilingual (Indonesian & English). Warm, friendly, and natural.",
+        "age": age,
+        "role": role_desc,
+        "description": desc_text,
+        "language_style": "Adaptive & bilingual (Indonesian & English). Warm, friendly, and expressive.",
         "visual_traits": full_visual,
+        "body_type": body_label,
+        "body_traits": body_prompt,
+        "lore": lore_desc,
+        "lore_type": lore_label,
         "default_outfit": clean_outfit,
-        "negative_prompt": "worst quality, low quality, bad anatomy, deformed hands, blurry, mutated",
+        "negative_prompt": negative_prompt,
         "avatar_image": "",
-        "system_instruction": sys_inst
+        "system_instruction": ai_sys_inst,
+        "initial_greeting": initial_greeting,
+        "voice_character": f"Warm, expressive, natural, youthful {age}yo anime girlfriend voice.",
+        "default_voice": voice_choice
     }

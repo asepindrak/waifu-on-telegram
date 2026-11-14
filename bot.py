@@ -27,7 +27,7 @@ from telebot import types
 
 from lu_llm_client import LocallyUncensoredClient, is_long_form_request, enforce_concise_chat_reply
 from routing_engine import get_hybrid_llm_client, detect_nsfw_intent, is_ai_refusal
-from persona_manager import PersonaManager, build_custom_persona
+from persona_manager import PersonaManager, build_custom_persona, ARCHETYPE_PRESETS, BODY_PRESETS, LORE_PRESETS, CUSTOM_PERSONA_OUTFIT_PRESETS
 from media_engine import MediaEngine
 from voice_engine import VoiceEngine
 from code_runner import CodeRunner
@@ -4334,6 +4334,53 @@ def callback_regen_photo(call):
     process_photo_request(call, scenario)
 
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('resend_photo:'))
+def callback_resend_photo(call):
+    if not is_authorized(call.from_user.id):
+        bot.answer_callback_query(call.id, "Unauthorized", show_alert=True)
+        return
+
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    last = USER_LAST_PHOTO_CONTEXT.get(user_id)
+
+    if not last or not last.get("img_bytes"):
+        bot.answer_callback_query(call.id, "Foto di cache sudah kedaluwarsa, membuat foto baru...", show_alert=False)
+        process_photo_request(call, "last")
+        return
+
+    bot.answer_callback_query(call.id, "🚀 Mengirimkan ulang foto dari memori...", show_alert=False)
+    img_bytes = last.get("img_bytes")
+    full_caption = last.get("full_caption") or "Ini fotoku untukmu yaa~ 💕"
+    clean_caption = last.get("clean_caption") or full_caption
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🔄 Pose Lain", callback_data="regen_photo:last"),
+        types.InlineKeyboardButton("🎬 Bikin Video Gerak", callback_data="regen_video:last")
+    )
+    markup = attach_voice_button(markup, clean_caption, user_id)
+
+    img_to_send = optimize_image_for_telegram(img_bytes, max_dimension=1280, quality=85)
+    try:
+        bot.send_photo(chat_id, img_to_send, caption=full_caption, reply_markup=markup, parse_mode="Markdown", timeout=60)
+        try:
+            bot.delete_message(chat_id, call.message.message_id)
+        except Exception:
+            pass
+    except Exception as e_send:
+        if "can't parse entities" in str(e_send).lower():
+            plain_caption = full_caption.replace("*", "").replace("`", "").replace("_", "")
+            bot.send_photo(chat_id, img_to_send, caption=plain_caption, reply_markup=markup, timeout=60)
+            try:
+                bot.delete_message(chat_id, call.message.message_id)
+            except Exception:
+                pass
+        else:
+            logger.error(f"Error in resend_photo callback: {e_send}", exc_info=True)
+            safe_send_message(chat_id, f"⚠️ Masih belum berhasil mengirimkan foto: `{e_send}`")
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('regen_video:'))
 def callback_regen_video(call):
     if not is_authorized(call.from_user.id):
@@ -4988,6 +5035,35 @@ def sanitize_chat_caption(
         return fallback
     return clean[0].upper() + clean[1:]
 
+def optimize_image_for_telegram(img_bytes: bytes, max_dimension: int = 1280, quality: int = 85) -> bytes:
+    """Optimizes image payload for Telegram API delivery to avoid socket read timeouts.
+
+    Resizes images exceeding max_dimension and converts to compressed JPEG (~150-350 KB).
+    Preserves visual sharpness on mobile and desktop viewports while guaranteeing fast upload.
+    """
+    if not img_bytes:
+        return img_bytes
+    try:
+        from PIL import Image
+        import io
+        im = Image.open(io.BytesIO(img_bytes))
+        if im.mode not in ("RGB", "L"):
+            im = im.convert("RGB")
+        w, h = im.size
+        if max(w, h) > max_dimension:
+            scale = max_dimension / max(w, h)
+            new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
+            im = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=quality, optimize=True)
+        compressed = buf.getvalue()
+        if len(compressed) < len(img_bytes) or len(img_bytes) > 500 * 1024:
+            return compressed
+        return img_bytes
+    except Exception as e_opt:
+        logger.warning(f"optimize_image_for_telegram skipped: {e_opt}")
+        return img_bytes
+
 def process_photo_request(
     target,
     user_text: str,
@@ -5348,34 +5424,53 @@ def process_photo_request(
 
             markup = attach_voice_button(markup, clean_caption or full_caption, user_id)
 
-            # Optimize image bytes before sending to Telegram to prevent read timeout
-            img_to_send = img_bytes
-            if len(img_bytes) > 800 * 1024:
-                try:
-                    from PIL import Image
-                    import io
-                    im = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-                    buf = io.BytesIO()
-                    im.save(buf, format="JPEG", quality=92, optimize=True)
-                    img_to_send = buf.getvalue()
-                except Exception as e_opt:
-                    logger.warning(f"Image optimization skipped: {e_opt}")
-                    img_to_send = img_bytes
+            # Save complete delivery details in USER_LAST_PHOTO_CONTEXT so resend works seamlessly
+            if user_id in USER_LAST_PHOTO_CONTEXT:
+                USER_LAST_PHOTO_CONTEXT[user_id]["img_bytes"] = img_bytes
+                USER_LAST_PHOTO_CONTEXT[user_id]["full_caption"] = full_caption
+                USER_LAST_PHOTO_CONTEXT[user_id]["clean_caption"] = clean_caption
+                USER_LAST_PHOTO_CONTEXT[user_id]["chat_id"] = chat_id
+                USER_LAST_PHOTO_CONTEXT[user_id]["markup"] = markup
 
-            for attempt in range(2):
-                try:
-                    bot.send_photo(chat_id, img_to_send, caption=full_caption, reply_markup=markup, parse_mode="Markdown", timeout=90)
-                    break
-                except Exception as e_send:
-                    if "can't parse entities" in str(e_send).lower():
+            # Optimize image bytes for Telegram API delivery (resizes > 1280px & JPEG 85% ~150-350KB)
+            # This guarantees upload completes in < 1 second and prevents Read timed out
+            img_to_send = optimize_image_for_telegram(img_bytes, max_dimension=1280, quality=85)
+
+            photo_delivered = False
+            last_send_error = None
+            is_read_timeout = False
+
+            try:
+                bot.send_photo(chat_id, img_to_send, caption=full_caption, reply_markup=markup, parse_mode="Markdown", timeout=60)
+                photo_delivered = True
+            except Exception as e_send:
+                err_str = str(e_send).lower()
+                last_send_error = e_send
+                if "can't parse entities" in err_str:
+                    try:
                         plain_caption = full_caption.replace("*", "").replace("`", "").replace("_", "")
-                        bot.send_photo(chat_id, img_to_send, caption=plain_caption, reply_markup=markup, timeout=90)
-                        break
-                    if attempt == 0:
-                        logger.warning(f"send_photo attempt 1 timed out ({e_send}), retrying in 2s...")
-                        time.sleep(2)
-                        continue
-                    raise e_send
+                        bot.send_photo(chat_id, img_to_send, caption=plain_caption, reply_markup=markup, timeout=60)
+                        photo_delivered = True
+                    except Exception as e_plain:
+                        last_send_error = e_plain
+                elif "read timed out" in err_str or "readtimeout" in err_str:
+                    # In HTTP POST multipart, Read timed out means payload was already transmitted to Telegram.
+                    # Telegram almost always delivers the photo to the user's chat anyway.
+                    # CRITICAL: We skip blind auto-retry to prevent sending duplicate photos to the user!
+                    logger.warning(f"send_photo encountered read timeout ({e_send}). Photo was likely delivered to chat; skipping duplicate auto-send.")
+                    is_read_timeout = True
+                else:
+                    logger.warning(f"send_photo failed with connection error ({e_send}), retrying once in 3s...")
+                    time.sleep(3)
+                    try:
+                        bot.send_photo(chat_id, img_to_send, caption=full_caption, reply_markup=markup, parse_mode="Markdown", timeout=60)
+                        photo_delivered = True
+                    except Exception as e_retry:
+                        logger.error(f"send_photo retry failed: {e_retry}")
+                        last_send_error = e_retry
+
+            if not photo_delivered and not is_read_timeout:
+                raise last_send_error or Exception("Gagal mengirimkan foto ke Telegram.")
 
             new_aff = persona_mgr.increase_affinity(user_id, delta=2)
             memory_engine.set_affinity(user_id, new_aff)
@@ -5393,7 +5488,19 @@ def process_photo_request(
 
         except Exception as e:
             logger.error(f"Error in photo delivery: {e}", exc_info=True)
-            safe_send_message(chat_id, f"⚠️ Gagal mengirimkan foto: `{e}`")
+            p_name = persona.get("name", "Aku") if ('persona' in locals() and isinstance(persona, dict)) else "Aku"
+            resend_markup = types.InlineKeyboardMarkup(row_width=2)
+            resend_markup.add(
+                types.InlineKeyboardButton("🔄 Kirim Ulang Foto", callback_data="resend_photo:last"),
+                types.InlineKeyboardButton("📸 Pose Lain", callback_data="regen_photo:last")
+            )
+            safe_send_message(
+                chat_id,
+                f"🌸 *{p_name}*: Aduh sayang, koneksiku ke Telegram sepertinya lagi agak lemot nih... 🥺\n"
+                f"Fotonya belum sempat terkirim tadi. Mau aku kirimkan ulang sekarang?",
+                reply_markup=resend_markup,
+                parse_mode="Markdown"
+            )
         finally:
             if photo_action_loop is not None:
                 photo_action_loop.__exit__(None, None, None)
@@ -5757,8 +5864,14 @@ def show_persona_wizard_preview(chat_id: int, user_id: int, message_to_edit: Opt
     data = state["data"]
     name = data.get("name", "CustomWaifu")
     arch = data.get("archetype", "Companion")
-    visual = data.get("visual", "anime girl, beautiful eyes")
-    outfit = data.get("outfit", "cute casual clothing")
+    arch_label = ARCHETYPE_PRESETS.get(arch, (arch, ""))[0] if arch in ARCHETYPE_PRESETS else arch
+    body = data.get("body", "petite_curvy")
+    body_label = BODY_PRESETS.get(body, (body, ""))[0] if body in BODY_PRESETS else body
+    visual = data.get("visual", "pastel hair, pretty eyes")
+    lore = data.get("lore", "Teman kosan yang manis")
+    lore_label = LORE_PRESETS.get(lore, (lore, ""))[0] if lore in LORE_PRESETS else lore
+    outfit = data.get("outfit", "casual")
+    outfit_label = CUSTOM_PERSONA_OUTFIT_PRESETS.get(outfit, (outfit, ""))[0] if outfit in CUSTOM_PERSONA_OUTFIT_PRESETS else outfit
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -5769,11 +5882,14 @@ def show_persona_wizard_preview(chat_id: int, user_id: int, message_to_edit: Opt
     text = (
         f"🎉 **PREVIEW WAIFU BARU: {name.upper()}**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"• **Nama**: **{name}**\n"
-        f"• **Kepribadian**: `{arch}`\n"
+        f"• **Nama**: **{name}** (21 th)\n"
+        f"• **Kepribadian**: `{arch_label}`\n"
+        f"• **Bentuk Tubuh**: `{body_label}`\n"
         f"• **Ciri Visual**: _{visual}_\n"
-        f"• **Busana Favorit**: `{outfit}`\n"
+        f"• **Latar Belakang (Lore)**: _{lore_label}_\n"
+        f"• **Busana Favorit**: `{outfit_label}`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🤖 _AI Copilot akan melengkapi instruksi dialog, prompt visual Danbooru, dan sapaan perdana secara otomatis._\n\n"
         f"Siap menghidupkan **{name}**? Klik tombol konfirmasi di bawah:"
     )
     if message_to_edit:
@@ -5812,14 +5928,9 @@ def handle_persona_wizard_input(message) -> bool:
         state["step"] = "archetype"
 
         markup = types.InlineKeyboardMarkup(row_width=2)
-        markup.add(
-            types.InlineKeyboardButton("🌸 Tsundere Manja", callback_data="wizard_arch:Tsundere Manja"),
-            types.InlineKeyboardButton("🖤 Yandere Posesif", callback_data="wizard_arch:Yandere Posesif"),
-            types.InlineKeyboardButton("✨ Ceria & Enerjik", callback_data="wizard_arch:Ceria & Enerjik"),
-            types.InlineKeyboardButton("❄️ Kuudere Tenang", callback_data="wizard_arch:Kuudere Tenang"),
-            types.InlineKeyboardButton("🍷 Onee-san Anggun", callback_data="wizard_arch:Onee-san Anggun"),
-            types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel")
-        )
+        for k, (lbl, _) in ARCHETYPE_PRESETS.items():
+            markup.add(types.InlineKeyboardButton(lbl, callback_data=f"wizard_arch:{k}"))
+        markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
         bot.reply_to(
             message,
             f"💖 Nama Waifu: **{clean_name}**\n\n"
@@ -5832,17 +5943,35 @@ def handle_persona_wizard_input(message) -> bool:
 
     elif step == "archetype":
         data["archetype"] = raw_text
+        state["step"] = "body"
+
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        for k, (lbl, _) in BODY_PRESETS.items():
+            markup.add(types.InlineKeyboardButton(lbl, callback_data=f"wizard_body:{k}"))
+        markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
+        bot.reply_to(
+            message,
+            f"✨ Kepribadian: **{data['archetype']}**\n\n"
+            f"3️⃣ **Bagaimana bentuk tubuh & postur {data.get('name', 'Waifu')}?**\n"
+            f"Pilih salah satu tipe proporsi tubuh canon di bawah, atau ketik deskripsi bentuk tubuh versimu:",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+        return True
+
+    elif step == "body":
+        data["body"] = raw_text
         state["step"] = "visual"
 
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
         bot.reply_to(
             message,
-            f"✨ Kepribadian: **{data['archetype']}**\n\n"
-            f"3️⃣ **Bagaimana ciri-ciri penampilan fisiknya untuk foto (PAP)?**\n"
+            f"👗 Bentuk tubuh tercatat: **{data['body']}**\n\n"
+            f"4️⃣ **Bagaimana ciri-ciri rambut, mata, dan wajah {data.get('name', 'Waifu')}?**\n"
             f"Sebutkan model/warna rambut, warna mata, atau aksesoris khasnya.\n\n"
             f"_(Contoh: rambut perak panjang bergelombang, mata biru kristal, kulit putih merona, pita hitam)_\n\n"
-            f"👉 *Ketik deskripsi penampilannya:*",
+            f"👉 *Ketik deskripsi penampilan wajah & rambutnya:*",
             reply_markup=markup,
             parse_mode="Markdown"
         )
@@ -5850,20 +5979,34 @@ def handle_persona_wizard_input(message) -> bool:
 
     elif step == "visual":
         data["visual"] = raw_text
-        state["step"] = "outfit"
+        state["step"] = "lore"
 
         markup = types.InlineKeyboardMarkup(row_width=2)
-        markup.add(
-            types.InlineKeyboardButton("🌸 Pakaian Kasual Santai", callback_data="wizard_outfit:casual"),
-            types.InlineKeyboardButton("🌙 Piyama Sutra Tidur", callback_data="wizard_outfit:pajamas"),
-            types.InlineKeyboardButton("🎀 Gaun Anggun Cantik", callback_data="wizard_outfit:dress"),
-            types.InlineKeyboardButton("🏫 Seragam Sekolah JK", callback_data="wizard_outfit:school"),
-            types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel")
-        )
+        for k, (lbl, _) in LORE_PRESETS.items():
+            markup.add(types.InlineKeyboardButton(lbl, callback_data=f"wizard_lore:{k}"))
+        markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
         bot.reply_to(
             message,
             f"🎨 Penampilan tercatat!\n\n"
-            f"4️⃣ **Pakaian favorit apa yang ia kenakan sehari-hari?**\n"
+            f"5️⃣ **Bagaimana latar belakang cerita (lore) & awal pertemuan kalian?**\n"
+            f"Pilih kisah awal di bawah, atau ketik kisah/lore versimu sendiri di chat:",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+        return True
+
+    elif step == "lore":
+        data["lore"] = raw_text
+        state["step"] = "outfit"
+
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        for k, (lbl, _) in CUSTOM_PERSONA_OUTFIT_PRESETS.items():
+            markup.add(types.InlineKeyboardButton(lbl, callback_data=f"wizard_outfit:{k}"))
+        markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
+        bot.reply_to(
+            message,
+            f"📖 Kisah latar belakang tercatat!\n\n"
+            f"6️⃣ **Pakaian favorit apa yang ia kenakan sehari-hari?**\n"
             f"Pilih tombol di bawah atau ketik gaya pakaiannya langsung:",
             reply_markup=markup,
             parse_mode="Markdown"
@@ -5903,19 +6046,69 @@ def callback_persona_wizard(call):
     data = state.setdefault("data", {})
 
     if action.startswith("wizard_arch:"):
-        arch = action.split(":", 1)[1]
-        data["archetype"] = arch
+        arch_key = action.split(":", 1)[1]
+        arch_label = ARCHETYPE_PRESETS.get(arch_key, (arch_key, ""))[0] if arch_key in ARCHETYPE_PRESETS else arch_key
+        data["archetype"] = arch_label
+        state["step"] = "body"
+        bot.answer_callback_query(call.id, f"Kepribadian: {arch_label}")
+
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        for k, (lbl, _) in BODY_PRESETS.items():
+            markup.add(types.InlineKeyboardButton(lbl, callback_data=f"wizard_body:{k}"))
+        markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
+        try:
+            bot.edit_message_text(
+                f"✨ Kepribadian: **{arch_label}**\n\n"
+                f"3️⃣ **Bagaimana bentuk tubuh & postur {data.get('name', 'Waifu')}?**\n"
+                f"Pilih salah satu tipe proporsi tubuh canon di bawah, atau ketik deskripsi bentuk tubuh versimu:",
+                chat_id=chat_id,
+                message_id=call.message.message_id,
+                reply_markup=markup,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+    elif action.startswith("wizard_body:"):
+        body_key = action.split(":", 1)[1]
+        body_label = BODY_PRESETS.get(body_key, (body_key, ""))[0] if body_key in BODY_PRESETS else body_key
+        data["body"] = body_key
         state["step"] = "visual"
-        bot.answer_callback_query(call.id, f"Kepribadian: {arch}")
+        bot.answer_callback_query(call.id, f"Bentuk tubuh: {body_label}")
+
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
         try:
             bot.edit_message_text(
-                f"✨ Kepribadian: **{arch}**\n\n"
-                f"3️⃣ **Bagaimana ciri-ciri penampilan fisiknya untuk foto (PAP)?**\n"
+                f"👗 Bentuk Tubuh: **{body_label}**\n\n"
+                f"4️⃣ **Bagaimana ciri-ciri rambut, mata, dan wajah {data.get('name', 'Waifu')}?**\n"
                 f"Sebutkan model/warna rambut, warna mata, atau aksesoris khasnya.\n\n"
                 f"_(Contoh: rambut perak panjang bergelombang, mata biru kristal, kulit putih merona, pita hitam)_\n\n"
-                f"👉 *Ketik deskripsi penampilannya di chat:*",
+                f"👉 *Ketik deskripsi penampilan wajah & rambutnya di chat:*",
+                chat_id=chat_id,
+                message_id=call.message.message_id,
+                reply_markup=markup,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+    elif action.startswith("wizard_lore:"):
+        lore_key = action.split(":", 1)[1]
+        lore_label = LORE_PRESETS.get(lore_key, (lore_key, ""))[0] if lore_key in LORE_PRESETS else lore_key
+        data["lore"] = lore_key
+        state["step"] = "outfit"
+        bot.answer_callback_query(call.id, f"Lore: {lore_label}")
+
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        for k, (lbl, _) in CUSTOM_PERSONA_OUTFIT_PRESETS.items():
+            markup.add(types.InlineKeyboardButton(lbl, callback_data=f"wizard_outfit:{k}"))
+        markup.add(types.InlineKeyboardButton("❌ Batalkan", callback_data="wizard_persona:cancel"))
+        try:
+            bot.edit_message_text(
+                f"📖 Latar Belakang (Lore): **{lore_label}**\n\n"
+                f"6️⃣ **Pakaian favorit apa yang ia kenakan sehari-hari?**\n"
+                f"Pilih tombol di bawah atau ketik gaya pakaiannya langsung di chat:",
                 chat_id=chat_id,
                 message_id=call.message.message_id,
                 reply_markup=markup,
@@ -5926,32 +6119,45 @@ def callback_persona_wizard(call):
 
     elif action.startswith("wizard_outfit:"):
         outfit_key = action.split(":", 1)[1]
-        outfit_map = {
-            "casual": "cute pastel casual sweater and skirt",
-            "pajamas": "cozy silk pajamas loungewear",
-            "dress": "elegant evening cocktail dress",
-            "school": "japanese school sailor uniform"
-        }
-        data["outfit"] = outfit_map.get(outfit_key, "cute casual clothing")
-        bot.answer_callback_query(call.id, "Pakaian dipilih")
+        outfit_label = CUSTOM_PERSONA_OUTFIT_PRESETS.get(outfit_key, (outfit_key, ""))[0] if outfit_key in CUSTOM_PERSONA_OUTFIT_PRESETS else outfit_key
+        data["outfit"] = outfit_key
+        bot.answer_callback_query(call.id, f"Pakaian: {outfit_label}")
         show_persona_wizard_preview(chat_id, user_id, message_to_edit=call.message.message_id)
 
     elif action == "wizard_persona:confirm":
-        bot.answer_callback_query(call.id, "✨ Membangun profil waifu baru...")
+        bot.answer_callback_query(call.id, "✨ AI Copilot sedang meracik karakter baru...")
         name = data.get("name", "CustomWaifu")
         arch = data.get("archetype", "Companion")
-        visual = data.get("visual", "long hair, anime girl, beautiful eyes")
-        outfit = data.get("outfit", "cute casual clothing")
+        body = data.get("body", "petite_curvy")
+        visual = data.get("visual", "pastel hair, pretty eyes")
+        lore = data.get("lore", "Teman kosan yang manis")
+        outfit = data.get("outfit", "casual")
 
         key = re.sub(r'[^a-zA-Z0-9_]', '', name).lower().strip()
         if not key:
             key = f"waifu_{int(time.time())}"
+
+        # Show interim building feedback
+        try:
+            bot.edit_message_text(
+                f"🪄 *AI Copilot sedang menyusun profil {name}...*\n\n"
+                f"⏳ Menulis instruksi kepribadian & lore...\n"
+                f"🎨 Mengunci prompt Danbooru & postur canon...",
+                chat_id=chat_id,
+                message_id=call.message.message_id,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
 
         new_persona_dict = build_custom_persona(
             name=name,
             archetype=arch,
             visual_traits=visual,
             outfit=outfit,
+            body_type=body,
+            lore=lore,
+            age=21,
             llm_client=llm_client
         )
 
@@ -5961,11 +6167,16 @@ def callback_persona_wizard(call):
             update_env_variable("DEFAULT_PERSONA", key)
             USER_PERSONA_WIZARD.pop(user_id, None)
 
+            initial_greeting = new_persona_dict.get("initial_greeting") or f"Hai! Senang banget bisa ketemu kamu! Mulai sekarang aku yang bakal nemenin hari-harimu yaa~ 💕"
             congrats_text = (
                 f"🎉 **SELAMAT! WAIFU BARU KAMU TELAH LAHIR!** 💖\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"✨ Karakter **{name}** ({arch}) kini resmi aktif dan siap menemani hari-harimu!\n\n"
-                f"💬 _Coba sapa {name} sekarang di chat, atau minta foto selfie perdananya dengan mengetik:_ `/pap`"
+                f"✨ Karakter **{name}** ({arch}) kini resmi aktif menemani hari-harimu!\n"
+                f"👗 *Bentuk Tubuh:* `{new_persona_dict.get('body_type', 'Petite Curvy')}`\n"
+                f"📖 *Latar Belakang:* _{new_persona_dict.get('lore_type') or 'Pacar baru'}_\n\n"
+                f"💌 *Pesan Perdana dari {name}:*\n"
+                f"_{initial_greeting}_\n\n"
+                f"💬 _Coba balas sapaan {name} sekarang di chat, atau minta foto selfie perdananya dengan mengetik:_ `/pap`"
             )
             try:
                 bot.edit_message_text(congrats_text, chat_id=chat_id, message_id=call.message.message_id, parse_mode="Markdown")
