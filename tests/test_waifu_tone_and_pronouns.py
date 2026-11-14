@@ -103,6 +103,19 @@ class TestWaifuToneAndPronouns(unittest.TestCase):
             self.assertIn("nyolot", inst)
             self.assertTrue(any(slang in inst for slang in ["'lo'", "'lu'", "lo", "lu"]))
 
+    def test_format_roleplay_italics_fixes_revealed_body_pronoun(self):
+        """Fixes 'menampakkan dada dan perutmu' -> 'menampakkan dada dan perutnya' in self-reveal actions."""
+        from bot import format_roleplay_italics
+        raw_text = "*Shiro membuka ujung handuk perlahan hingga menampakkan dada dan perutmu yang mulus serta memancarkan kilau halus setelah shower tadi*\n\nAduh, nggak sengaja ketutup ya..."
+        formatted = format_roleplay_italics(raw_text, character_name="Shiro")
+        self.assertNotIn("perutmu", formatted)
+        self.assertIn("perutnya", formatted)
+
+        # But normal interaction with user's body like "mengelus perutmu" must be preserved!
+        user_interaction = "*Shiro tersenyum manis lalu mengelus perutmu lembut*\n\nUdah kenyang yaa?"
+        formatted_user = format_roleplay_italics(user_interaction, character_name="Shiro")
+        self.assertIn("perutmu", formatted_user)
+
 
 if __name__ == '__main__':
     unittest.main()

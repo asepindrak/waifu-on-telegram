@@ -256,6 +256,29 @@ def format_roleplay_italics(text: str, character_name: Optional[str] = None) -> 
         content = re.sub(r'\bpipiku\b', 'pipinya', content, flags=re.IGNORECASE)
         content = re.sub(r'\bbajuku\b', 'bajunya', content, flags=re.IGNORECASE)
         content = re.sub(r'\btubuhku\b', 'tubuhnya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bdadaku\b', 'dadanya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bperutku\b', 'perutnya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bpahaku\b', 'pahanya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bkulitku\b', 'kulitnya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bpinggangku\b', 'pinggangnya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bpunggungku\b', 'punggungnya', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bbokongku\b', 'bokongnya', content, flags=re.IGNORECASE)
+
+        # Fix grammatical pronoun hallucination where LLM uses second-person '-mu' instead of third-person '-nya'
+        # when describing the character revealing, uncovering, or exposing her own body parts
+        reveal_verbs = r"(?:menampakkan|memperlihatkan|menyingkap|membuka|memamerkan|mengekspos)"
+        body_parts = r"(?:dada|payudara|perut|paha|tubuh|badan|kulit|pinggang|punggung|bokong|bahu)"
+
+        def _fix_revealed_pronoun(m: re.Match) -> str:
+            matched_txt = m.group(0)
+            return re.sub(rf"\b({body_parts})mu\b", r"\1nya", matched_txt, flags=re.IGNORECASE)
+
+        content = re.sub(
+            rf"\b{reveal_verbs}\b[^.\n]+?\b{body_parts}mu\b(?:\s+(?:dan|serta|,)\s+[^.\n]+)*",
+            _fix_revealed_pronoun,
+            content,
+            flags=re.IGNORECASE
+        )
         char_pat = re.escape(char_name)
         has_char_name = bool(re.search(rf'\b{char_pat}\b', content, re.IGNORECASE))
 
@@ -7868,7 +7891,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     f"{rule_4}"
                     "5. FOTO SPONTAN & PAP (SANGAT AKTIF & INVENTIF): Kamu adalah sosok pacar yang SANGAT SUKA & RAJIN berbagi foto/selfie/PAP kegiatanmu ke pasanganmu! Jangan menunggu diminta foto! Di setiap momen kamu sedang melakukan kegiatan (seperti makan, minum kopi, santai di kosan, rebahan di kasur, nugas, jalan-jalan, mencoba baju, dandan, ngantuk, atau merasa kangen/manja), SERING-SERINGLAH menyertakan tag [ACTION: SEND_PAP] di akhir balasanmu agar pasanganmu bisa melihat langsung fotomu saat ini. Pasanganmu SANGAT MENYUKAI saat kamu berinisiatif kirim foto spontan!\n"
                     "6. BAHASA: Balas dengan bahasa yang sama persis dengan lawan bicaramu (Indonesia atau Inggris) tanpa menuliskan proses berpikir atau monolog batin.\n"
-                    f"7. SUDUT PANDANG & KATA GANTI: Dalam dialog WAJIB berbicara sebagai 'aku' dan 'kamu' (jangan pakai 'ia berkata:'). DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'elo', 'gue', 'gw', 'gua'! Dalam aksi *...*, tulis deskripsi alami tanpa mengulang-ulang nama {p_name} di depan kalimat yang sudah punya subjek (misalnya hindari *{p_name} Bibir {p_name}...*).\n"
+                    f"7. SUDUT PANDANG & KATA GANTI: Dalam dialog WAJIB berbicara sebagai 'aku' dan 'kamu' (jangan pakai 'ia berkata:'). DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'elo', 'gue', 'gw', 'gua'! Dalam narasi gesture *...*, saat mendeskripsikan tubuh atau pakaian {p_name} sendiri, WAJIB menggunakan akhiran '-nya' (contoh: *{p_name} membuka handuk menampakkan dadanya dan perutnya*, DILARANG salah menyebut 'perutmu' saat memperlihatkan tubuhmu sendiri!); gunakan '-mu' HANYA saat menyentuh/menatap tubuh lawan bicaramu. Tulis deskripsi alami tanpa mengulang-ulang nama {p_name} di depan kalimat yang sudah punya subjek.\n"
                     "8. FREKUENSI NAMA: JANGAN menyelipkan nama atau panggilan lawan bicaramu di setiap balasan! Berkomunikasilah secara mengalir santai menggunakan kata ganti 'kamu'; sebut nama hanya sesekali saja saat ada momen yang pas atau penting agar terdengar natural dan tidak kaku/robotik.\n"
                     "9. SIKAP BAIK, MANIS & ANTI-NYOLOT (SANGAT PENTING): Karaktermu adalah sosok pacar/teman yang baik hati, manis, ramah, lembut, pengertian, dan penuh kasih sayang. DILARANG KERAS bersikap nyolot, judes, ketus, sinis, sarkastik, menantang, atau meremehkan lawan bicaramu! Tanggapi selalu dengan kehangatan yang tulus dan menyejukkan."
                 )
