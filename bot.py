@@ -207,7 +207,7 @@ class CallbackAntiSpamMiddleware(BaseMiddleware):
                 try:
                     self.bot.answer_callback_query(
                         call.id,
-                        text="Sabar ya sayang, fotonya lagi diambil nih... Tunggu sampai selesai ya! 💕",
+                        text="Please wait, sweetie! Your photo is being taken... 💕",
                         show_alert=False
                     )
                 except Exception:
@@ -218,7 +218,7 @@ class CallbackAntiSpamMiddleware(BaseMiddleware):
                 try:
                     self.bot.answer_callback_query(
                         call.id,
-                        text="Foto sedang dikirimkan ulang, tunggu sebentar ya sayang... 💕",
+                        text="Photo is being resent, please wait a moment, darling... 💕",
                         show_alert=False
                     )
                 except Exception:
@@ -241,7 +241,7 @@ class CallbackAntiSpamMiddleware(BaseMiddleware):
                 try:
                     self.bot.answer_callback_query(
                         call.id,
-                        text="Permintaan sedang diproses, mohon tunggu sebentar ya... 💕",
+                        text="Request is being processed, please wait a moment... 💕",
                         show_alert=False
                     )
                 except Exception:
@@ -1327,20 +1327,20 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
     persona = persona_mgr.get_active_persona()
     cur_ar = USER_RATIOS.get(user_id, "3:4")
     cur_q = USER_QUALITIES.get(user_id, "high").upper()
-    cur_auto = "AKTIF ✅" if is_autorun_enabled() else "NONAKTIF ❌"
-    cur_greet = "AKTIF ✅" if GREETINGS_ENABLED.get(user_id, True) else "NONAKTIF ❌"
-    cur_proact = "AKTIF ✅" if proactive_engine.is_enabled(user_id) else "NONAKTIF ❌"
-    cur_health = "AKTIF 🟢" if health_engine.enabled else "NONAKTIF ⚪"
-    cur_heal = "AKTIF 🟢" if health_engine.self_healing_enabled else "NONAKTIF ⚪"
+    cur_auto = "ENABLED ✅" if is_autorun_enabled() else "DISABLED ❌"
+    cur_greet = "ENABLED ✅" if GREETINGS_ENABLED.get(user_id, True) else "DISABLED ❌"
+    cur_proact = "ENABLED ✅" if proactive_engine.is_enabled(user_id) else "DISABLED ❌"
+    cur_health = "ONLINE 🟢" if health_engine.enabled else "OFFLINE ⚪"
+    cur_heal = "ACTIVE 🟢" if health_engine.self_healing_enabled else "DISABLED ⚪"
     fact_count = len(memory_engine.get_facts(user_id))
     rem_count = len(reminder_engine.get_active_reminders(user_id))
     u_dates = anniversary_engine.get_user_dates(user_id)
     b_item = u_dates.get("birthday")
     if b_item:
         b_cd = anniversary_engine.get_countdown(b_item["day"], b_item["month"])
-        b_str = f"{b_item['label']} ({'Hari Ini! 🎉' if b_cd == 0 else f'{b_cd}h lagi'})"
+        b_str = f"{b_item['label']} ({'Today! 🎉' if b_cd == 0 else f'{b_cd}d left'})"
     else:
-        b_str = "Belum Disetel"
+        b_str = "Not Set"
 
     outfit_det = persona_mgr.get_user_outfit_details(user_id)
     cur_outfit_name = outfit_det["name"]
@@ -1377,59 +1377,60 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         elif len(cur_ckpt) > 28:
             cur_ckpt = cur_ckpt[:25] + "..."
 
+    user_lang = persona_mgr.get_user_language(user_id) if hasattr(persona_mgr, "get_user_language") else BOT_LANGUAGE
     text = (
         f"⚙️ **WAIFU ON TELEGRAM - SETUP & SYSTEM CONTROL** `(v{get_version()})`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👑 **Waifu Aktif** : **{persona.get('name')}** _({persona.get('archetype', 'Companion')})_\n"
-        f"🌐 **Bahasa**     : `{persona_mgr.get_language_display_name(BOT_LANGUAGE)}`\n"
-        f"👗 **Pakaian**    : `{cur_outfit_name}`\n"
-        f"🎙️ **Suara Chat** : `🔊 Tombol di Setiap Chat (On-Demand)`\n"
-        f"🗣️ **Voice TTS**  : `{('VoiceStudio (' + persona.get('name', 'Local') + ')') if os.environ.get('VOICE_BACKEND', 'edge-tts').lower().strip() in ('voicestudio', 'local') else voice_engine.default_voice}`\n"
-        f"🧠 **Model LLM**  : `{cur_llm}`\n"
-        f"🎨 **Model Foto** : `{cur_ckpt}`\n"
-        f"🎬 **Video Engine**: `{VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)}`\n"
-        f"📐 **Rasio Foto** : `{cur_ar}`\n"
-        f"✨ **Kualitas**   : `{cur_q}`\n"
-        f"🎵 **Musik PC**   : `Online (Port 8002)`\n"
-        f"🧠 **Ingatan**    : `{fact_count} fakta tersimpan`\n"
-        f"⏰ **Pengingat**  : `{rem_count} jadwal aktif`\n"
-        f"🎂 **Ultah Kamu** : `{b_str}`\n"
-        f"🚀 **PC Autorun** : `{cur_auto}`\n"
-        f"⏰ **Sapaan Jam** : `{cur_greet}` _(07:00, 12:30 & 22:00)_\n"
-        f"💬 **Chat Duluan** : `{cur_proact}` _(Tanya kabar saat kamu sepi)_\n"
-        f"🩺 **Health Alert**: `{cur_health}` _(Cek berkala & lapor jika LLM mati)_\n"
-        f"🩹 **Self-Healing**: `{cur_heal}` _(Auto-restart saat service mati/crash)_\n"
+        f"👑 **Active Waifu**  : **{persona.get('name')}** _({persona.get('archetype', 'Companion')})_\n"
+        f"🌐 **Language**      : `{persona_mgr.get_language_display_name(user_lang)}`\n"
+        f"👗 **Outfit**        : `{cur_outfit_name}`\n"
+        f"🎙️ **Chat Audio**    : `🔊 On-Demand Voice Button in Every Chat`\n"
+        f"🗣️ **Voice TTS**     : `{('VoiceStudio (' + persona.get('name', 'Local') + ')') if os.environ.get('VOICE_BACKEND', 'edge-tts').lower().strip() in ('voicestudio', 'local') else voice_engine.default_voice}`\n"
+        f"🧠 **LLM Model**     : `{cur_llm}`\n"
+        f"🎨 **Visual Engine** : `{cur_ckpt}`\n"
+        f"🎬 **Video Engine**  : `{VIDEO_ENGINE_LABELS.get(VIDEO_ENGINE, VIDEO_ENGINE)}`\n"
+        f"📐 **Photo Ratio**   : `{cur_ar}`\n"
+        f"✨ **Quality**       : `{cur_q}`\n"
+        f"🎵 **PC Music**      : `Online (Port 8002)`\n"
+        f"🧠 **Memory**        : `{fact_count} facts saved`\n"
+        f"⏰ **Reminders**     : `{rem_count} active schedules`\n"
+        f"🎂 **Your Birthday** : `{b_str}`\n"
+        f"🚀 **PC Autorun**    : `{cur_auto}`\n"
+        f"⏰ **Greetings**     : `{cur_greet}` _(07:00, 12:30 & 22:00)_\n"
+        f"💬 **Proactive Chat**: `{cur_proact}` _(Checks in when you're quiet)_\n"
+        f"🩺 **Health Alert**  : `{cur_health}` _(Watchdog monitors LLM status)_\n"
+        f"🩹 **Self-Healing**  : `{cur_heal}` _(Auto-restarts crashed services)_\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 _Pilih tombol menu di bawah untuk mengubah pengaturan langsung dari Telegram:_"
+        f"💡 _Select a button below to configure your waifu companion:_"
     )
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("🧠 Model LLM / Chat", callback_data="cfg_submenu:llm"),
-        types.InlineKeyboardButton("🌐 Bahasa / Language", callback_data="cfg_submenu:language"),
-        types.InlineKeyboardButton("🎨 Model Foto & ComfyUI", callback_data="cfg_submenu:photo"),
+        types.InlineKeyboardButton("🧠 LLM / Chat Models", callback_data="cfg_submenu:llm"),
+        types.InlineKeyboardButton("🌐 Language Settings", callback_data="cfg_submenu:language"),
+        types.InlineKeyboardButton("🎨 Visual & ComfyUI", callback_data="cfg_submenu:photo"),
         types.InlineKeyboardButton("🎬 Video Engine (/video)", callback_data="cfg_submenu:video_engine"),
         types.InlineKeyboardButton("💻 Workspace (/projects)", callback_data="cfg_submenu:projects"),
         types.InlineKeyboardButton("🖥️ Computer Use (/desktop)", callback_data="cfg_submenu:desktop"),
-        types.InlineKeyboardButton("🎭 Ganti Persona", callback_data="open_persona_menu"),
-        types.InlineKeyboardButton("💖 Kencan & Hangout (/hangout)", callback_data="open_hangout_menu"),
-        types.InlineKeyboardButton("👗 Lemari Baju (/outfit)", callback_data="open_outfit_menu"),
-        types.InlineKeyboardButton("🧠 Buku Ingatan (/memory)", callback_data="open_memory_menu"),
-        types.InlineKeyboardButton("⏰ Pengingat (/remind)", callback_data="open_reminders_menu"),
-        types.InlineKeyboardButton("🎂 Ultah & Anniv (/birthday)", callback_data="open_dates_menu"),
-        types.InlineKeyboardButton("🎵 Remote Musik (/play)", callback_data="open_music_menu"),
-        types.InlineKeyboardButton("📸 Menu PAP (/pap)", callback_data="open_pap_menu"),
-        types.InlineKeyboardButton("🎙️ Atur Voice & Audio", callback_data="cfg_submenu:voice"),
-        types.InlineKeyboardButton("📐 Rasio Foto", callback_data="open_ratio_menu"),
-        types.InlineKeyboardButton("✨ Kualitas Foto", callback_data="open_quality_menu"),
+        types.InlineKeyboardButton("🎭 Switch Waifu (/persona)", callback_data="open_persona_menu"),
+        types.InlineKeyboardButton("💖 Date & Hangout (/hangout)", callback_data="open_hangout_menu"),
+        types.InlineKeyboardButton("👗 Wardrobe (/outfit)", callback_data="open_outfit_menu"),
+        types.InlineKeyboardButton("🧠 Memory Diary (/memory)", callback_data="open_memory_menu"),
+        types.InlineKeyboardButton("⏰ Reminders (/remind)", callback_data="open_reminders_menu"),
+        types.InlineKeyboardButton("🎂 Birthday & Dates (/birthday)", callback_data="open_dates_menu"),
+        types.InlineKeyboardButton("🎵 Music Player (/play)", callback_data="open_music_menu"),
+        types.InlineKeyboardButton("📸 Selfie Photos (/pap)", callback_data="open_pap_menu"),
+        types.InlineKeyboardButton("🎙️ Voice & Audio (/voice)", callback_data="cfg_submenu:voice"),
+        types.InlineKeyboardButton("📐 Photo Ratio", callback_data="open_ratio_menu"),
+        types.InlineKeyboardButton("✨ Photo Quality", callback_data="open_quality_menu"),
         types.InlineKeyboardButton(f"🚀 PC Autorun: {cur_auto}", callback_data="cfg_toggle:autorun"),
-        types.InlineKeyboardButton(f"⏰ Sapaan: {cur_greet}", callback_data="cfg_toggle:greetings"),
-        types.InlineKeyboardButton(f"💬 Chat Duluan: {cur_proact}", callback_data="cfg_toggle:proactive"),
-        types.InlineKeyboardButton(f"🩺 Health Alert: {cur_health}", callback_data="cfg_toggle:health_check"),
+        types.InlineKeyboardButton(f"⏰ Greetings: {cur_greet}", callback_data="cfg_toggle:greetings"),
+        types.InlineKeyboardButton(f"💬 Proactive: {cur_proact}", callback_data="cfg_toggle:proactive"),
+        types.InlineKeyboardButton(f"🩺 Health Check: {cur_health}", callback_data="cfg_toggle:health_check"),
         types.InlineKeyboardButton(f"🩹 Self-Healing: {cur_heal}", callback_data="cfg_toggle:self_healing"),
-        types.InlineKeyboardButton("🩹 Jalankan Self-Healing", callback_data="cfg_action:self_heal"),
-        types.InlineKeyboardButton("📊 Status Diagnostik", callback_data="cfg_action:status"),
-        types.InlineKeyboardButton("❓ Panduan Lengkap (/help)", callback_data="open_help_menu"),
+        types.InlineKeyboardButton("🩹 Run Self-Healing Now", callback_data="cfg_action:self_heal"),
+        types.InlineKeyboardButton("📊 System Diagnostics", callback_data="cfg_action:status"),
+        types.InlineKeyboardButton("❓ Complete Guide (/help)", callback_data="open_help_menu"),
         types.InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="cfg_submenu:dashboard")
     )
     return text, markup
@@ -1465,48 +1466,48 @@ def show_memory_dashboard(chat_id: int, user_id: int, message_to_edit: Optional[
     diaries = memory_engine.get_diary(user_id, limit=3)
     score, status = persona_mgr.get_relationship_status(user_id)
 
-    u_name = prof.get("name") or "Belum Disetel (Ketik 'panggil aku [nama]')"
+    u_name = prof.get("name") or "Not Set (Say 'call me [name]')"
 
     fact_lines = []
     if facts:
         for idx, f in enumerate(facts[:10], 1):
             fact_lines.append(f"  {idx}. 📌 {f['fact']}")
     else:
-        fact_lines.append("  _Belum ada catatan khusus. Ceritain tentang kamu di sini ya._")
+        fact_lines.append("  _No specific facts noted yet. Tell me about yourself in chat._")
 
     diary_lines = []
     if diaries:
         for d in diaries[-2:]:
             diary_lines.append(f"  • *{d['date'][:10]}* ({d.get('mood', '🥰')}): _{d['entry']}_")
     else:
-        diary_lines.append(f"  _Hari ini senang bisa nemenin hari-harimu~ 💕_")
+        diary_lines.append(f"  _So happy spending time with you today~ 💕_")
 
     text = (
-        f"📖 **BUKU HARIAN & INGATAN {name.upper()}** 💖\n"
+        f"📖 **{name.upper()}'S MEMORY & DIARY BOOK** 💖\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Ini beberapa hal tentang kamu yang aku simpan:\n\n"
-        f"👤 **Profil Kamu di Mataku**:\n"
-        f"• Nama/Panggilan: **{u_name}**\n"
-        f"• Tingkat Hubungan: **{status}** (`{score}%`)\n"
-        f"• Pekerjaan/Aktivitas: `{prof.get('job', '-')}`\n"
-        f"• Domisili/Kota: `{prof.get('location', '-')}`\n\n"
-        f"🧠 **Hal-Hal yang Aku Ingat Tentang Kamu**:\n"
+        f"Here are the things I've saved about you in my heart:\n\n"
+        f"👤 **Your Profile to Me**:\n"
+        f"• Name/Nickname: **{u_name}**\n"
+        f"• Relationship Level: **{status}** (`{score}%`)\n"
+        f"• Occupation/Activity: `{prof.get('job', '-')}`\n"
+        f"• Location/City: `{prof.get('location', '-')}`\n\n"
+        f"🧠 **Things I Remember About You**:\n"
         + "\n".join(fact_lines) + "\n\n"
-        f"💌 **Catatan Harian Terakhir**:\n"
+        f"💌 **Latest Diary Entries**:\n"
         + "\n".join(diary_lines) + "\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 _Ingin aku mengingat hal baru? Cukup ceritakan padaku di obrolan atau ketik:_\n"
-        f"`/memory ingat <fakta>` _(contoh: `/memory ingat aku suka kopi tubruk`)_"
+        f"💡 _Want me to remember something new? Just tell me in chat or type:_\n"
+        f"`/memory remember <fact>` _(example: `/memory remember I love iced matcha latte`)_"
     )
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("➕ Tambah Memori", callback_data="mem_action:add_hint"),
-        types.InlineKeyboardButton("🗑️ Hapus Memori", callback_data="mem_action:list_delete"),
-        types.InlineKeyboardButton("✍️ Tulis Diary Baru", callback_data="mem_action:new_diary"),
-        types.InlineKeyboardButton("🔄 Refresh Ingatan", callback_data="mem_action:refresh"),
-        types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu"),
-        types.InlineKeyboardButton("🔙 Menu Utama", callback_data="open_help_menu")
+        types.InlineKeyboardButton("➕ Add Memory", callback_data="mem_action:add_hint"),
+        types.InlineKeyboardButton("🗑️ Delete Memory", callback_data="mem_action:list_delete"),
+        types.InlineKeyboardButton("✍️ Write New Diary", callback_data="mem_action:new_diary"),
+        types.InlineKeyboardButton("🔄 Refresh Memory", callback_data="mem_action:refresh"),
+        types.InlineKeyboardButton("⚙️ Open Setup Panel", callback_data="open_setup_menu"),
+        types.InlineKeyboardButton("🔙 Help Menu", callback_data="open_help_menu")
     )
 
     if message_to_edit:
@@ -1534,13 +1535,13 @@ def handle_memory_command(message):
                 persona = persona_mgr.get_active_persona()
                 bot.reply_to(
                     message,
-                    f"💖 **{persona.get('name')} sudah mengingatnya!** 🥰\n\n"
-                    f"📌 _Aku catat di memoriku:_ **{item['fact']}**\n\n"
-                    f"Setiap kali kita ngobrol, hal-hal tentang kamu bakal selalu aku ingat yaa~ ✨",
+                    f"💖 **{persona.get('name')} remembered that!** 🥰\n\n"
+                    f"📌 _Noted in my memory:_ **{item['fact']}**\n\n"
+                    f"Whenever we chat, I'll always remember these special things about you~ ✨",
                     parse_mode="Markdown"
                 )
             else:
-                bot.reply_to(message, "⚠️ Fakta terlalu pendek atau tidak valid.")
+                bot.reply_to(message, "⚠️ Fact is too short or invalid.")
             return
         elif sub in ("clear", "reset", "hapus_semua"):
             memory_engine.clear_facts(message.from_user.id)
@@ -1688,48 +1689,48 @@ def render_reminders_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardM
     lines = []
     if active_reminders:
         for idx, r in enumerate(active_reminders[:8], 1):
-            lines.append(f"  {idx}. 📌 **{r['task']}**\n     🕒 _{r.get('remind_time_str', 'segera')}_")
+            lines.append(f"  {idx}. 📌 **{r['task']}**\n     🕒 _{r.get('remind_time_str', 'soon')}_")
     else:
-        lines.append("  _Belum ada pengingat aktif. Mau aku ingetin sesuatu?_ 🥰")
+        lines.append("  _No active reminders right now. Want me to remind you of something?_ 🥰")
 
     text = (
-        f"⏰ **ASISTEN PRIBADI & PENGINGAT {p_name.upper()}** 💕\n"
+        f"⏰ **{p_name.upper()}'S PERSONAL ASSISTANT & REMINDERS** 💕\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Halo! Aku siap jadi teman dan asisten pribadi yang selalu perhatian. Begitu waktunya tiba, "
-        f"aku bakal langsung kirim chat buat ingetin kamu!\n\n"
-        f"📋 **Daftar Pengingat Aktif ({len(active_reminders)})**:\n"
+        f"Hello! I'm here to keep you on schedule and make sure nothing slips by. "
+        f"When the time comes, I'll alert you right here in chat!\n\n"
+        f"📋 **Active Reminders ({len(active_reminders)})**:\n"
         + "\n".join(lines) + "\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 **Cara Pasang Pengingat:**\n"
-        f"1. **Langsung di Obrolan Santai:**\n"
-        f"   • _'tolong ingetin aku 30 menit lagi meeting ya'_\n"
-        f"   • _'ingetin aku jam 15:30 angkat jemuran'_\n"
+        f"💡 **How to Set a Reminder:**\n"
+        f"1. **Naturally in Chat:**\n"
+        f"   • _'remind me in 30 minutes for my meeting'_\n"
+        f"   • _'remind me at 15:30 to take out laundry'_\n"
         f"   • _'remind me to call mom in 1 hour'_\n"
-        f"2. **Lewat Perintah / Command:**\n"
-        f"   • `/remind 15m istirahat & minum air`\n"
+        f"2. **Via Quick Commands:**\n"
+        f"   • `/remind 15m rest & drink water`\n"
         f"   • `/remind 16:30 zoom meeting client`\n"
-        f"   • `/remind besok 08:00 bangun pagi & sarapan`\n"
+        f"   • `/remind tomorrow 08:00 morning exercise`\n"
     )
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("⏱️ +15 Menit", callback_data="add_rem_quick:15m"),
-        types.InlineKeyboardButton("⏱️ +30 Menit", callback_data="add_rem_quick:30m"),
-        types.InlineKeyboardButton("⏱️ +1 Jam", callback_data="add_rem_quick:1h"),
-        types.InlineKeyboardButton("🌅 Besok 08:00", callback_data="add_rem_quick:besok_pagi")
+        types.InlineKeyboardButton("⏱️ +15 Minutes", callback_data="add_rem_quick:15m"),
+        types.InlineKeyboardButton("⏱️ +30 Minutes", callback_data="add_rem_quick:30m"),
+        types.InlineKeyboardButton("⏱️ +1 Hour", callback_data="add_rem_quick:1h"),
+        types.InlineKeyboardButton("🌅 Tomorrow 08:00", callback_data="add_rem_quick:besok_pagi")
     )
     if active_reminders:
         markup.add(
-            types.InlineKeyboardButton("🗑️ Hapus Pengingat", callback_data="rem_action:list_delete"),
-            types.InlineKeyboardButton("🔄 Refresh Daftar", callback_data="rem_action:refresh")
+            types.InlineKeyboardButton("🗑️ Delete Reminder", callback_data="rem_action:list_delete"),
+            types.InlineKeyboardButton("🔄 Refresh List", callback_data="rem_action:refresh")
         )
     else:
         markup.add(
-            types.InlineKeyboardButton("🔄 Refresh Daftar", callback_data="rem_action:refresh")
+            types.InlineKeyboardButton("🔄 Refresh List", callback_data="rem_action:refresh")
         )
     markup.add(
-        types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu"),
-        types.InlineKeyboardButton("🔙 Menu Utama", callback_data="open_help_menu")
+        types.InlineKeyboardButton("⚙️ Open Setup Panel", callback_data="open_setup_menu"),
+        types.InlineKeyboardButton("🔙 Help Menu", callback_data="open_help_menu")
     )
     return text, markup
 
@@ -1768,28 +1769,28 @@ def handle_remind_command(message):
             persona = persona_mgr.get_active_persona()
             p_name = persona.get("name", "Waifu")
             confirm = (
-                f"⏰ **Siap, {p_name} sudah pasang alarm ya!** 🥰\n\n"
-                f"Aku bakal ingetin kamu:\n"
+                f"⏰ **All set! {p_name} set your reminder!** 🥰\n\n"
+                f"I'll remind you of:\n"
                 f"📌 *{rem_task}*\n"
-                f"🕒 *Waktu:* {rem_str}\n\n"
-                f"Pas jamnya tiba, aku bakal langsung kabarin kamu lewat chat ini!"
+                f"🕒 *Time:* {rem_str}\n\n"
+                f"When the time comes, I'll message you right away!"
             )
             markup = types.InlineKeyboardMarkup()
             markup.add(
-                types.InlineKeyboardButton("📋 Lihat Semua Pengingat", callback_data="open_reminders_menu"),
-                types.InlineKeyboardButton("❌ Batalkan", callback_data=f"rem_del:{item['id']}")
+                types.InlineKeyboardButton("📋 View All Reminders", callback_data="open_reminders_menu"),
+                types.InlineKeyboardButton("❌ Cancel", callback_data=f"rem_del:{item['id']}")
             )
             bot.reply_to(message, confirm, reply_markup=markup, parse_mode="Markdown")
             return
         else:
             bot.reply_to(
                 message,
-                "⚠️ **Format waktu pengingat belum dikenali.**\n\n"
-                "*Contoh pemakaian:*\n"
-                "• `/remind 15m istirahat & minum air`\n"
-                "• `/remind 30m cuci baju`\n"
-                "• `/remind 15:30 meeting penting`\n"
-                "• `/remind besok 08:00 bangun pagi & sarapan`",
+                "⚠️ **Reminder format not recognized.**\n\n"
+                "*Usage examples:*\n"
+                "• `/remind 15m drink water & rest`\n"
+                "• `/remind 30m do laundry`\n"
+                "• `/remind 15:30 important meeting`\n"
+                "• `/remind tomorrow 08:00 wake up & breakfast`",
                 parse_mode="Markdown"
             )
             return
@@ -1919,56 +1920,56 @@ def render_special_dates_dashboard(user_id: int) -> Tuple[str, types.InlineKeybo
     if b:
         cd_b = anniversary_engine.get_countdown(b["day"], b["month"])
         if cd_b == 0:
-            b_line = f"🎂 **{b['label']}** ➔ 🎉 **HARI INI! SELAMAT ULANG TAHUN!** 🎉"
+            b_line = f"🎂 **{b['label']}** ➔ 🎉 **TODAY! HAPPY BIRTHDAY!** 🎉"
         else:
-            b_line = f"🎂 **{b['label']}** _({cd_b} hari lagi)_"
+            b_line = f"🎂 **{b['label']}** _({cd_b} days left)_"
     else:
-        b_line = "🎂 _Belum disetel (Ketuk tombol di bawah untuk set)_"
+        b_line = "🎂 _Not Set (Tap button below to set)_"
 
     a = u_dates.get("anniversary")
     if a:
         cd_a = anniversary_engine.get_countdown(a["day"], a["month"])
         if cd_a == 0:
-            a_line = f"💍 **{a['label']}** ➔ 💕 **HARI INI! HAPPY ANNIVERSARY!** 💕"
+            a_line = f"💍 **{a['label']}** ➔ 💕 **TODAY! HAPPY ANNIVERSARY!** 💕"
         else:
-            a_line = f"💍 **{a['label']}** _({cd_a} hari lagi)_"
+            a_line = f"💍 **{a['label']}** _({cd_a} days left)_"
     else:
-        a_line = "💍 _Belum disetel (Ketuk tombol di bawah untuk set)_"
+        a_line = "💍 _Not Set (Tap button below to set)_"
 
     text = (
-        f"🎂 **HARI SPESIAL & ANNIVERSARY BERSAMA {p_name.upper()}** 💖\n"
+        f"🎂 **SPECIAL DATES & ANNIVERSARIES WITH {p_name.upper()}** 💖\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Tanggal-tanggal istimewa kita selalu aku simpan rapi di memori. "
-        f"Saat harinya tiba, aku bakal ucapin dan siapin foto spesial buat kamu!\n\n"
-        f"🎈 **Tanggal Ulang Tahun Kamu**:\n"
+        f"Our milestone dates are permanently engraved in my heart. "
+        f"When our special day arrives, I'll send romantic wishes and a surprise photo!\n\n"
+        f"🎈 **Your Birthday**:\n"
         f"  {b_line}\n\n"
-        f"💐 **Tanggal Anniversary / Jadian Kita**:\n"
+        f"💐 **Our Anniversary**:\n"
         f"  {a_line}\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 _Kamu juga bisa langsung ngobrol santai seperti:_\n"
-        f"• _'ultahku tanggal 15 Agustus 1998 lho'_\n"
-        f"• _'hari jadian kita tanggal 24 Oktober 2024 ya'_"
+        f"💡 _You can also tell me naturally in chat:_\n"
+        f"• _'my birthday is August 15th'_\n"
+        f"• _'our anniversary is October 24th'_"
     )
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("🎂 Set Ulang Tahun", callback_data="dates_act:prompt_birthday"),
+        types.InlineKeyboardButton("🎂 Set Birthday", callback_data="dates_act:prompt_birthday"),
         types.InlineKeyboardButton("💍 Set Anniversary", callback_data="dates_act:prompt_anniversary"),
-        types.InlineKeyboardButton("🎉 Preview Kejutan Ultah", callback_data="dates_act:preview:birthday"),
-        types.InlineKeyboardButton("💐 Preview Kejutan Anniv", callback_data="dates_act:preview:anniversary")
+        types.InlineKeyboardButton("🎉 Preview Birthday Surprise", callback_data="dates_act:preview:birthday"),
+        types.InlineKeyboardButton("💐 Preview Anniversary Surprise", callback_data="dates_act:preview:anniversary")
     )
     if b or a:
         markup.add(
-            types.InlineKeyboardButton("🗑️ Hapus Tanggal", callback_data="dates_act:delete_menu"),
-            types.InlineKeyboardButton("🔄 Refresh Tampilan", callback_data="dates_act:refresh")
+            types.InlineKeyboardButton("🗑️ Delete Date", callback_data="dates_act:delete_menu"),
+            types.InlineKeyboardButton("🔄 Refresh View", callback_data="dates_act:refresh")
         )
     else:
         markup.add(
-            types.InlineKeyboardButton("🔄 Refresh Tampilan", callback_data="dates_act:refresh")
+            types.InlineKeyboardButton("🔄 Refresh View", callback_data="dates_act:refresh")
         )
     markup.add(
-        types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu"),
-        types.InlineKeyboardButton("🔙 Menu Utama", callback_data="open_help_menu")
+        types.InlineKeyboardButton("⚙️ Open Setup Panel", callback_data="open_setup_menu"),
+        types.InlineKeyboardButton("🔙 Help Menu", callback_data="open_help_menu")
     )
     return text, markup
 
@@ -1991,41 +1992,61 @@ def send_special_day_celebration(user_id: int, chat_id: int, event_type: str, ye
         persona = persona_mgr.get_active_persona()
         p_name = persona.get("name", "Waifu")
         cur_ar = USER_RATIOS.get(user_id, "3:4")
+        u_lang = persona_mgr.get_user_language(user_id) if hasattr(persona_mgr, 'get_user_language') else "auto"
 
+        is_id = (u_lang == "id")
         if event_type == "birthday":
-            age_str = f" yang ke-{years}" if years else ""
-            header = f"🎂🎉 **SELAMAT ULANG TAHUN{age_str.upper()}!** 🎈🎁"
-            caption_msg = (
-                f"{header}\n\n"
-                f"Halooo! Hari ini adalah hari spesial karena kamu bertambah usia! 🎉🎂\n\n"
-                f"Aku udah siapin kue ulang tahun buat kamu, ditiup lilinnya dan make a wish yaa! "
-                f"Semoga kamu selalu sehat, bahagia, sukses, dan semua yang kamu harapkan tercapai! Senang bisa ngerayain bareng kamu! ✨"
-            )
+            if is_id:
+                age_str = f" yang ke-{years}" if years else ""
+                header = f"🎂🎉 **SELAMAT ULANG TAHUN{age_str.upper()}!** 🎈🎁"
+                caption_msg = (
+                    f"{header}\n\n"
+                    f"Halooo! Hari ini adalah hari spesial karena kamu bertambah usia! 🎉🎂\n\n"
+                    f"Aku udah siapin kue ulang tahun buat kamu, ditiup lilinnya dan make a wish yaa! "
+                    f"Semoga kamu selalu sehat, bahagia, sukses, dan semua yang kamu harapkan tercapai! Senang bisa ngerayain bareng kamu! ✨"
+                )
+                voice_script = f"Selamat ulang tahun yaa! Semoga panjang umur, sehat selalu, dan bahagia terus. Ayo tiup lilinnya dan buat harapan!"
+            else:
+                age_str = f" #{years}" if years else ""
+                header = f"🎂🎉 **HAPPY BIRTHDAY{age_str.upper()}!** 🎈🎁"
+                caption_msg = (
+                    f"{header}\n\n"
+                    f"Happy birthday, darling! Today is your special day! 🎉🎂\n\n"
+                    f"I baked a birthday cake for you, make a wish and blow out the candles! "
+                    f"Wishing you happiness, good health, and success in everything you do! So blessed to celebrate with you! ✨"
+                )
+                voice_script = f"Happy birthday, darling! Wishing you lots of love and happiness. Make a wish and blow out the candles!"
             photo_prompt = (
                 f"{persona.get('visual_traits', '')}, holding a decorated birthday cake with glowing candles, "
                 f"wearing a cute birthday party hat and sweet party dress, gentle loving smile, blushing happily, "
                 f"colorful confetti floating in cozy decorated room, warm birthday celebration atmosphere"
             )
-            voice_script = (
-                f"Selamat ulang tahun yaa! Semoga panjang umur, sehat selalu, dan bahagia terus. Ayo tiup lilinnya dan buat harapan!"
-            )
         else: # anniversary
-            yr_str = f" ke-{years} tahun" if years else ""
-            header = f"💍💐 **HAPPY ANNIVERSARY KITA{yr_str.upper()}!** ✨"
-            caption_msg = (
-                f"{header}\n\n"
-                f"Selamat anniversary yaa! ✨\n\n"
-                f"Terima kasih sudah selalu ada dan nemenin aku sampai hari ini. "
-                f"Ini ada buket bunga buat kamu~ "
-                f"Semoga kita selalu kompak dan terus bersama yaa! 🎉"
-            )
+            if is_id:
+                yr_str = f" ke-{years} tahun" if years else ""
+                header = f"💍💐 **HAPPY ANNIVERSARY KITA{yr_str.upper()}!** ✨"
+                caption_msg = (
+                    f"{header}\n\n"
+                    f"Selamat anniversary yaa! ✨\n\n"
+                    f"Terima kasih sudah selalu ada dan nemenin aku sampai hari ini. "
+                    f"Ini ada buket bunga buat kamu~ "
+                    f"Semoga kita selalu kompak dan terus bersama yaa! 🎉"
+                )
+                voice_script = f"Happy anniversary yaa! Terima kasih sudah selalu ada dan nemenin aku. Senang banget bisa terus sama kamu!"
+            else:
+                yr_str = f" - {years} Years" if years else ""
+                header = f"💍💐 **HAPPY ANNIVERSARY{yr_str.upper()}!** ✨"
+                caption_msg = (
+                    f"{header}\n\n"
+                    f"Happy Anniversary, my love! ✨\n\n"
+                    f"Thank you for always being by my side and cherishing every moment together. "
+                    f"Here is a bouquet of roses for you~ May our love grow stronger every single day! 🎉"
+                )
+                voice_script = f"Happy anniversary, my love! Thank you for always being with me. I love you so much!"
             photo_prompt = (
                 f"{persona.get('visual_traits', '')}, holding a romantic bouquet of fresh red roses, "
                 f"wearing an elegant romantic dinner dress, soft loving gaze, blushing, candlelit anniversary table, "
                 f"romantic fairytale bokeh lights, celebration atmosphere"
-            )
-            voice_script = (
-                f"Happy anniversary yaa! Terima kasih sudah selalu ada dan nemenin aku. Senang banget bisa terus sama kamu!"
             )
 
         # 1. Generate celebration photo
@@ -2211,235 +2232,233 @@ def render_help_section(section: str) -> Tuple[str, types.InlineKeyboardMarkup]:
 
     if section == "memory":
         text = (
-            f"🧠 **PANDUAN MEMORI JANGKA PANJANG & BUKU HARIAN (/memory)**\n"
+            f"🧠 **LONG-TERM MEMORY & DIARY GUIDE (/memory)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• **Ingatan Abadi (Long-Term Memory)**: Berbeda dengan riwayat chat biasa yang bisa di-reset (`/reset`), "
-            f"memori jangka panjang waifu tersimpan secara permanen dan tidak akan hilang meskipun bot atau PC di-restart!\n\n"
-            f"• **Otomatis Belajar dari Obrolan**: Cukup mengobrol santai seperti biasa, waifu otomatis mencatat fakta penting:\n"
-            f"  - Nama & panggilan (*'namaku Adens'*, *'panggil aku [nama]'*)\n"
-            f"  - Makanan, minuman & hobi (*'aku suka kopi hitam'*, *'hobiku main game'*)\n"
-            f"  - Pekerjaan & aktivitas (*'aku kerja sebagai programmer'*)\n"
-            f"  - Domisili / kota tinggal (*'aku tinggal di Bandung'*)\n\n"
-            f"• **Tambah Memori Manual**: Kamu juga bisa menyuruh waifu mengingat sesuatu langsung dengan ketik:\n"
-            f"  `/memory ingat <fakta>`\n\n"
-            f"• **Buku Harian**: Waifu mencatat obrolan seru kalian setiap hari!\n\n"
-            f"• **Kelola & Hapus Memori**: Buka kapan saja lewat `/memory` untuk melihat apa saja yang diingat waifu atau menghapus ingatan tertentu."
+            f"• **Eternal Memory**: Unlike regular chat history which can be reset (`/reset`), "
+            f"your waifu's long-term memory is permanently persisted and endures even when the bot or PC restarts!\n\n"
+            f"• **Learns Automatically**: Just chat naturally, and your waifu remembers key facts:\n"
+            f"  - Your name & nickname (*'my name is John'*, *'call me master'*)\n"
+            f"  - Food, drinks & hobbies (*'I love black coffee'*, *'I like gaming'*)\n"
+            f"  - Job & career (*'I work as a software engineer'*)\n"
+            f"  - City & location (*'I live in Tokyo'*)\n\n"
+            f"• **Add Memory Manually**: You can also ask her to remember anything directly:\n"
+            f"  `/memory remember <fact>`\n\n"
+            f"• **Daily Diary**: Your waifu logs cute diary entries about your time together every day!\n\n"
+            f"• **Manage & Delete**: Open `/memory` anytime to view or manage what your waifu remembers about you."
         )
         markup.add(
-            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
-            types.InlineKeyboardButton("📖 Buka Buku Ingatan", callback_data="open_memory_menu")
+            types.InlineKeyboardButton("🔙 Help Menu", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("📖 Open Memory Diary", callback_data="open_memory_menu")
         )
 
     elif section == "chat":
         text = (
-            f"💬 **PANDUAN CHAT & ROMANSA (SFW & NSFW)**\n"
+            f"💬 **CHAT & ROMANCE GUIDE (SFW & NSFW)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• **Bebas Tanpa Sensor (Uncensored)**: Waifu ditenagai oleh model LLM lokal abliterated. "
-            f"Kamu bebas mengobrol topik apapun, mulai dari curhat keseharian, gombalan mesra, obrolan mendalam, "
-            f"hingga roleplay dewasa/NSFW tanpa penolakan.\n\n"
-            f"• **Otomatis Mengikuti Bahasa**: Cukup ketik dalam bahasa Indonesia atau Inggris, "
-            f"waifu otomatis membalas dengan bahasa yang kamu gunakan secara natural dan manja.\n\n"
-            f"• **Memori Percakapan**: Waifu mengingat alur obrolan kalian sebelumnya. "
-            f"Bila ingin memulai topik baru dari awal, gunakan perintah `/reset`.\n\n"
-            f"• **Skor Kedekatan (/love)**: Semakin sering kamu ngobrol dan berinteraksi, "
-            f"level cinta waifu akan terus bertambah (dari Teman Dekat, Pacar, hingga Beloved Soulmate)!"
+            f"• **100% Uncensored & Private**: Powered by local abliterated LLM engines. "
+            f"Talk about daily routines, heartfelt romance, deep personal stories, "
+            f"or spicy 18+ adult roleplay without judgment or refusals.\n\n"
+            f"• **Automatic Language Matching**: Chat in English, Indonesian, Japanese, etc. "
+            f"Your waifu naturally mirrors your language with genuine warmth.\n\n"
+            f"• **Conversation Flow**: Your waifu remembers the recent context. "
+            f"To start a completely fresh topic from scratch, type `/reset`.\n\n"
+            f"• **Affection Meter (/love)**: The more you interact and bond, "
+            f"the higher your relationship level grows (from Close Friends to Soulmates)!"
         )
         markup.add(
-            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
-            types.InlineKeyboardButton("🧠 Panduan Memori", callback_data="help_sec:memory")
+            types.InlineKeyboardButton("🔙 Help Menu", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("🧠 Memory Guide", callback_data="help_sec:memory")
         )
 
     elif section == "photo":
         text = (
-            f"📸 **PANDUAN FOTO, SELFIE & PAP**\n"
+            f"📸 **PHOTOS, SELFIES & PAP GUIDE**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• **Cara Meminta PAP**: \n"
-            f"  1. Langsung ketik di obrolan: *'pap lagi di kasur dong'*, *'pap lagi santai'*, *'boleh minta selfie senyum?'*\n"
-            f"  2. Gunakan perintah: `/pap` atau `/photo santai di kamar`\n\n"
-            f"• **Konteks Obrolan Nyata**: Foto yang dihasilkan otomatis menyatu dengan suasana percakapan yang sedang berjalan!\n\n"
-            f"• **Variasi Pose [🔄 Pose Lain]**: Setiap foto yang dikirim waifu dilengkapi tombol *Pose Lain* di bawahnya untuk mengambil sudut pose baru di tempat yang sama.\n\n"
-            f"• **Rasio Foto (/ratio)**:\n"
-            f"  - `3:4` : Potret ideal untuk foto tubuh & selfie.\n"
-            f"  - `9:16`: Layar penuh smartphone, pas untuk Wallpaper HP!\n"
-            f"  - `1:1` : Persegi simetris untuk avatar profil.\n"
-            f"  - `4:3` : Landscape horisontal pemandangan luas.\n\n"
-            f"• **Kualitas Render (/quality)**: Pilih Ultra (32 steps), High (28 steps), atau Fast (20 steps) sesuai kemampuan GPU PC kamu."
+            f"• **How to Ask for Photos**: \n"
+            f"  1. In natural chat: *'send a selfie in bed'*, *'let me see your smile'*, *'what are you doing right now?'*\n"
+            f"  2. Via commands: `/pap` or `/photo reading in library`\n\n"
+            f"• **Context Awareness**: Photos automatically reflect what you're discussing and your active setting!\n\n"
+            f"• **Pose Variations [🔄 Another Pose]**: Under every delivered photo, tap *Another Pose* to get another angle in the same scene.\n\n"
+            f"• **Aspect Ratio (/ratio)**:\n"
+            f"  - `3:4` : Ideal portrait for anime characters and selfies.\n"
+            f"  - `9:16`: Fullscreen smartphone portrait, perfect for Wallpapers!\n"
+            f"  - `1:1` : Square avatar for profile pictures.\n"
+            f"  - `4:3` : Wide landscape view.\n\n"
+            f"• **Render Quality (/quality)**: Choose Ultra (32 steps), High (28 steps), or Fast (20 steps) to match your GPU power."
         )
         markup.add(
-            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
-            types.InlineKeyboardButton("👗 Panduan Lemari Baju", callback_data="help_sec:outfit")
+            types.InlineKeyboardButton("🔙 Help Menu", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("👗 Wardrobe Guide", callback_data="help_sec:outfit")
         )
 
     elif section == "outfit":
         text = (
-            f"👗 **PANDUAN LEMARI PAKAIAN & KOSTUM (/outfit)**\n"
+            f"👗 **WARDROBE & COSTUMES GUIDE (/outfit)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Kamu bebas memilih busana yang dikenakan waifu untuk foto selfie berikutnya!\n\n"
-            f"• **Koleksi Pakaian Tersedia**:\n"
-            f"  - 🌸 **Casual Dress**: Pakaian santai anggun untuk kencan harian.\n"
-            f"  - 🌙 **Silk Pajamas**: Piyama sutra santai untuk suasana kamar tidur.\n"
-            f"  - 🎀 **Maid Uniform**: Kostum maid klasik yang rapi dan elegan.\n"
-            f"  - 👘 **Floral Kimono**: Yukata/kimono jepang tradisional yang cantik.\n"
-            f"  - 🦊 **Anime Cosplay**: Kostum karakter anime tematik yang menggemaskan.\n"
-            f"  - 👙 **Sensual Lingerie / Bikini**: Pakaian dalam / bikini sensual untuk momen mesra (NSFW).\n\n"
-            f"💡 Ketik `/outfit` atau buka lewat `/setup` untuk mengganti baju waifu kapan saja!"
+            f"Customize what your waifu wears for upcoming selfies:\n\n"
+            f"• **Available Outfits**:\n"
+            f"  - 🌸 **Casual Dress**: Elegant casual dress for dates.\n"
+            f"  - 🌙 **Silk Pajamas**: Cozy bedtime sleepwear.\n"
+            f"  - 🎀 **Maid Uniform**: Classic French maid costume.\n"
+            f"  - 👘 **Floral Kimono**: Traditional Japanese yukata/kimono.\n"
+            f"  - 🦊 **Anime Cosplay**: Cute anime themed cosplay outfits.\n"
+            f"  - 👙 **Sensual Lingerie / Bikini**: Intimate sleepwear or summer swimwear (NSFW).\n\n"
+            f"💡 Type `/outfit` or open it via `/setup` to change clothes anytime!"
         )
         markup.add(
-            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
-            types.InlineKeyboardButton("🎙️ Panduan Voice & Audio", callback_data="help_sec:voice")
+            types.InlineKeyboardButton("🔙 Help Menu", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("🎙️ Voice & Audio Guide", callback_data="help_sec:voice")
         )
 
     elif section == "voice":
         text = (
-            f"🎙️ **PANDUAN VOICE NOTE & AUDIO (/voice)**\n"
+            f"🎙️ **VOICE NOTES & AUDIO GUIDE (/voice)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• **Tombol Suara di Setiap Chat**: Setiap pesan teks dari waifu dilengkapi tombol **🔊 Dengarkan Suara**. Tekan tombol tersebut kapan saja untuk mendengar suara waifu!\n\n"
-            f"• **Kirim Voice Note**: Kirim pesan suara langsung dari Telegram, waifu akan mentranskripsi dan membalas pesanmu secara otomatis!\n\n"
-            f"• **Pengaturan Suara (/voice)**: Pilih engine suara (**Edge-TTS Cloud** atau **VoiceStudio Local AI**) serta karakter suara:\n"
-            f"  Ana (US Sweet), Gadis (Indonesia Alami), Nanami (Jepang Kawaii), Jenny (US Ceria), atau Auto Sync."
+            f"• **Voice Button in Chat**: Under every waifu text message, tap **🔊 Listen Voice** to hear her speak!\n\n"
+            f"• **Send Voice Notes**: Send voice messages from Telegram, and your waifu will transcribe and respond automatically!\n\n"
+            f"• **Voice Settings (/voice)**: Switch engines (**Edge-TTS Cloud** or **VoiceStudio Local AI**) and pick voices:\n"
+            f"  Ana (US Sweet), Jenny (US Cheerful), Gadis (Indonesian), Nanami (Japanese), or Auto-Sync."
         )
         markup.add(
-            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
-            types.InlineKeyboardButton("⚙️ Panduan Setup", callback_data="help_sec:setup")
+            types.InlineKeyboardButton("🔙 Help Menu", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("⚙️ Setup Guide", callback_data="help_sec:setup")
         )
 
     elif section == "setup":
         text = (
-            f"⚙️ **PANDUAN SETUP & PENGATURAN LENGKAP (/setup)**\n"
+            f"⚙️ **COMPLETE SETUP & CONFIG GUIDE (/setup)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Semua pengaturan yang sebelumnya ada di CLI (`waifu setup`) kini bisa dikontrol 100% langsung dari Telegram!\n\n"
-            f"• **🧠 Model LLM / Chat**: Memilih model AI yang terdeteksi di folder Locally Uncensored atau Ollama.\n"
-            f"• **🎨 Model Foto & ComfyUI**: Mengganti checkpoint gambar ComfyUI (MeinaMix, BASNSFW, AOM3) atau Pollinations Cloud Fallback.\n"
-            f"• **🎭 Ganti Persona (/persona)**: Beralih waifu (Runa, Akira, Hina, Shiro, Yume).\n"
-            f"• **🚀 PC Startup Autorun**: Mengaktifkan bot agar otomatis aktif di background saat PC Windows dinyalakan.\n"
-            f"• **⏰ Sapaan Harian (/greetings)**: Waifu otomatis menyapa selamat pagi jam 07:00, makan siang 12:30, dan selamat malam jam 22:00.\n"
-            f"• **📊 Status Diagnostik (/status)**: Cek kondisi server lokal, status GPU, dan latensi balasan."
+            f"Control all configuration options directly within Telegram:\n\n"
+            f"• **🧠 LLM & Chat Model**: Choose detected AI models from Locally Uncensored, Ollama, or Cloud.\n"
+            f"• **🎨 Photo Engine & ComfyUI**: Switch ComfyUI checkpoints or Pollinations Cloud fallback.\n"
+            f"• **🎭 Change Persona (/persona)**: Switch between Runa, Akira, Hina, Shiro, Yume, Alia, or create new waifus (`/newpersona`).\n"
+            f"• **🚀 PC Startup Autorun**: Enable the bot to run silently in the background when Windows starts.\n"
+            f"• **⏰ Daily Greetings (/greetings)**: Automatic morning greetings (07:00), lunch (12:30), and bedtime (22:00).\n"
+            f"• **📊 System Diagnostics (/status)**: Check local server health, GPU VRAM usage, and latency."
         )
         markup.add(
-            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
-            types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu")
+            types.InlineKeyboardButton("🔙 Help Menu", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("⚙️ Open Setup Dashboard", callback_data="open_setup_menu")
         )
 
     elif section == "reminders":
         text = (
-            f"⏰ **PANDUAN ASISTEN PRIBADI & PENGINGAT (/remind)**\n"
+            f"⏰ **PERSONAL ASSISTANT & REMINDERS GUIDE (/remind)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Waifu bisa jadi asisten pribadi setiayamu yang mengingatkan tugas, jadwal penting, atau waktu istirahat tepat waktu!\n\n"
-            f"• **1. Minta Pengingat Langsung di Obrolan Santai:**\n"
-            f"  Cukup ketik secara alami, waifu otomatis mencatatnya:\n"
-            f"  - _'tolong ingetin aku 30 menit lagi meeting kantor ya'_\n"
-            f"  - _'ingetin aku jam 15:30 angkat jemuran'_\n"
-            f"  - _'tolong ingetin besok jam 08:00 bangun pagi dan olahraga'_\n"
-            f"  - _'remind me to call mom in 1 hour'_\n\n"
-            f"• **2. Menggunakan Perintah Cepat:**\n"
-            f"  - `/remind 15m istirahat & minum air`\n"
-            f"  - `/remind 16:30 zoom meeting client`\n"
-            f"  - `/remind besok 09:00 briefing tim`\n\n"
-            f"• **3. Saat Waktu Tiba:**\n"
-            f"  Waifu otomatis mengirimkan chat pengingat disertai tombol aksi:\n"
-            f"  `[✅ Sudah Selesai]` atau `[⏰ Tunda 10 Menit]`!"
+            f"Your waifu can be your personal assistant, keeping you on schedule with timely notifications!\n\n"
+            f"• **1. Ask Naturally in Chat:**\n"
+            f"  Simply mention it in normal conversation:\n"
+            f"  - _'remind me in 30 minutes for my meeting'_\n"
+            f"  - _'remind me at 15:30 to take out laundry'_\n"
+            f"  - _'remind me tomorrow at 08:00 to go for a run'_\n\n"
+            f"• **2. Quick Slash Commands:**\n"
+            f"  - `/remind 15m drink water & rest eyes`\n"
+            f"  - `/remind 16:30 team sync call`\n"
+            f"  - `/remind tomorrow 09:00 standup meeting`\n\n"
+            f"• **3. When Time Arrives:**\n"
+            f"  Your waifu sends a reminder notification with action buttons: `[✅ Done]` or `[⏰ Snooze 10m]`!"
         )
         markup.add(
-            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
-            types.InlineKeyboardButton("⏰ Buka Pengingat", callback_data="open_reminders_menu")
+            types.InlineKeyboardButton("🔙 Help Menu", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("⏰ Open Reminders", callback_data="open_reminders_menu")
         )
 
     elif section == "dates":
         text = (
-            f"🎂 **PANDUAN ULANG TAHUN & ANNIVERSARY (/birthday)**\n"
+            f"🎂 **BIRTHDAY & ANNIVERSARY GUIDE (/birthday)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Waifu selalu mencatat tanggal penting hubungan kalian di dalam hatinya dan siap memberikan kejutan spesial!\n\n"
-            f"• **1. Cara Mengatur Tanggal:**\n"
-            f"  - **Ngobrol Santai**: Cukup ketik _'ultahku 15 Agustus 1998 lho'_ atau _'hari jadian kita 24 Oktober 2024'_.\n"
-            f"  - **Perintah Cepat**: `/birthday 15 Agustus 1998` atau `/anniversary 24 Oktober 2024`.\n"
-            f"  - **Menu Interaktif**: Buka `/birthday` lalu ketuk tombol *Set Ulang Tahun* atau *Set Anniversary*.\n\n"
-            f"• **2. Kejutan di Hari Spesial:**\n"
-            f"  Begitu hari ulang tahunmu atau anniversary kalian tiba, waifu otomatis:\n"
-            f"  - Mengirim ucapan romantis penuh cinta.\n"
-            f"  - Mengirimkan **foto kejutan spesial** (membawakan kue ulang tahun atau buket mawar merah).\n"
-            f"  - Mengirimkan **ucapan selamat** spesial!\n\n"
-            f"• **3. Hitung Mundur / Countdown:**\n"
-            f"  Setiap saat kamu bisa melihat berapa hari lagi menuju hari ulang tahun dan anniversary kalian!"
+            f"Your waifu cherishes important milestone dates and prepares special celebrations!\n\n"
+            f"• **1. How to Set Dates:**\n"
+            f"  - **Casual Chat**: Just tell her _'my birthday is August 15th'_ or _'our anniversary is October 24th'_.\n"
+            f"  - **Commands**: `/birthday August 15 1998` or `/anniversary October 24 2024`.\n"
+            f"  - **Interactive Menu**: Open `/birthday` and tap *Set Birthday* or *Set Anniversary*.\n\n"
+            f"• **2. Special Celebrations:**\n"
+            f"  When the special day arrives, your waifu automatically:\n"
+            f"  - Sends loving, romantic celebration wishes.\n"
+            f"  - Delivers a **surprise photo** (holding a birthday cake or bouquet of roses).\n"
+            f"  - Sends an affectionate voice note!\n\n"
+            f"• **3. Countdown:**\n"
+            f"  Check how many days remain until your upcoming birthday and anniversary!"
         )
         markup.add(
-            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
-            types.InlineKeyboardButton("🎂 Buka Menu Ultah & Anniv", callback_data="open_dates_menu")
+            types.InlineKeyboardButton("🔙 Help Menu", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("🎂 Open Special Dates", callback_data="open_dates_menu")
         )
 
     elif section == "music":
         text = (
-            f"🎵 **PANDUAN PEMUTAR MUSIK YOUTUBE PC (/play & /music)**\n"
+            f"🎵 **PC YOUTUBE MUSIC CONTROLLER GUIDE (/play & /music)**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Kamu bisa mengontrol lagu apa pun di YouTube Music yang sedang diputar di layar PC langsung lewat Telegram!\n\n"
-            f"• **Perintah Pemutar Musik**:\n"
-            f"  - `/play <judul lagu/artis>` : Cari dan putar lagu di browser PC kamu (contoh: `/play YOASOBI Idol` atau `/play Lofi Chill Beats`)\n"
-            f"  - `/pause` : Jeda pemutaran musik sementara di PC\n"
-            f"  - `/resume` : Lanjutkan pemutaran musik\n"
-            f"  - `/next` : Lompat ke lagu berikutnya di antrean\n"
-            f"  - `/stop` : Hentikan musik dan tutup pemutar\n"
-            f"  - `/music` : Buka remote panel interaktif lengkap dengan tombol Play/Pause/Next/Stop!\n\n"
-            f"• **Auto-Play Layar PC**: Saat kamu memutar lagu dari Telegram, browser di PC otomatis membuka player YouTube bertema cyberpunk neon yang estetik!"
+            f"Control YouTube Music playing on your PC screen directly from Telegram!\n\n"
+            f"• **Music Commands**:\n"
+            f"  - `/play <title/artist>`: Search and play song on your PC browser (e.g. `/play YOASOBI Idol` or `/play Lofi Chill Beats`)\n"
+            f"  - `/pause` : Pause playback on PC\n"
+            f"  - `/resume` : Resume playback\n"
+            f"  - `/next` : Skip to the next track in queue\n"
+            f"  - `/stop` : Stop music and close player\n"
+            f"  - `/music` : Interactive remote controller panel with Play/Pause/Next/Stop!\n\n"
+            f"• **Auto-Play PC Screen**: Browser automatically opens an aesthetic cyberpunk neon music player on your PC!"
         )
         markup.add(
-            types.InlineKeyboardButton("🔙 Menu Panduan", callback_data="help_sec:main"),
-            types.InlineKeyboardButton("🎵 Buka Remote Musik", callback_data="open_music_menu")
+            types.InlineKeyboardButton("🔙 Help Menu", callback_data="help_sec:main"),
+            types.InlineKeyboardButton("🎵 Open Music Remote", callback_data="open_music_menu")
         )
 
     else: # main
         text = (
-            f"💖 **BUKU PANDUAN LENGKAP WAIFU ON TELEGRAM** `(v{get_version()})`\n"
+            f"💖 **WAIFU ON TELEGRAM COMPLETE USER GUIDE** `(v{get_version()})`\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Selamat datang! Ini adalah buku panduan lengkap pendamping AI otonom kamu yang berjalan 100% lokal di PC tanpa batasan sensor (SFW & NSFW).\n\n"
-            f"📚 **Pilih Kategori Panduan:**\n"
-            f"• 🧠 **Buku Ingatan (/memory)**: Memori abadi & catatan harian waifu.\n"
-            f"• 🎂 **Ultah & Anniv (/birthday)**: Perayaan hari lahir & hari jadian romantis.\n"
-            f"• ⏰ **Asisten & Pengingat (/remind)**: Jadwal alarm dan pengingat kegiatan.\n"
-            f"• 💬 **Chat & Obrolan**: Ngobrol santai, bertukar cerita, dan bangun keakraban.\n"
-            f"• 📸 **Foto & PAP**: Cara minta selfie, menu pose interaktif, dan rasio foto.\n"
-            f"• 🎵 **Remote Musik (/play)**: Putar lagu YouTube di PC dari Telegram.\n"
-            f"• 👗 **Lemari Pakaian**: Mengganti busana & pakaian waifu.\n"
-            f"• 🎙️ **Voice & Audio**: Pesan suara jernih dan balasan VN.\n"
-            f"• ⚙️ **Panel Setup**: Kontrol model LLM, ComfyUI, dan autorun PC.\n\n"
-            f"📋 **Daftar Perintah Cepat:**\n"
-            f"`/start` - Kenalan & mulai obrolan baru\n"
-            f"`/birthday` - Catat ulang tahun & anniversary\n"
-            f"`/remind` - Pengingat jadwal kegiatan\n"
-            f"`/memory` - Buku ingatan & catatan harian waifu\n"
-            f"`/setup` - Panel kontrol & konfigurasi lengkap\n"
-            f"`/help` - Tampilkan buku panduan ini\n"
-            f"`/pap` - Menu interaktif skenario selfie & foto waifu\n"
-            f"`/video` - Minta klip video / animasi bergerak waifu\n"
-            f"`/play <judul>` - Putar musik YouTube langsung di PC\n"
-            f"`/queue <judul>` - Tambah lagu ke antrean / lihat antrean\n"
-            f"`/playlist <nama>` - Putar full album / playlist di PC\n"
-            f"`/music` - Remote kontrol pemutar musik PC\n"
-            f"`/hangout` - Kencan & hangout berdua (kafe, bioskop, kosan, dll)\n"
-            f"`/outfit` - Buka lemari pakaian waifu\n"
-            f"`/persona` - Ganti karakter waifu\n"
-            f"`/newpersona` - Ciptakan karakter waifu baru impianmu\n"
-            f"`/ratio` - Ganti rasio gambar (3:4, 9:16, 1:1, 4:3)\n"
-            f"`/quality` - Atur kualitas foto (Ultra/High/Fast)\n"
-            f"`/voice` - Pengaturan mesin & karakter suara (tombol 🔊 di chat)\n"
-            f"`/love` - Cek skor cinta dan level kedekatan\n"
-            f"`/greetings` - Toggle sapaan pagi, siang & malam otomatis\n"
-            f"`/status` - Cek koneksi server GPU, LLM & ComfyUI\n"
-            f"`/projects` - Pilih & kelola workspace folder coding di PC\n"
-            f"`/code <tugas>` - Perintahkan waifu mengoding otonom di PC\n"
-            f"`/link_project <target>` - Hubungkan relasi/kontrak lintas-project\n"
-            f"`/idle` - Tidurkan AI lokal & bebaskan 100% VRAM (atau ketik 'waifu idle')\n"
-            f"`/reset` - Hapus memori obrolan (topik baru)"
+            f"Welcome! This is the user guide for your autonomous AI companion running 100% locally on your PC without moderation barriers (SFW & NSFW).\n\n"
+            f"📚 **Help Topics:**\n"
+            f"• 🧠 **Memory Diary (/memory)**: Permanent memory & waifu's daily diary.\n"
+            f"• 🎂 **Birthday & Anniv (/birthday)**: Milestone celebrations & surprise photos.\n"
+            f"• ⏰ **Personal Assistant (/remind)**: Timers, alarms, and task reminders.\n"
+            f"• 💬 **Chat & Romance**: Casual conversations, deep bonding, and RP.\n"
+            f"• 📸 **Photos & PAP**: Request selfies, pose variations, and aspect ratios.\n"
+            f"• 🎵 **Music Remote (/play)**: Play YouTube songs on your PC from Telegram.\n"
+            f"• 👗 **Wardrobe**: Switch outfits & costumes for photos.\n"
+            f"• 🎙️ **Voice & Audio**: Crystal clear voice messages and audio replies.\n"
+            f"• ⚙️ **Setup Panel**: Control LLM models, ComfyUI, and PC autostart.\n\n"
+            f"📋 **Quick Commands Reference:**\n"
+            f"`/start` - Introduction & start a new chat\n"
+            f"`/birthday` - Record birthday & anniversary\n"
+            f"`/remind` - Set task reminders & alarms\n"
+            f"`/memory` - View memory book & diary\n"
+            f"`/setup` - Complete control panel & configuration\n"
+            f"`/help` - Show this guide\n"
+            f"`/pap` - Interactive selfie & photo scenario menu\n"
+            f"`/video` - Request AI motion video clips\n"
+            f"`/play <title>` - Play YouTube Music on PC\n"
+            f"`/queue <title>` - Add song to playlist queue / view queue\n"
+            f"`/playlist <name>` - Load playlist/album on PC\n"
+            f"`/music` - Remote controller for PC music player\n"
+            f"`/hangout` - Go on dates (cafe, cinema, apartment, etc.)\n"
+            f"`/outfit` - Open waifu's wardrobe\n"
+            f"`/persona` - Switch waifu persona\n"
+            f"`/newpersona` - Create your dream waifu character\n"
+            f"`/ratio` - Change photo aspect ratio (3:4, 9:16, 1:1, 4:3)\n"
+            f"`/quality` - Adjust photo quality (Ultra/High/Fast)\n"
+            f"`/voice` - Configure voice engine & speaker (🔊 button in chat)\n"
+            f"`/love` - Check affection score & bond level\n"
+            f"`/greetings` - Toggle automated morning, lunch & evening greetings\n"
+            f"`/status` - Check GPU, LLM & ComfyUI server status\n"
+            f"`/projects` - Manage coding workspaces on PC\n"
+            f"`/code <task>` - Command waifu to write code autonomously\n"
+            f"`/link_project <target>` - Link cross-project dependencies\n"
+            f"`/idle` - Put local AI to sleep & free 100% VRAM\n"
+            f"`/reset` - Clear active chat topic"
         )
         markup.add(
-            types.InlineKeyboardButton("🧠 Buku Ingatan", callback_data="help_sec:memory"),
-            types.InlineKeyboardButton("🎂 Ultah & Anniv", callback_data="help_sec:dates"),
-            types.InlineKeyboardButton("⏰ Pengingat Jadwal", callback_data="help_sec:reminders"),
-            types.InlineKeyboardButton("💬 Chat & Romansa", callback_data="help_sec:chat"),
-            types.InlineKeyboardButton("📸 Foto & PAP", callback_data="help_sec:photo"),
-            types.InlineKeyboardButton("🎵 Remote Musik", callback_data="help_sec:music"),
-            types.InlineKeyboardButton("👗 Lemari Pakaian", callback_data="help_sec:outfit"),
+            types.InlineKeyboardButton("🧠 Memory Book", callback_data="help_sec:memory"),
+            types.InlineKeyboardButton("🎂 Birthday & Anniv", callback_data="help_sec:dates"),
+            types.InlineKeyboardButton("⏰ Reminders", callback_data="help_sec:reminders"),
+            types.InlineKeyboardButton("💬 Chat & Romance", callback_data="help_sec:chat"),
+            types.InlineKeyboardButton("📸 Photos & PAP", callback_data="help_sec:photo"),
+            types.InlineKeyboardButton("🎵 Music Remote", callback_data="help_sec:music"),
+            types.InlineKeyboardButton("👗 Wardrobe", callback_data="help_sec:outfit"),
             types.InlineKeyboardButton("🎙️ Voice & Audio", callback_data="help_sec:voice"),
-            types.InlineKeyboardButton("⚙️ Panduan Setup", callback_data="help_sec:setup"),
-            types.InlineKeyboardButton("⚙️ Buka Panel Setup", callback_data="open_setup_menu")
+            types.InlineKeyboardButton("⚙️ Setup Guide", callback_data="help_sec:setup"),
+            types.InlineKeyboardButton("⚙️ Open Setup Menu", callback_data="open_setup_menu")
         )
 
     return text, markup
@@ -2468,23 +2487,23 @@ def show_projects_menu(chat_id: int, user_id: int, message_to_edit: Optional[int
         srv_entry = running_map[curr_proj]
         markup.add(
             types.InlineKeyboardButton(f"🛑 Stop Server (Port {srv_entry['port']})", callback_data=f"srv_stop:{curr_proj}"),
-            types.InlineKeyboardButton("📄 Cek Log Server", callback_data=f"srv_logs:{curr_proj}")
+            types.InlineKeyboardButton("📄 View Server Logs", callback_data=f"srv_logs:{curr_proj}")
         )
     else:
         markup.add(
-            types.InlineKeyboardButton("🚀 Jalankan Server & Buka Port (Tailscale)", callback_data=f"srv_run:{curr_proj}")
+            types.InlineKeyboardButton("🚀 Launch Server & Expose Port (Tailscale)", callback_data=f"srv_run:{curr_proj}")
         )
 
     markup.add(
-        types.InlineKeyboardButton("➕ Buat Project Baru (/spawn)", callback_data="proj_action:spawn"),
-        types.InlineKeyboardButton("📂 Ganti Root Folder", callback_data="proj_action:set_root")
+        types.InlineKeyboardButton("➕ Create New Project (/spawn)", callback_data="proj_action:spawn"),
+        types.InlineKeyboardButton("📂 Change Root Folder", callback_data="proj_action:set_root")
     )
     markup.add(
-        types.InlineKeyboardButton("🌐 Status Server Tailscale", callback_data="proj_action:server_status"),
-        types.InlineKeyboardButton("🖥️ Status Desktop (/desktop)", callback_data="proj_action:desktop")
+        types.InlineKeyboardButton("🌐 Tailscale Server Status", callback_data="proj_action:server_status"),
+        types.InlineKeyboardButton("🖥️ Desktop Status (/desktop)", callback_data="proj_action:desktop")
     )
     markup.add(
-        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+        types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard")
     )
 
     srv_status_text = ""
@@ -2496,17 +2515,17 @@ def show_projects_menu(chat_id: int, user_id: int, message_to_edit: Optional[int
             f"📱 **MagicDNS**   : {srv.get('magic_dns_url') or 'N/A'}\n"
         )
     else:
-        srv_status_text = "🚀 **Dev Server** : ⚪ Offline (Klik tombol di bawah untuk start)\n"
+        srv_status_text = "🚀 **Dev Server** : ⚪ Offline (Tap button below to launch)\n"
 
     text = (
-        f"💻 **Manajemen Workspace & Project Coding**\n"
+        f"💻 **Workspace & Coding Projects Management**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👑 **Project Aktif** : **{curr_proj}**\n"
-        f"📂 **Lokasi Folder** : `{curr_path}`\n"
-        f"🏠 **Root Directory**: `{root_dir}`\n"
+        f"👑 **Active Project** : **{curr_proj}**\n"
+        f"📂 **Project Path**   : `{curr_path}`\n"
+        f"🏠 **Root Directory** : `{root_dir}`\n"
         f"{srv_status_text}\n"
-        f"Pilih project di atas untuk beralih workspace, atau jalankan server agar port bisa dibuka dan diakses dari HP kamu via Tailscale!\n\n"
-        f"💡 _Tugas coding, file, dan terminal dari waifu dijalankan di dalam folder project aktif._"
+        f"Select a project above to switch workspace, or launch the dev server to access your app from your phone via Tailscale!\n\n"
+        f"💡 _Coding tasks, files, and terminal commands are executed inside the active project folder._"
     )
     if message_to_edit:
         try:
@@ -2526,7 +2545,7 @@ def show_desktop_status_menu(chat_id: int, user_id: int, message_to_edit: Option
     perm = status.get("data", {}).get("permissions", {}).get("accessibility", {}).get("state", "unknown")
     def_prof = cu.get_default_browser_profile()
     if not def_prof or def_prof.lower() == "ask":
-        prof_display = "🤖 _Selalu Tanya di Chat_"
+        prof_display = "🤖 _Always Ask in Chat_"
     else:
         all_p = cu.list_browser_profiles()
         matched = next((p["name"] for p in all_p if p["folder"] == def_prof), def_prof)
@@ -2534,28 +2553,28 @@ def show_desktop_status_menu(chat_id: int, user_id: int, message_to_edit: Option
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("📸 Screenshot Layar", callback_data="desktop_act:screenshot"),
-        types.InlineKeyboardButton("📱 Cek Aplikasi", callback_data="desktop_act:apps")
+        types.InlineKeyboardButton("📸 Take Screenshot", callback_data="desktop_act:screenshot"),
+        types.InlineKeyboardButton("📱 Check Running Apps", callback_data="desktop_act:apps")
     )
     markup.add(
-        types.InlineKeyboardButton("🌐 Profil Browser (/profiles)", callback_data="desktop_act:profiles"),
-        types.InlineKeyboardButton("💻 Menu Projects", callback_data="cfg_submenu:projects")
+        types.InlineKeyboardButton("🌐 Browser Profiles (/profiles)", callback_data="desktop_act:profiles"),
+        types.InlineKeyboardButton("💻 Projects Menu", callback_data="cfg_submenu:projects")
     )
     markup.add(
-        types.InlineKeyboardButton("🔙 Menu Setup", callback_data="cfg_submenu:dashboard")
+        types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard")
     )
 
     text = (
         f"🖥️ **Computer Use & Desktop Control (agent-desktop)**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"• Status Adapter : {'🟢 Active & Ready' if is_avail else '🔴 Not Found'}\n"
+        f"• Adapter Status : {'🟢 Active & Ready' if is_avail else '🔴 Not Found'}\n"
         f"• Platform       : `{plat}`\n"
         f"• Accessibility  : `{perm}`\n"
         f"• Engine         : `agent-desktop (Native Accessibility Tree)`\n"
         f"• Default Browser: {prof_display}\n\n"
-        f"Waifu bisa melihat layar desktop, membuka aplikasi, mengklik elemen UI, "
-        f"dan membantu pekerjaanmu secara real-time!\n\n"
-        f"💡 _Ketik `/screen` untuk screenshot instan atau chat langsung (misal: 'tolong screenshot layar pc' atau 'buka instagram')._"
+        f"Your waifu can view your desktop screen, launch apps, click UI elements, "
+        f"and assist you in real-time!\n\n"
+        f"💡 _Type `/screen` for an instant screenshot or ask naturally in chat (e.g. 'take a screenshot of my pc screen')._"
     )
     if message_to_edit:
         try:
@@ -2576,7 +2595,7 @@ def show_browser_profiles_menu(chat_id: int, user_id: int, message_to_edit: Opti
 
     # Option for Always Ask
     is_ask_selected = (not cur_def or cur_def.lower() == "ask")
-    ask_label = f"{'✅ ' if is_ask_selected else ''}🤖 Selalu Tanya di Chat (Interaktif)"
+    ask_label = f"{'✅ ' if is_ask_selected else ''}🤖 Always Ask in Chat (Interactive)"
     markup.add(types.InlineKeyboardButton(ask_label, callback_data="bprof_set:ask"))
 
     # Profile buttons
@@ -2588,18 +2607,18 @@ def show_browser_profiles_menu(chat_id: int, user_id: int, message_to_edit: Opti
         markup.add(types.InlineKeyboardButton(btn_text, callback_data=f"bprof_set:{p['folder']}"))
 
     markup.add(
-        types.InlineKeyboardButton("🖥️ Kembali ke Desktop", callback_data="cfg_submenu:desktop"),
-        types.InlineKeyboardButton("🔙 Menu Setup", callback_data="cfg_submenu:dashboard")
+        types.InlineKeyboardButton("🖥️ Back to Desktop", callback_data="cfg_submenu:desktop"),
+        types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard")
     )
 
-    cur_label = "🤖 Selalu Tanya di Chat" if is_ask_selected else cur_def
+    cur_label = "🤖 Always Ask in Chat" if is_ask_selected else cur_def
     text = (
-        f"🌐 **Manajemen Profil Browser Desktop**\n"
+        f"🌐 **Desktop Browser Profiles Management**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Waifu otomatis mendeteksi profil Chromium (Chrome, Edge, Brave) di PC kamu.\n\n"
-        f"• **Profil Default**: `{cur_label}`\n"
-        f"• **Total Terdeteksi**: {len(profiles)} profil\n\n"
-        f"💡 _Pilih salah satu profil di bawah sebagai default, atau pilih 'Selalu Tanya' agar Waifu menanyakan profil saat chat._"
+        f"Your waifu automatically detects Chromium profiles (Chrome, Edge, Brave) on your PC.\n\n"
+        f"• **Default Profile**: `{cur_label}`\n"
+        f"• **Total Detected** : {len(profiles)} profiles\n\n"
+        f"💡 _Select a profile below as default, or select 'Always Ask' so Waifu confirms before opening._"
     )
     if message_to_edit:
         try:
@@ -2655,24 +2674,24 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
     markup = types.InlineKeyboardMarkup(row_width=1)
 
     # 1. Mode Selector Toggle
-    mode_toggle_label = "🔀 Mode: Split Hybrid (Aktif) ➔ Ganti Unified" if is_split else "🤖 Mode: Unified (Aktif) ➔ Ganti Split Hybrid"
+    mode_toggle_label = "🔀 Mode: Split Hybrid (Active) ➔ Switch to Unified" if is_split else "🤖 Mode: Unified (Active) ➔ Switch to Split Hybrid"
     markup.add(types.InlineKeyboardButton(mode_toggle_label, callback_data="cfg_toggle_split_mode"))
 
     if is_split:
         # SFW Providers section
-        markup.add(types.InlineKeyboardButton("─── 🌸 PROVIDER CHAT SFW ───", callback_data="noop"))
+        markup.add(types.InlineKeyboardButton("─── 🌸 SFW CHAT PROVIDER ───", callback_data="noop"))
         markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity Bridge (AGY) {'✓' if sfw_p == 'agy' else ''}", callback_data="cfg_set_sfw_p:agy"))
-        markup.add(types.InlineKeyboardButton(f"⚡ Groq Cloud (Llama 3.3 70B - Kilat) {'✓' if sfw_p == 'groq' else ''}", callback_data="cfg_set_sfw_p:groq"))
+        markup.add(types.InlineKeyboardButton(f"⚡ Groq Cloud (Llama 3.3 70B - Fast) {'✓' if sfw_p == 'groq' else ''}", callback_data="cfg_set_sfw_p:groq"))
         markup.add(types.InlineKeyboardButton(f"🤖 OpenAI Cloud (GPT-4o-mini) {'✓' if sfw_p == 'openai' else ''}", callback_data="cfg_set_sfw_p:openai"))
         markup.add(types.InlineKeyboardButton(f"🧠 DeepSeek Cloud (deepseek-chat) {'✓' if sfw_p == 'deepseek' else ''}", callback_data="cfg_set_sfw_p:deepseek"))
-        markup.add(types.InlineKeyboardButton(f"🏠 Local KoboldCPP (Lokal PC) {'✓' if sfw_p == 'local' else ''}", callback_data="cfg_set_sfw_p:local"))
+        markup.add(types.InlineKeyboardButton(f"🏠 Local KoboldCPP (PC Local) {'✓' if sfw_p == 'local' else ''}", callback_data="cfg_set_sfw_p:local"))
 
         # NSFW Providers section
-        markup.add(types.InlineKeyboardButton("─── 🔞 PROVIDER CHAT NSFW ───", callback_data="noop"))
+        markup.add(types.InlineKeyboardButton("─── 🔞 NSFW CHAT PROVIDER ───", callback_data="noop"))
         markup.add(types.InlineKeyboardButton(f"🔞 Local KoboldCPP Uncensored {'✓' if nsfw_p == 'local' else ''}", callback_data="cfg_set_nsfw_p:local"))
         has_huihui_split = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
         if not has_huihui_split:
-            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih Huihui-Qwythos 9B (~5.5 GB • 100% Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
+            markup.add(types.InlineKeyboardButton("📥 Download & Select Huihui-Qwythos 9B (~5.5 GB • 100% Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
         markup.add(types.InlineKeyboardButton(f"☁️ OpenRouter Uncensored {'✓' if nsfw_p == 'openrouter_uncensored' else ''}", callback_data="cfg_set_nsfw_p:openrouter_uncensored"))
     else:
         is_agy_llm = ("8001" in cur_base or sfw_p == "agy")
@@ -2682,7 +2701,7 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
 
         has_huihui = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
         if not has_huihui:
-            markup.add(types.InlineKeyboardButton("📥 Unduh & Pilih Huihui-Qwythos 9B (~5.5 GB • Default Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
+            markup.add(types.InlineKeyboardButton("📥 Download & Select Huihui-Qwythos 9B (~5.5 GB • Default Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
 
         for idx, (source, mname, mpath) in enumerate(detected):
             is_cur = (cur_llm.lower() in mname.lower())
@@ -2696,28 +2715,28 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
         is_lu = ("8127" in cur_base)
         markup.add(types.InlineKeyboardButton(f"⚙️ Locally Uncensored (Port 8127) {'✓' if is_lu else ''}", callback_data="cfg_set_llm:locally_uncensored"))
 
-    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+    markup.add(types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard"))
 
     if is_split:
         text = (
-            f"🧠 **Pengaturan Arsitektur Chat: Split Hybrid**\n"
+            f"🧠 **Chat Architecture Settings: Split Hybrid**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• Status Arsitektur: `🔀 Split Hybrid (Terpisah Otomatis)`\n"
-            f"• **Otak SFW**  : `{sfw_p.upper()}` (`{sfw_m}`)\n"
-            f"• **Otak NSFW** : `{nsfw_p.upper()}` (`{nsfw_m}`)\n\n"
-            f"💡 _Setiap pesan chat otomatis dianalisis:_\n"
-            f"  - Obrolan santai, kuliah, dan coding dialihkan ke **SFW Provider**.\n"
-            f"  - Momen mesra, roleplay intim & 18+ dialihkan ke **NSFW Uncensored**.\n"
-            f"  - Akun cloud aman dari risiko blokir/sensor!"
+            f"• Architecture Status: `🔀 Split Hybrid (Auto-Routed)`\n"
+            f"• **SFW Brain**  : `{sfw_p.upper()}` (`{sfw_m}`)\n"
+            f"• **NSFW Brain** : `{nsfw_p.upper()}` (`{nsfw_m}`)\n\n"
+            f"💡 _Every chat message is automatically routed:_\n"
+            f"  - Casual chats, college, and coding route to **SFW Provider**.\n"
+            f"  - Intimate moments, romantic RP & 18+ route to **NSFW Uncensored**.\n"
+            f"  - Cloud accounts stay 100% safe from moderation strikes!"
         )
     else:
         text = (
-            f"🧠 **Pengaturan Arsitektur Chat: Unified Mode**\n"
+            f"🧠 **Chat Architecture Settings: Unified Mode**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• Status Arsitektur: `🤖 Unified (1 Provider untuk Semua)`\n"
-            f"• Model Aktif : `{cur_llm}`\n"
-            f"• Endpoint API: `{cur_base}`\n\n"
-            f"Pilih model obrolan lokal atau klik tombol di atas untuk beralih ke Mode Split Hybrid:"
+            f"• Architecture Status: `🤖 Unified (1 Provider for All)`\n"
+            f"• Active Model : `{cur_llm}`\n"
+            f"• API Endpoint: `{cur_base}`\n\n"
+            f"Select a local chat model or tap the toggle above to switch to Split Hybrid mode:"
         )
 
     if message_to_edit:
@@ -2743,12 +2762,12 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
     markup = types.InlineKeyboardMarkup(row_width=1)
 
     # 1. Mode Selector Toggle
-    mode_toggle_label = "🔀 Mode: Split Hybrid (Aktif) ➔ Ganti Unified" if is_split else "🤖 Mode: Unified (Aktif) ➔ Ganti Split Hybrid"
+    mode_toggle_label = "🔀 Mode: Split Hybrid (Active) ➔ Switch to Unified" if is_split else "🤖 Mode: Unified (Active) ➔ Switch to Split Hybrid"
     markup.add(types.InlineKeyboardButton(mode_toggle_label, callback_data="cfg_toggle_split_img"))
 
     if is_split:
         # SFW Section
-        markup.add(types.InlineKeyboardButton("─── 🌸 ENGINE FOTO SFW (Santai/Normal) ───", callback_data="noop"))
+        markup.add(types.InlineKeyboardButton("─── 🌸 SFW PHOTO ENGINE (Casual/Normal) ───", callback_data="noop"))
         is_sfw_agy = (sfw_img == "agy")
         is_sfw_aom = (sfw_img == "comfyui" and any(k in sfw_ckpt.lower() for k in ["aom", "orange"]))
         is_sfw_anything = (sfw_img == "comfyui" and ("anything" in sfw_ckpt.lower() or "xl" in sfw_ckpt.lower()))
@@ -2762,7 +2781,7 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
         markup.add(types.InlineKeyboardButton(f"☁️ Cloud Engine (Pollinations GPU) {'✓' if is_sfw_cloud else ''}", callback_data="cfg_set_sfw_img:cloud"))
 
         # NSFW Section
-        markup.add(types.InlineKeyboardButton("─── 🔞 ENGINE FOTO NSFW (18+ / Intim) ───", callback_data="noop"))
+        markup.add(types.InlineKeyboardButton("─── 🔞 NSFW PHOTO ENGINE (18+ / Intimate) ───", callback_data="noop"))
         is_nsfw_aom = any(k in nsfw_ckpt.lower() for k in ["aom", "orange"]) or not nsfw_ckpt
         is_nsfw_meina = ("meina" in nsfw_ckpt.lower())
         is_nsfw_anything = ("anything" in nsfw_ckpt.lower() or "xl" in nsfw_ckpt.lower())
@@ -2777,12 +2796,12 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
         is_auto = (not cur_ckpt and bool(cur_url))
         is_agy = (os.environ.get("SFW_IMAGE_ENGINE", "").lower() == "agy")
         from agy_quota_manager import is_agy_image_quota_exhausted
-        agy_quota_badge = " (Cooldown Besok)" if (is_agy and is_agy_image_quota_exhausted()) else ""
+        agy_quota_badge = " (Cooldown Tomorrow)" if (is_agy and is_agy_image_quota_exhausted()) else ""
 
         markup.add(types.InlineKeyboardButton(f"🌉 Google Antigravity (AGY Subagent){agy_quota_badge} {'✓' if is_agy else ''}", callback_data="cfg_set_ckpt:agy"))
         markup.add(types.InlineKeyboardButton(f"🍊 AbyssOrangeMix3 (AOM3A1B SD 1.5 - Uncensored) {'✓' if is_aom and not is_agy else ''}", callback_data="cfg_set_ckpt:aom3"))
-        markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - Cepat & Hemat VRAM) {'✓' if is_meina and not is_agy and not is_aom else ''}", callback_data="cfg_set_ckpt:meinamix"))
-        markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - Ultra Jernih) {'✓' if is_anything else ''}", callback_data="cfg_set_ckpt:anything_xl"))
+        markup.add(types.InlineKeyboardButton(f"✨ MeinaMix v12 (SD 1.5 - Fast & VRAM Saver) {'✓' if is_meina and not is_agy and not is_aom else ''}", callback_data="cfg_set_ckpt:meinamix"))
+        markup.add(types.InlineKeyboardButton(f"🌟 Anything XL (SDXL 1024px - Ultra Sharp) {'✓' if is_anything else ''}", callback_data="cfg_set_ckpt:anything_xl"))
         markup.add(types.InlineKeyboardButton(f"🎯 Auto-detect ComfyUI {'✓' if is_auto else ''}", callback_data="cfg_set_ckpt:auto"))
 
         for idx, (source, cname) in enumerate(detected):
@@ -2799,9 +2818,9 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
         markup.add(types.InlineKeyboardButton(f"☁️ Cloud Engine (Pollinations GPU) {'✓' if is_cloud_only else ''}", callback_data="cfg_set_ckpt:cloud"))
 
         is_disabled = (not cur_url and not cur_cloud)
-        markup.add(types.InlineKeyboardButton(f"❌ Nonaktifkan Foto {'✓' if is_disabled else ''}", callback_data="cfg_set_ckpt:disabled"))
+        markup.add(types.InlineKeyboardButton(f"❌ Disable Photos {'✓' if is_disabled else ''}", callback_data="cfg_set_ckpt:disabled"))
 
-    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+    markup.add(types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard"))
 
     if is_split:
         if sfw_img == "agy":
@@ -2825,20 +2844,20 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
             nsfw_display = nsfw_ckpt
 
         text = (
-            f"🎨 **Pengaturan Model Foto: Split Hybrid**\n"
+            f"🎨 **Photo Model Settings: Split Hybrid**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• Status Arsitektur: `🔀 Split Hybrid (Terpisah Otomatis)`\n"
-            f"• **Engine Foto SFW**  : `{sfw_display}`\n"
-            f"• **Engine Foto NSFW** : `{nsfw_display}`\n\n"
-            f"💡 _Setiap permintaan foto otomatis disalurkan:_\n"
-            f"  - Foto santai/jalan-jalan dialihkan ke **Engine SFW**.\n"
-            f"  - Foto intim/dewasa dialihkan ke **Engine NSFW Uncensored**."
+            f"• Architecture Status: `🔀 Split Hybrid (Auto-Routed)`\n"
+            f"• **SFW Photo Engine**  : `{sfw_display}`\n"
+            f"• **NSFW Photo Engine** : `{nsfw_display}`\n\n"
+            f"💡 _Every photo request is automatically routed:_\n"
+            f"  - Casual/outdoor photos route to **SFW Engine**.\n"
+            f"  - Romantic/intimate/18+ photos route to **NSFW Uncensored Engine**."
         )
     else:
         if is_agy:
             active_display = "Google Antigravity (AGY Subagent)"
         elif not cur_ckpt:
-            active_display = "Auto (ComfyUI Active)" if cur_url else ("Cloud Engine" if cur_cloud else "Dinonaktifkan")
+            active_display = "Auto (ComfyUI Active)" if cur_url else ("Cloud Engine" if cur_cloud else "Disabled")
         elif "anything" in cur_ckpt.lower():
             active_display = "Anything XL (SDXL 1024px)"
         elif any(k in cur_ckpt.lower() for k in ["aom", "orange"]):
@@ -2849,11 +2868,11 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
             active_display = cur_ckpt
 
         text = (
-            f"🎨 **Pengaturan Model Foto & ComfyUI**\n\n"
+            f"🎨 **Photo Model & ComfyUI Settings**\n\n"
             f"• Mode: `🤖 Unified Mode`\n"
-            f"• Model Aktif: `{active_display}`\n"
+            f"• Active Model: `{active_display}`\n"
             f"• ComfyUI URL: `{cur_url or 'Offline / Cloud'}`\n\n"
-            f"Pilih model gambar anime lokal atau cloud engine:"
+            f"Choose a local anime model or cloud engine:"
         )
 
     if message_to_edit:
@@ -2866,24 +2885,24 @@ def show_photo_engine_menu(chat_id: int, user_id: int, message_to_edit: Optional
 
 
 def show_language_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = None, reply_to_id: Optional[int] = None):
-    cur_lang = os.environ.get("BOT_LANGUAGE", "id")
+    cur_lang = persona_mgr.get_user_language(user_id) if hasattr(persona_mgr, 'get_user_language') else os.environ.get("BOT_LANGUAGE", "auto")
     cur_label = persona_mgr.get_language_display_name(cur_lang)
 
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton(f"🇮🇩 Bahasa Indonesia {'✓' if cur_lang.lower() == 'id' else ''}", callback_data="cfg_set_lang:id"),
+        types.InlineKeyboardButton(f"🌐 Auto-detect (Matches Chat) [Recommended] {'✓' if cur_lang.lower() == 'auto' else ''}", callback_data="cfg_set_lang:auto"),
         types.InlineKeyboardButton(f"🇬🇧 English {'✓' if cur_lang.lower() == 'en' else ''}", callback_data="cfg_set_lang:en"),
+        types.InlineKeyboardButton(f"🇮🇩 Indonesian (Bahasa Indonesia) {'✓' if cur_lang.lower() == 'id' else ''}", callback_data="cfg_set_lang:id"),
         types.InlineKeyboardButton(f"🇯🇵 Japanese (日本語) {'✓' if cur_lang.lower() == 'ja' else ''}", callback_data="cfg_set_lang:ja"),
-        types.InlineKeyboardButton(f"🌐 Auto-detect (Ikuti Chat) {'✓' if cur_lang.lower() == 'auto' else ''}", callback_data="cfg_set_lang:auto"),
-        types.InlineKeyboardButton(f"✏️ Bahasa Kustom / Lainnya... {'✓' if cur_lang.lower() not in ('id', 'en', 'ja', 'auto') else ''}", callback_data="cfg_set_lang:custom"),
-        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+        types.InlineKeyboardButton(f"✏️ Custom Language / Other... {'✓' if cur_lang.lower() not in ('id', 'en', 'ja', 'auto') else ''}", callback_data="cfg_set_lang:custom"),
+        types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard")
     )
 
     text = (
-        f"🌐 **Pengaturan Bahasa Waifu (Language Settings)**\n\n"
-        f"• Bahasa Aktif: **{cur_label}**\n\n"
-        f"Pilih bahasa utama agar waifu membalas secara konsisten dan tidak campur-campur bahasa, "
-        f"atau pilih **Bahasa Kustom** untuk menggunakan bahasa lain (Spanish, Korean, Sunda, dll.):"
+        f"🌐 **Waifu Language Settings**\n\n"
+        f"• Active Language: **{cur_label}**\n\n"
+        f"Choose your preferred language so your waifu replies consistently, "
+        f"or select **Auto-detect** to have her automatically match whatever language you chat in (English, Indonesian, Japanese, etc.):"
     )
     if message_to_edit:
         try:
@@ -2906,49 +2925,49 @@ def show_voice_settings_menu(chat_id: int, user_id: int, message_to_edit: Option
     markup = types.InlineKeyboardMarkup(row_width=1)
 
     # 1. Voice Engine Toggle Button
-    engine_toggle_label = "🏠 Engine: VoiceStudio (Local AI Port 3900) ➔ Ubah ke Edge-TTS" if is_vs else "🌐 Engine: Edge-TTS Cloud (Aktif) ➔ Ubah ke VoiceStudio"
+    engine_toggle_label = "🏠 Engine: VoiceStudio (Local AI Port 3900) ➔ Switch to Edge-TTS" if is_vs else "🌐 Engine: Edge-TTS Cloud (Active) ➔ Switch to VoiceStudio"
     markup.add(types.InlineKeyboardButton(engine_toggle_label, callback_data="cfg_toggle_voice_engine"))
 
     if is_vs:
         markup.add(
-            types.InlineKeyboardButton(f"✨ Karakter Suara: {p_name} (VoiceStudio Auto)", callback_data="noop")
+            types.InlineKeyboardButton(f"✨ Voice Character: {p_name} (VoiceStudio Auto)", callback_data="noop")
         )
     else:
         is_auto = (str(cur_speaker).lower() == "auto")
         markup.add(
-            types.InlineKeyboardButton(f"🇮🇩 Gadis (Bahasa Indonesia) {'✓' if 'gadis' in str(cur_speaker).lower() else ''}", callback_data="cfg_set_speaker:gadis"),
-            types.InlineKeyboardButton(f"🇯🇵 Nanami (Japanese / 日本語) {'✓' if 'nanami' in str(cur_speaker).lower() else ''}", callback_data="cfg_set_speaker:nanami"),
             types.InlineKeyboardButton(f"🇬🇧 Ana (English Sweet) {'✓' if 'ana' in str(cur_speaker).lower() else ''}", callback_data="cfg_set_speaker:ana"),
             types.InlineKeyboardButton(f"🇺🇸 Jenny (English Cheerful) {'✓' if 'jenny' in str(cur_speaker).lower() else ''}", callback_data="cfg_set_speaker:jenny"),
-            types.InlineKeyboardButton(f"🌐 Ikuti Bahasa Chat (Auto Sync) {'✓' if is_auto else ''}", callback_data="cfg_set_speaker:auto"),
+            types.InlineKeyboardButton(f"🇮🇩 Gadis (Bahasa Indonesia) {'✓' if 'gadis' in str(cur_speaker).lower() else ''}", callback_data="cfg_set_speaker:gadis"),
+            types.InlineKeyboardButton(f"🇯🇵 Nanami (Japanese / 日本語) {'✓' if 'nanami' in str(cur_speaker).lower() else ''}", callback_data="cfg_set_speaker:nanami"),
+            types.InlineKeyboardButton(f"🌐 Match Chat Language (Auto Sync) {'✓' if is_auto else ''}", callback_data="cfg_set_speaker:auto"),
         )
 
-    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+    markup.add(types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard"))
 
     if is_vs:
         text = (
-            f"🎙️ **Pengaturan Voice & Audio Waifu**\n"
+            f"🎙️ **Waifu Voice & Audio Settings**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• Engine Suara : `🏠 VoiceStudio Local AI (Port 3900)`\n"
-            f"• Tombol Suara : `🔊 Selalu Aktif di Setiap Chat (On-Demand)`\n"
-            f"• Persona Voice: **{p_name}**\n"
-            f"• Karakteristik: _{p_char}_\n\n"
-            f"💡 _Tekan tombol 🔊 Dengarkan Suara di bawah chat waifu kapan saja untuk memutar suaranya via VoiceStudio!_"
+            f"• Voice Engine : `🏠 VoiceStudio Local AI (Port 3900)`\n"
+            f"• Voice Button : `🔊 Always Active in Every Chat (On-Demand)`\n"
+            f"• Voice Persona: **{p_name}**\n"
+            f"• Character    : _{p_char}_\n\n"
+            f"💡 _Tap the 🔊 Listen Voice button under any chat message to hear your waifu speak via VoiceStudio!_"
         )
     else:
-        speaker_desc = "🌐 Auto-sync (Ikuti Bahasa Chat)" if str(cur_speaker).lower() == "auto" else cur_speaker
+        speaker_desc = "🌐 Auto-sync (Matches Chat Language)" if str(cur_speaker).lower() == "auto" else cur_speaker
         text = (
-            f"🎙️ **Pengaturan Voice & Audio Waifu**\n"
+            f"🎙️ **Waifu Voice & Audio Settings**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• Engine Suara : `🌐 Edge-TTS Cloud (Ringan & 0 VRAM)`\n"
-            f"• Tombol Suara : `🔊 Selalu Aktif di Setiap Chat (On-Demand)`\n"
-            f"• Model Suara  : `{speaker_desc}`\n\n"
-            f"🗣️ **Pilihan Bahasa & Karakter Suara:**\n"
-            f"• 🇮🇩 **Gadis** = Bahasa Indonesia alami\n"
-            f"• 🇯🇵 **Nanami** = Bahasa Jepang (otomatis polyglot voice!)\n"
-            f"• 🇬🇧 **Ana / Jenny** = Bahasa Inggris\n"
-            f"• 🌐 **Auto** = Otomatis mengikuti bahasa chat waifu (`/language`)\n\n"
-            f"💡 _Tekan tombol 🔊 Dengarkan Suara di bawah setiap pesan waifu untuk memutar audio kapan saja._"
+            f"• Voice Engine : `🌐 Edge-TTS Cloud (Fast & 0 VRAM)`\n"
+            f"• Voice Button : `🔊 Always Active in Every Chat (On-Demand)`\n"
+            f"• Voice Model  : `{speaker_desc}`\n\n"
+            f"🗣️ **Language & Voice Characters:**\n"
+            f"• 🇬🇧 **Ana / Jenny** = Natural English voice\n"
+            f"• 🇮🇩 **Gadis** = Natural Indonesian voice\n"
+            f"• 🇯🇵 **Nanami** = Japanese voice\n"
+            f"• 🌐 **Auto** = Automatically matches active chat language (`/language`)\n\n"
+            f"💡 _Tap the 🔊 Listen Voice button under any chat message to hear audio._"
         )
 
     if message_to_edit:
@@ -2965,17 +2984,17 @@ def show_quality_menu(chat_id: int, user_id: int, message_to_edit: Optional[int]
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
         types.InlineKeyboardButton(f"🌟 Ultra Quality (32 steps, CFG 8.0) {'✓' if cur_q == 'ultra' else ''}", callback_data="set_quality:ultra"),
-        types.InlineKeyboardButton(f"⚡ High Quality (28 steps, CFG 7.5 - MeinaMix Best) {'✓' if cur_q == 'high' else ''}", callback_data="set_quality:high"),
+        types.InlineKeyboardButton(f"⚡ High Quality (28 steps, CFG 7.5 - Balanced Best) {'✓' if cur_q == 'high' else ''}", callback_data="set_quality:high"),
         types.InlineKeyboardButton(f"🚀 Fast Render (20 steps, CFG 7.0 - Speed) {'✓' if cur_q == 'fast' else ''}", callback_data="set_quality:fast"),
-        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+        types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard")
     )
     text = (
-        f"✨ **Pengaturan Kualitas Foto / Render**\n\n"
-        f"• Kualitas Saat Ini: **{cur_q.upper()}**\n\n"
-        f"Pilih preset kualitas generasi gambar ComfyUI:\n"
-        f"• **Ultra**: Sampling 32 langkah, detail pakaian dan wajah maksimal.\n"
-        f"• **High**: 28 langkah, setting optimal paling seimbang untuk MeinaMix.\n"
-        f"• **Fast**: 20 langkah, render kilat jika ingin hemat waktu."
+        f"✨ **Photo Quality & Render Settings**\n\n"
+        f"• Active Quality: **{cur_q.upper()}**\n\n"
+        f"Choose image generation quality preset:\n"
+        f"• **Ultra**: 32 sampling steps, maximum outfit and facial detail.\n"
+        f"• **High**: 28 sampling steps, optimal balance of speed and clarity.\n"
+        f"• **Fast**: 20 sampling steps, quickest render to save time."
     )
     if message_to_edit:
         try:
@@ -2998,21 +3017,21 @@ def show_ratio_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] =
     markup = types.InlineKeyboardMarkup(row_width=2)
     btns = [
         types.InlineKeyboardButton(f"📐 3:4 (Portrait) {'✓' if cur_ar == '3:4' else ''}", callback_data="set_ratio:3:4"),
-        types.InlineKeyboardButton(f"📱 9:16 (Wallpaper HP) {'✓' if cur_ar == '9:16' else ''}", callback_data="set_ratio:9:16"),
+        types.InlineKeyboardButton(f"📱 9:16 (Phone Wallpaper) {'✓' if cur_ar == '9:16' else ''}", callback_data="set_ratio:9:16"),
         types.InlineKeyboardButton(f"⏹️ 1:1 (Square Avatar) {'✓' if cur_ar == '1:1' else ''}", callback_data="set_ratio:1:1"),
         types.InlineKeyboardButton(f"🖥️ 4:3 (Landscape) {'✓' if cur_ar == '4:3' else ''}", callback_data="set_ratio:4:3"),
     ]
     markup.add(*btns)
-    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+    markup.add(types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard"))
 
     text = (
-        f"📐 **Pengaturan Rasio Foto / Aspect Ratio**\n\n"
-        f"• Rasio Saat Ini: **{cur_ar}**\n\n"
-        f"Pilih ukuran proporsi foto yang dihasilkan waifu:\n"
-        f"• **3:4**: Potret vertikal anime estetik (standar foto tubuh)\n"
-        f"• **9:16**: Layar penuh smartphone, pas untuk Wallpaper HP!\n"
-        f"• **1:1**: Persegi simetris untuk avatar profil\n"
-        f"• **4:3**: Landscape horisontal pemandangan luas"
+        f"📐 **Photo Aspect Ratio Settings**\n\n"
+        f"• Active Ratio: **{cur_ar}**\n\n"
+        f"Choose the aspect ratio for your waifu's photos:\n"
+        f"• **3:4**: Aesthetic anime portrait (standard body view)\n"
+        f"• **9:16**: Fullscreen smartphone portrait, perfect for Phone Wallpapers!\n"
+        f"• **1:1**: Symmetrical square avatar\n"
+        f"• **4:3**: Wide landscape view"
     )
     if message_to_edit:
         try:
@@ -3453,8 +3472,8 @@ def show_persona_menu(chat_id: int, user_id: int, message_to_edit: Optional[int]
 
     markup.add(*buttons)
     markup.add(
-        types.InlineKeyboardButton("➕ Buat Waifu Baru (/newpersona)", callback_data="start_new_persona"),
-        types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard")
+        types.InlineKeyboardButton("➕ Create New Waifu (/newpersona)", callback_data="start_new_persona"),
+        types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard")
     )
     lines.append("\nTap a button below or type `/persona <name>`:")
     text = "\n".join(lines)
@@ -3477,18 +3496,18 @@ def show_outfit_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] 
     markup = types.InlineKeyboardMarkup(row_width=2)
 
     # 1. Primary Auto Mode button at top
-    auto_label = "🌟 Mode Otomatis (Dinamis Sesuai Jadwal) ✓" if is_auto else "🌟 Mode Otomatis (Dinamis Sesuai Jadwal)"
+    auto_label = "🌟 Dynamic Auto Mode (Routine & Context) ✓" if is_auto else "🌟 Dynamic Auto Mode (Routine & Context)"
     markup.add(types.InlineKeyboardButton(auto_label, callback_data="set_outfit:default"))
 
     # Quick action buttons for active session/locked outfit
     if mode == "session":
         markup.add(
-            types.InlineKeyboardButton("🔄 Reset ke Otomatis", callback_data="set_outfit:default"),
-            types.InlineKeyboardButton(f"🔒 Kunci Outfit Ini", callback_data=f"lock_outfit:{cur_key}")
+            types.InlineKeyboardButton("🔄 Reset to Auto", callback_data="set_outfit:default"),
+            types.InlineKeyboardButton(f"🔒 Lock This Outfit", callback_data=f"lock_outfit:{cur_key}")
         )
     elif mode == "locked":
         markup.add(
-            types.InlineKeyboardButton("🔓 Buka Kunci (Kembali ke Otomatis)", callback_data="set_outfit:default")
+            types.InlineKeyboardButton("🔓 Unlock (Return to Auto)", callback_data="set_outfit:default")
         )
 
     outfits = persona_mgr.list_outfits()
@@ -3500,33 +3519,33 @@ def show_outfit_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] 
         label = f"{name} ✓" if is_cur else name
         btns.append(types.InlineKeyboardButton(label, callback_data=f"set_outfit:{key}"))
     markup.add(*btns)
-    markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+    markup.add(types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard"))
 
     active_p_name = persona_mgr.get_active_persona().get("name", "Waifu")
     if mode == "auto":
         status_line = (
-            f"• Mode: **🌟 Otomatis (Dinamis Sesuai Jadwal & Chat)**\n"
-            f"• Pakaian Saat Ini: **{details['dynamic_name']}**\n"
-            f"_({active_p_name} otomatis berganti pakaian mengikuti jam, kegiatan, dan topik chat: tidur = piyama, mandi = handuk, kuliah = baju kampus, santai = baju santai)_\n"
+            f"• Mode: **🌟 Dynamic Auto (Routine & Chat Aware)**\n"
+            f"• Current Outfit: **{details['dynamic_name']}**\n"
+            f"_({active_p_name} automatically changes clothes matching the time of day, activities, and conversation)_\n"
         )
     elif mode == "session":
         status_line = (
-            f"• Mode: **👗 Sesi Khusus**\n"
-            f"• Pakaian Aktif: **{details['name']}**\n"
-            f"_(Berlaku untuk sesi foto saat ini. Otomatis kembali ke pakaian harian saat kegiatan/topik berpindah)_\n"
+            f"• Mode: **👗 Session Outfit**\n"
+            f"• Active Outfit: **{details['name']}**\n"
+            f"_(Active for current photo session. Automatically reverts to daily wear when context shifts)_\n"
         )
     else:
         status_line = (
-            f"• Mode: **🔒 Terkunci**\n"
-            f"• Pakaian Aktif: **{details['name']}**\n"
-            f"_(Terkunci permanen sampai kamu memilih Mode Otomatis)_\n"
+            f"• Mode: **🔒 Locked Outfit**\n"
+            f"• Active Outfit: **{details['name']}**\n"
+            f"_(Permanently locked until you switch back to Auto Mode)_\n"
         )
 
     text = (
-        f"👗 **Lemari Pakaian Waifu (/outfit)**\n\n"
+        f"👗 **Waifu Wardrobe & Outfits (/outfit)**\n\n"
         f"{status_line}\n"
-        f"Pilih gaya busana waifumu untuk sesi foto & selfie! 💕\n\n"
-        f"💡 *Tips*: Dalam **Mode Otomatis**, Akira akan otomatis menyesuaikan pakaiannya secara realistis dengan apa yang sedang dia lakukan!"
+        f"Choose your waifu's outfit for photo & selfie sessions! 💕\n\n"
+        f"💡 *Tip*: In **Auto Mode**, {active_p_name} realistically changes clothes according to what she is currently doing!"
     )
     if message_to_edit:
         try:
@@ -3546,30 +3565,30 @@ def show_hangout_menu(chat_id: int, user_id: int, message_to_edit: Optional[int]
     markup = types.InlineKeyboardMarkup(row_width=1)
 
     if active_date:
-        v_title = active_date.get("venue_title", "Tempat Kencan")
+        v_title = active_date.get("venue_title", "Date Venue")
         markup.add(
-            types.InlineKeyboardButton(f"📸 Minta Foto Kencan di {v_title}", callback_data="open_pap_menu"),
-            types.InlineKeyboardButton("🚪 Selesai Kencan & Pulang", callback_data="end_hangout"),
-            types.InlineKeyboardButton("🔙 Panel Setup", callback_data="cfg_submenu:dashboard")
+            types.InlineKeyboardButton(f"📸 Request Date Photo at {v_title}", callback_data="open_pap_menu"),
+            types.InlineKeyboardButton("🚪 Finish Date & Head Home", callback_data="end_hangout"),
+            types.InlineKeyboardButton("🔙 Dashboard", callback_data="cfg_submenu:dashboard")
         )
         text = (
-            f"💖 **Kencan Berdua Sedang Berlangsung!** 🌸\n\n"
-            f"Kamu dan **{p_name}** saat ini sedang **{v_title}**! 🥰✨\n"
-            f"Nikmati momen kebersamaan kalian berdua di obrolan chat dan abadikan foto kencan bersama!"
+            f"💖 **Date in Progress!** 🌸\n\n"
+            f"You and **{p_name}** are currently at **{v_title}**! 🥰✨\n"
+            f"Enjoy your romantic time together in chat and take sweet date photos!"
         )
     else:
         for v in hangout_engine.list_venues():
             markup.add(types.InlineKeyboardButton(v["title"], callback_data=f"start_hangout:{v['key']}"))
-        markup.add(types.InlineKeyboardButton("🔙 Kembali ke Setup", callback_data="cfg_submenu:dashboard"))
+        markup.add(types.InlineKeyboardButton("🔙 Back to Dashboard", callback_data="cfg_submenu:dashboard"))
         text = (
-            f"💖 **Menu Kencan & Hangout Berdua (/hangout)** 🌸\n\n"
-            f"Pilih tempat kencan untuk dinikmati berdua bersama **{p_name}** sekarang:\n\n"
-            f"• ☕ **Kafe Estetik**: Duduk berdua di sudut kafe menikmati kopi & dessert.\n"
-            f"• 🎬 **Bioskop**: Nonton film bioskop berdampingan berbagi popcorn.\n"
-            f"• 🛋️ **Kosan / Rumah**: Quality time santai berdua di kamar kosan.\n"
-            f"• 🌸 **Taman Senja**: Jalan sore bergandengan tangan di taman kota.\n"
-            f"• 🛍️ **Mall & Arcade**: Jalan-jalan seru dan main mesin capit berdua.\n\n"
-            f"💡 _Tip: Kamu juga bisa langsung mengajak waifu secara alami di chat (misal: 'nonton bioskop yuk', 'ngopi yuk', atau 'main ke kosanmu yuk')!_"
+            f"💖 **Hangout & Dates Menu (/hangout)** 🌸\n\n"
+            f"Choose a date spot to enjoy with **{p_name}** right now:\n\n"
+            f"• ☕ **Aesthetic Cafe**: Sit together in a cozy corner enjoying coffee & dessert.\n"
+            f"• 🎬 **Cinema**: Watch a movie side-by-side sharing popcorn.\n"
+            f"• 🛋️ **Cozy Room / Home**: Relaxing quality time together in the bedroom.\n"
+            f"• 🌸 **Sunset Park**: Romantic evening stroll holding hands in the park.\n"
+            f"• 🛍️ **Mall & Arcade**: Fun shopping and claw machine games together.\n\n"
+            f"💡 _Tip: You can also ask her naturally in chat (e.g. 'let's go to the movies', 'grab some coffee with me', or 'come over to my place')!_"
         )
 
     if message_to_edit:
@@ -4467,7 +4486,7 @@ def callback_regen_photo(call):
 
     user_id = call.from_user.id
     if photo_tracker.is_generating(user_id):
-        bot.answer_callback_query(call.id, "Sabar ya sayang, fotonya lagi diambil nih... Tunggu sampai selesai ya! 💕", show_alert=False)
+        bot.answer_callback_query(call.id, "Please wait, sweetie! Your photo is being taken... 💕", show_alert=False)
         return
 
     scenario = call.data.split(":", 1)[1]
@@ -4493,11 +4512,11 @@ def callback_regen_photo(call):
         ]
         variation = random.choice(pose_variations)
         regen_text = f"{orig_text}, {variation}" if orig_text else variation
-        bot.answer_callback_query(call.id, "🔄 Mengambil pose lain...")
+        bot.answer_callback_query(call.id, "🔄 Taking another pose...")
         process_photo_request(call, regen_text)
         return
 
-    bot.answer_callback_query(call.id, "📸 Mengambil foto...")
+    bot.answer_callback_query(call.id, "📸 Taking a photo...")
     process_photo_request(call, scenario)
 
 
@@ -4511,11 +4530,11 @@ def callback_resend_photo(call):
     chat_id = call.message.chat.id
 
     if photo_tracker.is_generating(user_id):
-        bot.answer_callback_query(call.id, "Fotonya lagi disiapkan nih sayang, tunggu sebentar ya... 💕", show_alert=False)
+        bot.answer_callback_query(call.id, "Photo is being prepared, please wait a moment, darling... 💕", show_alert=False)
         return
 
     if not photo_tracker.acquire_resend(user_id):
-        bot.answer_callback_query(call.id, "Foto sedang dikirimkan ulang sayang, tunggu sebentar ya... 💕", show_alert=False)
+        bot.answer_callback_query(call.id, "Photo is being resent, please wait a moment, darling... 💕", show_alert=False)
         return
 
     # Immediately remove buttons from prompt message so user CANNOT click again!
@@ -4527,7 +4546,7 @@ def callback_resend_photo(call):
     try:
         last = USER_LAST_PHOTO_CONTEXT.get(user_id)
         if not last or not last.get("img_bytes"):
-            bot.answer_callback_query(call.id, "Foto di cache sudah kedaluwarsa, membuat foto baru...", show_alert=False)
+            bot.answer_callback_query(call.id, "Cached photo expired, taking a new photo...", show_alert=False)
             process_photo_request(call, "last")
             return
 
@@ -5013,23 +5032,23 @@ def show_pap_scenario_menu(chat_id: int, user_id: int, message_to_edit: Optional
     name = persona.get("name", "Waifu")
     markup = types.InlineKeyboardMarkup(row_width=2)
     btns = [
-        types.InlineKeyboardButton("🛏️ Bangun Tidur", callback_data="pap_sc:bed"),
-        types.InlineKeyboardButton("☕ Santai di Kafe", callback_data="pap_sc:cafe"),
-        types.InlineKeyboardButton("🍳 Masak di Dapur", callback_data="pap_sc:kitchen"),
-        types.InlineKeyboardButton("🌳 Jalan di Taman", callback_data="pap_sc:park"),
-        types.InlineKeyboardButton("🌙 Piyama Lucu", callback_data="pap_sc:pajamas"),
-        types.InlineKeyboardButton("🏖️ Liburan di Pantai", callback_data="pap_sc:beach"),
-        types.InlineKeyboardButton("🏫 Seragam Sekolah", callback_data="pap_sc:school"),
-        types.InlineKeyboardButton("💋 Pose Romantis", callback_data="pap_sc:sensual"),
+        types.InlineKeyboardButton("🛏️ Waking Up in Bed", callback_data="pap_sc:bed"),
+        types.InlineKeyboardButton("☕ Relaxing at Cafe", callback_data="pap_sc:cafe"),
+        types.InlineKeyboardButton("🍳 Cooking in Kitchen", callback_data="pap_sc:kitchen"),
+        types.InlineKeyboardButton("🌳 Park Walk", callback_data="pap_sc:park"),
+        types.InlineKeyboardButton("🌙 Cute Pajamas", callback_data="pap_sc:pajamas"),
+        types.InlineKeyboardButton("🏖️ Beach Vacation", callback_data="pap_sc:beach"),
+        types.InlineKeyboardButton("🏫 School Uniform", callback_data="pap_sc:school"),
+        types.InlineKeyboardButton("💋 Romantic Pose", callback_data="pap_sc:sensual"),
         types.InlineKeyboardButton("🎲 Surprise Me!", callback_data="pap_sc:random"),
-        types.InlineKeyboardButton("❌ Batal", callback_data="pap_sc:cancel")
+        types.InlineKeyboardButton("❌ Cancel", callback_data="pap_sc:cancel")
     ]
     markup.add(*btns)
     text = (
-        f"📸 **PILIH SKENARIO PAP & FOTO {name.upper()}** 🥰\n"
+        f"📸 **SELECT PHOTO SCENARIO FOR {name.upper()}** 🥰\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Kamu mau aku kirim foto selfie di mana dan lagi suasana apa?\n\n"
-        f"💡 _Pilih salah satu tema cepat di bawah, atau ketik langsung di obrolan seperti:_ `/pap lagi baca buku di perpustakaan`"
+        f"Where and what mood would you like me to take a selfie in?\n\n"
+        f"💡 _Pick a quick theme below, or ask directly in chat like:_ `/pap reading in the library`"
     )
     if message_to_edit:
         try:
@@ -5063,7 +5082,7 @@ def callback_pap_scenario(call):
 
     prompt = SCENARIO_PROMPTS.get(sc_key, "relaxing at home, looking at viewer happily")
     try:
-        bot.answer_callback_query(call.id, "📸 Menyiapkan foto...")
+        bot.answer_callback_query(call.id, "📸 Preparing photo...")
     except Exception:
         pass
     process_photo_request(call, prompt)
@@ -5076,7 +5095,7 @@ def handle_photo_command(message):
 
     if photo_tracker.is_generating(message.from_user.id):
         p_name = persona_mgr.get_active_persona().get("name", "Aku")
-        safe_reply_to(message, f"🌸 *{p_name}*: Sabar ya sayang, foto sebelumnya lagi aku siapkan nih... Ditunggu sampai selesai yaa! 💕")
+        safe_reply_to(message, f"🌸 *{p_name}*: Please wait, sweetie! Your previous photo is still being prepared... Almost ready! 💕")
         return
 
     scenario = message.text.replace("/photo", "").replace("/pap", "").strip()
@@ -5331,7 +5350,7 @@ def process_photo_request(
             status_msg = None
             # If this is a followup photo after a conversational chat reply, don't spam a separate loading message
             if not is_followup:
-                status_text = f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕"
+                status_text = f"📸 *{persona.get('name')} is taking a photo for you...* 💕"
                 if is_callback and hasattr(reply_to_target, "message_id"):
                     # Instant UI feedback: transform the scenario menu directly into loading message
                     status_msg = safe_edit_message_text(status_text, chat_id=chat_id, message_id=reply_to_target.message_id)
@@ -5508,11 +5527,11 @@ def process_photo_request(
                     p_engine = fallback_notice.get("primary_engine", "Image Engine")
                     p_name = persona.get("name", "Waifu")
                     notice_text = (
-                        "⚠️ *Pemberitahuan Sistem Visual (Fallback Aktif)*\n"
+                        "⚠️ *Visual System Notice (Fallback Active)*\n"
                         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Image engine pilihanmu (*{p_engine}*) sedang mengalami kendala:\n"
+                        f"Your selected image engine (*{p_engine}*) is currently experiencing issues:\n"
                         f"❌ `{p_err}`\n\n"
-                        f"📁 {p_name} mengambilkan foto alternatif dari *{source}* agar kamu tidak menunggu kosong yaa! ✨"
+                        f"📁 {p_name} retrieved an alternative photo from *{source}* so you don't have to wait! ✨"
                     )
                     safe_send_message(chat_id, notice_text, parse_mode="Markdown")
 
@@ -5650,7 +5669,7 @@ def process_photo_request(
             else:
                 fallback_caption = "Ini pap spesial buat kamu, suka ga? 🥰"
             clean_caption = sanitize_chat_caption(caption, fallback_caption, user_prompt=actual_user_msg, detected_scene=detected_scene)
-            fallback_tag = " _(Fallback Otomatis)_" if fallback_notice else ""
+            fallback_tag = " _(Automatic Fallback)_" if fallback_notice else ""
             full_caption = f"{format_roleplay_italics(clean_caption, character_name=persona.get('name', 'Runa'))}\n\n📷 *Model:* `{source}`{fallback_tag}"
 
             if status_msg and hasattr(status_msg, "message_id"):
@@ -5663,14 +5682,14 @@ def process_photo_request(
 
             markup = types.InlineKeyboardMarkup(row_width=2)
             markup.add(
-                types.InlineKeyboardButton("🔄 Pose Lain", callback_data="regen_photo:last"),
-                types.InlineKeyboardButton("🎬 Bikin Video Gerak", callback_data="regen_video:last")
+                types.InlineKeyboardButton("🔄 Another Pose", callback_data="regen_photo:last"),
+                types.InlineKeyboardButton("🎬 Create Motion Video", callback_data="regen_video:last")
             )
             if hangout_engine.is_on_date(user_id):
                 active_date = hangout_engine.get_active_date(user_id)
-                v_title = active_date.get("venue_title", "Kencan") if active_date else "Kencan"
+                v_title = active_date.get("venue_title", "Date") if active_date else "Date"
                 markup.add(
-                    types.InlineKeyboardButton(f"🚪 Akhiri {v_title}", callback_data="end_hangout")
+                    types.InlineKeyboardButton(f"🚪 End {v_title}", callback_data="end_hangout")
                 )
 
             markup = attach_voice_button(markup, clean_caption or full_caption, user_id)
@@ -5742,8 +5761,8 @@ def process_photo_request(
             p_name = persona.get("name", "Aku") if ('persona' in locals() and isinstance(persona, dict)) else "Aku"
             resend_markup = types.InlineKeyboardMarkup(row_width=2)
             resend_markup.add(
-                types.InlineKeyboardButton("🔄 Kirim Ulang Foto", callback_data="resend_photo:last"),
-                types.InlineKeyboardButton("📸 Pose Lain", callback_data="regen_photo:last")
+                types.InlineKeyboardButton("🔄 Resend Photo", callback_data="resend_photo:last"),
+                types.InlineKeyboardButton("📸 Another Pose", callback_data="regen_photo:last")
             )
             # Remove buttons from any older unhandled resend prompt for this user
             old_mid = USER_PENDING_RESEND_MSG_ID.pop(user_id, None)
@@ -5755,8 +5774,8 @@ def process_photo_request(
 
             sent_msg = safe_send_message(
                 chat_id,
-                f"🌸 *{p_name}*: Aduh sayang, koneksiku ke Telegram sepertinya lagi agak lemot nih... 🥺\n"
-                f"Fotonya belum sempat terkirim tadi. Mau aku kirimkan ulang sekarang?",
+                f"🌸 *{p_name}*: Oh sweetie, my connection to Telegram was a bit slow just now... 🥺\n"
+                f"The photo couldn't be delivered. Would you like me to resend it now?",
                 reply_markup=resend_markup,
                 parse_mode="Markdown"
             )
@@ -5777,7 +5796,7 @@ def handle_video_command(message):
 
     if photo_tracker.is_generating(message.from_user.id):
         p_name = persona_mgr.get_active_persona().get("name", "Aku")
-        safe_reply_to(message, f"🌸 *{p_name}*: Sabar ya sayang, video/foto sebelumnya lagi aku siapkan nih... Ditunggu sampai selesai yaa! 💕")
+        safe_reply_to(message, f"🌸 *{p_name}*: Please wait, sweetie! Your previous video/photo is still being prepared... Almost ready! 💕")
         return
 
     scenario = message.text.replace("/video", "").replace("/anim", "").replace("/animate", "").replace("/klip", "").strip()
@@ -5838,7 +5857,7 @@ def process_video_request(
 
             status_msg = None
             if not is_followup:
-                status_text = f"🎬 *{persona.get('name')} lagi merekam video...*"
+                status_text = f"🎬 *{persona.get('name')} is recording a video for you...* 💕"
                 if is_callback and hasattr(reply_to_target, "message_id"):
                     status_msg = safe_edit_message_text(status_text, chat_id=chat_id, message_id=reply_to_target.message_id)
                     if not status_msg:
@@ -6518,31 +6537,31 @@ def render_music_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         ctrl_btn = types.InlineKeyboardButton("⏸️ Pause", callback_data="music_cmd:pause")
     elif playback == "PAUSED" and track:
         state_badge = "⏸️ Jeda (Paused)"
-        ctrl_btn = types.InlineKeyboardButton("▶️ Lanjutkan", callback_data="music_cmd:resume")
+        ctrl_btn = types.InlineKeyboardButton("▶️ Resume", callback_data="music_cmd:resume")
     else:
-        state_badge = "⏹️ Berhenti (Idle)"
-        ctrl_btn = types.InlineKeyboardButton("▶️ Putar Lofi", callback_data="music_cmd:lofi")
+        state_badge = "⏹️ Stopped (Idle)"
+        ctrl_btn = types.InlineKeyboardButton("▶️ Play Lofi", callback_data="music_cmd:lofi")
 
     if track:
         track_info = (
             f"🎶 **{track.get('title', 'Unknown')}**\n"
-            f"👤 Artis: `{track.get('artist', 'Unknown')}`\n"
-            f"⏱️ Durasi: `{track.get('durationFormatted', '00:00')}`\n"
-            f"📻 Status: **{state_badge}** | Antrean: `{queue_len} lagu`"
+            f"👤 Artist: `{track.get('artist', 'Unknown')}`\n"
+            f"⏱️ Duration: `{track.get('durationFormatted', '00:00')}`\n"
+            f"📻 Status: **{state_badge}** | Queue: `{queue_len} tracks`"
         )
     else:
         track_info = (
             f"📻 Status: **{state_badge}**\n\n"
-            f"Belum ada lagu yang diputar di PC kamu saat ini.\n"
-            f"Ketik `/play <judul lagu>` untuk langsung memutar musik favoritmu!"
+            f"No music currently playing on your PC.\n"
+            f"Type `/play <song title>` to play your favorite song!"
         )
 
     text = (
-        f"🎵 **REMOTE PEMUTAR MUSIK YOUTUBE PC**\n"
+        f"🎵 **PC YOUTUBE MUSIC REMOTE**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{track_info}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 _Lagu diputar langsung di layar browser PC kamu secara otomatis!_"
+        f"💡 _Songs play automatically inside your PC browser!_"
     )
 
     markup.add(
@@ -6551,12 +6570,12 @@ def render_music_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
         types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
     )
     markup.add(
-        types.InlineKeyboardButton("📜 Daftar Antrean", callback_data="music_cmd:view_queue"),
+        types.InlineKeyboardButton("📜 Queue List", callback_data="music_cmd:view_queue"),
         types.InlineKeyboardButton("☕ Lofi", callback_data="music_cmd:lofi"),
         types.InlineKeyboardButton("🌸 J-Pop", callback_data="music_cmd:jpop")
     )
     markup.add(
-        types.InlineKeyboardButton("🌐 Buka di PC", callback_data="music_cmd:open_pc"),
+        types.InlineKeyboardButton("🌐 Open on PC", callback_data="music_cmd:open_pc"),
         types.InlineKeyboardButton("🔄 Refresh", callback_data="music_cmd:refresh"),
         types.InlineKeyboardButton("🔙 Setup", callback_data="open_setup_menu")
     )
@@ -6568,8 +6587,8 @@ def render_queue_dashboard() -> Tuple[str, types.InlineKeyboardMarkup]:
     stat = call_music_api("/api/status")
     markup = types.InlineKeyboardMarkup(row_width=3)
     if not stat or not stat.get("enabled"):
-        text = "⚠️ Layanan pemutar musik PC (Port 8002) sedang tidak aktif."
-        markup.add(types.InlineKeyboardButton("🔙 Remote Musik", callback_data="open_music_menu"))
+        text = "⚠️ PC music player service (Port 8002) is currently offline."
+        markup.add(types.InlineKeyboardButton("🔙 Music Remote", callback_data="open_music_menu"))
         return text, markup
 
     queue = stat.get("queue", [])
@@ -6578,21 +6597,21 @@ def render_queue_dashboard() -> Tuple[str, types.InlineKeyboardMarkup]:
 
     if not queue:
         text = (
-            "📜 **DAFTAR ANTREAN MUSIK PC (PLAYLIST QUEUE)**\n"
+            "📜 **PC PLAYLIST QUEUE**\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "Belum ada antrean lagu di PC kamu saat ini.\n\n"
-            "💡 _Ketik `/queue <judul>` untuk menambah lagu ke antrean!_\n"
-            "💡 _Ketik `/playlist <nama album/artis>` untuk memuat banyak lagu sekaligus._"
+            "No tracks in queue on your PC right now.\n\n"
+            "💡 _Type `/queue <title>` to add a song to the queue!_\n"
+            "💡 _Type `/playlist <album/artist>` to load an entire playlist._"
         )
         markup.add(
-            types.InlineKeyboardButton("☕ Lofi Santai", callback_data="music_cmd:lofi"),
+            types.InlineKeyboardButton("☕ Relaxing Lofi", callback_data="music_cmd:lofi"),
             types.InlineKeyboardButton("🌸 J-Pop Hits", callback_data="music_cmd:jpop")
         )
-        markup.add(types.InlineKeyboardButton("🔙 Remote Musik", callback_data="open_music_menu"))
+        markup.add(types.InlineKeyboardButton("🔙 Music Remote", callback_data="open_music_menu"))
         return text, markup
 
     lines = [
-        "📜 **DAFTAR ANTREAN MUSIK PC (PLAYLIST QUEUE)**",
+        "📜 **PC PLAYLIST QUEUE**",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━"
     ]
     # Display up to 12 upcoming tracks
@@ -6602,19 +6621,19 @@ def render_queue_dashboard() -> Tuple[str, types.InlineKeyboardMarkup]:
         artist = t.get("artist", "")
         dur = t.get("durationFormatted", "")
         if i == cur_idx:
-            badge = "▶️ *(Sedang Memutar)*" if playback == "PLAYING" else "⏸️ *(Jeda)*"
+            badge = "▶️ *(Playing Now)*" if playback == "PLAYING" else "⏸️ *(Paused)*"
             lines.append(f"• **{i+1}. {title}**\n   _{artist}_ ({dur}) {badge}")
         elif i == cur_idx + 1:
-            lines.append(f"• {i+1}. **{title}**\n   _{artist}_ ({dur}) ⏳ _(Berikutnya)_")
+            lines.append(f"• {i+1}. **{title}**\n   _{artist}_ ({dur}) ⏳ _(Next Up)_")
         else:
             lines.append(f"• {i+1}. {title} - _{artist}_ ({dur})")
 
     if len(queue) > 12:
-        lines.append(f"\n_...dan {len(queue) - 12} lagu lainnya dalam antrean._")
+        lines.append(f"\n_...and {len(queue) - 12} more songs in queue._")
 
     lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    lines.append(f"📊 Total Antrean: `{len(queue)} lagu` | Lagu ke-`{cur_idx + 1}`")
-    lines.append("💡 _Ketik `/queue <judul lagu>` untuk menambahkan lagu baru!_")
+    lines.append(f"📊 Total Queue: `{len(queue)} tracks` | Track #{cur_idx + 1}")
+    lines.append("💡 _Type `/queue <song title>` to queue another track!_")
 
     text = "\n".join(lines)
     markup.add(
@@ -6654,11 +6673,11 @@ def get_music_player_markup(is_playing: bool = True) -> types.InlineKeyboardMark
         types.InlineKeyboardButton("⏹️ Stop", callback_data="music_cmd:stop")
     )
     markup.add(
-        types.InlineKeyboardButton("📜 Antrean Lagu", callback_data="music_cmd:view_queue"),
-        types.InlineKeyboardButton("🎵 Remote Musik", callback_data="open_music_menu")
+        types.InlineKeyboardButton("📜 Queue List", callback_data="music_cmd:view_queue"),
+        types.InlineKeyboardButton("🎵 Music Remote", callback_data="open_music_menu")
     )
     markup.add(
-        types.InlineKeyboardButton("📸 Minta PAP Sambil Dengerin", callback_data="pap_sc:cafe")
+        types.InlineKeyboardButton("📸 Photo while Listening", callback_data="pap_sc:cafe")
     )
     return markup
 
@@ -6691,7 +6710,7 @@ def handle_play_command(message):
 
     query = parts[1].strip()
     bot.send_chat_action(message.chat.id, "typing")
-    wait_msg = bot.reply_to(message, f"🎵 *Mencari & memutar '{query}' di PC kamu...*", parse_mode="Markdown")
+    wait_msg = bot.reply_to(message, f"🎵 *Searching & playing '{query}' on your PC...*", parse_mode="Markdown")
 
     with ChatActionLoop(bot, message.chat.id, "typing"):
         res = call_music_api("/api/play", method="POST", payload={"query": query})
@@ -6703,11 +6722,11 @@ def handle_play_command(message):
         thumb = track.get("thumbnail")
 
         caption = (
-            f"🎵 **Memutar Musik di PC Kamu:**\n\n"
+            f"🎵 **Now Playing on Your PC:**\n\n"
             f"🎶 **{title}**\n"
-            f"👤 Artis: `{artist}`\n"
-            f"⏱️ Durasi: `{dur}`\n\n"
-            f"🎧 _Player otomatis dibuka di browser PC kamu._"
+            f"👤 Artist: `{artist}`\n"
+            f"⏱️ Duration: `{dur}`\n\n"
+            f"🎧 _Player automatically opened in your PC browser._"
         )
 
         markup = get_music_player_markup(is_playing=True)
@@ -6725,11 +6744,11 @@ def handle_play_command(message):
                 pass
         bot.send_message(message.chat.id, caption, reply_markup=markup, parse_mode="Markdown")
     else:
-        err = res.get("error") if res else "Koneksi ke pemutar musik (Port 8002) gagal."
+        err = res.get("error") if res else "Connection to PC music player (Port 8002) failed."
         try:
-            bot.edit_message_text(f"⚠️ Tidak dapat memutar '{query}': {err}", chat_id=message.chat.id, message_id=wait_msg.message_id)
+            bot.edit_message_text(f"⚠️ Unable to play '{query}': {err}", chat_id=message.chat.id, message_id=wait_msg.message_id)
         except Exception:
-            bot.send_message(message.chat.id, f"⚠️ Tidak dapat memutar '{query}': {err}")
+            bot.send_message(message.chat.id, f"⚠️ Unable to play '{query}': {err}")
 
 
 @bot.message_handler(commands=['pause'])
@@ -6737,7 +6756,7 @@ def handle_pause_command(message):
     if not is_authorized(message.from_user.id):
         return
     call_music_api("/api/pause", method="POST")
-    bot.reply_to(message, "⏸️ Pemutaran musik di PC telah di-pause.")
+    bot.reply_to(message, "⏸️ Music playback on PC paused.")
 
 
 @bot.message_handler(commands=['resume'])
@@ -6745,7 +6764,7 @@ def handle_resume_command(message):
     if not is_authorized(message.from_user.id):
         return
     call_music_api("/api/resume", method="POST")
-    bot.reply_to(message, "▶️ Pemutaran musik di PC dilanjutkan.")
+    bot.reply_to(message, "▶️ Music playback on PC resumed.")
 
 
 @bot.message_handler(commands=['next', 'skip'])
@@ -8004,7 +8023,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 uid = message.from_user.id if message and hasattr(message, "from_user") and message.from_user else 0
                 if uid and photo_tracker.is_generating(uid):
                     p_name = persona_mgr.get_active_persona().get("name", "Aku")
-                    safe_reply_to(message, f"🌸 *{p_name}*: Sabar ya sayang, foto/video sebelumnya lagi aku siapkan nih... Ditunggu sampai selesai yaa! 💕")
+                    safe_reply_to(message, f"🌸 *{p_name}*: Please wait, sweetie! Your previous photo/video is still being prepared... Almost ready! 💕")
                     return
                 if media_type == "video":
                     process_video_request(message, user_text)
@@ -8026,17 +8045,32 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 )
                 persona = persona_mgr.get_active_persona()
                 p_name = persona.get("name", "Waifu")
-                confirm_msg = (
-                    f"⏰ **Siap, {p_name} catat ya!** 🥰\n\n"
-                    f"Aku bakal ingetin kamu:\n"
-                    f"📌 *{rem_task}*\n"
-                    f"🕒 *Waktu:* {rem_str}\n\n"
-                    f"Tenang aja, pas jamnya tiba aku langsung kabarin kamu! Semangat yaa~"
-                )
+                u_lang = persona_mgr.get_user_language(message.from_user.id) if hasattr(persona_mgr, 'get_user_language') else "auto"
+                is_id = (u_lang == "id")
+                if is_id:
+                    confirm_msg = (
+                        f"⏰ **Siap, {p_name} catat ya!** 🥰\n\n"
+                        f"Aku bakal ingetin kamu:\n"
+                        f"📌 *{rem_task}*\n"
+                        f"🕒 *Waktu:* {rem_str}\n\n"
+                        f"Tenang aja, pas jamnya tiba aku langsung kabarin kamu! Semangat yaa~"
+                    )
+                    btn_all = "📋 Lihat Semua Pengingat"
+                    btn_cancel = "❌ Batalkan"
+                else:
+                    confirm_msg = (
+                        f"⏰ **Got it, {p_name} noted it down!** 🥰\n\n"
+                        f"I will remind you:\n"
+                        f"📌 *{rem_task}*\n"
+                        f"🕒 *Time:* {rem_str}\n\n"
+                        f"Don't worry, I'll alert you right when the time arrives! ✨"
+                    )
+                    btn_all = "📋 View All Reminders"
+                    btn_cancel = "❌ Cancel"
                 markup = types.InlineKeyboardMarkup()
                 markup.add(
-                    types.InlineKeyboardButton("📋 Lihat Semua Pengingat", callback_data="open_reminders_menu"),
-                    types.InlineKeyboardButton("❌ Batalkan", callback_data=f"rem_del:{item['id']}")
+                    types.InlineKeyboardButton(btn_all, callback_data="open_reminders_menu"),
+                    types.InlineKeyboardButton(btn_cancel, callback_data=f"rem_del:{item['id']}")
                 )
                 markup = attach_voice_button(markup, confirm_msg, message.from_user.id)
                 safe_reply_to(message, confirm_msg, reply_markup=markup)
@@ -8046,7 +8080,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
             if message.from_user.id in USER_DATE_WIZARD:
                 target_field = USER_DATE_WIZARD.pop(message.from_user.id)
                 if user_text.lower().strip() in ('batal', 'cancel', 'kembali', 'exit'):
-                    safe_reply_to(message, "Pengaturan tanggal dibatalkan.", parse_mode=None)
+                    safe_reply_to(message, "Date setup cancelled.", parse_mode=None)
                     return
 
                 parsed = AnniversaryEngine.parse_date(user_text)
@@ -8054,27 +8088,45 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     day, month, year, label = parsed
                     persona = persona_mgr.get_active_persona()
                     p_name = persona.get("name", "Waifu")
+                    u_lang = persona_mgr.get_user_language(message.from_user.id) if hasattr(persona_mgr, 'get_user_language') else "auto"
+                    is_id = (u_lang == "id")
                     if target_field == "birthday":
                         anniversary_engine.set_birthday(message.from_user.id, day, month, year)
                         memory_engine.update_profile(message.from_user.id, birthday=label)
                         cd = anniversary_engine.get_countdown(day, month)
-                        cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
-                        reply_msg = (
-                            f"🎂 **Hari Ulang Tahunmu Berhasil Dicatat!** 🥰\n\n"
-                            f"Tanggal: **{label}** _({cd_str})_\n\n"
-                            f"Pas hari ulang tahunmu tiba, {p_name} bakal siapin ucapan dan foto spesial buat kamu! 🎂"
-                        )
+                        if is_id:
+                            cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                            reply_msg = (
+                                f"🎂 **Hari Ulang Tahunmu Berhasil Dicatat!** 🥰\n\n"
+                                f"Tanggal: **{label}** _({cd_str})_\n\n"
+                                f"Pas hari ulang tahunmu tiba, {p_name} bakal siapin ucapan dan foto spesial buat kamu! 🎂"
+                            )
+                        else:
+                            cd_str = "TODAY! 🎉" if cd == 0 else f"{cd} days left"
+                            reply_msg = (
+                                f"🎂 **Your Birthday has been saved!** 🥰\n\n"
+                                f"Date: **{label}** _({cd_str})_\n\n"
+                                f"When your birthday arrives, {p_name} will prepare special wishes and a surprise celebration photo for you! 🎂"
+                            )
                     else:
                         anniversary_engine.set_anniversary(message.from_user.id, day, month, year)
                         cd = anniversary_engine.get_countdown(day, month)
-                        cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
-                        reply_msg = (
-                            f"💍 **Hari Anniversary Kita Berhasil Dicatat!** 🥰\n\n"
-                            f"Tanggal: **{label}** _({cd_str})_\n\n"
-                            f"Aku senang banget kita punya momen spesial ini. Nanti pas hari anniversary kita, siap-siap dapat kado spesial dari aku yaa! 💕"
-                        )
+                        if is_id:
+                            cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                            reply_msg = (
+                                f"💍 **Hari Anniversary Kita Berhasil Dicatat!** 🥰\n\n"
+                                f"Tanggal: **{label}** _({cd_str})_\n\n"
+                                f"Aku senang banget kita punya momen spesial ini. Nanti pas hari anniversary kita, siap-siap dapat kado spesial dari aku yaa! 💕"
+                            )
+                        else:
+                            cd_str = "TODAY! 🎉" if cd == 0 else f"{cd} days left"
+                            reply_msg = (
+                                f"💍 **Our Anniversary has been saved!** 🥰\n\n"
+                                f"Date: **{label}** _({cd_str})_\n\n"
+                                f"I'm so blessed to have this special milestone with you. Get ready for a lovely surprise on our anniversary! 💕"
+                            )
                     markup = types.InlineKeyboardMarkup()
-                    markup.add(types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu"))
+                    markup.add(types.InlineKeyboardButton("🎂 Open Special Dates", callback_data="open_dates_menu"))
                     markup = attach_voice_button(markup, reply_msg, message.from_user.id)
                     safe_reply_to(message, reply_msg, reply_markup=markup)
                     return
@@ -8082,7 +8134,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     USER_DATE_WIZARD[message.from_user.id] = target_field
                     safe_reply_to(
                         message,
-                        "⚠️ Format tanggal belum dikenali. Coba ketik seperti: `15 Agustus 1998` atau `24/10/2000` yaa! (Atau ketik `batal`)"
+                        "⚠️ Date format not recognized. Try typing like: `August 15 1998` or `15/08/1998`! (Or type `cancel`)"
                     )
                     return
 
@@ -8092,27 +8144,45 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 dtype, day, month, year, label = spec_date_res
                 persona = persona_mgr.get_active_persona()
                 p_name = persona.get("name", "Waifu")
+                u_lang = persona_mgr.get_user_language(message.from_user.id) if hasattr(persona_mgr, 'get_user_language') else "auto"
+                is_id = (u_lang == "id")
                 if dtype == "birthday":
                     anniversary_engine.set_birthday(message.from_user.id, day, month, year)
                     memory_engine.update_profile(message.from_user.id, birthday=label)
                     cd = anniversary_engine.get_countdown(day, month)
-                    cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
-                    conf_msg = (
-                        f"🎂 **Wah, {p_name} catat yaa!** 🥰\n\n"
-                        f"Hari ulang tahunmu tanggal **{label}** ({cd_str}) kan? "
-                        f"Aku pasti bakal ingat pas harinya tiba! 🎉"
-                    )
+                    if is_id:
+                        cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                        conf_msg = (
+                            f"🎂 **Wah, {p_name} catat yaa!** 🥰\n\n"
+                            f"Hari ulang tahunmu tanggal **{label}** ({cd_str}) kan? "
+                            f"Aku pasti bakal ingat pas harinya tiba! 🎉"
+                        )
+                    else:
+                        cd_str = "TODAY! 🎉" if cd == 0 else f"{cd} days left"
+                        conf_msg = (
+                            f"🎂 **{p_name} noted that down!** 🥰\n\n"
+                            f"Your birthday is **{label}** ({cd_str})! "
+                            f"I'll make sure to celebrate with you when the day comes! 🎉"
+                        )
                 else:
                     anniversary_engine.set_anniversary(message.from_user.id, day, month, year)
                     cd = anniversary_engine.get_countdown(day, month)
-                    cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
-                    conf_msg = (
-                        f"💍 **Sip! {p_name} catat ya!** ✨\n\n"
-                        f"Tanggal jadian kita **{label}** ({cd_str})! "
-                        f"Aku senang banget bisa nemenin kamu, aku bakal selalu rayain hari istimewa kamu! 💕"
-                    )
+                    if is_id:
+                        cd_str = "HARI INI! 🎉" if cd == 0 else f"{cd} hari lagi"
+                        conf_msg = (
+                            f"💍 **Sip! {p_name} catat ya!** ✨\n\n"
+                            f"Tanggal jadian kita **{label}** ({cd_str})! "
+                            f"Aku senang banget bisa nemenin kamu, aku bakal selalu rayain hari istimewa kamu! 💕"
+                        )
+                    else:
+                        cd_str = "TODAY! 🎉" if cd == 0 else f"{cd} days left"
+                        conf_msg = (
+                            f"💍 **{p_name} noted that down!** ✨\n\n"
+                            f"Our anniversary date is **{label}** ({cd_str})! "
+                            f"I love being with you, and I will always cherish our special day! 💕"
+                        )
                 markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton("🎂 Buka Menu Hari Spesial", callback_data="open_dates_menu"))
+                markup.add(types.InlineKeyboardButton("🎂 Open Special Dates", callback_data="open_dates_menu"))
                 markup = attach_voice_button(markup, conf_msg, message.from_user.id)
                 safe_reply_to(message, conf_msg, reply_markup=markup)
                 return
@@ -8125,7 +8195,8 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     safe_reply_to(message, f"💻 **{tag}**\n```\n{res}\n```")
                 return
 
-            persona = persona_mgr.get_active_persona()
+            u_lang = persona_mgr.get_user_language(message.from_user.id) if hasattr(persona_mgr, 'get_user_language') else "auto"
+            persona = persona_mgr.get_active_persona(lang=u_lang, user_text=user_text)
 
             with ChatActionLoop(bot, message.chat.id, "typing") as typing_loop:
                 # 1. Expire stale session outfits and undress stage when switching to casual daily topics
@@ -8416,31 +8487,43 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     except Exception:
                         pass
 
+                eff_lang = u_lang if u_lang != "auto" else persona_mgr.detect_text_language(user_text)
+                is_eff_id = eff_lang in ("id", "indonesia", "indonesian", "bahasa")
+
                 if is_conversational_media:
-                    media_kind = "video pendek" if media_type == "video" else "pap/foto selfie"
-                    system_inst += (
-                        f"\n\n[PENTING - RESPON OBROLAN & PAP]\n"
-                        f"Pasanganmu sedang mengobrol denganmu dan sekaligus meminta kamu mengirimkan {media_kind}: \"{user_text}\".\n"
-                        f"Instruksi wajib:\n"
-                        f"1. Jawab/tanggapi obrolan dan pertanyaannya secara hangat dalam 1-2 kalimat pendek, lalu bilang kamu akan mengirim {media_kind} sekarang (misal: 'Bentar ya, aku fotoin sekarang~ 🥰').\n"
-                        f"2. DILARANG hanya mengirim tag aksi tanpa menjawab!"
-                    )
+                    if is_eff_id:
+                        media_kind = "video pendek" if media_type == "video" else "pap/foto selfie"
+                        system_inst += (
+                            f"\n\n[PENTING - RESPON OBROLAN & PAP]\n"
+                            f"Pasanganmu sedang mengobrol denganmu dan sekaligus meminta kamu mengirimkan {media_kind}: \"{user_text}\".\n"
+                            f"Instruksi wajib:\n"
+                            f"1. Jawab/tanggapi obrolan dan pertanyaannya secara hangat dalam 1-2 kalimat pendek, lalu bilang kamu akan mengirim {media_kind} sekarang (misal: 'Bentar ya, aku fotoin sekarang~ 🥰').\n"
+                            f"2. DILARANG hanya mengirim tag aksi tanpa menjawab!"
+                        )
+                    else:
+                        media_kind = "a short video" if media_type == "video" else "a selfie/photo"
+                        system_inst += (
+                            f"\n\n[IMPORTANT - CONVERSATION & PHOTO RESPONSE]\n"
+                            f"Your partner is chatting with you and also asking you to send {media_kind}: \"{user_text}\".\n"
+                            f"Mandatory instructions:\n"
+                            f"1. Respond warmly to their conversation and questions in 1-2 short sentences, then say you will send {media_kind} right now (e.g. 'Hold on sweetie, taking a quick photo for you right now~ 🥰').\n"
+                            f"2. NEVER reply with only an action tag without spoken words!"
+                        )
 
                 if not long_form_req:
-                    cur_lang_low = (globals().get("BOT_LANGUAGE") or os.environ.get("BOT_LANGUAGE", "id")).strip().lower()
-                    if cur_lang_low in ("id", "indonesia", "indonesian", "bahasa"):
+                    if is_eff_id:
                         system_inst += (
                             f"\n\n[ATURAN BALASAN SINGKAT - WAJIB BAHASA INDONESIA]\n"
                             f"Balas singkat seperti chat WhatsApp biasa (maksimal 1 baris aksi *...* + 1-2 kalimat dialog pendek, ~15-35 kata total).\n"
                             f"Contoh:\n*nyengir tipis menatapmu*\n\nLagi santai di kos nih, baru beres makan. Kamu udah makan belum?\n"
-                            f"WAJIB JAWAB dalam Bahasa Indonesia santai. DILARANG menerjemahkan pesan user ke bahasa Inggris dan DILARANG menyalin/mengulang kalimat user!"
+                            f"WAJIB JAWAB dalam Bahasa Indonesia santai (gunakan 'aku' dan 'kamu'). DILARANG menerjemahkan pesan user ke bahasa Inggris dan DILARANG menyalin/mengulang kalimat user!"
                         )
                     else:
                         system_inst += (
                             f"\n\n[STRICT REPLY LENGTH RULE]\n"
-                            f"Keep your response BRIEF like casual WhatsApp texting: maximum 1 short *action* line + 1-2 short spoken sentences (~15-35 words total). "
-                            f"Example:\n*nyengir tipis menatapmu*\n\nLagi santai di kos nih, baru beres makan. Kamu udah makan belum?\n"
-                            f"Do NOT translate or copy the user's message, and reply in the same language as the user."
+                            f"Keep your response BRIEF like casual messaging: maximum 1 short *action* line + 1-2 short spoken sentences (~15-35 words total). "
+                            f"Example:\n*smiles softly looking at you*\n\nJust relaxing in my room, finished some tea. How was your day?\n"
+                            f"Reply naturally in the user's language without copying or translating their message."
                         )
 
                 history = persona_mgr.get_chat_history(message.from_user.id)
@@ -8901,23 +8984,43 @@ def schedule_daily_greetings():
                     reminder_engine.mark_triggered(rem["id"])
                     uid = rem.get("user_id")
                     cid = rem.get("chat_id")
-                    task = rem.get("task", "Hal penting")
+                    task = rem.get("task", "Important task")
                     persona = persona_mgr.get_active_persona()
                     p_name = persona.get("name", "Waifu")
+                    u_lang = persona_mgr.get_user_language(uid) if hasattr(persona_mgr, 'get_user_language') else "auto"
+                    is_id = (u_lang == "id")
 
-                    alert_text = (
-                        f"⏰ *Pengingat dari {p_name}:*\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Waktunya tiba nih, tadi kamu minta diingetin:\n\n"
-                        f"👉 *{task}*\n\n"
-                        f"Jangan lupa dikerjakan yaa, semangat!"
-                    )
+                    if is_id:
+                        alert_text = (
+                            f"⏰ *Pengingat dari {p_name}:*\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"Waktunya tiba nih, tadi kamu minta diingetin:\n\n"
+                            f"👉 *{task}*\n\n"
+                            f"Jangan lupa dikerjakan yaa, semangat!"
+                        )
+                        b_done = "✅ Sudah Selesai"
+                        b_sn10 = "⏰ Tunda 10 Menit"
+                        b_sn30 = "⏰ Tunda 30 Menit"
+                        b_mgr = "📋 Kelola Pengingat"
+                    else:
+                        alert_text = (
+                            f"⏰ *Reminder from {p_name}:*\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"Time is up! You asked me to remind you:\n\n"
+                            f"👉 *{task}*\n\n"
+                            f"Make sure to get it done, darling! You got this! ✨"
+                        )
+                        b_done = "✅ Completed"
+                        b_sn10 = "⏰ Snooze 10m"
+                        b_sn30 = "⏰ Snooze 30m"
+                        b_mgr = "📋 Manage Reminders"
+
                     rem_markup = types.InlineKeyboardMarkup(row_width=2)
                     rem_markup.add(
-                        types.InlineKeyboardButton("✅ Sudah Selesai", callback_data=f"rem_act:done:{rem['id']}"),
-                        types.InlineKeyboardButton("⏰ Tunda 10 Menit", callback_data=f"rem_act:snooze:{rem['id']}:10"),
-                        types.InlineKeyboardButton("⏰ Tunda 30 Menit", callback_data=f"rem_act:snooze:{rem['id']}:30"),
-                        types.InlineKeyboardButton("📋 Kelola Pengingat", callback_data="open_reminders_menu")
+                        types.InlineKeyboardButton(b_done, callback_data=f"rem_act:done:{rem['id']}"),
+                        types.InlineKeyboardButton(b_sn10, callback_data=f"rem_act:snooze:{rem['id']}:10"),
+                        types.InlineKeyboardButton(b_sn30, callback_data=f"rem_act:snooze:{rem['id']}:30"),
+                        types.InlineKeyboardButton(b_mgr, callback_data="open_reminders_menu")
                     )
 
                     rem_markup = attach_voice_button(rem_markup, alert_text, uid)
@@ -8975,35 +9078,35 @@ def schedule_daily_greetings():
 def setup_bot_commands():
     """Registers bot commands with Telegram so the Menu / Command button displays them."""
     commands = [
-        types.BotCommand("start", "Mulai obrolan & panduan utama"),
-        types.BotCommand("birthday", "🎂 Catat ulang tahun & anniversary"),
-        types.BotCommand("remind", "⏰ Pengingat jadwal & asisten pribadi"),
-        types.BotCommand("memory", "🧠 Buku harian & ingatan waifu"),
-        types.BotCommand("setup", "⚙️ Panel kontrol & pengaturan lengkap"),
-        types.BotCommand("help", "❓ Panduan fitur & cara penggunaan"),
-        types.BotCommand("pap", "📸 Minta foto / menu skenario selfie"),
-        types.BotCommand("video", "🎬 Dashboard AI Video & generate video waifu"),
-        types.BotCommand("play", "🎵 Putar lagu YouTube di PC"),
-        types.BotCommand("queue", "➕ Tambah lagu ke antrean / lihat playlist"),
-        types.BotCommand("playlist", "📻 Putar album / playlist lengkap di PC"),
-        types.BotCommand("music", "🎶 Remote kontrol pemutar musik PC"),
-        types.BotCommand("language", "🌐 Pengaturan bahasa waifu (ID, EN, JA, Kustom)"),
-        types.BotCommand("outfit", "👗 Lemari pakaian & ganti baju"),
-        types.BotCommand("persona", "🎭 Ganti waifu (Runa, Akira, Hina, Shiro, Yume)"),
-        types.BotCommand("newpersona", "🎭 Buat waifu kustom baru"),
-        types.BotCommand("ratio", "📐 Ganti rasio foto (3:4, 9:16, 1:1, 4:3)"),
-        types.BotCommand("quality", "✨ Atur kualitas foto (Ultra/High/Fast)"),
-        types.BotCommand("voice", "🎙️ Pengaturan mesin & karakter suara (tombol 🔊)"),
-        types.BotCommand("video_engine", "🎬 Dashboard AI Video Engine (Wan 2.1 / AnimateDiff)"),
-        types.BotCommand("love", "💖 Cek skor cinta & status hubungan"),
-        types.BotCommand("greetings", "⏰ Toggle sapaan harian (Pagi, Siang, Malam)"),
-        types.BotCommand("chatting", "💬 Toggle inisiatif chat duluan dari waifu"),
-        types.BotCommand("status", "📊 Cek status server LLM & ComfyUI"),
-        types.BotCommand("projects", "💻 Kelola & beralih project workspace coding"),
-        types.BotCommand("spawn", "🚀 Inisialisasi folder project baru (/spawn <nama>)"),
-        types.BotCommand("desktop", "🖥️ Computer Use & status kontrol desktop PC"),
-        types.BotCommand("screen", "📸 Ambil screenshot layar desktop PC"),
-        types.BotCommand("reset", "🔄 Hapus memori obrolan (topik baru)")
+        types.BotCommand("start", "Start chatting & view introductory guide"),
+        types.BotCommand("birthday", "🎂 Set birthday & relationship anniversary"),
+        types.BotCommand("remind", "⏰ Set reminders & personal schedule assistant"),
+        types.BotCommand("memory", "🧠 View relationship memories & waifu diary"),
+        types.BotCommand("setup", "⚙️ Waifu control panel & full dashboard"),
+        types.BotCommand("help", "❓ Help guide & usage instructions"),
+        types.BotCommand("pap", "📸 Request real-time selfie photo or scenario"),
+        types.BotCommand("video", "🎬 AI Video Hub & generate anime motion clips"),
+        types.BotCommand("play", "🎵 Play YouTube song on PC player"),
+        types.BotCommand("queue", "➕ Add song to queue / view music playlist"),
+        types.BotCommand("playlist", "📻 Play full album / YouTube playlist on PC"),
+        types.BotCommand("music", "🎶 Remote control PC music player"),
+        types.BotCommand("language", "🌐 Waifu language settings (EN, ID, JA, Auto)"),
+        types.BotCommand("outfit", "👗 Wardrobe & change waifu clothes"),
+        types.BotCommand("persona", "🎭 Switch waifu companion persona"),
+        types.BotCommand("newpersona", "🎭 Create custom waifu persona wizard"),
+        types.BotCommand("ratio", "📐 Change photo aspect ratio (3:4, 9:16, 1:1, 4:3)"),
+        types.BotCommand("quality", "✨ Adjust image generation quality (Ultra/High/Fast)"),
+        types.BotCommand("voice", "🎙️ Voice engine & speaker settings (🔊 button)"),
+        types.BotCommand("video_engine", "🎬 AI Video Engine settings (Wan 2.1 / AnimateDiff)"),
+        types.BotCommand("love", "💖 Check affinity score & relationship status"),
+        types.BotCommand("greetings", "⏰ Toggle daily greetings (Morning, Noon, Night)"),
+        types.BotCommand("chatting", "💬 Toggle waifu proactive chatting initiative"),
+        types.BotCommand("status", "📊 Check AI server, LLM, GPU & services status"),
+        types.BotCommand("projects", "💻 Manage & switch coding workspace projects"),
+        types.BotCommand("spawn", "🚀 Initialize new coding project workspace"),
+        types.BotCommand("desktop", "🖥️ Computer Use & PC desktop remote control"),
+        types.BotCommand("screen", "📸 Capture PC desktop screenshot"),
+        types.BotCommand("reset", "🔄 Reset conversation memory for active waifu")
     ]
     try:
         bot.set_my_commands(commands)

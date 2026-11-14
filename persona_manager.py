@@ -774,14 +774,57 @@ class PersonaManager:
         self.user_locations: Dict[int, Dict[str, Any]] = {}
         self.user_recent_angles: Dict[int, List[str]] = {}
         self.user_locked_outfit_prompts: Dict[int, Dict[str, Any]] = {}
+        self.user_languages: Dict[int, str] = {}
         self.outfits_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_outfits.json")
         self.locations_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_locations.json")
+        self.languages_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_languages.json")
         self.history_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "chat_history.json")
         self._history_mtime = 0.0
         self._load_all_personas()
         self._load_user_outfits()
         self._load_user_locations()
+        self._load_user_languages()
         self._load_chat_history()
+
+    def _load_user_languages(self):
+        """Loads user language preferences from persistent JSON storage."""
+        self.user_languages = {}
+        if os.path.exists(self.languages_file):
+            try:
+                with open(self.languages_file, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                    for k, v in raw.items():
+                        self.user_languages[int(k)] = str(v).strip().lower()
+            except Exception as e:
+                logger.error(f"Error loading user languages: {e}")
+
+    def _save_user_languages(self):
+        """Saves user language preferences to persistent JSON storage."""
+        d = os.path.dirname(self.languages_file)
+        if d and not os.path.exists(d):
+            os.makedirs(d, exist_ok=True)
+        try:
+            with open(self.languages_file, "w", encoding="utf-8") as f:
+                json.dump({str(k): v for k, v in self.user_languages.items()}, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving user languages: {e}")
+
+    def get_user_language(self, user_id: Optional[int] = None) -> str:
+        """Returns the user's preferred language code ('auto', 'en', 'id', 'ja', etc.)."""
+        if user_id:
+            uid = int(user_id)
+            if uid in self.user_languages:
+                return self.user_languages[uid]
+        return os.environ.get("BOT_LANGUAGE", "auto").strip().lower()
+
+    def set_user_language(self, user_id: int, lang: str) -> bool:
+        """Saves and persists user preferred language."""
+        if not user_id:
+            return False
+        uid = int(user_id)
+        self.user_languages[uid] = lang.strip().lower()
+        self._save_user_languages()
+        return True
 
     def get_recent_angles(self, user_id: int) -> List[str]:
         """Returns the list of recently used camera compositions for a user."""
@@ -1049,11 +1092,78 @@ class PersonaManager:
                         logger.error(f"Error loading persona {fname}: {e}")
 
     @staticmethod
-    def get_language_directive(lang: Optional[str] = None) -> str:
+    def detect_text_language(text: str) -> str:
+        """Heuristically detects whether user text is Indonesian, Japanese, English, or other."""
+        if not text:
+            return "en"
+        t = text.strip()
+        # Japanese (Hiragana, Katakana, Kanji)
+        if re.search(r"[\u3040-\u30ff\u4e00-\u9faf]", t):
+            return "ja"
+        # Korean
+        if re.search(r"[\uac00-\ud7af]", t):
+            return "ko"
+        # Cyrillic / Russian
+        if re.search(r"[\u0400-\u04ff]", t):
+            return "ru"
+
+        words = set(re.findall(r"\b[a-zA-Z']+\b", t.lower()))
+        if not words:
+            return "en"
+
+        id_keywords = {
+            "aku", "kamu", "lagi", "apa", "dong", "ya", "gak", "yaa", "udah", "mau",
+            "sini", "kangen", "sayang", "halo", "pagi", "siang", "malam", "gimana",
+            "beneran", "suka", "kenapa", "deh", "kok", "kan", "santai", "makasih",
+            "selamat", "yuk", "jangan", "tapi", "ada", "ini", "itu", "dia", "mereka",
+            "kita", "kami", "kalian", "bisa", "harus", "pernah", "sedang", "sudah",
+            "belum", "telah", "akan", "baru", "aja", "cuma", "sangat", "banget",
+            "lelah", "capek", "cape", "ngobrol", "tidur", "makan", "minum", "rumah",
+            "kosan", "kerja", "kantor", "kuliah", "kampus", "belajar", "pusing",
+            "nemenin", "sendirian", "peluk", "cium", "jalan", "sore", "hari", "sama",
+            "ngesex", "ngewe", "ewe", "ewean", "diewe", "pap", "fotoin", "cantik"
+        }
+        en_keywords = {
+            "the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it",
+            "for", "not", "on", "with", "he", "as", "you", "do", "at", "this",
+            "but", "his", "by", "from", "they", "we", "say", "her", "she", "or",
+            "an", "will", "my", "one", "all", "would", "there", "their", "what",
+            "so", "up", "out", "if", "about", "who", "get", "which", "go", "me",
+            "when", "make", "can", "like", "time", "no", "just", "him", "know",
+            "take", "people", "into", "year", "your", "good", "some", "could",
+            "them", "see", "other", "than", "then", "now", "look", "only", "come",
+            "its", "over", "think", "also", "back", "after", "use", "two", "how",
+            "our", "work", "first", "well", "way", "even", "new", "want", "because",
+            "any", "these", "give", "day", "most", "us", "are", "is", "was", "were",
+            "am", "been", "being", "hey", "hi", "hello", "morning", "night", "evening",
+            "honey", "sweetie", "babe", "love", "photo", "picture", "selfie", "send",
+            "cute", "sleep", "eat", "miss", "doing", "today", "tomorrow", "beautiful"
+        }
+
+        id_score = len(words.intersection(id_keywords))
+        en_score = len(words.intersection(en_keywords))
+
+        if id_score > en_score:
+            return "id"
+        elif en_score > id_score:
+            return "en"
+        elif id_score > 0:
+            return "id"
+        return "en"
+
+    @staticmethod
+    def get_language_directive(lang: Optional[str] = None, user_text: Optional[str] = None) -> str:
         """Returns a strict language and tone constraint instruction for the LLM."""
-        cur_lang = (lang or os.environ.get("BOT_LANGUAGE", "id")).strip()
-        low = cur_lang.lower()
-        if low in ("id", "indonesia", "indonesian", "bahasa"):
+        cur_lang = (lang or os.environ.get("BOT_LANGUAGE", "auto")).strip().lower()
+        if cur_lang in ("auto", "adaptive"):
+            if user_text:
+                effective_lang = PersonaManager.detect_text_language(user_text)
+            else:
+                effective_lang = "en"
+        else:
+            effective_lang = cur_lang
+
+        if effective_lang in ("id", "indonesia", "indonesian", "bahasa"):
             return (
                 "ATURAN BAHASA WAJIB (BAHASA INDONESIA): Kamu WAJIB berbicara, menanggapi, dan membalas HANYA dalam Bahasa Indonesia santai sehari-hari (aku/kamu). "
                 "KATA GANTI WAJIB 'AKU' & 'KAMU': Kamu WAJIB menggunakan kata ganti 'aku' untuk dirimu dan 'kamu' untuk lawan bicaramu. DILARANG KERAS menggunakan kata sapaan/slang tongkrongan kasar seperti 'lo', 'lu', 'elu', 'elo', 'gue', 'gw', 'gua'! "
@@ -1067,54 +1177,54 @@ class PersonaManager:
                 "ATURAN PANGGILAN & KATA GANTI: Gunakan 'aku' dan 'kamu' secara default. DILARANG memanggil 'sayang', 'babe', 'ayang', atau panggilan mesra lainnya KECUALI jika user sendiri yang secara eksplisit meminta dipanggil sayang atau user yang memanggilmu sayang lebih dulu. Jangan langsung menganggap diri sebagai pacar jika baru kenal; biarkan hubungan berkembang secara dinamis dan alami sesuai kenyamanan user. "
                 "Panjang respon cukup 1-3 kalimat santai dan to the point."
             )
-        elif low in ("en", "english"):
+        elif effective_lang in ("en", "english"):
             return (
                 "STRICT LANGUAGE & TONE DIRECTIVE: You MUST speak, converse, and reply EXCLUSIVELY in natural, casual modern English. "
-                "NEVER mix in Indonesian, Japanese, or other languages. "
-                "NATURAL & REALISTIC TONE: Talk normally and casually like a real companion texting on chat. "
+                "NEVER mix in Indonesian, Japanese, or other languages under any circumstances. "
+                "NATURAL & REALISTIC TONE: Talk normally, sweetly, and casually like a real companion texting on chat (1-3 sentences). "
                 "Directly answer questions with relevant, grounded responses. "
                 "DO NOT be melodramatic, theatrical, overly cheesy, or cringe. Avoid fanfiction-like monologues. "
                 "PRONOUNS & ADDRESS DIRECTIVE: Use 'I' and 'you' naturally. DO NOT use pet names like 'babe', 'honey', or 'darling' UNLESS the user explicitly asks for it or uses it first. Allow the relationship dynamic to unfold naturally. "
-                "Use casual texting habits (1-3 natural sentences)."
+                "NEVER speak like an influencer, YouTuber, or vlogger. This is an intimate 1-on-1 private chat. "
+                "Keep response brief and sweet (1-3 casual sentences)."
             )
-        elif low in ("ja", "jp", "japan", "japanese", "nihongo"):
+        elif effective_lang in ("ja", "jp", "japan", "japanese", "nihongo"):
             return (
                 "STRICT LANGUAGE & TONE DIRECTIVE: You MUST speak, converse, and reply EXCLUSIVELY in natural, casual Japanese (日本語). "
                 "NEVER mix in English, Indonesian, or other languages. "
                 "Respond naturally and casually like texting a real-life partner. Directly answer questions, keep responses natural (1-3 sentences), and avoid overly theatrical or exaggerated anime monologues."
             )
-        elif low in ("auto", "adaptive"):
+        elif effective_lang in ("ru", "russian"):
             return (
-                "LANGUAGE & TONE DIRECTIVE: Automatically and seamlessly match the language used by the user in the ongoing conversation. "
-                "Keep your tone natural, grounded, casual, and realistic (1-3 sentences). "
-                "Default to 'aku/kamu' (or 'I/you'). DO NOT use romantic pet names ('sayang', 'babe') unless explicitly initiated or requested by the user. Let the relationship develop dynamically. "
-                "Do not be dramatic, overly cheesy, or cringe. Answer questions directly."
+                "STRICT LANGUAGE & TONE DIRECTIVE: You MUST speak, converse, and reply EXCLUSIVELY in natural, casual Russian (Русский). "
+                "NEVER mix in English or Indonesian. Respond naturally, affectionately, and casually (1-3 sentences)."
             )
         else:
             return (
-                f"STRICT LANGUAGE & TONE DIRECTIVE: You MUST speak, converse, and reply EXCLUSIVELY in natural, casual modern {cur_lang}. "
-                f"NEVER mix in other languages under any circumstances. Keep your tone natural, grounded, realistic, and affectionate like a real girlfriend texting (1-3 sentences). "
+                f"STRICT LANGUAGE & TONE DIRECTIVE: You MUST speak, converse, and reply EXCLUSIVELY in natural, casual modern {effective_lang}. "
+                f"NEVER mix in other languages under any circumstances. Keep your tone natural, grounded, realistic, and affectionate like a real companion texting (1-3 sentences). "
                 f"Answer questions directly and avoid overly dramatic or theatrical responses."
             )
-
 
     @staticmethod
     def get_language_display_name(lang: Optional[str] = None) -> str:
         """Returns friendly human-readable display name for language."""
-        cur_lang = (lang or os.environ.get("BOT_LANGUAGE", "id")).strip()
+        cur_lang = (lang or os.environ.get("BOT_LANGUAGE", "auto")).strip()
         low = cur_lang.lower()
-        if low in ("id", "indonesia", "indonesian", "bahasa"):
-            return "Bahasa Indonesia 🇮🇩"
+        if low in ("auto", "adaptive"):
+            return "Auto-detect (Matches Chat) 🌐"
         elif low in ("en", "english"):
             return "English 🇬🇧"
+        elif low in ("id", "indonesia", "indonesian", "bahasa"):
+            return "Indonesian (Bahasa Indonesia) 🇮🇩"
         elif low in ("ja", "jp", "japan", "japanese", "nihongo"):
             return "Japanese (日本語) 🇯🇵"
-        elif low in ("auto", "adaptive"):
-            return "Auto-detect (Ikuti Chat) 🌐"
+        elif low in ("ru", "russian"):
+            return "Russian (Русский) 🇷🇺"
         else:
             return f"{cur_lang.title()} ✏️"
 
-    def get_active_persona(self, lang: Optional[str] = None) -> Dict[str, Any]:
+    def get_active_persona(self, lang: Optional[str] = None, user_text: Optional[str] = None) -> Dict[str, Any]:
         """Returns the currently active persona with strict language enforcement injected."""
         base = self.personas.get(self.active_key, DEFAULT_PERSONAS["runa"]).copy()
         raw_inst = base.get("system_instruction", "")
@@ -1123,7 +1233,7 @@ class PersonaManager:
         if "IMPORTANT LANGUAGE RULE:" in clean_inst:
             clean_inst = re.sub(r"IMPORTANT LANGUAGE RULE:.*?(?=(\. [A-Z]|$))", "", clean_inst).strip()
         
-        lang_rule = self.get_language_directive(lang)
+        lang_rule = self.get_language_directive(lang, user_text=user_text)
         base["system_instruction"] = f"{clean_inst} {lang_rule}"
         return base
 

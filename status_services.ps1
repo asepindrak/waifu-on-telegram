@@ -1,4 +1,4 @@
-# Health & Status Checker for Waifu on Telegram
+﻿# Health & Status Checker for Waifu on Telegram
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 $bullet = [char]0x2022
 $vPath = Join-Path $PSScriptRoot "VERSION"
@@ -44,10 +44,10 @@ try {
     $bLang = $env:BOT_LANGUAGE
     if (-not $bLang) { $bLang = "id" }
     $langMap = @{
-        "id" = "Bahasa Indonesia (id)"
+        "id" = "Indonesian (id)"
         "en" = "English (en)"
         "ja" = "Japanese (ja)"
-        "auto" = "Auto-detect (Ikuti Bahasa Chat)"
+        "auto" = "Auto-detect (Matches Chat Language)"
     }
     $langDisp = if ($langMap.ContainsKey($bLang)) { $langMap[$bLang] } else { $bLang }
     Write-Host "  [LANGUAGE] Chat Language: $langDisp" -ForegroundColor Cyan
@@ -67,7 +67,7 @@ try {
             }
             $outfitMap = @{
                 "default" = "Default (Persona Style)"
-                "campus_casual" = "Pakaian Kuliah (Campus Casual)"
+                "campus_casual" = "Campus Casual"
                 "mall_casual" = "Trendy Mall Hangout"
                 "cafe_cozy" = "Cozy Cafe Knit"
                 "sweater" = "Pastel Sweater (Cozy)"
@@ -78,10 +78,10 @@ try {
                 "school_jk" = "School JK Uniform"
                 "gym" = "Sporty Gym Wear"
                 "dress" = "Elegant Evening Dress"
-                "towel" = "Handuk Mandi (After Shower)"
+                "towel" = "Bath Towel (After Shower)"
                 "lingerie" = "Sensual Lace Lingerie"
-                "romantic" = "Pakaian Romantis (Silk Slip Dress)"
-                "nude" = "Tanpa Busana (Full Nude)"
+                "romantic" = "Romantic Silk Slip Dress"
+                "nude" = "Full Nude"
             }
             if ($outfitMap.ContainsKey($outfitRawKey)) {
                 $outfitName = $outfitMap[$outfitRawKey]
@@ -89,7 +89,7 @@ try {
                 $outfitName = $outfitRawKey
             }
             if ($outfitRawKey -eq "nude") {
-                $outfitName = "$outfitName (Auto-Switch NSFW Image & LLM Engine Aktif)"
+                $outfitName = "$outfitName (Auto-Switch NSFW Image & LLM Engine Active)"
             }
         }
     }
@@ -188,7 +188,7 @@ try {
         if (-not $uniModel -or $uniModel -eq "default") { $uniModel = $nsfwModel }
         Write-Host "            - Unified LLM: $uniModel ($uniUrl)" -ForegroundColor DarkCyan
         if ($sfwProv -and ($sfwProv -ne "local") -and ($uniUrl -like "*:5001*")) {
-            Write-Host "            - Note       : SFW_LLM_PROVIDER='$sfwProv' aktif untuk SFW (Port 8001/Cloud)" -ForegroundColor DarkCyan
+            Write-Host "            - Note       : SFW_LLM_PROVIDER='$sfwProv' active for SFW (Port 8001/Cloud)" -ForegroundColor DarkCyan
         }
     }
 
@@ -328,9 +328,9 @@ try {
             $comfyCkpt = $ckptList[0]
         }
     } catch {}
-    Write-Host "  [ONLINE]  ComfyUI Generator: ONLINE (Port 8188 - Load Penuh)" -ForegroundColor Green
+    Write-Host "  [ONLINE]  ComfyUI Generator: ONLINE (Port 8188 - Full Load)" -ForegroundColor Green
     Write-Host "            Device: $gpu" -ForegroundColor DarkCyan
-    Write-Host "            Photo Model: $comfyCkpt (Aktif di ComfyUI)" -ForegroundColor DarkCyan
+    Write-Host "            Photo Model: $comfyCkpt (Active in ComfyUI)" -ForegroundColor DarkCyan
     $comfyOnline = $true
 } catch {
     $comfyDirCandidates = @(
@@ -389,17 +389,17 @@ try {
     }
 
     $onDemand = $env:COMFYUI_ON_DEMAND
-    $badge = if ($ckptInstalled) { "(Terpasang [OK])" } else { "(Perlu Download)" }
+    $badge = if ($ckptInstalled) { "(Installed [OK])" } else { "(Download Required)" }
     if ($hasComfyDir) {
         if (-not $onDemand -or $onDemand -eq "true") {
-            Write-Host "  [STANDBY] ComfyUI Generator (Port 8188): STANDBY ON-DEMAND (Tidur hemat VRAM • Aktif otomatis saat minta foto)" -ForegroundColor Cyan
+            Write-Host "  [STANDBY] ComfyUI Generator (Port 8188): STANDBY ON-DEMAND (VRAM saving sleep • Auto-wakes on request)" -ForegroundColor Cyan
             Write-Host "            Target Model: $targetCkpt $badge" -ForegroundColor DarkCyan
         } else {
             Write-Host "  [OFFLINE] ComfyUI Generator (Port 8188): OFFLINE" -ForegroundColor Yellow
             Write-Host "            Target Model: $targetCkpt $badge" -ForegroundColor DarkCyan
         }
     } else {
-        Write-Host "  [NOT READY] ComfyUI Generator: Folder ComfyUI belum terdeteksi (Fallback Cloud/Pollinations aktif jika diaktifkan)" -ForegroundColor Yellow
+        Write-Host "  [NOT READY] ComfyUI Generator: ComfyUI folder not detected (Cloud/Pollinations fallback if enabled)" -ForegroundColor Yellow
     }
 }
 
@@ -416,7 +416,7 @@ if (Test-Path $vaultPath) {
         if ($vaultData) { $vaultCount = @($vaultData).Count }
     } catch {}
 }
-Write-Host "  [VAULT]   Photo Vault: $vaultCount foto di arsip galeri lokal (Fallback Semantik Aktif [OK])" -ForegroundColor Cyan
+Write-Host "  [VAULT]   Photo Vault: $vaultCount photos in local gallery archive (Semantic Fallback Active [OK])" -ForegroundColor Cyan
 
 # 4. Video Engine
 $vEngine = $env:VIDEO_ENGINE
@@ -487,7 +487,7 @@ try {
     if (Test-Path $openDesignDir) {
         $dsCount = (Get-ChildItem -Path $openDesignDir -Directory -ErrorAction SilentlyContinue).Count
         $skCount = (Get-ChildItem -Path (Join-Path $PSScriptRoot "open_design\skills") -Directory -ErrorAction SilentlyContinue).Count
-        Write-Host "  [DESIGN]  Open-Design UI/UX: ONLINE ($dsCount Design Systems • $skCount Skills • Aktif)" -ForegroundColor Green
+        Write-Host "  [DESIGN]  Open-Design UI/UX: ONLINE ($dsCount Design Systems • $skCount Skills • Active)" -ForegroundColor Green
     }
 
     # 4d. Active Project Web Servers & Previews
@@ -574,6 +574,6 @@ if (Test-Path $bufFile) {
         }
     } catch {}
 }
-Write-Host "  [GAMING]  Scheduled Messages Buffer: $bufCount pesan tersimpan (Gaming Protection Aktif)" -ForegroundColor Cyan
-Write-Host "  [LOCK]    GPU Resource Lock: AKTIF (Proteksi Tabrakan VRAM Image & Voice Aktif [OK])" -ForegroundColor Green
+Write-Host "  [GAMING]  Scheduled Messages Buffer: $bufCount messages saved (Gaming Protection Active)" -ForegroundColor Cyan
+Write-Host "  [LOCK]    GPU Resource Lock: ACTIVE (VRAM collision protection for Image & Voice [OK])" -ForegroundColor Green
 Write-Host ""

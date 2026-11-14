@@ -83,7 +83,10 @@ class TestButtonAntiSpamAndPhotoSingleFlight(unittest.TestCase):
         res2 = self.middleware.pre_process(call2, {})
         self.assertIsInstance(res2, CancelUpdate)
         self.mock_bot.answer_callback_query.assert_called()
-        self.assertIn("sedang diproses", self.mock_bot.answer_callback_query.call_args[1]["text"])
+        self.assertTrue(
+            "sedang diproses" in self.mock_bot.answer_callback_query.call_args[1]["text"] or
+            "being processed" in self.mock_bot.answer_callback_query.call_args[1]["text"]
+        )
 
     def test_middleware_blocks_photo_buttons_when_generation_in_progress(self):
         uid = 991166
@@ -103,7 +106,10 @@ class TestButtonAntiSpamAndPhotoSingleFlight(unittest.TestCase):
         res = self.middleware.pre_process(call_regen, {})
         self.assertIsInstance(res, CancelUpdate)
         self.mock_bot.answer_callback_query.assert_called()
-        self.assertIn("lagi diambil", self.mock_bot.answer_callback_query.call_args[1]["text"])
+        self.assertTrue(
+            "lagi diambil" in self.mock_bot.answer_callback_query.call_args[1]["text"] or
+            "being taken" in self.mock_bot.answer_callback_query.call_args[1]["text"]
+        )
 
         # User tries clicking 'Kirim Ulang Foto' while generating
         call_resend = types.CallbackQuery.de_json({

@@ -88,7 +88,10 @@ class TestPhotoResendAndTimeout(unittest.TestCase):
             callback_resend_photo(mock_call)
 
             mock_ans.assert_called_once()
-            self.assertIn("kedaluwarsa", mock_ans.call_args[0][1])
+            self.assertTrue(
+                "kedaluwarsa" in mock_ans.call_args[0][1] or
+                "expired" in mock_ans.call_args[0][1].lower()
+            )
             mock_process.assert_called_once_with(mock_call, "last")
 
     def test_persona_body_and_maturity_consistency(self):

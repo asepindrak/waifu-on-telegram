@@ -251,7 +251,7 @@ def start_auxiliary_services():
     comfyui_on_demand = os.environ.get("COMFYUI_ON_DEMAND", "true").lower() in ("true", "1", "yes")
     media_cloud = os.environ.get("MEDIA_FALLBACK_CLOUD", "false").lower() in ("true", "1", "yes")
     if comfyui_on_demand and not media_cloud:
-        print(c(CYAN, "  💤 ComfyUI on standby (On-Demand Mode: otomatis aktif saat ada request foto/video)"))
+        print(c(CYAN, "  💤 ComfyUI on standby (On-Demand Mode: auto-starts when photo/video is requested)"))
     elif not is_port_listening(8188) and asset_manager and not media_cloud:
         spec = asset_manager.get_comfyui_launch_spec()
         if spec:
@@ -390,7 +390,7 @@ def cmd_status():
                 pass
         outfit_disp = outfit_key
         if outfit_key == "nude":
-            outfit_disp = "Tanpa Busana (Full Nude) [Auto-Switch NSFW Engine Aktif]"
+            outfit_disp = "Full Nude [Auto-Switch NSFW Engine Active]"
 
         print(f"  👑 Active Persona: {persona_name} | Language: {lang_disp}")
         print(f"  👗 Current Outfit: {outfit_disp}")
@@ -421,12 +421,12 @@ def cmd_status():
         ]:
             try:
                 with urllib.request.urlopen(url, timeout=2) as r:
-                    print(f"  ✓ {name}: " + c(GREEN, "ONLINE (Load Penuh)"))
+                    print(f"  ✓ {name}: " + c(GREEN, "ONLINE (Full Load)"))
                     print(c(DIM, f"    Active Model: {model_name}"))
             except Exception:
                 if is_idle:
-                    print(f"  💤 {name}: " + c(CYAN, "STANDBY / TIDUR (Hemat VRAM)"))
-                    print(c(DIM, f"    Target Model: {model_name} (Siap On-Demand)"))
+                    print(f"  💤 {name}: " + c(CYAN, "STANDBY / SLEEPING (VRAM Saver)"))
+                    print(c(DIM, f"    Target Model: {model_name} (Ready On-Demand)"))
                 else:
                     print(f"  🔴 {name}: " + c(RED, "OFFLINE"))
 
@@ -439,13 +439,13 @@ def cmd_status():
                     v_count = len(json.load(vf))
             except Exception:
                 pass
-        print(f"  📂 Photo Vault: {v_count} foto tersimpan di arsip galeri lokal " + c(GREEN, "(Arsip Lokal Aktif ✓)"))
+        print(f"  📂 Photo Vault: {v_count} photos stored in local gallery archive " + c(GREEN, "(Local Archive Active ✓)"))
 
         # Voice TTS
         v_backend = os.environ.get("VOICE_BACKEND", "edge-tts")
         v_speaker = os.environ.get("VOICE_NAME", "id-ID-GadisNeural")
         v_lang = os.environ.get("VOICE_LANGUAGE", "id-ID")
-        print(f"  🎙️ Voice Engine: {v_backend} (Speaker: {v_speaker} • Lang: {v_lang} • Tombol Suara: On-Demand di Chat)")
+        print(f"  🎙️ Voice Engine: {v_backend} (Speaker: {v_speaker} • Lang: {v_lang} • Voice Button: On-Demand in Chat)")
         if "voicestudio" in v_backend.lower():
             vs_port = int(os.environ.get("VOICESTUDIO_PORT", "3900"))
             try:
@@ -454,7 +454,7 @@ def cmd_status():
             except Exception:
                 vs_dir = os.path.join(PROJECT_ROOT, "tools", "VoiceStudio")
                 if os.path.exists(vs_dir):
-                    print(f"  💤 VoiceStudio Local AI (Port {vs_port}): " + c(CYAN, "STANDBY / TIDUR (Hemat VRAM)"))
+                    print(f"  💤 VoiceStudio Local AI (Port {vs_port}): " + c(CYAN, "STANDBY / SLEEPING (VRAM Saver)"))
                 else:
                     print(f"  🔴 VoiceStudio Local AI (Port {vs_port}): " + c(RED, "NOT INSTALLED"))
         else:
@@ -481,9 +481,9 @@ def cmd_status():
             ds_count = len(ode.list_available_systems())
             sk_count = len(ode.list_available_skills())
             if ds_count > 0:
-                print(f"  🎨 Open-Design UI/UX: ONLINE ({ds_count} Design Systems • {sk_count} Skills) " + c(GREEN, "[AKTIF ✓]"))
+                print(f"  🎨 Open-Design UI/UX: ONLINE ({ds_count} Design Systems • {sk_count} Skills) " + c(GREEN, "[ACTIVE ✓]"))
             else:
-                print(f"  🎨 Open-Design UI/UX: " + c(YELLOW, "Belum terpasang"))
+                print(f"  🎨 Open-Design UI/UX: " + c(YELLOW, "Not installed"))
         except Exception:
             pass
 
@@ -494,7 +494,7 @@ def cmd_status():
             live_srvs = psm.list_active_servers()
             if live_srvs:
                 desc = " • ".join([f"{s['project']} -> http://127.0.0.1:{s['port']}/" for s in live_srvs])
-                print(f"  🌐 Web Previews: ONLINE ({desc}) " + c(GREEN, "[AKTIF ✓]"))
+                print(f"  🌐 Web Previews: ONLINE ({desc}) " + c(GREEN, "[ACTIVE ✓]"))
         except Exception:
             pass
 
@@ -510,7 +510,7 @@ def cmd_status():
                             buf_count += len(m_list)
             except Exception:
                 pass
-        print(f"  🎮 Scheduled Message Buffer: {buf_count} pesan tersimpan " + c(GREEN, "(Gaming Protection Aktif ✓)"))
+        print(f"  🎮 Scheduled Message Buffer: {buf_count} messages saved " + c(GREEN, "(Gaming Protection Active ✓)"))
 
         # AGY OpenAI Bridge diagnostics
         agy_port = int(os.environ.get("AGY_BRIDGE_PORT", "8001"))
@@ -527,7 +527,7 @@ def cmd_status():
             else:
                 print(f"  ⚪ Google Antigravity Bridge (Port {agy_port}): " + c(DIM, "DISABLED"))
 
-        print(f"  🔒 GPU Resource Lock: " + c(GREEN, "AKTIF (Proteksi Tabrakan VRAM Image & Voice Aktif ✓)"))
+        print(f"  🔒 GPU Resource Lock: " + c(GREEN, "ACTIVE (VRAM collision protection for Image & Voice Active ✓)"))
 
 def cmd_setup():
     setup_py = os.path.join(PROJECT_ROOT, "setup.py")
@@ -632,11 +632,11 @@ def cmd_autotune():
     hw = asset_manager.detect_hardware_profile(refresh=True)
     print(c(BOLD + CYAN, "🎮 HARDWARE GPU & VRAM AUTO-TUNER"))
     print("-" * 60)
-    print(f"  Kartu Grafis  : {c(BOLD + GREEN, hw['gpu_name'])}")
+    print(f"  GPU Card      : {c(BOLD + GREEN, hw['gpu_name'])}")
     print(f"  Total VRAM    : {c(BOLD + GREEN, str(hw['vram_gb']) + ' GB')} ({hw['vram_mb']} MB)")
     print(f"  Hardware Tier : {c(BOLD + CYAN, hw['tier_label'])}")
-    print(f"\n  💡 Rekomendasi:")
-    print(f"    • Model Foto  : {c(BOLD + GREEN, hw['recommended_image_file'] or 'Cloud Fallback Engine')}")
+    print(f"\n  💡 Recommendations:")
+    print(f"    • Photo Model : {c(BOLD + GREEN, hw['recommended_image_file'] or 'Cloud Fallback Engine')}")
     print(f"    • Video Engine: {c(BOLD + GREEN, hw['recommended_video_engine'].upper())}")
     print(f"    • LLM Layers  : {c(BOLD + GREEN, str(hw['recommended_llm_layers']))}")
     print(f"\n  {c(DIM, hw['recommendation_text'])}")
@@ -664,7 +664,7 @@ def cmd_autotune():
         if changed:
             with open(env_file, "w", encoding="utf-8") as f:
                 f.write(content)
-            print(c(GREEN, f"\n✓ Konfigurasi .env berhasil di-tuning otomatis sesuai GPU PC kamu!"))
+            print(c(GREEN, f"\n✓ .env configuration successfully auto-tuned for your PC GPU!"))
 
 def cmd_persona(name: str):
     env_file = os.path.join(PROJECT_ROOT, ".env")
@@ -945,7 +945,7 @@ def _execute_update():
                 for m in [cur_llm, cur_local, cur_nsfw]
             )
             if is_using_other:
-                print(c(CYAN, f"\n🔄 Mengaktifkan model default uncensored Huihui (bebas penolakan NSFW): {huihui_fn}..."))
+                print(c(CYAN, f"\n🔄 Activating default uncensored Huihui model: {huihui_fn}..."))
                 changed = False
                 if any(x in cur_llm for x in ("qwen", "stheno", "llama")):
                     env_dict["LLM_MODEL"] = huihui_fn
@@ -961,7 +961,7 @@ def _execute_update():
                     changed = True
                 if changed:
                     write_env(env_dict)
-                    print(c(GREEN, f"  ✓ Model default uncensored Huihui ({huihui_fn}) berhasil diaktifkan!"))
+                    print(c(GREEN, f"  ✓ Default uncensored Huihui model ({huihui_fn}) successfully activated!"))
         except Exception as e_env:
             logger.debug(f"Auto-select error: {e_env}")
 
@@ -1072,13 +1072,13 @@ def _execute_update():
 
     active_pid = get_running_pid()
     if is_running or active_pid:
-        target_pid = active_pid or "aktif"
-        print(c(CYAN, f"\n🔄 Terdeteksi bot sedang aktif di latar belakang (PID: {target_pid})."))
-        print(c(CYAN, "⚡ Me-restart bot secara otomatis agar seluruh pembaruan langsung aktif..."))
+        target_pid = active_pid or "active"
+        print(c(CYAN, f"\n🔄 Detected bot running in background (PID: {target_pid})."))
+        print(c(CYAN, "⚡ Restarting bot automatically so all updates take effect..."))
         cmd_restart(daemon=True)
-        print(c(GREEN, "✓ Bot berhasil di-restart otomatis di background! ✨\n"))
+        print(c(GREEN, "✓ Bot restarted successfully in background! ✨\n"))
     else:
-        print(c(DIM, "\n💡 Bot belum berjalan. Jalankan bot kapan saja dengan: waifu start --daemon\n"))
+        print(c(DIM, "\n💡 Bot is not running. Start anytime with: waifu start --daemon\n"))
 
 
 def cmd_voicestudio(action: str = "status"):
@@ -1089,49 +1089,49 @@ def cmd_voicestudio(action: str = "status"):
     if action == "status":
         st = voicestudio_engine.get_status()
         print(c(BOLD + CYAN, "\n🔊 VoiceStudio Local AI Voice Server Diagnostics:"))
-        print(f"  • Status Service : {c(BOLD + GREEN, 'ONLINE 🟢') if st['running'] else c(YELLOW, 'OFFLINE ⚪')}")
-        print(f"  • Port Backend   : {st['port']} ({st['url']})")
-        print(f"  • Terpasang      : {'Sudah ✅' if st['installed'] else 'Belum ❌'}")
-        print(f"  • Folder Root    : {st['install_dir']}")
+        print(f"  • Service Status : {c(BOLD + GREEN, 'ONLINE 🟢') if st['running'] else c(YELLOW, 'OFFLINE ⚪')}")
+        print(f"  • Backend Port   : {st['port']} ({st['url']})")
+        print(f"  • Installed      : {'Yes ✅' if st['installed'] else 'No ❌'}")
+        print(f"  • Root Directory : {st['install_dir']}")
         print(f"  • Default Model  : {st['default_model']}")
         if not st['running'] and st['installed']:
-            print(c(DIM, "\n💡 Jalankan 'waifu voicestudio start' untuk menyalakan backend VoiceStudio."))
+            print(c(DIM, "\n💡 Run 'waifu voicestudio start' to launch the VoiceStudio backend."))
         elif not st['installed']:
-            print(c(DIM, "\n💡 Jalankan 'waifu voicestudio install' untuk mengunduh & memasang VoiceStudio."))
+            print(c(DIM, "\n💡 Run 'waifu voicestudio install' to download and set up VoiceStudio."))
     elif action == "start":
-        print(c(CYAN, f"\n🚀 Menjalankan VoiceStudio background service di port {voicestudio_engine.port}..."))
+        print(c(CYAN, f"\n🚀 Launching VoiceStudio background service on port {voicestudio_engine.port}..."))
         if voicestudio_engine.is_service_running():
-            print(c(YELLOW, f"⚠️ VoiceStudio sudah aktif di {voicestudio_engine.server_url}."))
+            print(c(YELLOW, f"⚠️ VoiceStudio is already running at {voicestudio_engine.server_url}."))
             return
         if not voicestudio_engine.is_installed():
-            print(c(YELLOW, "VoiceStudio belum terpasang. Menjalankan auto-install..."))
+            print(c(YELLOW, "VoiceStudio is not installed. Running auto-installer..."))
             ok, msg = voicestudio_engine.install(progress_callback=lambda m: print(f"  {m}"))
             if not ok:
                 print(c(RED, f"❌ {msg}"))
                 return
         ok = voicestudio_engine.start_service()
         if ok:
-            print(c(GREEN, f"✓ VoiceStudio online di {voicestudio_engine.server_url}"))
+            print(c(GREEN, f"✓ VoiceStudio online at {voicestudio_engine.server_url}"))
         else:
-            print(c(RED, "❌ Gagal menyalakan VoiceStudio. Cek log atau port 3900."))
+            print(c(RED, "❌ Failed to start VoiceStudio. Check logs or port 3900."))
     elif action == "stop":
-        print(c(YELLOW, f"\n🛑 Menghentikan VoiceStudio background service..."))
+        print(c(YELLOW, f"\n🛑 Stopping VoiceStudio background service..."))
         ok = voicestudio_engine.stop_service()
         if ok:
-            print(c(GREEN, "✓ VoiceStudio telah dinonaktifkan."))
+            print(c(GREEN, "✓ VoiceStudio has been stopped."))
         else:
-            print(c(RED, "❌ Gagal menghentikan VoiceStudio."))
+            print(c(RED, "❌ Failed to stop VoiceStudio."))
     elif action == "restart":
-        print(c(CYAN, f"\n🔄 Merestart VoiceStudio background service..."))
+        print(c(CYAN, f"\n🔄 Restarting VoiceStudio background service..."))
         voicestudio_engine.stop_service()
         time.sleep(1.0)
         ok = voicestudio_engine.start_service()
         if ok:
-            print(c(GREEN, f"✓ VoiceStudio berhasil direstart di {voicestudio_engine.server_url}"))
+            print(c(GREEN, f"✓ VoiceStudio restarted successfully at {voicestudio_engine.server_url}"))
         else:
-            print(c(RED, "❌ Gagal merestart VoiceStudio."))
+            print(c(RED, "❌ Failed to restart VoiceStudio."))
     elif action in ("install", "setup"):
-        print(c(CYAN, "\n📦 Memulai instalasi & setup backend VoiceStudio..."))
+        print(c(CYAN, "\n📦 Starting VoiceStudio backend setup & installation..."))
         ok, msg = voicestudio_engine.install(progress_callback=lambda m: print(f"  {m}"))
         if ok:
             print(c(GREEN, f"✓ {msg}"))
@@ -1210,25 +1210,25 @@ def cmd_chat():
 
 def cmd_idle():
     """Manually puts local AI engines (KoboldCPP, ComfyUI, VoiceStudio) to sleep to free VRAM & RAM."""
-    print(c(BOLD + CYAN, "\n💤 Mengaktifkan Mode Idle Secara Manual..."))
+    print(c(BOLD + CYAN, "\n💤 Activating Idle Mode Manually (VRAM Saver)..."))
     try:
         from idle_engine import IdleEngine
         engine = IdleEngine(project_root=PROJECT_ROOT)
         results = engine.manual_idle()
         for d in results.get("details", []):
             print(f"  • {d}")
-        print(c(BOLD + GREEN, "\n✓ Mode idle berhasil diaktifkan. VRAM & RAM telah dibebaskan untuk gaming/kerja!"))
-        print(c(DIM, "  (Waifu akan otomatis bangun saat kamu mengirim pesan atau chat baru)\n"))
+        print(c(BOLD + GREEN, "\n✓ Idle mode activated. VRAM & RAM freed for gaming or heavy work!"))
+        print(c(DIM, "  (Waifu will automatically wake up when you send a message or request)\n"))
     except Exception as e:
-        print(c(RED, f"\n❌ Gagal mengaktifkan mode idle: {e}\n"))
+        print(c(RED, f"\n❌ Failed to activate idle mode: {e}\n"))
 
 def cmd_code(prompt: str):
     """Executes a coding task directly in active workspace via CLI."""
     if not prompt:
-        print(c(YELLOW, "\n💡 Penggunaan: waifu code \"<instruksi coding>\""))
-        print("   Contoh: waifu code \"buatkan navbar responsive\"\n")
+        print(c(YELLOW, "\n💡 Usage: waifu code \"<coding task instructions>\""))
+        print("   Example: waifu code \"create a responsive modern navbar\"\n")
         return
-    print(c(BOLD + CYAN, f"\n👩‍💻 Menjalankan tugas coding di workspace aktif..."))
+    print(c(BOLD + CYAN, f"\n👩‍💻 Executing coding task in active workspace..."))
     try:
         from coding_engine import get_coding_engine
         from project_manager import get_project_manager
@@ -1240,9 +1240,9 @@ def cmd_code(prompt: str):
         engine = get_coding_engine()
         res, _ = engine.execute_coding_task(user_id=0, prompt=prompt, persona={"name": "Waifu"})
         print(res)
-        print(c(BOLD + GREEN, "\n✓ Selesai!\n"))
+        print(c(BOLD + GREEN, "\n✓ Completed!\n"))
     except Exception as e:
-        print(c(RED, f"\n❌ Gagal menjalankan tugas coding: {e}\n"))
+        print(c(RED, f"\n❌ Failed to execute coding task: {e}\n"))
 
 def print_cli_help(unknown_cmd: str = None):
     print_banner()
@@ -1255,44 +1255,44 @@ def print_cli_help(unknown_cmd: str = None):
         ]
         matches = difflib.get_close_matches(unknown_cmd.lower(), valid_cmds, n=1, cutoff=0.4)
         if matches:
-            print(c(BOLD + YELLOW, f"\n⚠️  Perintah '{unknown_cmd}' tidak dikenali. Mungkin maksud kamu: 'waifu {matches[0]}'?\n"))
+            print(c(BOLD + YELLOW, f"\n⚠️  Command '{unknown_cmd}' not recognized. Did you mean: 'waifu {matches[0]}'?\n"))
         else:
-            print(c(BOLD + RED, f"\n❌ Perintah '{unknown_cmd}' tidak dikenali.\n"))
+            print(c(BOLD + RED, f"\n❌ Command '{unknown_cmd}' not recognized.\n"))
 
-    print(c(BOLD + CYAN, "📋 DAFTAR PERINTAH RESMI ('waifu <command>'):"))
+    print(c(BOLD + CYAN, "📋 OFFICIAL COMMANDS LIST ('waifu <command>'):"))
     print(c(DIM, "─" * 70))
-    print(c(BOLD + MAGENTA, "  💬 Obrolan Langsung & Interaksi:"))
-    print(f"    {c(GREEN, 'waifu')} (atau {c(GREEN, 'waifu chat')})      Sesi chat CLI interaktif langsung (Auto-open foto & video!)")
-    print(f"    {c(GREEN, 'waifu code')} \"<tugas>\"        Jalankan coding otonom langsung di workspace aktif")
+    print(c(BOLD + MAGENTA, "  💬 Direct Chat & Interaction:"))
+    print(f"    {c(GREEN, 'waifu')} (or {c(GREEN, 'waifu chat')})        Interactive CLI chat session (Auto-opens photo & video!)")
+    print(f"    {c(GREEN, 'waifu code')} \"<task>\"        Run autonomous coding task in active workspace")
 
-    print(c(BOLD + MAGENTA, "\n  🚀 Kontrol Layanan & Status:"))
-    print(f"    {c(GREEN, 'waifu start')} [--daemon]       Mulai bot & AI engines (foreground / background)")
-    print(f"    {c(GREEN, 'waifu stop')}                  Hentikan bot & semua background services")
-    print(f"    {c(GREEN, 'waifu restart')}               Restart bot & daemon secara bersih")
-    print(f"    {c(GREEN, 'waifu idle')}                  Tidurkan AI lokal & bebaskan 100% VRAM secara manual")
-    print(f"    {c(GREEN, 'waifu status')}                Diagnostik kesehatan LLM, ComfyUI, Music & RAM/VRAM")
-    print(f"    {c(GREEN, 'waifu logs')}                  Pantau log aktivitas bot secara real-time")
-    print(f"    {c(GREEN, 'waifu bridge')} [start|stop|status]  Kelola Google Antigravity CLI OpenAI-compatible Bridge")
+    print(c(BOLD + MAGENTA, "\n  🚀 Service Control & Diagnostics:"))
+    print(f"    {c(GREEN, 'waifu start')} [--daemon]       Start bot & AI engines (foreground / background)")
+    print(f"    {c(GREEN, 'waifu stop')}                  Stop bot & all background services")
+    print(f"    {c(GREEN, 'waifu restart')}               Cleanly restart bot daemon")
+    print(f"    {c(GREEN, 'waifu idle')}                  Manually put local AI to sleep & free 100% VRAM")
+    print(f"    {c(GREEN, 'waifu status')}                Health diagnostics for LLM, ComfyUI, Music & RAM/VRAM")
+    print(f"    {c(GREEN, 'waifu logs')}                  Monitor live bot activity logs")
+    print(f"    {c(GREEN, 'waifu bridge')} [start|stop|status]  Manage Google Antigravity CLI OpenAI-compatible Bridge")
 
-    print(c(BOLD + MAGENTA, "\n  ⚙️ Konfigurasi & Model AI:"))
-    print(f"    {c(GREEN, 'waifu autotune')}              Deteksi GPU/VRAM & optimalkan model foto/video otomatis")
-    print(f"    {c(GREEN, 'waifu setup')}                 Wizard konfigurasi interaktif (Token, Model, Voice)")
-    print(f"    {c(GREEN, 'waifu models')} [dl <nama>]    Kelola & download model (MeinaMix, Anything XL, dll.)")
-    print(f"    {c(GREEN, 'waifu persona')} <nama>        Ganti waifu (runa, akira, hina, shiro, yume)")
-    print(f"    {c(GREEN, 'waifu language')} [id|en|ja]   Ganti bahasa percakapan waifu (ID, EN, JA)")
-    print(f"    {c(GREEN, 'waifu autorun')} [on|off]      Atur bot berjalan otomatis saat PC boot")
+    print(c(BOLD + MAGENTA, "\n  ⚙️ Configuration & AI Models:"))
+    print(f"    {c(GREEN, 'waifu autotune')}              Detect GPU/VRAM & optimize image/video models automatically")
+    print(f"    {c(GREEN, 'waifu setup')}                 Interactive setup wizard (Token, Models, Voice)")
+    print(f"    {c(GREEN, 'waifu models')} [dl <name>]    Manage & download AI models (MeinaMix, Anything XL, etc.)")
+    print(f"    {c(GREEN, 'waifu persona')} <name>        Switch active waifu persona (runa, akira, hina, shiro, yume, alia)")
+    print(f"    {c(GREEN, 'waifu language')} [id|en|ja]   Set conversational language preference (ID, EN, JA, AUTO)")
+    print(f"    {c(GREEN, 'waifu autorun')} [on|off]      Configure bot autostart on Windows boot")
 
-    print(c(BOLD + MAGENTA, "\n  🔄 Pemeliharaan & Info:"))
-    print(f"    {c(GREEN, 'waifu doctor')}                Cek kesehatan sistem & kelengkapan tools (Python, Node.js, GPU)")
-    print(f"    {c(GREEN, 'waifu update')}                Update repository, dependensi, dan model AI")
-    print(f"    {c(GREEN, 'waifu version')}               Tampilkan versi Waifu on Telegram saat ini")
-    print(f"    {c(GREEN, 'waifu uninstall')}             Wizard uninstalasi lengkap & pembersihan sistem")
+    print(c(BOLD + MAGENTA, "\n  🔄 Maintenance & Info:"))
+    print(f"    {c(GREEN, 'waifu doctor')}                System health & prerequisite tools check (Python, Node.js, GPU)")
+    print(f"    {c(GREEN, 'waifu update')}                Update repository, dependencies, and AI models")
+    print(f"    {c(GREEN, 'waifu version')}               Show current Waifu on Telegram version")
+    print(f"    {c(GREEN, 'waifu uninstall')}             Complete uninstallation wizard & clean up")
 
     print(c(DIM, "─" * 70))
-    print(c(DIM, "💡 Contoh penggunaan:"))
+    print(c(DIM, "💡 Usage examples:"))
     print(c(DIM, "    waifu start --daemon"))
     print(c(DIM, "    waifu models download anything_xl"))
-    print(c(DIM, "    waifu persona akira\n"))
+    print(c(DIM, "    waifu persona alia\n"))
 
 def main():
     if any(a in sys.argv[1:] for a in ("-v", "--version", "version")):
