@@ -50,6 +50,14 @@ To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the
 
 ---
 
+## 🦾 Proteksi Anatomi Anggota Tubuh & Anti-Amputasi Tangan (v2.4.54)
+
+Pembaruan v2.4.54 menuntaskan masalah hilangnya lengan/tangan (*missing arm / amputation*) pada pose santai, miring, atau rebahan:
+* **🛡️ Negative Prompt Guard Lengkap:** Menambahkan filter berbobot tinggi `(missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (disappearing arm:1.4), (floating arms:1.4), (bad arms:1.4)` di seluruh generator gambar (ComfyUI & AGY) serta seluruh profil persona.
+* **✨ Positive Anatomy Anchors:** Menginjeksi token struktural `(proper anime anatomy:1.2), (complete body:1.1), (two arms:1.1)` agar kedua lengan digambar utuh, simetris, dan terposisikan secara natural (*arms naturally positioned*) bahkan saat pose menyamping (*three-quarter angle*) atau santai di sofa.
+
+---
+
 ## 🧝 Persona Baru Sylvie & Mimi, Custom Persona Wizard & Persistensi Pakaian Dalam Canon (v2.4.53)
 
 Pembaruan v2.4.53 menghadirkan dua karakter kanon baru, fitur pembuatan persona penuh kustom (*Interactive Persona Builder*), serta konsistensi visual mendalam:

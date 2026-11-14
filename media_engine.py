@@ -344,7 +344,7 @@ class MediaEngine:
     def generate_image_comfyui(
         self,
         prompt: str,
-        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, (2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate:1.4), blurry",
+        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (disappearing arm:1.4), (floating arms:1.4), (fused arms:1.4), (bad arms:1.4), (extra arms:1.4), extra limbs, bad hands, (missing fingers:1.4), (extra fingers:1.4), bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, (2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate:1.4), blurry",
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None,
         width: Optional[int] = None,
@@ -372,7 +372,7 @@ class MediaEngine:
     def _execute_generate_image_comfyui(
         self,
         prompt: str,
-        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, (2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate:1.4), blurry",
+        negative_prompt: str = "(worst quality, low quality:1.4), bad anatomy, deformed eyes, (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (disappearing arm:1.4), (floating arms:1.4), (fused arms:1.4), (bad arms:1.4), (extra arms:1.4), extra limbs, bad hands, (missing fingers:1.4), (extra fingers:1.4), bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, (2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate:1.4), blurry",
         aspect_ratio: Optional[str] = None,
         quality: Optional[str] = None,
         width: Optional[int] = None,
@@ -753,7 +753,7 @@ class MediaEngine:
             if self.comfyui_url:
                 local_img = self.generate_image_comfyui(
                     effective_prompt,
-                    negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, extra limbs, bad hands, missing fingers, bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, (2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate:1.4), blurry",
+                    negative_prompt=negative_prompt or "(worst quality, low quality:1.4), bad anatomy, deformed eyes, (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (disappearing arm:1.4), (floating arms:1.4), (fused arms:1.4), (bad arms:1.4), (extra arms:1.4), extra limbs, bad hands, (missing fingers:1.4), (extra fingers:1.4), bad legs, extra legs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body, (2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate:1.4), blurry",
                     aspect_ratio=aspect_ratio,
                     quality=quality,
                     is_nude=is_nude,

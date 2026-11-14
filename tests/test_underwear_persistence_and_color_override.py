@@ -51,6 +51,15 @@ class TestUnderwearPersistenceAndColorOverride(unittest.TestCase):
         self.assertNotIn("animal ears", extra_neg)
         self.assertIn("cat ears", vis_prompt.lower())
 
+    def test_arm_and_hand_anatomy_guardrails(self):
+        self.pm.set_active_persona("mimi")
+        vis_prompt, extra_neg, is_nude, name = self.pm.craft_visual_prompt_full("pap lagi santai di sofa", user_id=107)
+        self.assertIn("two arms", vis_prompt.lower())
+        self.assertIn("missing arm", extra_neg.lower())
+        self.assertIn("amputation", extra_neg.lower())
+        self.assertIn("severed arm", extra_neg.lower())
+        self.assertIn("bad arms", extra_neg.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

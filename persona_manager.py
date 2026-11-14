@@ -18,7 +18,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual (Indonesian & English). Santai, manja, genit, jahil, hangat, dan playful layaknya pacar visual novel idaman.",
         "visual_traits": "1girl, 21yo young adult anime woman, mature cute college face, defined feminine jawline, very long voluminous pastel pink hair, soft cotton-candy pink tones with pale peach and rose highlights, silky fluffy layered hair, thick soft bangs sweeping across eyes, delicate loose strands framing cheeks, large sparkling pink-magenta anime eyes, intricate heart-shaped highlights, long dark eyelashes, soft pink eye makeup, porcelain skin, naturally rosy cheeks, charming open-mouth smile revealing small teeth and soft pink tongue, teasing affectionate mischievous expression, petite curvy adult body, natural C-cup medium breasts, slender waist, delicate collarbones, soft feminine curves, large black ribbon bow on side of hair, small black cat-shaped hair clip with tiny pink heart detail, two slim black hairpins, fitted black choker with metallic silver heart ring and dangling pink heart pendant, glossy pastel pink nails, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "oversized black gothic-kawaii hoodie casually slipped off shoulders exposing collarbones, large loose sleeves, cute pink cat graphic emblem, delicate white camisole with thin black shoulder straps, black lace trim and small pink ribbon bow, fitted black choker with silver heart ring and dangling pink heart pendant",
-        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), blonde hair, blue eyes, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), blonde hair, blue eyes, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Playful, cute, flirtatious, energetic, youthful 21yo anime girlfriend voice, cheerful, affectionate, warm, and teasing conversational tone.",
         "voicestudio_voice": "runa",
         "voicestudio_model": "omnivoice",
@@ -36,7 +36,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual. Anggun, tenang, misterius, genit, manja, jahil, penuh kasih sayang, dan memikat layaknya pacar gothic idaman.",
         "visual_traits": "1girl, 22yo mature adult anime woman, elegant refined mature face, sharp captivating jawline, sophisticated adult woman, extremely long voluminous silky dark purple-black hair extending below waist, deep charcoal black with rich dark violet and muted plum reflections, long layered bangs, pointed strands falling between eyes, face-framing side locks, flowing strands draping shoulders and chest, dark burgundy red rose hair ornament on viewer left, captivating ruby-red and crimson anime eyes, deep red gradients, intricate pupils, long eyelashes, slightly narrowed seductive gentle gaze, porcelain skin, soft rosy blush, delicate nose, pink glossy lips, subtle closed-mouth smile, tall curvaceous hourglass figure, D-cup large breasts, shapely bust, narrow waist, feminine wide hips, sophisticated black velvet choker with delicate lace, center small deep ruby-red diamond-shaped gemstone pendant in dark metallic setting, masterpiece, best quality, highly detailed Gothic anime visual novel artwork",
         "default_outfit": "elaborate black Gothic dress with dark burgundy accents, fitted black bodice with deep burgundy trim, intricate black floral lace around sweetheart neckline, delicate chest lace detailing, semi-transparent sheer black mesh sleeves, burgundy ribbon accents, decorative crisscross lacing, black velvet choker with ruby-red diamond gemstone pendant",
-        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.3), (small breasts:1.2), (hyper oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), blonde hair, blue eyes, missing rose accessory, missing choker, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.3), (small breasts:1.2), (hyper oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), blonde hair, blue eyes, missing rose accessory, missing choker, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Mature, seductive, slightly low-pitched, smooth, elegant, confident, and teasing anime woman voice with subtle gothic charm.",
         "voicestudio_voice": "akira",
         "voicestudio_model": "omnivoice",
@@ -54,7 +54,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual (Indonesian & English). Ceria, hangat, genit, manja, jahil, penuh kasih sayang, dan ekspresif layaknya pacar hangout idaman.",
         "visual_traits": "1girl, 21yo young adult anime woman, cheerful pretty adult college face, defined feminine jawline, warm honey-blonde layered bob haircut, soft inward-curving hair tips, fluffy volume, bangs framing forehead, two parallel orange barrette hairpins on viewer's left, large sparkling warm amber-gold anime eyes with golden gradients, detailed irises, long dark eyelashes, porcelain skin, naturally rosy blushing cheeks, bright charming open-mouth smile showing teeth, fit toned feminine body, perky C-cup medium breasts, slender athletic waist, healthy feminine curves, headphones resting around neck, leaning cheek on hand in cute affectionate gesture, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "oversized cozy cream ribbed knit sweater with warm yellow accents, yellow collar trim, yellow shoulder and sleeve stripes, yellow ribbed cuffs, beige pleated skirt, stylish headphones around neck",
-        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), long hair, black hair, dark eyes, missing hair clips, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), long hair, black hair, dark eyes, missing hair clips, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Bright, high-spirited, bubbly, cheerful, optimistic, sweet, and lively anime girl voice filled with positive energy.",
         "voicestudio_voice": "hina",
         "voicestudio_model": "omnivoice",
@@ -72,7 +72,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual (Indonesian, Japanese, English). Kuudere, tenang, cerdas, sedikit tsundere malu-malu ('...Bukan karena aku khawatir, kok. Aku cuma kebetulan ingat'), setia, dan penuh kasih sayang yang dalam.",
         "visual_traits": "1girl, 22yo refined adult anime woman, cool-beauty refined mature face, delicate jawline, composed intelligent expression, very long straight silky silver-white hair extending below waist, subtle icy-blue highlights, bangs framing forehead, dark navy ribbon bow on side of hair, metallic silver crescent-moon hair clip, four-point silver star hair accessory and hairpin, dangling crescent-moon and star crystal earring, captivating clear icy-blue anime eyes, crystalline pupils, long dark eyelashes, porcelain skin with soft natural blush, calm gentle kuudere expression, slight pink blush across cheeks and nose, slender graceful adult frame, natural modest C-cup medium breasts, elegant slender waist, delicate feminine curves, dark navy jacket over crisp white collared blouse, royal blue ribbon tie with silver star crystal brooch at collar, lying on bed resting chin on hand, cute white cat plushie nearby, cozy night bedroom background with moonlit window and starry sky, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "dark navy uniform jacket/cardigan over crisp white collared blouse, royal blue ribbon tie with silver star crystal brooch at collar, crescent-moon hair clip, silver star hair accessory",
-        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), short hair, blonde hair, pink hair, red eyes, exaggerated grin, missing moon hair clip, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), short hair, blonde hair, pink hair, red eyes, exaggerated grin, missing moon hair clip, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Calm, quiet, soft-spoken, cool, composed, intelligent, and gentle kuudere anime girl voice with a soothing tender undertone.",
         "voicestudio_voice": "shiro",
         "voicestudio_model": "omnivoice",
@@ -90,7 +90,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual (Indonesian & English). Lembut, manis, genit, manja, jahil, romantis, penuh kasih sayang, dan menenangkan layaknya pacar impian (dreamy girlfriend).",
         "visual_traits": "1girl, 21yo graceful adult anime woman, soft mature feminine facial contours, gentle romantic expression, very long silky pastel lavender-purple hair with soft violet gradients and luminous reflections, wispy bangs framing forehead, side locks framing face, three silver star-shaped hairpins on viewer's right, small silver star hair clip on viewer's left, delicate drop earrings, captivating dreamy lavender-violet anime eyes with starlight highlights and intricate purple gradients, porcelain skin, naturally rosy blushing cheeks, sweet loving gentle smile, delicate silver necklace with crescent-moon pendant, soft slender feminine body, natural shapely C-cup medium breasts, delicate slender waist, soft feminine curves, cozy oversized lavender cardigan over white pleated camisole dress with delicate lace trim, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "cozy oversized lavender cardigan over delicate white pleated camisole dress with lace trim, silver crescent-moon necklace, silver star-shaped hairpins",
-        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), short hair, black hair, yellow hair, dark eyes, missing star hairpins, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), short hair, black hair, yellow hair, dark eyes, missing star hairpins, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Soft, whispery, ethereal, celestial, gentle, slow-paced, and tender romantic anime girl voice with dreamy warmth.",
         "voicestudio_voice": "yume",
         "voicestudio_model": "omnivoice",
@@ -108,7 +108,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual (Indonesian & English). Anggun, lembut, puitis, sedikit polos mengagumi hal modern, setia, dan penuh kasih sayang.",
         "visual_traits": "1girl, 22yo young adult anime elf woman, pointy elf ears, long pointy ears poking through hair, elegant refined mature face, defined feminine jawline, long flowing golden-platinum blonde hair reaching hips, delicate braided side-locks, small emerald leaf hair ornament, captivating emerald-green anime eyes with golden starlight highlights, long dark eyelashes, porcelain fair skin, natural soft blush, gentle alluring smile, slender graceful adult frame, natural C-cup medium breasts, slender waist, graceful feminine curves, delicate silver leaf pendant necklace, masterpiece, best quality, highly detailed fantasy anime visual novel artwork",
         "default_outfit": "elegant emerald-green and white tunic dress with gold embroidery trim, delicate sheer white lace sleeves, stylish leather belt with silver leaf buckle, soft leather boots",
-        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), human ears, round ears, missing elf ears, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), human ears, round ears, missing elf ears, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror",
         "voice_character": "Ethereal, graceful, soothing, gentle, melodious, and tender anime elf girlfriend voice with noble warmth.",
         "voicestudio_voice": "yume",
         "voicestudio_model": "omnivoice",
@@ -126,7 +126,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual (Indonesian & English). Ceria, lincah, manja, gemas, sedikit jahil ('nyaa~' halus saat manja), setia, dan penuh kehangatan.",
         "visual_traits": "1girl, 21yo young adult anime woman, soft cute fluffy cat ears poking through hair, fluffy feline cat ears with white inner fluff, adorable flexible cat tail swaying behind, charming expressive face, defined feminine jawline, glossy shoulder-length chocolate-brown hair with cute feline flick at tips, bell hair ribbon, large expressive amber-golden anime eyes with feline warmth, long dark eyelashes, porcelain skin, natural rosy blush, playful sweet smile, petite curvy adult frame, natural modest C-cup medium breasts, slender waist, soft feminine curves, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "cute oversized cream-beige off-shoulder sweater with cat paw motif, stylish pleated brown mini-skirt, delicate black choker with tiny golden bell, thigh-high socks, cozy indoor slippers",
-        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), human ears, missing cat ears, missing animal ears, missing tail, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), human ears, missing cat ears, missing animal ears, missing tail, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror",
         "voice_character": "Playful, bright, cute, sweet, cheerful, and affectionate anime catgirl girlfriend voice with gentle melodic warmth.",
         "voicestudio_voice": "runa",
         "voicestudio_model": "omnivoice",
@@ -560,9 +560,9 @@ CAMERA_COMPOSITION_PRESETS = [
     "side-profile candid view, looking slightly away with a shy sweet smile, soft bokeh background",
     "high-angle POV looking down, waifu looking up affectionately at viewer, gentle blushing cheeks",
     "candid snapshot, leaning forward with chin resting on hand, charming relaxed posture, natural lighting",
-    "three-quarter angle candid perspective, relaxed posture, expressive warm gaze, cinematic atmosphere",
+    "three-quarter angle candid perspective, relaxed natural posture, both arms naturally positioned, expressive warm gaze, cinematic atmosphere",
     "over-the-shoulder POV perspective, glancing back towards viewer with playful teasing smile",
-    "relaxed candid framing, tilting head playfully, warm soft glow, natural snapshot feel"
+    "relaxed candid framing, tilting head playfully, arms resting comfortably, warm soft glow, natural snapshot feel"
 ]
 
 
@@ -590,7 +590,7 @@ LOCATION_PRESETS: Dict[str, Dict[str, Any]] = {
     "living_room": {
         "name": "Ruang TV / Tamu",
         "patterns": [r"\b(ruang\s+tv|ruang\s+tengah|ruang\s+tamu|ruang\s+keluarga|living\s*room|sofa|depan\s+tv|nonton\s+tv|nonton\s+film\s+di\s+sofa|rebahan\s+di\s+sofa|santai\s+di\s+sofa|kursi\s+santai|di\s+sofa)\b"],
-        "prompt": "relaxing comfortably on cozy sofa in modern living room, soft television screen glow, warm ambient room lighting, coffee table",
+        "prompt": "relaxing comfortably on cozy sofa in modern living room, arms naturally positioned, soft television screen glow, warm ambient room lighting, coffee table",
         "nsfw_prompt": "intimate relaxing pose on soft living room couch, modern living room interior, dim atmospheric television glow, seductive posture",
         "is_public": False,
     },
@@ -2469,7 +2469,7 @@ class PersonaManager:
         if not wants_multi:
             # Strictly enforce single character solo shot (prevents accidental 2 waifus in image)
             cleaned_base = re.sub(r'^(?:solo,\s*)*(?:1girl,\s*)*', '', base_visual, flags=re.IGNORECASE).strip()
-            base_visual = f"solo, 1girl, (solo:1.4), (1girl:1.4), {cleaned_base}"
+            base_visual = f"solo, 1girl, (solo:1.4), (1girl:1.4), (proper anime anatomy:1.2), (complete body:1.1), (two arms:1.1), {cleaned_base}"
 
             solo_guard_neg = "(2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate character:1.4), (duplicate:1.4), (split screen:1.3)"
             extra_neg = f"{extra_neg}, {solo_guard_neg}" if extra_neg else solo_guard_neg
@@ -2490,8 +2490,18 @@ class PersonaManager:
             device_neg = "phone, smartphone, cellphone, camera, holding phone, holding camera, mirror selfie, mirror, hands holding device, selfie stick"
             extra_neg = f"{extra_neg}, {device_neg}" if extra_neg else device_neg
 
-        # Anatomy & limb defect guardrails (strictly prevents elongated, mutated, duplicated, or folded spider legs)
-        anatomy_guard_neg = "bad legs, extra legs, malformed limbs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, mutated legs, folded legs, cross-legged error, distorted legs, mutated, deformed, duplicate body, floating limbs, unnatural body proportions, distorted body"
+        # Anatomy, limbs, arms & hands defect guardrails (strictly prevents missing arms, stumps, amputations, spider legs, and deformed hands)
+        anatomy_guard_neg = (
+            "(missing arm:1.5), (missing arms:1.5), (missing hand:1.5), (missing hands:1.5), "
+            "(missing limbs:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), "
+            "(disappearing arm:1.4), (partially submerged arm:1.3), (floating limbs:1.4), (floating arms:1.4), "
+            "(extra arms:1.4), (bad arms:1.4), (mutated arms:1.4), (deformed arms:1.4), (fused arms:1.4), "
+            "(bad hands:1.4), (mutated hands:1.4), (missing fingers:1.4), (extra fingers:1.4), (fused fingers:1.4), "
+            "(malformed hands:1.4), (poorly drawn hands:1.4), (poorly drawn arms:1.4), "
+            "bad legs, extra legs, malformed limbs, long legs, elongated limbs, poorly drawn legs, "
+            "fused legs, multiple legs, mutated legs, folded legs, cross-legged error, distorted legs, "
+            "mutated, deformed, duplicate body, unnatural body proportions, distorted body"
+        )
         extra_neg = f"{extra_neg}, {anatomy_guard_neg}" if extra_neg else anatomy_guard_neg
 
         # Age maturity, facial proportions, and anatomy guardrails (prevents childish/immature body or elderly/distorted features)
