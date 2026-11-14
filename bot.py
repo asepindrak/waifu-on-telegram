@@ -5350,17 +5350,19 @@ def process_photo_request(
             if not is_nsfw_photo and user_text != actual_user_msg:
                 is_nsfw_photo = detect_nsfw_intent(user_text, history)
 
+            # Effective nude override to avoid UnboundLocalError in closure
+            eff_nude_override = is_nude_override
             # If this is a spontaneous/followup photo and user didn't explicitly request NSFW, enforce SFW
             if is_followup and not is_nsfw_photo:
                 is_nsfw_photo = False
-                if is_nude_override is None:
-                    is_nude_override = False
+                if eff_nude_override is None:
+                    eff_nude_override = False
 
-            if is_nude_override is False:
+            if eff_nude_override is False:
                 is_nsfw_photo = False
 
             cur_outfit_key, _ = persona_mgr.get_user_outfit(user_id)
-            if cur_outfit_key in ("bra_off", "nude") and (is_nude_override is not False):
+            if cur_outfit_key in ("bra_off", "nude") and (eff_nude_override is not False):
                 is_nsfw_photo = True
 
             if scene_override and not is_nsfw_photo:
@@ -5406,8 +5408,8 @@ def process_photo_request(
                 is_nsfw=is_nsfw_photo,
                 allow_undress_advance=(not is_followup),
             )
-            if is_nude_override is not None:
-                is_nude = is_nude_override
+            if eff_nude_override is not None:
+                is_nude = eff_nude_override
                 if not is_nude and any(nud_kw in outfit_label.lower() for nud_kw in ["telanjang", "nude", "topless", "bra_off"]):
                     ctx_clothed = student_schedule.detect_contextual_activity_and_outfit(user_text, [], persona_key=persona_mgr.active_key)
                     outfit_label = ctx_clothed.get("outfit_name", "🌸 Pakaian Kasual Santai") if ctx_clothed else "🌸 Pakaian Kasual Santai"
@@ -5606,7 +5608,7 @@ def process_photo_request(
 
             u_lower = user_text.lower() if user_text else ""
             u_stage = persona_mgr.get_undress_stage(user_id)
-            if (is_nude or is_nsfw_photo or u_stage > 0 or ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)) and (is_nude_override is not False):
+            if (is_nude or is_nsfw_photo or u_stage > 0 or ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)) and (eff_nude_override is not False):
                 stage_captions = {
                     1: "Kaosnya udah kubuka... tinggal BH sama celana pendek santai nih. Suka liatnya? 🙈💕",
                     2: "Sekarang cuma pakai BH sama celana dalam aja... jangan diliatin terus dong, malu tau~ 😳💕",
