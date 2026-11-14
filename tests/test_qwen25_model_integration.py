@@ -38,6 +38,28 @@ class TestQwen25ModelIntegration(unittest.TestCase):
             self.assertTrue(any("Qwen2.5-7B" in text for text in button_texts))
             self.assertIn("cfg_set_llm:qwen_auto", button_datas)
 
+    def test_show_llm_menu_split_mode_displays_detected_local_models(self):
+        import bot
+        mock_detected = [
+            ("KoboldCPP", "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf", "models/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"),
+            ("KoboldCPP", "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf", "models/Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"),
+        ]
+        with patch("bot.scan_local_llm_models", return_value=mock_detected), \
+             patch.dict(os.environ, {"AI_ENGINE_MODE": "split", "NSFW_LLM_PROVIDER": "local"}), \
+             patch("bot.bot.send_message") as mock_send:
+            bot.show_llm_menu(chat_id=12345, user_id=12345)
+            mock_send.assert_called_once()
+            markup = mock_send.call_args[1].get("reply_markup")
+            self.assertIsNotNone(markup)
+            
+            button_datas = [btn.callback_data for row in markup.keyboard for btn in row]
+            button_texts = [btn.text for row in markup.keyboard for btn in row]
+            
+            self.assertIn("cfg_set_llm:0", button_datas)
+            self.assertIn("cfg_set_llm:1", button_datas)
+            self.assertTrue(any("Qwen2.5" in text for text in button_texts))
+            self.assertTrue(any("Huihui" in text for text in button_texts))
+
     def test_callback_auto_downloads_and_activates_qwen(self):
         import bot
         mock_call = MagicMock()

@@ -2700,16 +2700,27 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
         # NSFW Providers section
         markup.add(types.InlineKeyboardButton("─── 🔞 NSFW CHAT PROVIDER ───", callback_data="noop"))
         markup.add(types.InlineKeyboardButton(f"🔞 Local KoboldCPP Uncensored {'✓' if nsfw_p == 'local' else ''}", callback_data="cfg_set_nsfw_p:local"))
-        has_huihui_split = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
-        if not has_huihui_split:
-            markup.add(types.InlineKeyboardButton("📥 Download & Select Huihui-Qwythos 9B (~5.5 GB • 100% Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
-        has_qwen_split = any("qwen" in mname.lower() for _, mname, _ in detected)
-        if not has_qwen_split:
-            markup.add(types.InlineKeyboardButton("📥 Download & Select Qwen2.5-7B (~4.7 GB • Natural ID & Uncensored)", callback_data="cfg_set_llm:qwen_auto"))
-        has_nemo_split = any("nemo" in mname.lower() or "mistral" in mname.lower() for _, mname, _ in detected)
-        if not has_nemo_split:
-            markup.add(types.InlineKeyboardButton("📥 Download & Select Mistral-NeMo 12B (~7.5 GB • 128k Context)", callback_data="cfg_set_llm:mistral_nemo_auto"))
         markup.add(types.InlineKeyboardButton(f"☁️ OpenRouter Uncensored {'✓' if nsfw_p == 'openrouter_uncensored' else ''}", callback_data="cfg_set_nsfw_p:openrouter_uncensored"))
+
+        if nsfw_p == "local":
+            markup.add(types.InlineKeyboardButton("─── 💾 PILIH MODEL NSFW LOKAL (GGUF) ───", callback_data="noop"))
+            cur_active_nsfw = (os.environ.get("LOCAL_LLM_MODEL") or os.environ.get("NSFW_LLM_MODEL") or "").lower()
+            for idx, (source, mname, mpath) in enumerate(detected):
+                is_cur = bool(cur_active_nsfw and (cur_active_nsfw in mname.lower() or mname.lower() in cur_active_nsfw))
+                short_name = mname.replace(".gguf", "")
+                if len(short_name) > 34:
+                    short_name = short_name[:31] + "..."
+                markup.add(types.InlineKeyboardButton(f"🔞 {short_name} ({source}) {'✓' if is_cur else ''}", callback_data=f"cfg_set_llm:{idx}"))
+
+            has_qwen_split = any("qwen" in mname.lower() for _, mname, _ in detected)
+            if not has_qwen_split:
+                markup.add(types.InlineKeyboardButton("📥 Download & Select Qwen2.5-7B (~4.7 GB • Natural ID & Uncensored)", callback_data="cfg_set_llm:qwen_auto"))
+            has_nemo_split = any("nemo" in mname.lower() or "mistral" in mname.lower() for _, mname, _ in detected)
+            if not has_nemo_split:
+                markup.add(types.InlineKeyboardButton("📥 Download & Select Mistral-NeMo 12B (~7.5 GB • 128k Context)", callback_data="cfg_set_llm:mistral_nemo_auto"))
+            has_huihui_split = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
+            if not has_huihui_split:
+                markup.add(types.InlineKeyboardButton("📥 Download & Select Huihui-Qwythos 9B (~5.5 GB • 100% Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
     else:
         is_agy_llm = ("8001" in cur_base or sfw_p == "agy")
         is_kobold = ("5001" in cur_base and not is_agy_llm)
@@ -4138,8 +4149,12 @@ def callback_set_llm(call):
             return
 
     label = apply_llm_choice(key)
+    try:
+        get_hybrid_llm_client(force_reload=True)
+    except Exception:
+        pass
     bot.answer_callback_query(call.id, f"LLM: {label}")
-    show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+    show_llm_menu(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'cfg_toggle_split_mode')
@@ -4203,7 +4218,7 @@ def callback_set_nsfw_provider(call):
     else:
         base = "http://127.0.0.1:5001/v1"
         key = "kobold"
-        model = "default"
+        model = os.environ.get("LOCAL_LLM_MODEL") or os.environ.get("NSFW_LLM_MODEL") or "default"
     os.environ["AI_ENGINE_MODE"] = "split"
     os.environ["NSFW_LLM_PROVIDER"] = prov
     os.environ["NSFW_LLM_BASE_URL"] = base

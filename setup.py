@@ -451,7 +451,61 @@ def config_llm_model(env_vars):
         else:
             env_vars["NSFW_LLM_BASE_URL"] = np_url
             env_vars["NSFW_LLM_API_KEY"] = "kobold"
-            env_vars["NSFW_LLM_MODEL"] = "default"
+
+            # Allow user to pick which local GGUF model to use for NSFW
+            detected_nsfw_models = scan_local_llm_models()
+            nsfw_model_options = []
+            for src, mname, mpath in detected_nsfw_models:
+                nsfw_model_options.append((f"{mname} ({src})", mname))
+
+            has_qwen = any("qwen" in m[1].lower() for m in nsfw_model_options)
+            if not has_qwen:
+                nsfw_model_options.append(("Qwen2.5-7B-Instruct-Abliterated (Download & Auto-select • Natural ID & Uncensored)", "download_qwen"))
+            has_nemo = any("nemo" in m[1].lower() or "mistral" in m[1].lower() for m in nsfw_model_options)
+            if not has_nemo:
+                nsfw_model_options.append(("Mistral-NeMo-12B-Instruct (Download & Auto-select • 128k Context RP)", "download_nemo"))
+            has_stheno = any("stheno" in m[1].lower() for m in nsfw_model_options)
+            if not has_stheno:
+                nsfw_model_options.append(("L3-8B-Stheno-v3.4 (Download & Auto-select • Uncensored RP)", "download_stheno"))
+
+            if not nsfw_model_options:
+                nsfw_model_options.append(("Auto-detect / Default Model", "default"))
+
+            cur_active_nsfw = env_vars.get("LOCAL_LLM_MODEL", env_vars.get("NSFW_LLM_MODEL", "default"))
+            print(c(BOLD + CYAN, "\n  Pilih Model GGUF Lokal untuk NSFW / Roleplay:"))
+            def_idx = 1
+            for m_idx, (opt_label, opt_val) in enumerate(nsfw_model_options, 1):
+                is_active = (opt_val.lower() in cur_active_nsfw.lower()) if opt_val != "default" else False
+                if is_active:
+                    def_idx = m_idx
+                print(f"    {m_idx}) {opt_label} {'(Aktif ✓)' if is_active else ''}")
+
+            m_choice = input(f"\n  Pilih Model NSFW [1-{len(nsfw_model_options)}, default: {def_idx}]: ").strip()
+            chosen_m_idx = int(m_choice) - 1 if m_choice.isdigit() and 1 <= int(m_choice) <= len(nsfw_model_options) else (def_idx - 1)
+            selected_model_val = nsfw_model_options[chosen_m_idx][1]
+
+            if selected_model_val == "download_qwen":
+                print(c(CYAN, "\n⏳ Downloading Qwen2.5-7B-Instruct-Abliterated (~4.7 GB)..."))
+                ok = asset_manager.download_asset("qwen25_7b") if asset_manager else False
+                if ok:
+                    print(c(GREEN, "  ✓ Model berhasil diunduh dan diverifikasi!"))
+                selected_model_val = "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+            elif selected_model_val == "download_nemo":
+                print(c(CYAN, "\n⏳ Downloading Mistral-NeMo-12B-Instruct (~7.5 GB)..."))
+                ok = asset_manager.download_asset("mistral_nemo_12b") if asset_manager else False
+                if ok:
+                    print(c(GREEN, "  ✓ Model successfully downloaded and verified!"))
+                selected_model_val = "Mistral-Nemo-12B-Instruct-v0.4.Q4_K_M.gguf"
+            elif selected_model_val == "download_stheno":
+                print(c(CYAN, "\n⏳ Mengunduh L3-8B-Stheno-v3.4 (~4.9 GB)..."))
+                ok = asset_manager.download_asset("stheno_8b") if asset_manager else False
+                if ok:
+                    print(c(GREEN, "  ✓ Model berhasil diunduh dan diverifikasi!"))
+                selected_model_val = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
+
+            env_vars["LOCAL_LLM_MODEL"] = selected_model_val
+            env_vars["NSFW_LLM_MODEL"] = selected_model_val
+            print(c(GREEN, f"  ✓ Model NSFW Lokal Aktif: {selected_model_val}"))
 
         env_vars["LLM_BASE_URL"] = env_vars["SFW_LLM_BASE_URL"]
         env_vars["LLM_API_KEY"] = env_vars["SFW_LLM_API_KEY"]
