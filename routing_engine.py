@@ -128,9 +128,14 @@ _NSFW_WORDS = [
     r"\b(?:pantat|bokong|pantatmu|bokongmu|butt|buttocks|ass)\b",
 
     # Sexual Acts & Erotic Activities (ID & EN)
-    r"\b(?:bercinta|ngentot|entot|masturbasi|masturbate|coli|onani)\b",
-    r"\b(?:orgasme|orgasm|crot|squirt|ejakulasi)\b",
-    r"\b(?:hisap\s+(?:titit|kontol|payudara|puting|nenen|toket))\b",
+    r"\b(?:ngesex|ngeseks|nge-sex|nge-seks|sex|seks)\b",
+    r"\b(?:ngewe|ewe|ewean|diewe|nge-we|di-ewe|ngeue|ue|uean)\b",
+    r"\b(?:bercinta|ngentot|entot|dientot|masturbasi|masturbate|coli|onani)\b",
+    r"\b(?:have\s+sex|having\s+sex|making\s+love|fuck|fucking)\b",
+    r"\b(?:crot\s+di\s+(?:dalem|dalam)|keluar\s+di\s+(?:dalem|dalam)|masukin\s+(?:kontol|penis|titit))\b",
+    r"\b(?:genjot|nggenjot|digenjot|sodok|nyodok|disodok)\b",
+    r"\b(?:orgasme|orgasm|crot|squirt|ejakulasi|sperma|pejuh|cum|cumming|air\s+mani)\b",
+    r"\b(?:hisap|isap)\s+(?:titit|kontol|payudara|puting|nenen|toket|kemaluan)\b",
     r"\b(?:remas\s+(?:payudara|pantat|tetek|nenen|toket|bokong))\b",
     r"\b(?:jilat\s+(?:memek|pepek|puting|vagina|nenen|toket|leher))\b",
     r"\b(?:oral\s+sex|blowjob|handjob)\b",
@@ -140,7 +145,7 @@ _NSFW_WORDS = [
     r"\b(?:how\s+wet|see\s+how\s+wet|wet\s+you\s+are|wet\s+already|legs\s+parting|part\s+(?:your\s+|my\s+)?legs|spread\s+(?:your\s+|my\s+)?legs|under\s+(?:your\s+|my\s+)?skirt)\b",
 
     # Erotic Context & State of Mind (ID & EN)
-    r"\b(?:sange|horny|terangsang|desah|mendesah|erotis|erotic|sensual|flustered)\b",
+    r"\b(?:sange|sangean|ngaceng|horny|terangsang|desah|mendesah|erotis|erotic|sensual|flustered)\b",
     r"\b(?:erp|nsfw|hentai|ecchi|r18|18\+)\b",
     r"\b(?:sensual\s+(?:touch|kiss|massage|rubbing))\b",
     r"\b(?:arching\s+into|arching\s+off\s+the\s+bed|trembling\s+with|body\s+burning)\b",

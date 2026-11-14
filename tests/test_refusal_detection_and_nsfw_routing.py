@@ -92,6 +92,30 @@ class TestRefusalDetectionAndNSFWRouting(unittest.TestCase):
         self.assertFalse(detect_nsfw_intent("I just finished taking a shower after gym"))
         self.assertFalse(detect_nsfw_intent("Hari ini cuaca di luar lagi gerimis sejuk"))
 
+    def test_indonesian_slang_sexual_acts_detection(self):
+        """Verify Indonesian slang for sexual intercourse (ngesex, ngewe, ewe, ewean) are flagged as NSFW."""
+        self.assertTrue(detect_nsfw_intent("ngesex"))
+        self.assertTrue(detect_nsfw_intent("ngesex yuk"))
+        self.assertTrue(detect_nsfw_intent("mau ngesex bareng kamu"))
+        self.assertTrue(detect_nsfw_intent("ngeseks"))
+        self.assertTrue(detect_nsfw_intent("nge-sex"))
+
+        self.assertTrue(detect_nsfw_intent("ngewe"))
+        self.assertTrue(detect_nsfw_intent("ngewe yuk"))
+        self.assertTrue(detect_nsfw_intent("pengen ngewe"))
+
+        self.assertTrue(detect_nsfw_intent("ewe"))
+        self.assertTrue(detect_nsfw_intent("mau ewe kamu"))
+        self.assertTrue(detect_nsfw_intent("bisa di ewe gak"))
+        self.assertTrue(detect_nsfw_intent("diewe"))
+
+        self.assertTrue(detect_nsfw_intent("ewean"))
+        self.assertTrue(detect_nsfw_intent("lagi pengen ewean nih"))
+        self.assertTrue(detect_nsfw_intent("ayo kita ewean"))
+
+        self.assertTrue(detect_nsfw_intent("ngaceng"))
+        self.assertTrue(detect_nsfw_intent("crot di dalem ya"))
+
 
 if __name__ == "__main__":
     unittest.main()
