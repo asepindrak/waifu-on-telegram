@@ -38,6 +38,28 @@ ASSET_REGISTRY = {
         "description": "Model chat/roleplay terbaik untuk Bahasa Indonesia (Qwen 2.5 7B abliterated uncensored, tata bahasa alami, tanpa delay thinking).",
         "required_for": "Otak Utama Chat & Roleplay Waifu (Qwen2.5-7B-Instruct-Abliterated)"
     },
+    "mistral_nemo_12b": {
+        "name": "Mistral-Nemo-12B-Instruct-v0.4 (128k Context Roleplay LLM)",
+        "type": "llm_model",
+        "filename": "Mistral-Nemo-12B-Instruct-v0.4.Q4_K_M.gguf",
+        "patterns": [
+            "*Mistral-Nemo*12B*.gguf",
+            "*Mistral-Nemo-Instruct*.gguf",
+            "*Mistral*Nemo*.gguf",
+            "*Nemo*12B*.gguf",
+            "Mistral-Nemo-12B-Instruct-v0.4.Q4_K_M.gguf"
+        ],
+        "size_mb": 7680,
+        "url": "https://huggingface.co/mradermacher/Mistral-Nemo-12B-Instruct-GGUF/resolve/main/Mistral-Nemo-12B-Instruct.Q4_K_M.gguf",
+        "fallback_url": "https://hf-mirror.com/mradermacher/Mistral-Nemo-12B-Instruct-GGUF/resolve/main/Mistral-Nemo-12B-Instruct.Q4_K_M.gguf",
+        "mirrors": [
+            "https://huggingface.co/mradermacher/Mistral-Nemo-12B-Instruct-GGUF/resolve/main/Mistral-Nemo-12B-Instruct.Q4_K_M.gguf",
+            "https://hf-mirror.com/mradermacher/Mistral-Nemo-12B-Instruct-GGUF/resolve/main/Mistral-Nemo-12B-Instruct.Q4_K_M.gguf",
+            "https://huggingface.co/bartowski/Mistral-Nemo-Instruct-2407-GGUF/resolve/main/Mistral-Nemo-Instruct-2407-Q4_K_M.gguf"
+        ],
+        "description": "Model roleplay 12B dengan context window 128k, vocabulary Tekken masif, dan kemampuan multi-bahasa yang luar biasa.",
+        "required_for": "Otak Utama Chat & Roleplay Waifu (Mistral-Nemo-12B-Instruct)"
+    },
     "stheno_8b": {
         "name": "L3-8B-Stheno-v3.4 (Uncensored Roleplay LLM)",
         "type": "llm_model",
@@ -852,6 +874,11 @@ def get_llm_launch_spec(project_root: Optional[str] = None) -> Optional[Dict[str
         if info_stheno and info_stheno.get("installed") and info_stheno.get("target_path"):
             model_path = info_stheno["target_path"]
 
+    if not model_path:
+        info_nemo = get_asset_info("mistral_nemo_12b")
+        if info_nemo and info_nemo.get("installed") and info_nemo.get("target_path"):
+            model_path = info_nemo["target_path"]
+
     for m_dir in models_dirs:
         if not m_dir or not os.path.isdir(m_dir):
             continue
@@ -903,7 +930,7 @@ def get_llm_launch_spec(project_root: Optional[str] = None) -> Optional[Dict[str
         mm_lower = os.path.basename(mmproj_path).lower()
         if "qwythos" in mm_lower and "qwythos" not in m_lower:
             mmproj_path = None
-        elif ("stheno" in m_lower or "llama" in m_lower or "qwen2.5" in m_lower) and "moondream" not in mm_lower:
+        elif ("stheno" in m_lower or "llama" in m_lower or "qwen2.5" in m_lower or "mistral" in m_lower or "nemo" in m_lower) and "moondream" not in mm_lower:
             mmproj_path = None
 
     mm_args = ["--mmproj", mmproj_path] if (mmproj_path and os.path.isfile(mmproj_path)) else []

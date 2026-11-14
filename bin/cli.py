@@ -755,6 +755,8 @@ def _execute_models(subcmd=None, target=None):
             return
         if target in ("stheno", "stheno-8b"):
             target = "stheno_8b"
+        if target in ("mistral", "nemo", "mistral-nemo", "mistral_nemo", "mistral_nemo_12b", "nemo-12b", "nemo_12b"):
+            target = "mistral_nemo_12b"
         if target in ("qwen", "qwen25", "qwen2.5", "qwen-7b", "qwen2.5-7b", "qwen25_7b"):
             target = "qwen25_7b"
         if target in ("huihui", "qwythos", "qwythos-9b", "huihui-qwythos", "huihui_9b"):

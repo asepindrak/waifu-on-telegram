@@ -857,6 +857,13 @@ def apply_llm_choice(choice: str) -> str:
         update_env_variable("LOCAL_LLM_MODEL", new_model)
         update_env_variable("NSFW_LLM_MODEL", new_model)
         update_env_variable("LLM_MODEL", new_model)
+    elif choice in ("mistral_nemo", "mistral_nemo_12b", "nemo", "nemo_12b", "mistral"):
+        new_base = "http://127.0.0.1:5001/v1"
+        new_model = "Mistral-Nemo-12B-Instruct-v0.4.Q4_K_M.gguf"
+        label = "Mistral-NeMo-12B-Instruct (KoboldCPP)"
+        update_env_variable("LOCAL_LLM_MODEL", new_model)
+        update_env_variable("NSFW_LLM_MODEL", new_model)
+        update_env_variable("LLM_MODEL", new_model)
     elif choice in ("agy", "agy_bridge"):
         new_base = "http://127.0.0.1:8001/v1"
         new_model = "gemini-3.8-flash-medium"
@@ -2692,6 +2699,9 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
         has_huihui_split = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
         if not has_huihui_split:
             markup.add(types.InlineKeyboardButton("📥 Download & Select Huihui-Qwythos 9B (~5.5 GB • 100% Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
+        has_nemo_split = any("nemo" in mname.lower() or "mistral" in mname.lower() for _, mname, _ in detected)
+        if not has_nemo_split:
+            markup.add(types.InlineKeyboardButton("📥 Download & Select Mistral-NeMo 12B (~7.5 GB • 128k Context)", callback_data="cfg_set_llm:mistral_nemo_auto"))
         markup.add(types.InlineKeyboardButton(f"☁️ OpenRouter Uncensored {'✓' if nsfw_p == 'openrouter_uncensored' else ''}", callback_data="cfg_set_nsfw_p:openrouter_uncensored"))
     else:
         is_agy_llm = ("8001" in cur_base or sfw_p == "agy")
@@ -2702,6 +2712,9 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
         has_huihui = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
         if not has_huihui:
             markup.add(types.InlineKeyboardButton("📥 Download & Select Huihui-Qwythos 9B (~5.5 GB • Default Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
+        has_nemo = any("nemo" in mname.lower() or "mistral" in mname.lower() for _, mname, _ in detected)
+        if not has_nemo:
+            markup.add(types.InlineKeyboardButton("📥 Download & Select Mistral-NeMo 12B (~7.5 GB • 128k Context)", callback_data="cfg_set_llm:mistral_nemo_auto"))
 
         for idx, (source, mname, mpath) in enumerate(detected):
             is_cur = (cur_llm.lower() in mname.lower())
@@ -4059,6 +4072,57 @@ def callback_set_llm(call):
             return
         else:
             label = apply_llm_choice("stheno")
+            bot.answer_callback_query(call.id, f"LLM: {label}")
+            show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
+            return
+    elif key in ("mistral_nemo_auto", "mistral_nemo", "mistral_nemo_12b", "nemo", "nemo_12b", "mistral"):
+        info_nemo = asset_manager.get_asset_info("mistral_nemo_12b") if asset_manager else None
+        if info_nemo and not info_nemo.get("installed"):
+            bot.answer_callback_query(call.id, "📥 Starting download of Mistral-NeMo-12B...")
+            chat_id = call.message.chat.id
+            mid = call.message.message_id
+            msg_prompt = bot.send_message(
+                chat_id,
+                "⏳ **Downloading Mistral-NeMo-12B-Instruct (~7.5 GB)**\n\n"
+                "The 128k-context multilingual roleplay model is downloading in the background. "
+                "Once complete, it will be **automatically selected & activated** as waifu's main brain! 💕",
+                parse_mode="Markdown"
+            )
+            def _async_dl_nemo():
+                ok = asset_manager.download_asset("mistral_nemo_12b") if asset_manager else False
+                if ok:
+                    apply_llm_choice("mistral_nemo_12b")
+                    try:
+                        bot.edit_message_text(
+                            "🎉 **Mistral-NeMo-12B-Instruct Successfully Installed & Activated!** 💕\n\n"
+                            "The 12B roleplay model is now active with 128k context and fluent multilingual storytelling! ✨",
+                            chat_id=chat_id,
+                            message_id=msg_prompt.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+                    try:
+                        health_engine.heal_llm()
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        bot.edit_message_text(
+                            "⚠️ **Failed to Download Mistral-NeMo-12B-Instruct**\n\n"
+                            "Connection interrupted. Please try again later or run in terminal:\n"
+                            "`waifu models download mistral_nemo`",
+                            chat_id=chat_id,
+                            message_id=msg_prompt.message_id,
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+            threading.Thread(target=_async_dl_nemo, daemon=True).start()
+            show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=mid)
+            return
+        else:
+            label = apply_llm_choice("mistral_nemo_12b")
             bot.answer_callback_query(call.id, f"LLM: {label}")
             show_setup_dashboard(call.message.chat.id, call.from_user.id, message_to_edit=call.message.message_id)
             return
