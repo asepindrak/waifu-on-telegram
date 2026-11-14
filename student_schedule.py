@@ -209,7 +209,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
                 "activity_desc": "udah rebahan di kasur di bawah selimut, skincare-an dan siap-siap tidur nyenyak",
                 "scene": "lying comfortably on bed with fluffy pillows and soft blanket, dim cozy night bedroom lamp",
                 "outfit_prompt": profile.get("pajamas_outfit", "(wearing soft pastel silk pajamas:1.35), cozy bedtime sleepwear"),
-                "outfit_name": "🌙 Piyama Tidur",
+                "outfit_name": "🌙 Baju Tidur Santai (Camisole & Shorts / Pajamas)",
                 "is_public": False,
                 "is_weekend": True
             }
@@ -291,7 +291,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
             "activity_desc": "udah rebahan di kasur di bawah selimut, skincare-an dan siap-siap tidur nyenyak",
             "scene": "lying comfortably on bed with fluffy pillows and soft blanket, dim cozy night bedroom lamp",
             "outfit_prompt": profile.get("pajamas_outfit", "(wearing soft pastel silk pajamas:1.35), cozy bedtime sleepwear"),
-            "outfit_name": "🌙 Piyama Tidur",
+            "outfit_name": "🌙 Baju Tidur Santai (Camisole & Shorts / Pajamas)",
             "is_public": False,
             "is_weekend": False
         }
@@ -349,7 +349,7 @@ def detect_contextual_activity_and_outfit(
                 "scene": "relaxing on bed with fluffy pillows, warm dim night bedroom lamp, cozy intimate bedroom",
                 "outfit_prompt": profile.get("pajamas_outfit", "(wearing soft pastel silk camisole and sleep shorts:1.35), bedtime loungewear"),
                 "outfit_negative": "hoodie, jacket, coat, outdoor clothes, jeans, campus",
-                "outfit_name": "🌙 Silk Pajamas",
+                "outfit_name": "🌙 Baju Tidur Santai (Camisole & Shorts / Pajamas)",
                 "is_public": False
             }
 

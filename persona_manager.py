@@ -214,6 +214,45 @@ BODY_POSES = [
     )
 ]
 
+INTIMATE_SEX_POSITIONS = [
+    # Doggy style / Menungging / All fours / Dari belakang
+    (
+        [r"\b(doggy(\s*style)?|doggystyle|nungging|posisi\s+nungging|menungging|dari\s+belakang|all\s+fours|on\s+all\s+fours)\b"],
+        "rear view from behind, (on all fours:1.4), (doggy style:1.4), on hands and knees, arched back, looking back over shoulder at viewer, seductive blush, passionate intimate gaze",
+        "standing, supine, front view, face close-up"
+    ),
+    # Missionary / Misionaris / Telentang paha terbuka
+    (
+        [r"\b(missionary(\s*style)?|misionaris|telentang\s+kaki\s+terbuka|ngangkang\s+te[lr]entang|posisi\s+misionaris|legs\s+spread\s+on\s+back)\b"],
+        "(missionary:1.4), (lying on back:1.3), supine pose, (spread legs:1.35), thighs parted, view from above looking down, intimate POV perspective, passionate eye contact, flushed face",
+        "rear view, from behind, standing, sitting upright"
+    ),
+    # Cowgirl / Riding / Posisi di atas / Straddling
+    (
+        [r"\b(cowgirl(\s*position)?|riding|woman\s+on\s+top|posisi\s+di\s+atas|kamu\s+di\s+atas|straddling|nindih|menindih|duduk\s+di\s+atas)\b"],
+        "(cowgirl position:1.4), (straddling:1.35), sitting on top of viewer, upright kneeling posture, looking down at viewer, flushed blushing face, hands on viewer chest or waist, passionate intimate POV",
+        "lying flat, rear view, supine"
+    ),
+    # Mating Press / Kaki ditekuk ke dada
+    (
+        [r"\b(mating\s*press|matingpress|kaki\s+(?:diangkat|ditekuk)\s*(?:ke\s*dada)?|legs\s+folded\s+up|legs\s+pushed\s+back)\b"],
+        "(mating press:1.4), lying on back, legs folded up to chest, thighs pushed back, view from above looking down, ecstatic blushing expression, intense intimate perspective",
+        "standing, sitting upright, rear view"
+    ),
+    # Prone Bone / Tengkurap rata pasrah
+    (
+        [r"\b(prone\s*bone|pronebone|tengkurap\s+pasrah|tengkurap\s+rata|tengkurap\s+kaki\s+lurus|posisi\s+prone\s*bone)\b"],
+        "(prone bone:1.4), lying flat on stomach, face down looking slightly back over shoulder, arched lower back, intimate rear perspective, flushed cheeks",
+        "sitting upright, front view, standing"
+    ),
+    # Standing against wall / Berdiri nempel tembok
+    (
+        [r"\b(standing\s+sex|berdiri\s+nempel\s+tembok|nempel\s+dinding|disandarkan\s+ke\s+tembok|disandarkan\s+ke\s+dinding|standing\s+against\s+wall|sex\s+berdiri)\b"],
+        "(standing against wall:1.35), pushed against wall, one leg raised, breathless passionate expression, intimate perspective, seductive eye contact",
+        "lying on bed, sitting, kneeling"
+    )
+]
+
 ANATOMY_CUES = [
     # Crotch / Vagina / Memek / Pussy
     ([r"\b(memek|pepek|vagina|kemaluan|puki|itil|liang|crotch|pussy|vulva|labia)\b"],
@@ -285,7 +324,7 @@ OUTFIT_PRESETS = {
         "negative": "hoodie, casual clothes, jeans, bikini"
     },
     "pajamas": {
-        "name": "🌙 Silk Pajamas",
+        "name": "🌙 Baju Tidur Santai (Camisole & Shorts / Pajamas)",
         "prompt": "(wearing soft pastel silk camisole and sleep shorts:1.35), bedtime loungewear",
         "negative": "hoodie, jacket, coat, outdoor clothes, jeans, denim, trousers, long pants, slacks"
     },
@@ -472,6 +511,121 @@ BEDROOM_SCENE_VARIATIONS = [
     "leaning comfortably against bed headboard, cozy blankets, soft ambient bedroom lighting"
 ]
 
+LOCATION_PRESETS: Dict[str, Dict[str, Any]] = {
+    "kitchen": {
+        "name": "Dapur",
+        "patterns": [r"\b(dapur|kitchen|masak|memasak|masakin|kompor|nyiapin makan|baking|goreng|rebus|cuci piring)\b"],
+        "prompt": "standing in modern cozy kitchen preparing food, warm domestic lighting, clean kitchen counter, stove and cookware in soft blur",
+        "nsfw_prompt": "standing by modern kitchen counter, kitchen island, intimate warm domestic kitchen ambiance, seductive pose",
+        "is_public": False,
+    },
+    "living_room": {
+        "name": "Ruang TV / Tamu",
+        "patterns": [r"\b(ruang\s+tv|ruang\s+tengah|ruang\s+tamu|ruang\s+keluarga|living\s*room|sofa|depan\s+tv|nonton\s+tv|nonton\s+film\s+di\s+sofa|rebahan\s+di\s+sofa|santai\s+di\s+sofa|kursi\s+santai|di\s+sofa)\b"],
+        "prompt": "relaxing comfortably on cozy sofa in modern living room, soft television screen glow, warm ambient room lighting, coffee table",
+        "nsfw_prompt": "intimate relaxing pose on soft living room couch, modern living room interior, dim atmospheric television glow, seductive posture",
+        "is_public": False,
+    },
+    "bedroom": {
+        "name": "Kamar Tidur / Kasur",
+        "patterns": [r"\b(kamar\s+tidur|kamar\s+kos|di\s+kamar|di\s+kasur|tempat\s+tidur|ranjang|rebahan\s+di\s+kasur|bantal|guling|bedroom|di\s+ranjang|rebahan)\b"],
+        "prompt": "relaxing comfortably on bed with fluffy pillows, cozy warm modern bedroom, soft room lamp lighting",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows, warm intimate atmosphere",
+        "is_public": False,
+    },
+    "bathroom": {
+        "name": "Kamar Mandi",
+        "patterns": [r"\b(kamar\s+mandi|bathroom|shower|bathtub|bak\s+mandi|wastafel|mandi|keramas|berendam)\b"],
+        "prompt": "standing in modern bathroom with soft steam, post-shower glow, bathroom mirror, clean tiles, warm soft lighting",
+        "nsfw_prompt": "steamy modern bathroom, glass shower cabin, soft water droplets on skin, sensual mirror reflection, intimate bathroom ambiance",
+        "is_public": False,
+    },
+    "balcony": {
+        "name": "Balkon / Rooftop",
+        "patterns": [r"\b(balkon|rooftop|atap\s+gedung|teras\s+atas|balcony|skyline)\b"],
+        "prompt": "standing on open balcony terrace, city skyline view in background, gentle evening breeze, atmospheric ambient lighting",
+        "nsfw_prompt": "private dimly lit balcony terrace at night, soft city lights bokeh in background, intimate outdoor breeze, seductive pose",
+        "is_public": False,
+    },
+    "cafe": {
+        "name": "Kafe / Coffee Shop",
+        "patterns": [r"\b(kafe|cafe|coffee\s*shop|kopi|ngopi|boba|matcha|starbucks|nongkrong\s+di\s+kafe|meja\s+kafe|nongkrong)\b"],
+        "prompt": "sitting at aesthetic cafe table holding a warm beverage, beautiful coffee shop interior, warm bokeh background",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+    "campus": {
+        "name": "Kampus / Ruang Kuliah",
+        "patterns": [r"\b(kampus|kuliah|kelas|ruang\s+kelas|lecture\s*hall|gedung\s+kuliah|fakultas|dosen|makul|skripsi)\b"],
+        "prompt": "sitting at wooden desk inside modern university lecture hall, college campus classroom background, clean lighting",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+    "library": {
+        "name": "Perpustakaan",
+        "patterns": [r"\b(perpustakaan|perpus|library|rak\s+buku|meja\s+belajar\s+perpus|study\s+room|buku\s+pelajaran)\b"],
+        "prompt": "sitting at wooden study desk in quiet university library, bookshelves with books in soft blur, warm study lamp lighting",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+    "minimarket": {
+        "name": "Minimarket",
+        "patterns": [r"\b(minimarket|indomaret|alfamart|konbini|convenience\s*store|supermarket)\b"],
+        "prompt": "standing in modern Japanese-style convenience store aisle, shelves with snacks and drinks, bright clean fluorescent lighting",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+    "cinema": {
+        "name": "Bioskop",
+        "patterns": [r"\b(bioskop|cinema|teater|nonton\s+bioskop|popcorn|studio\s+bioskop)\b"],
+        "prompt": "sitting in cinema lobby holding cinema ticket, movie posters in soft blur background, cozy dim ambient lighting",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+    "park": {
+        "name": "Taman Kota",
+        "patterns": [r"\b(taman|taman\s+kota|park|kebun|jogging|piknik|picnic|jalan\s+sore)\b"],
+        "prompt": "standing in blooming green park, lush trees and flowers in background, natural daylight, fresh outdoor atmosphere",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+    "beach": {
+        "name": "Pantai",
+        "patterns": [r"\b(pantai|beach|laut|pesisir|pantai\s+pasir\s+putih|ombak)\b"],
+        "prompt": "walking along tropical beach, ocean horizon, soft sandy shore, gentle sea breeze",
+        "nsfw_prompt": "private seaside resort room with balcony overlooking ocean, soft dim evening lighting, intimate atmosphere",
+        "is_public": True,
+    },
+    "car": {
+        "name": "Mobil",
+        "patterns": [r"\b(di\s+mobil|dalam\s+mobil|naik\s+mobil|kursi\s+mobil|car\s+seat|passenger\s+seat)\b"],
+        "prompt": "sitting in comfortable passenger seat of car, car interior, soft window lighting, road view bokeh outside",
+        "nsfw_prompt": "intimate seated pose inside car passenger seat at night, dim interior dashboard illumination, private car interior atmosphere",
+        "is_public": False,
+    },
+    "station": {
+        "name": "Stasiun / Halte",
+        "patterns": [r"\b(stasiun|peron|kereta|mrt|krl|train\s*station|subway|halte|bus\s*stop)\b"],
+        "prompt": "standing at modern train station platform or transit shelter, commuter ambiance, atmospheric lighting",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+    "street_food": {
+        "name": "Street Food / Kuliner",
+        "patterns": [r"\b(street\s*food|jajanan|kaki\s+lima|angkringan|warung|pasar\s+malam|food\s*stall)\b"],
+        "prompt": "standing outdoors by lively street food stalls, warm evening street lights, holding warm snacks, festive atmosphere",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+    "gym": {
+        "name": "Gym / Tempat Fitness",
+        "patterns": [r"\b(gym|fitness|workout|tempat\s+gym|olahraga\s+gym)\b"],
+        "prompt": "in bright modern fitness gym studio, exercise equipment in background, clean energetic atmosphere",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
+}
+
 
 class PersonaManager:
     """Manages AI girlfriend personality, consistent appearance, memory & photo triggers."""
@@ -484,13 +638,16 @@ class PersonaManager:
         self.user_affinity: Dict[int, int] = {}
         self.user_outfits: Dict[int, Any] = {}
         self.session_outfits: Dict[int, Dict[str, Any]] = {}
+        self.user_locations: Dict[int, Dict[str, Any]] = {}
         self.user_recent_angles: Dict[int, List[str]] = {}
         self.user_locked_outfit_prompts: Dict[int, Dict[str, Any]] = {}
         self.outfits_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_outfits.json")
+        self.locations_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_locations.json")
         self.history_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "chat_history.json")
         self._history_mtime = 0.0
         self._load_all_personas()
         self._load_user_outfits()
+        self._load_user_locations()
         self._load_chat_history()
 
     def get_recent_angles(self, user_id: int) -> List[str]:
@@ -580,6 +737,111 @@ class PersonaManager:
                 json.dump({str(k): v for k, v in self.user_outfits.items()}, f, indent=2)
         except Exception as e:
             logger.error(f"Error saving user outfits to {self.outfits_file}: {e}")
+
+    def _load_user_locations(self):
+        """Loads user active locked locations from persistent JSON storage."""
+        self.user_locations = {}
+        if os.path.exists(self.locations_file):
+            try:
+                with open(self.locations_file, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                    now = time.time()
+                    for k, v in raw.items():
+                        if not str(k).isdigit() or not isinstance(v, dict):
+                            continue
+                        uid = int(k)
+                        if v.get("expires_at", 0) > now:
+                            self.user_locations[uid] = v
+            except Exception as e:
+                logger.error(f"Error loading user locations: {e}")
+                self.user_locations = {}
+        else:
+            self.user_locations = {}
+
+    def _save_user_locations(self):
+        """Saves user active locked locations to persistent JSON storage."""
+        d = os.path.dirname(self.locations_file)
+        if d and not os.path.exists(d):
+            try:
+                os.makedirs(d, exist_ok=True)
+            except Exception as e:
+                logger.error(f"Error creating dir for locations: {e}")
+        try:
+            with open(self.locations_file, "w", encoding="utf-8") as f:
+                json.dump({str(k): v for k, v in self.user_locations.items()}, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving user locations to {self.locations_file}: {e}")
+
+    def detect_location_intent(self, text: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+        """
+        Detects if text mentions a specific physical location or room from LOCATION_PRESETS.
+        Returns: (location_key, location_dict) or None.
+        """
+        if not text:
+            return None
+        low = text.lower()
+        for loc_key, loc_info in LOCATION_PRESETS.items():
+            for pat in loc_info.get("patterns", []):
+                if re.search(pat, low):
+                    return loc_key, loc_info
+        return None
+
+    def get_user_location(self, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """
+        Retrieves active locked location session for user if not expired.
+        """
+        if not user_id:
+            return None
+        uid = int(user_id)
+        loc = self.user_locations.get(uid)
+        if not loc:
+            return None
+        if time.time() > loc.get("expires_at", 0):
+            self.user_locations.pop(uid, None)
+            self._save_user_locations()
+            return None
+        return loc
+
+    def set_user_location(
+        self,
+        user_id: int,
+        key: str,
+        duration_seconds: int = 7200,
+        source: str = "chat"
+    ) -> bool:
+        """
+        Locks the active location/scene for user (default 2 hours).
+        """
+        if not user_id:
+            return False
+        uid = int(user_id)
+        if key in ("default", "auto", "clear"):
+            self.user_locations.pop(uid, None)
+            self._save_user_locations()
+            logger.info(f"User {uid} location lock cleared to dynamic auto mode.")
+            return True
+
+        if key in LOCATION_PRESETS:
+            loc_data = LOCATION_PRESETS[key]
+            now = time.time()
+            self.user_locations[uid] = {
+                "key": key,
+                "name": loc_data.get("name", key.title()),
+                "prompt": loc_data.get("prompt", ""),
+                "nsfw_prompt": loc_data.get("nsfw_prompt", loc_data.get("prompt", "")),
+                "is_public": loc_data.get("is_public", False),
+                "source": source,
+                "set_at": now,
+                "expires_at": now + duration_seconds
+            }
+            self._save_user_locations()
+            logger.info(f"User {uid} location locked to '{key}' ({loc_data.get('name')}) for {duration_seconds}s (source={source}).")
+            return True
+        return False
+
+    def clear_user_location(self, user_id: int):
+        """Clears locked location for user."""
+        self.set_user_location(user_id, "clear")
 
     def _load_all_personas(self):
         """Loads personas from default dictionary and local JSON files."""
@@ -760,6 +1022,19 @@ class PersonaManager:
                 break
 
         return detected_angle, detected_pose
+
+    def detect_intimate_position(self, text: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Detects explicit intimate / sexual positions (e.g. doggy style, missionary, cowgirl, mating press, prone bone, standing).
+        Returns: (positive_position_prompt, negative_position_prompt)
+        """
+        if not text:
+            return None, None
+        low = text.lower()
+        for patterns, pos_prompt, neg_prompt in INTIMATE_SEX_POSITIONS:
+            if any(re.search(pat, low) for pat in patterns):
+                return pos_prompt, neg_prompt
+        return None, None
 
     def detect_anatomy_cues(self, text: str) -> Optional[str]:
         """
@@ -1294,11 +1569,12 @@ class PersonaManager:
         user_id: Optional[int] = None,
         llm_client: Any = None,
         history: Optional[List[Dict[str, str]]] = None,
-        conversational_reply: Optional[str] = None
+        conversational_reply: Optional[str] = None,
+        is_nsfw: bool = False
     ) -> str:
         """
         Determines the visual scene/location for image generation based on
-        explicit user prompt, waifu's conversational reply, recent dialogue, or college routine.
+        explicit user prompt, waifu's conversational reply, locked active location, recent dialogue, or college routine.
         Uses strict word boundaries to prevent substring false-positives (e.g. 'makanannya' -> kitchen).
         """
         lower = (user_text or "").lower()
@@ -1309,6 +1585,38 @@ class PersonaManager:
                 return False
             pat = r"\b(?:" + "|".join(re.escape(k) for k in keywords) + r")\b"
             return bool(re.search(pat, text, re.IGNORECASE))
+
+        def _resolve_scene_variation(desc: str) -> str:
+            import random
+            if "aesthetic cafe" in desc:
+                return random.choice(CAFE_SCENE_VARIATIONS)
+            if "bedroom" in desc or "fluffy pillows" in desc:
+                return random.choice(BEDROOM_SCENE_VARIATIONS)
+            return desc
+
+        # 1. Location Locking Priority 1: Check if user_text or conversational_reply explicitly states a location from LOCATION_PRESETS
+        combined_text = f"{user_text or ''} {conversational_reply or ''}".strip()
+        loc_match = self.detect_location_intent(combined_text)
+        if loc_match:
+            loc_key, loc_info = loc_match
+            if user_id:
+                self.set_user_location(user_id, loc_key)
+            if is_nsfw:
+                if not loc_info.get("is_public", False):
+                    return loc_info.get("nsfw_prompt", loc_info.get("prompt", ""))
+                else:
+                    return "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows"
+            return _resolve_scene_variation(loc_info.get("prompt", ""))
+
+        # 2. Location Locking Priority 2: Check active locked location session for this user
+        active_loc = self.get_user_location(user_id) if user_id else None
+        if active_loc:
+            if is_nsfw:
+                if not active_loc.get("is_public", False):
+                    return active_loc.get("nsfw_prompt", active_loc.get("prompt", ""))
+                else:
+                    return "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows"
+            return _resolve_scene_variation(active_loc.get("prompt", ""))
 
         # Keyword mapping for common anime / girlfriend situations & dynamic narrative settings
         # Ordered from most specific outdoor/culinary/public settings to indoor/campus settings
@@ -1417,6 +1725,17 @@ class PersonaManager:
         # 3. Context from ongoing chat history (newest turn first so latest setting wins)
         for hist_turn in reversed(clean_turns):
             hist_low = (hist_turn or "").lower()
+            hist_loc_match = self.detect_location_intent(hist_low)
+            if hist_loc_match:
+                h_key, h_info = hist_loc_match
+                if user_id:
+                    self.set_user_location(user_id, h_key)
+                if is_nsfw:
+                    if not h_info.get("is_public", False):
+                        return h_info.get("nsfw_prompt", h_info.get("prompt", ""))
+                    else:
+                        return "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows"
+                return _resolve_scene_variation(h_info.get("prompt", ""))
             for keywords, scene_desc in SCENE_PATTERNS:
                 if _has_kw(hist_low, keywords):
                     return _resolve_scene_variation(scene_desc)
@@ -1907,7 +2226,7 @@ class PersonaManager:
         base_visual = persona.get("visual_traits", DEFAULT_PERSONAS["runa"]["visual_traits"])
 
         hist = history or (self.get_chat_history(user_id) if user_id else [])
-        scene = scene_override or self.extract_contextual_scene(user_text, user_id=user_id, history=hist)
+        scene = scene_override or self.extract_contextual_scene(user_text, user_id=user_id, history=hist, is_nsfw=is_nsfw)
         outfit_prompt, extra_neg, is_nude, outfit_name = self.detect_clothing_intent(
             user_text,
             user_id=user_id,
@@ -1961,7 +2280,15 @@ class PersonaManager:
 
         # Check explicit camera angle and body pose requested by user
         angle_cue, pose_cue = self.detect_camera_angle_and_pose(user_text)
-        if angle_cue or pose_cue:
+
+        # Check intimate sexual positions (highest priority for NSFW intimate poses)
+        intimate_pos_prompt, intimate_pos_neg = self.detect_intimate_position(user_text)
+        if intimate_pos_prompt:
+            chosen_angle = intimate_pos_prompt
+            if intimate_pos_neg:
+                extra_neg = f"{extra_neg}, {intimate_pos_neg}" if extra_neg else intimate_pos_neg
+            logger.info(f"Intimate sex position detected & camera locked: {chosen_angle}")
+        elif angle_cue or pose_cue:
             custom_parts = []
             if angle_cue:
                 custom_parts.append(angle_cue)

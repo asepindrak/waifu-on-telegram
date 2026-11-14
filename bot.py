@@ -4878,7 +4878,7 @@ def sanitize_waifu_tone_and_pronouns(text: Optional[str]) -> str:
     return res
 
 
-def sanitize_chat_caption(text: Optional[str], fallback: str) -> str:
+def sanitize_chat_caption(text: Optional[str], fallback: str, user_prompt: str = "") -> str:
     """Cleans up influencer, YouTuber, vlogger, and AI refusal artifacts from LLM captions."""
     if not text:
         return fallback
@@ -4898,6 +4898,15 @@ def sanitize_chat_caption(text: Optional[str], fallback: str) -> str:
     # Strip defensive proof / existential doubt artifacts (anti-paranoid)
     clean = re.sub(r'\b(?:biar\s+(?:kamu\s+)?(?:percaya|yakin)|liat\s+sendiri\s+(?:nih|biar|foto)|nih\s+buktinya|tuh\s+kan\s+beneran|aku\s+beneran\s+ada|diliatin\s+aja\s+yuk|jangan\s+bohong\s+lagi)[,\s!.]*', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'\b(?:biar\s+kamu\s+ga\s+main\s+game\s+doang|biar\s+kamu\s+tau\s+aku\s+beneran)[,\s!.]*', '', clean, flags=re.IGNORECASE)
+
+    # Strip awkward robotic self-narrating clothes phrases if partner didn't ask about clothes
+    u_low = (user_prompt or "").lower()
+    asking_outfit = any(k in u_low for k in ["baju", "outfit", "pakaian", "pake apa", "pakai apa", "liat baju", "lihat baju", "pamer"])
+    if not asking_outfit:
+        clean = re.sub(r'[,]?\s*\b(?:pakai|pake)\s+(?:piyama|baju|outfit|kaos|celana)\s+(?:begini|kayak\s+gini|ini)\b[,]?\s*', ', ', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'[,]?\s*\b(?:lagi\s+)?(?:pakai|pake)\s+(?:set\s+)?(?:piyama|baju\s+tidur|outfit\s+ini)\b[,]?\s*', ', ', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\s*,\s*', ', ', clean).strip(', ')
+
     clean = sanitize_waifu_tone_and_pronouns(clean).strip()
     if not clean or len(clean) < 3:
         return fallback
@@ -4972,7 +4981,8 @@ def process_photo_request(
                     user_id=user_id,
                     llm_client=llm_client,
                     history=history,
-                    conversational_reply=conversational_reply
+                    conversational_reply=conversational_reply,
+                    is_nsfw=is_nsfw_photo
                 )
             if is_nsfw_photo and (not detected_scene or any(pub in detected_scene.lower() for pub in ["cafe", "campus", "classroom", "library", "mall", "park", "gym", "street"])):
                 detected_scene = "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows, warm intimate atmosphere"
@@ -5134,6 +5144,15 @@ def process_photo_request(
             if "Vault" in source:
                 vault_guidance = " [Primary image engine was unavailable; you are happily sending a matching saved photo from your private album]."
 
+            is_asking_outfit = any(k in (actual_user_msg or "").lower() for k in ["baju", "outfit", "pakaian", "pake apa", "pakai apa", "liat baju", "lihat baju", "pamer"])
+            outfit_context = (
+                f"- Pakaian yang kamu kenakan: {outfit_label}{vault_guidance}\n"
+                f"Pasanganmu bertanya soal pakaianmu, sebutkan secara manis dan santai apa yang kamu kenakan di foto."
+                if is_asking_outfit else
+                f"- Pakaian visual di foto: {outfit_label}{vault_guidance}\n"
+                f"PENTING: Jangan terus-menerus menyebut kata pakaian (DILARANG kaku menyebut 'pakai baju ini', 'pakai piyama begini', dll). Pasanganmu tidak menanyakan baju, jadi fokuskan caption pada perasaan, suasana tempat, dan obrolanmu!"
+            )
+
             caption_prompt.extend(clean_recent_turns)
             if conversational_reply:
                 caption_prompt.append({
@@ -5144,12 +5163,13 @@ def process_photo_request(
                         f"- Kamu baru saja membalas di chat: \"{conversational_reply}\"\n\n"
                         f"Konteks foto yang kamu kirimkan saat ini:\n"
                         f"- Suasana/Lokasi: {detected_scene}\n"
-                        f"- Busana yang kamu kenakan: {outfit_label}{vault_guidance}\n\n"
+                        f"{outfit_context}\n\n"
                         f"PETUNJUK CAPTION FOTO (WAJIB DIPATUHI):\n"
-                        f"1. Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, gunakan 'aku' dan 'kamu') yang MELANJUTKAN PERSIS alur obrolan di atas.\n"
-                        f"2. Caption HARUS 100% SESUAI dengan apa yang baru saja kamu bicarakan di chat, suasana tempat, dan pakaianmu saat ini.\n"
-                        f"3. DILARANG membuat caption generik seperti 'ini pap buat kamu' jika sedang membicarakan kegiatan/topik tertentu! Hubungkan langsung dengan obrolanmu.\n"
-                        f"4. Tulis langsung caption pendekmu (maksimal 1-2 kalimat):"
+                        f"1. Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, gunakan 'aku' dan 'kamu') yang MELANJUTKAN ALAMI alur obrolan di atas.\n"
+                        f"2. FOKUS PADA AKSI, PERASAAN & INTERAKSI: Bicarakan apa yang sedang kalian rasakan atau lakukan secara natural (contoh: 'Udah nyaman banget rebahan di kasur nih, jangan berhenti mijit kakiku ya, enak banget~').\n"
+                        f"3. JANGAN MEMAKSAKAN MENYEBUT NAMA BAJU: Jangan menyebut nama pakaian secara kaku KECUALI jika pasanganmu memang sedang bertanya soal baju atau sedang pamer outfit baru!\n"
+                        f"4. DILARANG membuat caption generik seperti 'ini pap buat kamu' jika sedang membicarakan kegiatan/topik tertentu!\n"
+                        f"5. Tulis langsung caption pendekmu (maksimal 1-2 kalimat):"
                     )
                 })
             else:
@@ -5157,8 +5177,8 @@ def process_photo_request(
                     "role": "user",
                     "content": (
                         f"Pasanganmu berkata: \"{actual_user_msg}\".\n"
-                        f"Kamu mengirim foto momen ini (Suasana: '{detected_scene}', Busana: '{outfit_label}'{vault_guidance}).\n"
-                        f"Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, aku/kamu) yang menyapa pasanganmu dan sesuai dengan foto ini (maksimal 1-2 kalimat):"
+                        f"Kamu mengirim foto momen ini (Suasana: '{detected_scene}', Visual: '{outfit_label}'{vault_guidance}).\n"
+                        f"Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, aku/kamu) yang menyapa pasanganmu dan sesuai dengan foto ini (fokus pada perasaan & suasana, jangan kaku menyebut nama baju jika tidak ditanya, maksimal 1-2 kalimat):"
                     )
                 })
 
@@ -5195,9 +5215,9 @@ def process_photo_request(
                     else "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕"
                 )
             elif "pajama" in outfit_low or "piyama" in outfit_low or "tidur" in outfit_low:
-                fallback_caption = "Nih fotoku lagi pakai piyama santai di kamar nih, nyaman banget~ 🌙💕"
+                fallback_caption = "Udah nyaman banget santai rebahan di kasur kamar nih~ 🌙💕"
             elif "handuk" in outfit_low or "towel" in outfit_low:
-                fallback_caption = "Baru beres mandi masih pakai handuk nih, bentar yaa~ 🚿💕"
+                fallback_caption = "Baru beres mandi masih seger banget nih, bentar yaa~ 🚿💕"
             elif any(k in u_lower for k in ["bobo", "tidur", "ngantuk", "malam", "night"]) or any(k in (conversational_reply or "").lower() for k in ["bobo", "tidur", "ngantuk", "malam"]):
                 fallback_caption = "Ini fotoku buat nemenin kamu malam ini yaa~ 🌙💕"
             elif any(k in u_lower for k in ["pagi", "morning", "bangun"]) or any(k in (conversational_reply or "").lower() for k in ["pagi", "morning", "sarapan"]):
@@ -5218,7 +5238,7 @@ def process_photo_request(
                 fallback_caption = "Ini foto manis dari galeri albumku yaa~ 🥰"
             else:
                 fallback_caption = "Ini pap spesial buat kamu, suka ga? 🥰"
-            clean_caption = sanitize_chat_caption(caption, fallback_caption)
+            clean_caption = sanitize_chat_caption(caption, fallback_caption, user_prompt=actual_user_msg)
             fallback_tag = " _(Fallback Otomatis)_" if fallback_notice else ""
             full_caption = f"{format_roleplay_italics(clean_caption, character_name=persona.get('name', 'Runa'))}\n\n📷 *Model:* `{source}`{fallback_tag}"
 
@@ -7658,6 +7678,9 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                 # Check for natural context shift to expire session outfits when activity changes
                 persona_mgr.check_context_shift(message.from_user.id, user_text)
+                u_loc_match = persona_mgr.detect_location_intent(user_text)
+                if u_loc_match:
+                    persona_mgr.set_user_location(message.from_user.id, u_loc_match[0])
                 cur_outfit_details = persona_mgr.get_user_outfit_details(message.from_user.id)
 
                 invitation_instruction = ""
@@ -7933,6 +7956,9 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                 # Check for vivid visual novel narrative moment (CG scene e.g. sitting on lap, cuddling, outfit show, study buddy, or dynamic location transitions)
                 is_scene_moment, scene_override_desc = persona_mgr.detect_visual_scene_moment(user_text, reply_text, llm_client=llm_client)
+                r_loc_match = persona_mgr.detect_location_intent(reply_text)
+                if r_loc_match:
+                    persona_mgr.set_user_location(message.from_user.id, r_loc_match[0])
 
                 # In NSFW mode: proactively send photo when undressing or during intimate physical actions (ID & EN)
                 u_text_low = user_text.lower()

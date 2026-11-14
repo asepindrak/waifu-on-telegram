@@ -90,6 +90,19 @@ class TestSpontaneousPhotoAndCaptionAlignment(unittest.TestCase):
         self.assertNotIn("gaes", cleaned.lower())
         self.assertNotIn("intip yuk", cleaned.lower())
 
+    def test_outfit_mention_stripping_when_not_asked(self):
+        """Verify awkward self-narrating clothes phrases are stripped when partner didn't ask about clothes."""
+        sample_caption = "Udah nyaman banget rebahan di kasur pakai piyama begini, jangan berhenti mijit kakiku ya, enak banget."
+        cleaned = bot.sanitize_chat_caption(sample_caption, "fallback", user_prompt="kamu lagi ngapain?")
+        self.assertNotIn("pakai piyama", cleaned.lower())
+        self.assertIn("rebahan di kasur", cleaned.lower())
+        self.assertIn("jangan berhenti mijit kakiku ya", cleaned.lower())
+
+        # But when user explicitly asks about clothes, keep outfit mention!
+        outfit_caption = "Aku lagi pakai piyama santai setelan camisole warna pink nih, lucu kan?"
+        kept = bot.sanitize_chat_caption(outfit_caption, "fallback", user_prompt="kamu lagi pake baju apa?")
+        self.assertIn("pakai piyama", kept.lower())
+
 
 if __name__ == "__main__":
     unittest.main()
