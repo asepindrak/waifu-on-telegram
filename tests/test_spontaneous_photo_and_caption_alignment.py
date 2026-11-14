@@ -103,6 +103,32 @@ class TestSpontaneousPhotoAndCaptionAlignment(unittest.TestCase):
         kept = bot.sanitize_chat_caption(outfit_caption, "fallback", user_prompt="kamu lagi pake baju apa?")
         self.assertIn("pakai piyama", kept.lower())
 
+    def test_furniture_and_location_alignment_bed_vs_sofa(self):
+        """Verify that hallucinated sofa and 'sebelum berangkat' are corrected to bed when scene is on a bed."""
+        cap = "Masih nyaman banget santai di sofa sebelum berangkat, kamu belum kasih tahu nama kamu nih."
+        scene = "relaxing on bed with fluffy pillows and soft blanket, bright sunny morning bedroom window"
+        cleaned = bot.sanitize_chat_caption(cap, "fallback", user_prompt="pagi sayang", detected_scene=scene)
+        self.assertNotIn("sofa", cleaned.lower())
+        self.assertNotIn("sebelum berangkat", cleaned.lower())
+        self.assertIn("kasur", cleaned.lower())
+        self.assertIn("kamu belum kasih tahu nama kamu nih", cleaned.lower())
+
+    def test_furniture_and_location_alignment_sofa_vs_bed(self):
+        """Verify that hallucinated bed is corrected to sofa when scene is in living room sofa."""
+        cap = "Udah PW banget rebahan di kasur sambil nonton TV bareng kamu."
+        scene = "sitting on comfortable living room sofa watching tv, cozy apartment"
+        cleaned = bot.sanitize_chat_caption(cap, "fallback", user_prompt="lagi apa?", detected_scene=scene)
+        self.assertNotIn("kasur", cleaned.lower())
+        self.assertIn("sofa", cleaned.lower())
+
+    def test_indonesian_scene_descriptions(self):
+        """Verify PersonaManager translates Danbooru scene prompts to Indonesian."""
+        from persona_manager import PersonaManager
+        self.assertIn("kasur", PersonaManager.get_indonesian_scene_desc("relaxing on bed with fluffy pillows").lower())
+        self.assertIn("sofa", PersonaManager.get_indonesian_scene_desc("sitting on living room couch sofa").lower())
+        self.assertIn("dapur", PersonaManager.get_indonesian_scene_desc("kitchen counter cooking breakfast").lower())
+        self.assertIn("kafe", PersonaManager.get_indonesian_scene_desc("sitting at cozy cafe coffee shop").lower())
+
 
 if __name__ == "__main__":
     unittest.main()

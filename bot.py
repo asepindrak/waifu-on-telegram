@@ -4902,8 +4902,13 @@ def sanitize_waifu_tone_and_pronouns(text: Optional[str]) -> str:
     return res
 
 
-def sanitize_chat_caption(text: Optional[str], fallback: str, user_prompt: str = "") -> str:
-    """Cleans up influencer, YouTuber, vlogger, and AI refusal artifacts from LLM captions."""
+def sanitize_chat_caption(
+    text: Optional[str],
+    fallback: str,
+    user_prompt: str = "",
+    detected_scene: str = ""
+) -> str:
+    """Cleans up influencer, YouTuber, vlogger, AI refusal, and hallucinated location/furniture discrepancies from captions."""
     if not text:
         return fallback
     clean = text.strip()
@@ -4930,6 +4935,30 @@ def sanitize_chat_caption(text: Optional[str], fallback: str, user_prompt: str =
         clean = re.sub(r'[,]?\s*\b(?:pakai|pake)\s+(?:piyama|baju|outfit|kaos|celana)\s+(?:begini|kayak\s+gini|ini)\b[,]?\s*', ', ', clean, flags=re.IGNORECASE)
         clean = re.sub(r'[,]?\s*\b(?:lagi\s+)?(?:pakai|pake)\s+(?:set\s+)?(?:piyama|baju\s+tidur|outfit\s+ini)\b[,]?\s*', ', ', clean, flags=re.IGNORECASE)
         clean = re.sub(r'\s*,\s*', ', ', clean).strip(', ')
+
+    # Strip hallucinated 'sebelum berangkat' if neither partner nor waifu discussed going anywhere
+    if not any(k in u_low for k in ["berangkat", "pergi", "jalan", "kuliah", "kampus", "keluar", "jemput"]):
+        clean = re.sub(r'[,]?\s*\bsebelum\s+berangkat\b[,]?\s*', ', ', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\s*,\s*', ', ', clean).strip(', ')
+
+    # Align furniture/location mentions with the detected visual scene
+    s_low = (detected_scene or "").lower()
+    if any(k in s_low for k in ["bed", "kasur", "pillows", "bantal", "ranjang", "bedroom"]):
+        clean = re.sub(r'\b(?:di\s+(?:atas\s+)?|atas\s+)?sofa\b', 'di kasur', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\b(?:di\s+(?:atas\s+)?|atas\s+)?kursi\b', 'di kasur', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\bdi\s+di\s+kasur\b', 'di kasur', clean, flags=re.IGNORECASE)
+    elif any(k in s_low for k in ["sofa", "couch", "living room", "ruang tv", "ruang tengah"]):
+        clean = re.sub(r'\b(?:di\s+(?:atas\s+)?|atas\s+)?kasur\b', 'di sofa', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\b(?:di\s+(?:atas\s+)?|atas\s+)?ranjang\b', 'di sofa', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\bdi\s+di\s+sofa\b', 'di sofa', clean, flags=re.IGNORECASE)
+    elif any(k in s_low for k in ["kitchen", "dapur"]):
+        clean = re.sub(r'\b(?:di\s+(?:atas\s+)?|atas\s+)?kasur\b', 'di dapur', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\b(?:di\s+(?:atas\s+)?|atas\s+)?sofa\b', 'di dapur', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\bdi\s+di\s+dapur\b', 'di dapur', clean, flags=re.IGNORECASE)
+
+    clean = re.sub(r'\s{2,}', ' ', clean)
+    clean = re.sub(r'^\s*,\s*', '', clean)
+    clean = re.sub(r'\s*,\s*$', '', clean)
 
     clean = sanitize_waifu_tone_and_pronouns(clean).strip()
     if not clean or len(clean) < 3:
@@ -5169,6 +5198,7 @@ def process_photo_request(
                 vault_guidance = " [Primary image engine was unavailable; you are happily sending a matching saved photo from your private album]."
 
             is_asking_outfit = any(k in (actual_user_msg or "").lower() for k in ["baju", "outfit", "pakaian", "pake apa", "pakai apa", "liat baju", "lihat baju", "pamer"])
+            indo_scene = persona_mgr.get_indonesian_scene_desc(detected_scene)
             outfit_context = (
                 f"- Pakaian yang kamu kenakan: {outfit_label}{vault_guidance}\n"
                 f"Pasanganmu bertanya soal pakaianmu, sebutkan secara manis dan santai apa yang kamu kenakan di foto."
@@ -5186,14 +5216,15 @@ def process_photo_request(
                         f"- Pasanganmu berkata: \"{actual_user_msg}\"\n"
                         f"- Kamu baru saja membalas di chat: \"{conversational_reply}\"\n\n"
                         f"Konteks foto yang kamu kirimkan saat ini:\n"
-                        f"- Suasana/Lokasi: {detected_scene}\n"
+                        f"- Lokasi & Suasana Nyata di Foto: {indo_scene} ({detected_scene})\n"
                         f"{outfit_context}\n\n"
-                        f"PETUNJUK CAPTION FOTO (WAJIB DIPATUHI):\n"
+                        f"PETUNJUK CAPTION FOTO (WAJIB DIPATUHI - STRICT CONSISTENCY RULE):\n"
                         f"1. Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, gunakan 'aku' dan 'kamu') yang MELANJUTKAN ALAMI alur obrolan di atas.\n"
-                        f"2. FOKUS PADA AKSI, PERASAAN & INTERAKSI: Bicarakan apa yang sedang kalian rasakan atau lakukan secara natural (contoh: 'Udah nyaman banget rebahan di kasur nih, jangan berhenti mijit kakiku ya, enak banget~').\n"
-                        f"3. JANGAN MEMAKSAKAN MENYEBUT NAMA BAJU: Jangan menyebut nama pakaian secara kaku KECUALI jika pasanganmu memang sedang bertanya soal baju atau sedang pamer outfit baru!\n"
-                        f"4. DILARANG membuat caption generik seperti 'ini pap buat kamu' jika sedang membicarakan kegiatan/topik tertentu!\n"
-                        f"5. Tulis langsung caption pendekmu (maksimal 1-2 kalimat):"
+                        f"2. KESELARASAN LOKASI (MUTLAK): Lokasi nyata kamu di foto adalah {indo_scene}! DILARANG menyebut sofa jika di foto sedang di kasur/kamar tidur, DILARANG menyebut kasur jika di sofa/dapur/meja, dan DILARANG menyebut 'sebelum berangkat' jika tidak ada obrolan mau pergi/berangkat!\n"
+                        f"3. FOKUS PADA AKSI, PERASAAN & INTERAKSI: Bicarakan apa yang sedang kalian rasakan atau lakukan secara natural (contoh: 'Udah nyaman banget rebahan di kasur nih, jangan berhenti mijit kakiku ya, enak banget~').\n"
+                        f"4. JANGAN MEMAKSAKAN MENYEBUT NAMA BAJU: Jangan menyebut nama pakaian secara kaku KECUALI jika pasanganmu memang sedang bertanya soal baju atau sedang pamer outfit baru!\n"
+                        f"5. DILARANG membuat caption generik seperti 'ini pap buat kamu' jika sedang membicarakan kegiatan/topik tertentu!\n"
+                        f"6. Tulis langsung caption pendekmu (maksimal 1-2 kalimat):"
                     )
                 })
             else:
@@ -5201,8 +5232,10 @@ def process_photo_request(
                     "role": "user",
                     "content": (
                         f"Pasanganmu berkata: \"{actual_user_msg}\".\n"
-                        f"Kamu mengirim foto momen ini (Suasana: '{detected_scene}', Visual: '{outfit_label}'{vault_guidance}).\n"
-                        f"Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, aku/kamu) yang menyapa pasanganmu dan sesuai dengan foto ini (fokus pada perasaan & suasana, jangan kaku menyebut nama baju jika tidak ditanya, maksimal 1-2 kalimat):"
+                        f"Kamu mengirim foto momen ini (Lokasi nyata: '{indo_scene}', Suasana: '{detected_scene}', Visual pakaian: '{outfit_label}'{vault_guidance}).\n"
+                        f"STRICT CONSISTENCY RULE:\n"
+                        f"- Lokasi foto adalah {indo_scene}. DILARANG menyebut sofa jika sedang di kasur, dilarang menyebut kasur jika di sofa/dapur, dan dilarang menyebut 'sebelum berangkat' jika tidak ada yang mengajak pergi!\n"
+                        f"- Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, aku/kamu) yang menyapa pasanganmu dan sesuai dengan foto ini (fokus pada perasaan & suasana, jangan kaku menyebut nama baju jika tidak ditanya, maksimal 1-2 kalimat):"
                     )
                 })
 
@@ -5262,7 +5295,7 @@ def process_photo_request(
                 fallback_caption = "Ini foto manis dari galeri albumku yaa~ 🥰"
             else:
                 fallback_caption = "Ini pap spesial buat kamu, suka ga? 🥰"
-            clean_caption = sanitize_chat_caption(caption, fallback_caption, user_prompt=actual_user_msg)
+            clean_caption = sanitize_chat_caption(caption, fallback_caption, user_prompt=actual_user_msg, detected_scene=detected_scene)
             fallback_tag = " _(Fallback Otomatis)_" if fallback_notice else ""
             full_caption = f"{format_roleplay_italics(clean_caption, character_name=persona.get('name', 'Runa'))}\n\n📷 *Model:* `{source}`{fallback_tag}"
 
@@ -5522,7 +5555,7 @@ def process_video_request(
                 fallback_caption = "Pagi sayang! Semangat ya hari ini, ini video manis buat kamu~ 💕"
             else:
                 fallback_caption = "Ini video manis buat kamu sayang, suka ga? 🥰"
-            clean_caption = sanitize_chat_caption(caption, fallback_caption)
+            clean_caption = sanitize_chat_caption(caption, fallback_caption, user_prompt=user_text, detected_scene=detected_scene)
 
             if status_msg and hasattr(status_msg, "message_id"):
                 try:

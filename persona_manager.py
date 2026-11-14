@@ -554,6 +554,13 @@ LOCATION_PRESETS: Dict[str, Dict[str, Any]] = {
         "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
         "is_public": True,
     },
+    "street_food": {
+        "name": "Street Food / Kuliner",
+        "patterns": [r"\b(street\s*food|jajanan|jajan|kaki\s+lima|angkringan|warung|pasar\s+malam|food\s*stall|kuliner)\b"],
+        "prompt": "standing outdoors by lively street food stalls, warm evening street lights, holding warm snacks, festive atmosphere",
+        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
+        "is_public": True,
+    },
     "campus": {
         "name": "Kampus / Ruang Kuliah",
         "patterns": [r"\b(kampus|kuliah|kelas|ruang\s+kelas|lecture\s*hall|gedung\s+kuliah|fakultas|dosen|makul|skripsi)\b"],
@@ -607,13 +614,6 @@ LOCATION_PRESETS: Dict[str, Dict[str, Any]] = {
         "name": "Stasiun / Halte",
         "patterns": [r"\b(stasiun|peron|kereta|mrt|krl|train\s*station|subway|halte|bus\s*stop)\b"],
         "prompt": "standing at modern train station platform or transit shelter, commuter ambiance, atmospheric lighting",
-        "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
-        "is_public": True,
-    },
-    "street_food": {
-        "name": "Street Food / Kuliner",
-        "patterns": [r"\b(street\s*food|jajanan|kaki\s+lima|angkringan|warung|pasar\s+malam|food\s*stall)\b"],
-        "prompt": "standing outdoors by lively street food stalls, warm evening street lights, holding warm snacks, festive atmosphere",
         "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
         "is_public": True,
     },
@@ -842,6 +842,39 @@ class PersonaManager:
     def clear_user_location(self, user_id: int):
         """Clears locked location for user."""
         self.set_user_location(user_id, "clear")
+
+    @staticmethod
+    def get_indonesian_scene_desc(scene: str) -> str:
+        """
+        Translates raw Danbooru scene prompts into clear, grounded Indonesian location/furniture descriptions.
+        Prevents LLMs from confusing kasur with sofa or inventing non-existent rooms in captions.
+        """
+        s_low = (scene or "").lower()
+        if any(k in s_low for k in ["bed", "pillows", "kasur", "ranjang", "bedroom"]):
+            return "di atas kasur tempat tidur kamar (santai di kasur empuk)"
+        if any(k in s_low for k in ["sofa", "couch", "living room", "ruang tv", "ruang tengah"]):
+            return "di sofa ruang santai / ruang TV"
+        if any(k in s_low for k in ["kitchen", "dapur", "cook", "masak"]):
+            return "di dapur (area memasak/counter dapur)"
+        if any(k in s_low for k in ["cafe", "coffee", "kafe", "starbucks"]):
+            return "di meja kafe / coffee shop"
+        if any(k in s_low for k in ["campus", "lecture hall", "classroom", "kuliah"]):
+            return "di ruang kelas kuliah kampus"
+        if any(k in s_low for k in ["library", "perpustakaan", "perpus"]):
+            return "di perpustakaan kampus"
+        if any(k in s_low for k in ["bathroom", "kamar mandi", "shower", "bath"]):
+            return "di kamar mandi"
+        if any(k in s_low for k in ["balcony", "balkon", "rooftop"]):
+            return "di balkon / rooftop terbuka"
+        if any(k in s_low for k in ["beach", "pantai"]):
+            return "di pantai tepi laut"
+        if any(k in s_low for k in ["car", "mobil"]):
+            return "di dalam mobil (kursi mobil)"
+        if any(k in s_low for k in ["park", "taman"]):
+            return "di taman kota terbuka"
+        if any(k in s_low for k in ["minimarket", "convenience"]):
+            return "di minimarket"
+        return "di kamar santai"
 
     def _load_all_personas(self):
         """Loads personas from default dictionary and local JSON files."""
@@ -1594,6 +1627,38 @@ class PersonaManager:
                 return random.choice(BEDROOM_SCENE_VARIATIONS)
             return desc
 
+        # 0. When a follow-up photo accompanies a conversational reply, extract from LLM FIRST
+        #    so complex narratives (e.g. "street food viral dekat kampus") are captured verbatim without false keyword overrides
+        if conversational_reply and llm_client and hasattr(llm_client, "chat"):
+            try:
+                extract_prompt = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an anime visual scene extractor for Stable Diffusion / Danbooru. "
+                            "Given what the user asked and what the waifu JUST replied in chat, output ONLY 8-18 concise English Danbooru-style descriptive visual tokens "
+                            "describing the EXACT physical location, background, weather, and props she just described (e.g. holding a bag of street food, warm stall lights). "
+                            "Do NOT invent a different location (do NOT turn street food into a kitchen or campus into a bedroom). "
+                            "Do NOT include character hair or eye colors."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": f"User said: '{user_text}'.\nWaifu JUST replied: '{conversational_reply}'.\nWhat exact visual scene & props are shown in this photo?"
+                    }
+                ]
+                dyn_scene, _ = llm_client.chat(extract_prompt, max_tokens=45)
+                if (
+                    isinstance(dyn_scene, str)
+                    and len(dyn_scene.strip()) >= 8
+                    and "none" not in dyn_scene.lower()
+                ):
+                    clean_dyn = re.sub(r"^(Setting|Scene|Background|Visuals?)\s*:\s*", "", dyn_scene.strip(), flags=re.I).strip().strip('"\'')
+                    logger.info(f"LLM aligned visual scene from conversational reply: {clean_dyn}")
+                    return clean_dyn
+            except Exception as e_dyn:
+                logger.debug(f"LLM aligned scene extraction skipped: {e_dyn}")
+
         # 1. Location Locking Priority 1: Check if user_text or conversational_reply explicitly states a location from LOCATION_PRESETS
         combined_text = f"{user_text or ''} {conversational_reply or ''}".strip()
         loc_match = self.detect_location_intent(combined_text)
@@ -1673,38 +1738,6 @@ class PersonaManager:
 
         hist = history or (self.get_chat_history(user_id) if user_id else [])
         clean_turns = [m.get("content", "") for m in hist[-5:] if not m.get("content", "").startswith("[")]
-
-        # 0. When a follow-up photo accompanies a conversational reply, extract from LLM FIRST
-        #    so complex narratives (e.g. "street food viral dekat kampus") are captured verbatim without false keyword overrides
-        if conversational_reply and llm_client and hasattr(llm_client, "chat"):
-            try:
-                extract_prompt = [
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an anime visual scene extractor for Stable Diffusion / Danbooru. "
-                            "Given what the user asked and what the waifu JUST replied in chat, output ONLY 8-18 concise English Danbooru-style descriptive visual tokens "
-                            "describing the EXACT physical location, background, weather, and props she just described (e.g. holding a bag of street food, warm stall lights). "
-                            "Do NOT invent a different location (do NOT turn street food into a kitchen or campus into a bedroom). "
-                            "Do NOT include character hair or eye colors."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": f"User said: '{user_text}'.\nWaifu JUST replied: '{conversational_reply}'.\nWhat exact visual scene & props are shown in this photo?"
-                    }
-                ]
-                dyn_scene, _ = llm_client.chat(extract_prompt, max_tokens=45)
-                if (
-                    isinstance(dyn_scene, str)
-                    and len(dyn_scene.strip()) >= 8
-                    and "none" not in dyn_scene.lower()
-                ):
-                    clean_dyn = re.sub(r"^(Setting|Scene|Background|Visuals?)\s*:\s*", "", dyn_scene.strip(), flags=re.I).strip().strip('"\'')
-                    logger.info(f"LLM aligned visual scene from conversational reply: {clean_dyn}")
-                    return clean_dyn
-            except Exception as e_dyn:
-                logger.debug(f"LLM aligned scene extraction skipped: {e_dyn}")
 
         # 1. Explicit scene in waifu's current conversational reply (when present)
         if reply_lower:

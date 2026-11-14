@@ -462,3 +462,4 @@ class WeatherEngine:
 
 # Global singleton instance
 weather_engine = WeatherEngine()
+
