@@ -147,6 +147,33 @@ _NSFW_WORDS = [
     # Provocative Intimate Clothing Requests
     r"\b(?:lingerie|g-string|thong|celana\s+dalam|pakaian\s+dalam|panties|underwear)\b",
     r"\b(?:transparan|see-through|baju\s+tidur\s+seksi)\b",
+
+    # Intimate Romantic / Shared Shower / Bath / Bedroom Activities (ID)
+    r"\b(?:(?:mandi|berendam|keramas)\s+(?:bareng|bersama|sama\s+aku|berdua))\b",
+    r"\b(?:temen(?:in|i)\s+mandi|ikut\s+mandi|ngajak\s+mandi\s+bareng)\b",
+    r"\b(?:masuk\s+(?:ke\s+)?(?:kamar\s+mandi|bathtub|bak\s+mandi)\s+bareng)\b",
+    r"\b(?:lepas\s+handuk|buka\s+handuk|tarik\s+handuk|jatuhkan\s+handuk)\b",
+    r"\b(?:(?:tidur|bobo|rebahan)\s+(?:bareng|berdua|seranjang)\s*(?:tanpa\s+baju|telanjang)?)\b",
+    r"\b(?:peluk\s+(?:tanpa\s+baju|telanjang)|sentuh\s+tubuh(?:mu|ku)?)\b",
+    r"\b(?:pijat|pijit)\s+(?:seluruh\s+tubuh|sensual|badan\s+aku|badanmu)\b",
+    r"\b(?:cium\s+(?:bibir|leher|tubuh|sensual|mesra))\b",
+    r"\b(?:buka\s+resleting|turunkan\s+resleting)\b",
+
+    # English Intimate Shower / Bath / Bedroom & Body Activities (EN)
+    r"\b(?:shower\s+together|take\s+a\s+shower\s+together|take\s+a\s+bath\s+together|bathe\s+together)\b",
+    r"\b(?:join\s+me\s+in\s+the\s+(?:shower|bath|tub|bathtub)|shower\s+with\s+me|bath\s+with\s+me)\b",
+    r"\b(?:wash\s+(?:each\s+other|your\s+back|my\s+back|together\s+in\s+the\s+shower))\b",
+    r"\b(?:in\s+the\s+bathtub\s+together|in\s+the\s+jacuzzi\s+together|soak\s+together)\b",
+    r"\b(?:drop\s+your\s+towel|take\s+off\s+your\s+towel|remove\s+your\s+towel|let\s+the\s+towel\s+fall)\b",
+    r"\b(?:sleep\s+together\s+naked|sleep\s+naked\s+with\s+me|cuddle\s+naked|lay\s+naked\s+in\s+bed)\b",
+    r"\b(?:sensual\s+massage|massage\s+your\s+body|massage\s+my\s+body|oil\s+massage)\b",
+    r"\b(?:kiss\s+your\s+neck|kiss\s+deeply|make\s+out\s+with\s+me|passionately\s+kiss)\b",
+    r"\b(?:unzip\s+your\s+dress|unhook\s+your\s+bra|slide\s+down\s+your\s+panties)\b",
+
+    # Intimate Sex Positions (ID & EN)
+    r"\b(?:doggy\s*style|missionary|cowgirl|reverse\s+cowgirl|mating\s+press|prone\s+bone)\b",
+    r"\b(?:posisi\s+(?:doggy|missionary|cowgirl|mating\s+press|nungging|telentang))\b",
+    r"\b(?:gaya\s+(?:doggy|missionary|cowgirl|mating\s+press|nungging))\b",
 ]
 
 _NSFW_REGEX = re.compile("|".join(_NSFW_WORDS), re.IGNORECASE)

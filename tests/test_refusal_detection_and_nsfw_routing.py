@@ -9,7 +9,7 @@ Verifies:
 
 import unittest
 from unittest.mock import MagicMock
-from routing_engine import is_ai_refusal, HybridLLMClient
+from routing_engine import is_ai_refusal, HybridLLMClient, detect_nsfw_intent
 from bot import sanitize_chat_caption
 
 
@@ -66,6 +66,29 @@ class TestRefusalDetectionAndNSFWRouting(unittest.TestCase):
             # Since SFW returned refusal, it must have auto-redirected to mock_nsfw
             self.assertIn("Ini foto spesial buat kamu", reply)
             mock_nsfw.chat.assert_called_once()
+
+    def test_intimate_shared_activities_detection_id_and_en(self):
+        """Verify Indonesian and English intimate shower/bed/positions activities trigger NSFW route."""
+        # Indonesian intimate activities
+        self.assertTrue(detect_nsfw_intent("Yuk kita mandi bareng sore ini"))
+        self.assertTrue(detect_nsfw_intent("Boleh temenin mandi nggak?"))
+        self.assertTrue(detect_nsfw_intent("Coba lepas handuk kamu sekarang"))
+        self.assertTrue(detect_nsfw_intent("Malam ini kita tidur bareng ya"))
+        self.assertTrue(detect_nsfw_intent("Gaya doggy style bisa nggak?"))
+        self.assertTrue(detect_nsfw_intent("Posisi missionary ya"))
+
+        # English intimate activities
+        self.assertTrue(detect_nsfw_intent("Let's take a shower together babe"))
+        self.assertTrue(detect_nsfw_intent("Can you join me in the shower?"))
+        self.assertTrue(detect_nsfw_intent("Drop your towel for me"))
+        self.assertTrue(detect_nsfw_intent("Let's sleep together naked tonight"))
+        self.assertTrue(detect_nsfw_intent("Can we try cowgirl position?"))
+        self.assertTrue(detect_nsfw_intent("Give me a sensual massage please"))
+
+        # Normal everyday non-intimate activities must stay SFW
+        self.assertFalse(detect_nsfw_intent("Aku baru beres mandi air hangat di kosan"))
+        self.assertFalse(detect_nsfw_intent("I just finished taking a shower after gym"))
+        self.assertFalse(detect_nsfw_intent("Hari ini cuaca di luar lagi gerimis sejuk"))
 
 
 if __name__ == "__main__":
