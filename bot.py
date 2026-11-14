@@ -7652,6 +7652,7 @@ _EN_CHAT_WORDS = {
     "because", "very", "really", "right", "now", "here", "there", "today", "tonight", "want",
     "need", "like", "love", "know", "think", "feel", "going", "doing", "asking", "saying",
     "translate", "translation", "means", "meaning", "yes", "no", "please", "sorry", "thanks",
+    "him", "her", "his", "call", "name", "avoid", "perhaps", "overuse", "overusing", "repeat",
 }
 
 
@@ -7876,7 +7877,13 @@ META_REASONING_PATTERNS = [
     re.compile(r"\b(system prompt|system instruction|user wants me to|user said)\b", re.IGNORECASE),
     re.compile(r"\b(the user is asking|in this prompt|according to the guidelines)\b", re.IGNORECASE),
     re.compile(r"\b(respond as a girlfriend|acting as|character guidelines)\b", re.IGNORECASE),
-    re.compile(r"^(thinking|thought|reasoning|analysis):", re.IGNORECASE),
+    re.compile(r"^(thinking(\s+process)?|thought|reasoning|analysis):", re.IGNORECASE),
+    re.compile(r"\b(avoid\s+(?:overusing|repeating|mentioning|using|saying))\b", re.IGNORECASE),
+    re.compile(r"\b(overusing\s+(?:name|calling|pet\s+name|words?))\b", re.IGNORECASE),
+    re.compile(r"\b(perhaps\s+(?:call|say|ask|respond|reply|remind|use|tell))\b", re.IGNORECASE),
+    re.compile(r"\b(call\s+(?:him|her|them|the\s+user))\b", re.IGNORECASE),
+    re.compile(r"\b(address\s+(?:him|her|them|the\s+user))\b", re.IGNORECASE),
+    re.compile(r"\b(keep\s+(?:in\s+mind|response|it\s+natural|in\s+character))\b", re.IGNORECASE),
 ]
 
 
@@ -7894,6 +7901,24 @@ def is_meta_or_reasoning_leak(text: str) -> bool:
         if pat.search(clean):
             return True
     return False
+
+
+def strip_meta_reasoning_leak(text: str) -> str:
+    """
+    Strips internal LLM planning, chain-of-thought, or meta-instruction leaks
+    that may prefix or suffix the actual conversational response.
+    """
+    if not text:
+        return ""
+    # Strip leading commas, colons, semicolons
+    cleaned = re.sub(r"^[,\.;:]\s*", "", text).strip()
+    lines = cleaned.split("\n")
+    dialogue_lines = []
+    for line in lines:
+        if is_meta_or_reasoning_leak(line):
+            continue
+        dialogue_lines.append(line)
+    return "\n".join(dialogue_lines).strip()
 
 
 class ChatQueueManager:
@@ -8646,23 +8671,40 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 pending_manager.clear_pending(message.chat.id)
 
                 # Anti-Parroting, English-Translation Leak, Meta-Leak & Nyolot/Hostility Guard
+                reply_text = strip_meta_reasoning_leak(reply_text)
                 if (
                     is_echo_or_parroting(reply_text, user_text)
                     or is_meta_or_reasoning_leak(reply_text)
                     or is_unwanted_english_or_translation(reply_text, user_text)
                     or is_hostile_or_nyolot(reply_text)
+                    or not reply_text.strip()
                 ):
                     logger.warning(f"⚠️ Echo/Translation/Meta/Hostility detected from LLM: '{reply_text}' (User: '{user_text}'). Intercepting...")
+                    fallback_persona_cues = {
+                        "alia": "*tersenyum manis sambil merapikan pita rambutku lalu menatapmu lembut*\n\nIya, ada apa sayang? Aku selalu ada di sini buat kamu kok... Kamu lagi mikirin apa?",
+                        "runa": "*tersenyum manis sambil melambaikan tangan ke arahmu*\n\nHehe iya sayang, ada apa nih? Aku lagi asyik mikirin kamu juga lho~",
+                        "akira": "*tersenyum lembut dan menatap matamu penuh kehangatan*\n\nAda apa, sayang? Kamu kelihatan manis banget hari ini... Mau cerita sesuatu ke aku?",
+                        "hina": "*tersenyum ceria sambil memeluk tanganmu erat*\n\nHihi iya sayang! Ada apa nih? Aku seneng banget bisa ngobrol bareng kamu lagi!",
+                        "shiro": "*tersenyum tipis dan tenang sambil memandangmu hangat*\n\nIya... Aku di sini. Ada yang mau kamu bicarakan?",
+                        "yume": "*tersenyum lembut penuh kehangatan dan menyentuh jemarimu*\n\nIya sayangku... Aku selalu siap mendengarkan cerita kamu. Gimana harimu?",
+                        "sylvie": "*tersenyum anggun sambil mengibaskan rambut perakku perlahan*\n\nIya, ada apa sayang? Keberadaanmu selalu membuat hariku lebih tenang dan menyenangkan.",
+                        "mimi": "*menggoyangkan ekor kucingku senang sambil tersenyum gemas*\n\nNyaa~ Iya sayang! Ada apa nih? Mimi siap nemenin kamu seharian!",
+                    }
+                    default_safe_reply = fallback_persona_cues.get(
+                        persona_mgr.active_key, "*tersenyum manis menatapmu*\n\nIya sayang, ada apa nih? Cerita ke aku dong~"
+                    )
                     try:
                         steer_sys = (
                             system_inst + 
                             "\n\n[PENTING - RESPON RAMAH, MANIS & BAHASA INDONESIA: Langsung tanggapi perkataan pasanganmu dengan ramah, manis, dan hangat dalam 1 baris aksi *...* + 1-2 kalimat dialog Bahasa Indonesia santai (aku/kamu). "
-                            "DILARANG bersikap nyolot/judes/ketus/sinis, DILARANG menggunakan kata 'lo/lu/gue/gw', DILARANG menyalin/mengulang kalimat pasanganmu, DILARANG menerjemahkan ke bahasa Inggris, dan DILARANG menulis monolog berpikir!]"
+                            "DILARANG bersikap nyolot/judes/ketus/sinis, DILARANG menggunakan kata 'lo/lu/gue/gw', DILARANG menyalin/mengulang kalimat pasanganmu, DILARANG menerjemahkan ke bahasa Inggris, dan DILARANG menulis monolog berpikir atau instruksi meta!]"
                         )
                         retry_messages = [{"role": "system", "content": steer_sys}]
                         retry_messages.extend(prompt_history)
                         retry_messages.append({"role": "user", "content": user_text})
                         steered_reply, _ = llm_client.chat(retry_messages, max_tokens=chat_max_tokens, temperature=0.88, is_nsfw=is_nsfw_turn)
+                        if steered_reply:
+                            steered_reply = strip_meta_reasoning_leak(steered_reply)
                         if (steered_reply 
                             and not is_echo_or_parroting(steered_reply, user_text)
                             and not is_meta_or_reasoning_leak(steered_reply)
@@ -8670,11 +8712,17 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                             and not is_hostile_or_nyolot(steered_reply)):
                             logger.info(f"✓ Steering resolved issue: '{steered_reply}'")
                             reply_text = sanitize_waifu_tone_and_pronouns(steered_reply)
+                        elif is_meta_or_reasoning_leak(reply_text) or not reply_text.strip():
+                            logger.warning(f"Steering could not resolve meta leak. Using persona fallback.")
+                            reply_text = default_safe_reply
                         else:
                             reply_text = sanitize_waifu_tone_and_pronouns(reply_text)
                     except Exception as e_steer:
                         logger.debug(f"Steering error: {e_steer}")
-                        reply_text = sanitize_waifu_tone_and_pronouns(reply_text)
+                        if is_meta_or_reasoning_leak(reply_text) or not reply_text.strip():
+                            reply_text = default_safe_reply
+                        else:
+                            reply_text = sanitize_waifu_tone_and_pronouns(reply_text)
 
                 # Check if waifu takes initiative to send spontaneous PAP photo
                 has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
