@@ -237,7 +237,7 @@ def detect_nsfw_intent(text: str, messages: Optional[List[Dict[str, Any]]] = Non
             content = m.get("content", "")
             if isinstance(content, str) and _NSFW_REGEX.search(content):
                 # If recently active NSFW context and current prompt is confirming/reacting intimately
-                if any(k in clean_text for k in ["lagi", "terus", "suka", "nikmat", "enak", "mau", "peluk", "cium", "sayang", "ahh", "ihh"]):
+                if re.search(r"\b(nikmat|enak|peluk\s+erat|cium\s+bibir|sentuh|raba|remas|elus|desah|ahh+|ihh+|basah|masukin|kocok|squirt|lanjut(?:kan)?|tambah\s+lagi|lebih\s+dalam)\b", clean_text):
                     return True
 
     return False

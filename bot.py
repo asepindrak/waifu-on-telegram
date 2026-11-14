@@ -5448,7 +5448,7 @@ def process_photo_request(
             if cur_outfit_key in ("bra_off", "nude") and (eff_nude_override is not False):
                 is_nsfw_photo = True
 
-            if scene_override and not is_nsfw_photo:
+            if scene_override:
                 detected_scene = scene_override
                 logger.info(f"Using explicit visual scene override from narrative turn: {detected_scene}")
             else:
@@ -5460,17 +5460,18 @@ def process_photo_request(
                     conversational_reply=conversational_reply,
                     is_nsfw=is_nsfw_photo
                 )
-            if is_nsfw_photo and (not detected_scene or any(pub in detected_scene.lower() for pub in ["lab", "laboratorium", "office", "kantor", "cafe", "campus", "classroom", "library", "mall", "park", "gym", "street"])):
-                detected_scene = "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows, warm intimate atmosphere"
+            if not detected_scene:
+                if is_nsfw_photo:
+                    detected_scene = "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows, warm intimate atmosphere"
+                else:
+                    story_photo = story_engine.get_story_photo_suggestion(persona_mgr.active_key)
+                    if story_photo and story_photo.get("danbooru_tags"):
+                        detected_scene = story_photo["danbooru_tags"]
             elif hangout_engine.is_on_date(user_id) and not scene_override and not conversational_reply:
                 active_date = hangout_engine.get_active_date(user_id)
                 if active_date and active_date.get("scene_prompt"):
                     detected_scene = active_date["scene_prompt"]
                 hangout_engine.record_date_photo(user_id)
-            elif not detected_scene:
-                story_photo = story_engine.get_story_photo_suggestion(persona_mgr.active_key)
-                if story_photo and story_photo.get("danbooru_tags"):
-                    detected_scene = story_photo["danbooru_tags"]
 
             cur_out_det = persona_mgr.get_user_outfit_details(user_id) if user_id else {}
             has_explicit_outfit = (
@@ -8820,9 +8821,10 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                     def _send_followup_photo():
                         try:
-                            # Explicit intimate actions or undress transitions keep NSFW; casual cadence/lifestyle is forced SFW
+                            # Casual cadence/lifestyle is forced SFW (nude_override=False).
+                            # Intimate turns allow natural clothing / undress progression (nude_override=None).
                             is_explicit_intimate = is_nsfw_turn and (is_undress_trans or is_intimate_action)
-                            nude_override = True if is_explicit_intimate else False
+                            nude_override = None if is_explicit_intimate else False
 
                             if is_nsfw_turn and is_explicit_intimate:
                                 action_ctx = undress_desc if undress_desc else ""

@@ -2185,15 +2185,16 @@ class PersonaManager:
         unambiguous_nude = [
             "tanpa busana", "tanpa baju", "tanpa pakaian", "telanjang", "telanjang bulat",
             "bugil", "nude", "naked", "completely naked", "unclothed", "bottomless",
-            "no clothes", "tanpa sehelai benang", "uncensored", "nsfw",
-            "nenen", "toket", "tetek", "payudara", "memek", "vagina",
+            "no clothes", "tanpa sehelai benang", "telanjang polos", "full nude",
+            "nenen", "toket", "tetek", "memek", "vagina",
+            "foto nenen", "pap nenen", "foto toket", "pap toket", "foto payudara", "pap payudara",
             "buka semua", "buka semuanya", "lepas semua", "lepas semuanya",
             "buka handuk", "buka handuknya", "lepas handuk", "lepas handuknya",
             "copot handuk", "copot handuknya", "tarik handuk", "tarik handuknya",
             "jatuhkan handuk", "jatuhkan handuknya", "drop towel", "drop your towel",
             "take off towel", "take off your towel", "remove towel", "remove your towel",
-            "foto nenen", "pap nenen", "foto toket", "pap toket",
             "foto telanjang", "pap telanjang", "foto bugil", "pap bugil",
+            "foto memek", "pap memek", "foto vagina", "pap vagina",
             "gak pake baju", "ngga pake baju", "ga pake baju", "ga pake busana",
             "gak pake pakaian", "ga pake pakaian",
         ]
@@ -2535,25 +2536,17 @@ class PersonaManager:
                     preset = self.get_preset_outfit(k)
                     return _finalize(preset["prompt"], preset["negative"], is_n, preset["name"])
 
-        # 5. NSFW Mode Fallback (if turn is NSFW and no manual/clothed preset active, default to nude)
-        if is_nsfw and not (is_manual and outfit_key != "default"):
-            is_work_or_public = False
-            if scene_hint and any(pub in scene_hint.lower() for pub in ["lab", "laboratorium", "science lab", "office", "kantor", "mall", "campus", "classroom", "library", "cafe", "park", "street", "store"]):
-                is_work_or_public = True
-            if not is_work_or_public:
-                nude_preset = self.get_preset_outfit("nude")
-                return _finalize(
-                    nude_preset["prompt"],
-                    nude_preset["negative"],
-                    True,
-                    nude_preset["name"]
-                )
+        # 5. Clothed Intimate / Roleplay Coherence:
+        # When at Stage 0 (clothed) or early in an intimate scene without explicit undress commands,
+        # waifu remains clothed in her contextual outfit (e.g. cozy loungewear/pajamas/casual).
+        # Full nudity is strictly restricted to explicit user commands or Stage 4 of sequential undressing!
 
         # 6. Context-aware Student Routine & Conversation History
         # When an active session outfit is set, check activity shifts/public guards against current user_text only
         # so stale chat history (e.g., earlier "piyama" / "tidur") does NOT cancel user's newly selected /outfit!
         current_ctx = current_loc_ctx
-        ctx = detect_contextual_activity_and_outfit(user_text, clean_turns, persona_key=self.active_key)
+        clean_with_scene = ([scene_hint] if scene_hint else []) + clean_turns
+        ctx = detect_contextual_activity_and_outfit(user_text, clean_with_scene, persona_key=self.active_key)
 
         # Determine if current venue is public (mall, campus, cafe, etc.)
         is_public = bool(current_ctx.get("is_public", False)) if outfit_mode != "auto" else bool(ctx.get("is_public", False))

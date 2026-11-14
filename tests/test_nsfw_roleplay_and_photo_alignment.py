@@ -33,10 +33,15 @@ class TestNSFWRoleplayAndPhotoAlignment(unittest.TestCase):
             self.assertIn("nude", prompt.lower(), f"Prompt missing nude keywords for '{query}'")
 
     def test_clothing_intent_with_is_nsfw_flag(self):
-        # When turn is NSFW and user asks for a photo without a clothed preset, default to nude
+        # When turn is NSFW but user does NOT ask for nude and scene is at Stage 0, waifu remains clothed (NOT nude!)
         query = "foto kamu yang cantik dong sayang"
         prompt, neg, is_nude, name = self.persona_mgr.detect_clothing_intent(query, is_nsfw=True)
-        self.assertTrue(is_nude, f"Expected is_nude=True when is_nsfw=True, got {is_nude}")
+        self.assertFalse(is_nude, f"Expected is_nude=False when user has not commanded undress, got {is_nude}")
+
+        # When user explicitly asks for nude, she becomes nude
+        query_nude = "foto kamu telanjang bulat dong sayang"
+        prompt_nude, neg_nude, is_nude_exp, name_nude = self.persona_mgr.detect_clothing_intent(query_nude, is_nsfw=True)
+        self.assertTrue(is_nude_exp, f"Expected is_nude=True when explicit nude requested, got {is_nude_exp}")
 
         # If user asks for lingerie in NSFW mode, return lingerie
         query_lingerie = "pake lingerie renda hitam ya"
