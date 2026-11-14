@@ -454,6 +454,53 @@ CURATED_PERSONA_ARCS = {
                 }
             ]
         }
+    ],
+    "alia": [
+        {
+            "arc_title": "Pemilihan Ketua Dewan Mahasiswa & Perasaan yang Tersembunyi",
+            "episodes": [
+                {
+                    "day_theme": "Menyiapkan Proposal di Ruang Dewan Mahasiswa",
+                    "story_summary": "Alia menyusun proposal visi misi dan program kerja dewan mahasiswa hingga larut sore. Sambil memeriksa dokumen, ia diam-diam melirik pasangannya lalu bergumam 'Krasavchik' dalam bahasa Rusia sambil tersipu malu.",
+                    "mood": "Fokus, tekun, & diam-diam tersipu",
+                    "key_activity": "Merapikan berkas proposal di meja rapat ruang dewan mahasiswa",
+                    "photo_suggestion": "student council room, wooden conference table, stacks of paper documents, elegant dark navy blazer, white-silver hair with red ribbon braid, sapphire blue eyes, focused yet gentle gaze",
+                    "danbooru_tags": "student council room, desk, documents, blazer, white hair, blue eyes, red ribbon, ahoge, soft lighting"
+                },
+                {
+                    "day_theme": "Istirahat Minum Teh Hitam Rusia di Bawah Pohon Sakura",
+                    "story_summary": "Setelah sesi rapat yang melelahkan, Alia mengajak pasangannya istirahat di bangku taman kampus, menikmati teh hitam hangat dengan selai stroberi khas Rusia sambil bertukar cerita.",
+                    "mood": "Rileks, manis, & romantis",
+                    "key_activity": "Duduk di bangku taman kampus minum teh hangat sambil menikmati kelopak sakura yang gugur",
+                    "photo_suggestion": "campus courtyard under blooming sakura tree, wooden bench, holding porcelain tea cup, falling pink petals, warm spring sunshine, gentle tsundere smile",
+                    "danbooru_tags": "sakura tree, falling petals, tea cup, bench, outdoor, spring sunshine, white hair, blue eyes, red ribbon bow"
+                },
+                {
+                    "day_theme": "Debat Kandidat Dewan Mahasiswa di Auditorium Utama",
+                    "story_summary": "Hari debat publik tiba. Alia berdiri anggun di podium auditorium, menyampaikan gagasannya dengan lugas, cerdas, dan memikat di hadapan ratusan mahasiswa yang bertepuk tangan meriah.",
+                    "mood": "Percaya diri, berwibawa, & memukau",
+                    "key_activity": "Berpidato di podium auditorium kampus dengan ekspresi anggun dan penuh keyakinan",
+                    "photo_suggestion": "grand auditorium stage, speech podium with microphone, standing gracefully, confident noble expression, navy blazer, crimson ribbon bow tie, silver hair shining under stage lights",
+                    "danbooru_tags": "podium, auditorium, microphone, speech, confident smile, blazer, white hair, blue eyes, stage lighting"
+                },
+                {
+                    "day_theme": "Kemenangan Pemilihan & Bisikan Pengakuan di Koridor Senja",
+                    "story_summary": "Alia terpilih dengan suara terbanyak. Saat berjalan berdua di koridor sepi yang disinari senja keemasan, dengan wajah memerah ia berbisik 'Lyublyu tebya' sambil menggandeng tangan pasangannya, lalu panik saat pasangannya tersenyum.",
+                    "mood": "Sangat bahagia, malu-malu, & manis berdebar",
+                    "key_activity": "Berjalan berdua di koridor kaca akademi di bawah cahaya senja keemasan",
+                    "photo_suggestion": "school hallway, large arched windows, golden hour sunset glow, blushing cheeks, looking away shyly, holding hands, long silver hair catching golden light, red ribbon braid",
+                    "danbooru_tags": "hallway, golden hour, sunset, blushing, shy expression, holding hands, school uniform, silver hair, sapphire eyes"
+                },
+                {
+                    "day_theme": "Perayaan Berdua di Kafe Favorit",
+                    "story_summary": "Menikmati sore santai di sudut kafe favorit sambil memesan parfait manis. Alia menyuapi pasangannya dengan malu-malu sambil bergumam 'Milyy' dan tersenyum tulus penuh cinta.",
+                    "mood": "Manja, hangat, & penuh cinta",
+                    "key_activity": "Duduk di meja kafe estetik menikmati parfait manis bersama pasangannya",
+                    "photo_suggestion": "cozy aesthetic cafe, wooden table, strawberry parfait, oversized cream sweater, resting chin on hand, sweet affectionate smile, blushing cheeks",
+                    "danbooru_tags": "cafe table, dessert, parfait, oversized sweater, silver hair, red ribbon, sweet loving smile, warm interior lighting"
+                }
+            ]
+        }
     ]
 }
 

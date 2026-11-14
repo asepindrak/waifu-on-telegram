@@ -147,6 +147,23 @@ STUDENT_PROFILES = {
         "sweater_outfit": "(wearing cozy soft forest-green knit sweater, delicate silver leaf pendant:1.35), pointy elf ears",
         "bikini_outfit": "(wearing elegant emerald-green and gold two-piece summer bikini:1.4), pointy elf ears, bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
         "romantic_outfit": "(wearing alluring romantic translucent white silk slip dress with delicate gold embroidery:1.35), pointy elf ears, off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+    },
+    "alia": {
+        "name": "Alia",
+        "age": 20,
+        "major": "Sastra & Diplomasi Hubungan Internasional (Semester 3)",
+        "campus": "Kampus Utama Akademi Kehormatan (Fakultas Diplomasi Internasional)",
+        "hobbies": "membaca novel sastra klasik di perpustakaan akademi, mengelola agenda Dewan Mahasiswa, minum teh hitam varian Rusia, jalan santai musim semi",
+        "style": "prestigious academy student, elegant dark navy-blue blazer over white collared shirt with crimson ribbon bow tie, pleated plaid skirt, black thigh-high socks",
+        "campus_outfit": "(wearing elegant academy student uniform, dark navy-blue academy blazer over crisp white shirt with crimson ribbon bow tie, pleated plaid skirt:1.35)",
+        "mall_outfit": "(wearing fashionable elegant Russian-chic streetwear, stylish tailored white cropped jacket, navy pleated skirt, chic boots:1.35)",
+        "cafe_outfit": "(wearing cozy oversized cream-white cable-knit sweater, dark navy pleated skirt, red ribbon hair bow:1.35)",
+        "pajamas_outfit": "(wearing delicate pure white and icy-blue silk camisole and matching sleep shorts with red ribbon bow accent:1.35), cozy bedtime sleepwear",
+        "morning_outfit": "(wearing cozy oversized pure white morning t-shirt and comfy soft navy loungewear shorts:1.35)",
+        "loungewear_outfit": "(wearing elegant comfortable loungewear, soft white tee, relaxed navy shorts, red ribbon hair bow:1.35)",
+        "sweater_outfit": "(wearing cozy oversized white turtleneck knit sweater, red ribbon hair bow:1.35)",
+        "bikini_outfit": "(wearing stunning white and sapphire-blue two-piece summer bikini with tiny red ribbon bow:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "romantic_outfit": "(wearing alluring romantic sheer white and sapphire silk slip dress with delicate crimson lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
     }
 }
 
