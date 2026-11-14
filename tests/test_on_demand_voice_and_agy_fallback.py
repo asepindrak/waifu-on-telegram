@@ -21,6 +21,12 @@ class TestOnDemandVoiceAndAgyFallback(unittest.TestCase):
     def setUp(self):
         USER_VOICE_MODES.clear()
         VOICE_CACHE.clear()
+        import agy_quota_manager
+        agy_quota_manager.reset_agy_image_quota()
+
+    def tearDown(self):
+        import agy_quota_manager
+        agy_quota_manager.reset_agy_image_quota()
 
     def test_voice_mode_always_button_regardless_of_env_or_legacy_state(self):
         """get_user_voice_mode always returns 'button' even if legacy flags or env vars exist."""
@@ -147,6 +153,7 @@ class TestOnDemandVoiceAndAgyFallback(unittest.TestCase):
         with patch.object(engine, "generate_image_agy", return_value=None), \
              patch("agy_quota_manager.has_local_image_models", return_value=False), \
              patch("media_engine.photo_vault.find_matching_photo", return_value=None), \
+             patch("agy_quota_manager.record_agy_image_quota_exhausted"), \
              patch.object(engine, "generate_image_cloud_fallback", return_value=b"FakePNGImageBytes") as mock_cloud:
             
             with patch.dict(os.environ, {"SFW_IMAGE_ENGINE": "agy", "MEDIA_FALLBACK_CLOUD": "false"}):

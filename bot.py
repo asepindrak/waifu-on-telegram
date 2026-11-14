@@ -8574,8 +8574,10 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 # 3. Active date / hangout in progress (waifu loves capturing date memories)
                 # 4. NSFW undress transition or intimate physical engagement (only explicit undress actions)
                 # 5. Natural conversational cadence: every 3-4 turns during active chat, waifu naturally shares a candid photo of her ongoing moment!
+                # Short greetings (e.g. 'hai mimi', 'pagi', 'halo') must NOT trigger random unsolicited photos!
                 is_on_active_date = hangout_engine.is_on_date(uid)
-                is_natural_cadence = (turn_diff >= 3 and time_diff >= 45.0)
+                is_simple_greeting = bool(re.match(r"^(hai|halo|hei|hey|pagi|siang|sore|malam|selamat\s+(?:pagi|siang|sore|malam)|assalamu['a]?laikum|p)\b", user_text.lower().strip()))
+                is_natural_cadence = (turn_diff >= 3 and time_diff >= 45.0 and not is_simple_greeting)
 
                 raw_spontaneous = (
                     (
@@ -8588,6 +8590,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         or is_natural_cadence
                     )
                     and not (should_send_conv_photo or should_send_conv_video)
+                    and not is_simple_greeting
                 )
 
                 if raw_spontaneous:
