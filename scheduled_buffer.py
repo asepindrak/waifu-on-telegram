@@ -60,27 +60,43 @@ class ScheduledMessageBuffer:
         except Exception as e:
             logger.error(f"Error saving scheduled message buffer: {e}")
 
-    def has_message(self, user_id: int, msg_type: str) -> bool:
-        """Checks if a pre-generated message of msg_type exists for user_id."""
+    def has_message(self, user_id: int, msg_type: str, persona_key: Optional[str] = None) -> bool:
+        """Checks if a pre-generated message of msg_type exists for user_id and persona."""
         with self.lock:
             uid_str = str(user_id)
             items = self.buffer.get(uid_str, {}).get(msg_type, [])
+            if persona_key:
+                p_key = persona_key.lower().strip()
+                return any(item.get("persona_key") == p_key for item in items)
             return len(items) > 0
 
-    def get_message(self, user_id: int, msg_type: str) -> Optional[str]:
-        """Pops and returns the oldest pre-generated message for msg_type, or None if buffer is empty."""
+    def get_message(self, user_id: int, msg_type: str, persona_key: Optional[str] = None) -> Optional[str]:
+        """Pops and returns the oldest pre-generated message matching persona, or None if buffer is empty."""
         with self.lock:
             uid_str = str(user_id)
             user_bucket = self.buffer.get(uid_str, {})
             items = user_bucket.get(msg_type, [])
-            if items:
-                msg_obj = items.pop(0)
-                self._save_buffer()
-                logger.info(f"✓ Dispatched buffered {msg_type} message for user {user_id} (0% GPU/VRAM load, 0 lag).")
-                return msg_obj.get("text")
+            if not items:
+                return None
+
+            p_key = persona_key.lower().strip() if persona_key else None
+            # Filter and pop message matching persona_key
+            for idx, msg_obj in enumerate(items):
+                obj_p_key = msg_obj.get("persona_key")
+                if p_key is None or not obj_p_key or obj_p_key == p_key:
+                    items.pop(idx)
+                    self._save_buffer()
+                    logger.info(f"✓ Dispatched buffered {msg_type} message for user {user_id} (persona: {p_key or 'default'}).")
+                    return msg_obj.get("text")
+                else:
+                    # Mismatched persona message in buffer: discard stale message
+                    logger.debug(f"Discarding stale buffered {msg_type} message for mismatched persona {obj_p_key} (active: {p_key})")
+                    items.pop(idx)
+                    self._save_buffer()
+                    return None
             return None
 
-    def add_message(self, user_id: int, msg_type: str, text: str, max_items: int = 3):
+    def add_message(self, user_id: int, msg_type: str, text: str, max_items: int = 3, persona_key: Optional[str] = None):
         """Adds a pre-generated message to the queue."""
         clean = text.strip().strip('"').strip("'")
         if not clean:
@@ -93,16 +109,34 @@ class ScheduledMessageBuffer:
                 self.buffer[uid_str][msg_type] = []
 
             items = self.buffer[uid_str][msg_type]
+            p_key = (persona_key or "").lower().strip()
             # Avoid duplicate identical text
             if not any(item.get("text") == clean for item in items):
                 items.append({
                     "text": clean,
+                    "persona_key": p_key,
                     "created_at": time.time()
                 })
                 if len(items) > max_items:
                     items.pop(0)
                 self._save_buffer()
-                logger.info(f"✓ Cached pre-generated {msg_type} greeting for user {user_id} (Buffer count: {len(items)})")
+                logger.info(f"✓ Cached pre-generated {msg_type} greeting for user {user_id} [{p_key}] (Buffer count: {len(items)})")
+
+    def clear_user_buffer(self, user_id: int, persona_key: Optional[str] = None):
+        """Clears buffer for user (optionally only for specific persona)."""
+        with self.lock:
+            uid_str = str(user_id)
+            if uid_str in self.buffer:
+                if persona_key:
+                    p_key = persona_key.lower().strip()
+                    for m_type in list(self.buffer[uid_str].keys()):
+                        self.buffer[uid_str][m_type] = [
+                            item for item in self.buffer[uid_str][m_type]
+                            if item.get("persona_key") != p_key
+                        ]
+                else:
+                    self.buffer[uid_str] = {}
+                self._save_buffer()
 
     def count(self, user_id: int, msg_type: Optional[str] = None) -> int:
         """Returns total buffered messages for user."""

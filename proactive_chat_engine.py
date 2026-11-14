@@ -9,7 +9,7 @@ import json
 import time
 import logging
 from typing import Dict, Any, Optional, List
-from student_schedule import get_hourly_routine, STUDENT_PROFILES
+from student_schedule import get_hourly_routine, get_student_profile, STUDENT_PROFILES
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +169,7 @@ class ProactiveChatEngine:
         routine = get_hourly_routine(cur_hour, persona_key=persona_key)
         act_desc = routine["activity_desc"]
         p_name = persona.get("name", "Runa")
-        profile = STUDENT_PROFILES.get(persona_key.lower(), STUDENT_PROFILES["runa"])
+        profile = get_student_profile(persona_key)
         major = profile["major"]
 
         # Prompt for LLM

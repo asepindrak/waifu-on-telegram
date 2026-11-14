@@ -251,9 +251,9 @@ BODY_POSES = [
 ]
 
 INTIMATE_SEX_POSITIONS = [
-    # Doggy style / Menungging / All fours / Dari belakang
+    # Doggy style / Menungging / All fours
     (
-        [r"\b(doggy(\s*style)?|doggystyle|nungging|posisi\s+nungging|menungging|dari\s+belakang|all\s+fours|on\s+all\s+fours)\b"],
+        [r"\b(doggy(\s*style)?|doggystyle|nungging|posisi\s+nungging|menungging|posisi\s+dari\s+belakang|gaya\s+dari\s+belakang|all\s+fours|on\s+all\s+fours)\b"],
         "rear view from behind, (on all fours:1.4), (doggy style:1.4), on hands and knees, arched back, looking back over shoulder at viewer, seductive blush, passionate intimate gaze",
         "standing, supine, front view, face close-up"
     ),
@@ -787,13 +787,27 @@ class PersonaManager:
             self.user_outfits = {}
 
     
+    def _conv_key(self, user_id: int, persona_key: Optional[str] = None) -> str:
+        """Returns isolated composite storage key for (user_id, persona_key)."""
+        p_key = (persona_key or self.active_key or "runa").lower().strip()
+        return f"{user_id}:{p_key}"
+
     def _load_chat_history(self):
-        """Loads user chat histories from persistent JSON storage."""
+        """Loads user chat histories partitioned per persona from persistent JSON storage."""
         if os.path.exists(self.history_file):
             try:
                 with open(self.history_file, "r", encoding="utf-8") as f:
                     raw = json.load(f)
-                    self.user_conversations = {int(k): v for k, v in raw.items() if str(k).isdigit() and isinstance(v, list)}
+                loaded: Dict[str, List[Dict[str, str]]] = {}
+                for k, v in raw.items():
+                    if isinstance(v, list):
+                        s_k = str(k)
+                        if ":" in s_k:
+                            loaded[s_k] = v
+                        elif s_k.isdigit():
+                            # Backward compatibility: migrate legacy single-user history to active persona key
+                            loaded[f"{s_k}:{self.active_key}"] = v
+                self.user_conversations = loaded
                 self._history_mtime = os.path.getmtime(self.history_file)
             except Exception as e:
                 logger.error(f"Error loading chat history from {self.history_file}: {e}")
@@ -802,7 +816,7 @@ class PersonaManager:
             self.user_conversations = {}
 
     def _save_chat_history(self):
-        """Saves user chat histories to persistent JSON storage atomically."""
+        """Saves user chat histories partitioned per persona to persistent JSON storage atomically."""
         d = os.path.dirname(self.history_file)
         if d and not os.path.exists(d):
             try:
@@ -813,7 +827,14 @@ class PersonaManager:
         try:
             with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump({str(k): v for k, v in self.user_conversations.items()}, f, ensure_ascii=False, indent=2)
-            os.replace(temp_file, self.history_file)
+            for attempt in range(5):
+                try:
+                    os.replace(temp_file, self.history_file)
+                    break
+                except (PermissionError, OSError) as pe:
+                    if attempt == 4:
+                        raise pe
+                    time.sleep(0.05 * (attempt + 1))
             self._history_mtime = os.path.getmtime(self.history_file)
         except Exception as e:
             logger.error(f"Error saving chat history to {self.history_file}: {e}")
@@ -1073,12 +1094,23 @@ class PersonaManager:
         return base
 
     def set_active_persona(self, key: str) -> bool:
-        """Switches active persona key."""
+        """Switches active persona key, resetting transient session states and undress states."""
         key = key.lower()
         if key in self.personas:
             self.active_key = key
             if hasattr(self, "user_locked_outfit_prompts"):
                 self.user_locked_outfit_prompts.clear()
+            if hasattr(self, "session_outfits"):
+                self.session_outfits.clear()
+            # Ensure fresh start: reset any temporary undress stages so new persona is clothed
+            for uid in list(self.user_outfits.keys()):
+                rec = self.user_outfits.get(uid)
+                if isinstance(rec, dict) and rec.get("undress_stage", 0) > 0:
+                    rec["undress_stage"] = 0
+                    if rec.get("key") in ("shirt_off", "bottoms_off", "bra_off", "nude"):
+                        rec["key"] = "default"
+                    self.user_outfits[uid] = rec
+            self._save_user_outfits()
             return True
         return False
 
@@ -1722,17 +1754,17 @@ class PersonaManager:
                 break
 
         if shifted:
+            did_shift = False
             # If waifu was undressed, automatically restore her clothes on daily life context shift!
             if cur_undress > 0:
                 logger.info(f"Daily context shift detected for user {uid} ('{user_text[:35]}'). Resetting undress stage {cur_undress} -> 0 (clothed).")
                 self.reset_undress_stage(uid)
+                did_shift = True
             if details.get("is_session"):
                 logger.info(f"Natural context shift detected for user {uid} ('{user_text[:35]}'). Reverting session outfit '{details['key']}' to auto.")
                 self.clear_session_outfit(uid)
-            return True
-
-        if not details.get("is_session") and cur_undress == 0:
-            return False
+                did_shift = True
+            return did_shift
 
         return False
 
@@ -2684,8 +2716,8 @@ class PersonaManager:
         prompt, _, _, _ = self.craft_visual_prompt_full(user_text, user_id=user_id, scene_override=scene_override)
         return prompt
 
-    def get_chat_history(self, user_id: int) -> List[Dict[str, str]]:
-        """Returns chat history for user, re-syncing from disk if modified by other processes."""
+    def get_chat_history(self, user_id: int, persona_key: Optional[str] = None) -> List[Dict[str, str]]:
+        """Returns chat history partitioned for user and persona, re-syncing from disk if modified."""
         if os.path.exists(self.history_file):
             try:
                 mtime = os.path.getmtime(self.history_file)
@@ -2693,38 +2725,46 @@ class PersonaManager:
                     self._load_chat_history()
             except Exception:
                 pass
-        return self.user_conversations.setdefault(user_id, [])
+        k = self._conv_key(user_id, persona_key)
+        return self.user_conversations.setdefault(k, [])
 
-    def add_message(self, user_id: int, role: str, content: str):
-        """Adds a message to history, keeping maximum 20 turns, and persists atomically."""
-        history = self.get_chat_history(user_id)
+    def add_message(self, user_id: int, role: str, content: str, persona_key: Optional[str] = None):
+        """Adds a message to persona-specific history, keeping maximum 20 turns, and persists atomically."""
+        k = self._conv_key(user_id, persona_key)
+        history = self.get_chat_history(user_id, persona_key=persona_key)
         history.append({"role": role, "content": content})
         if len(history) > 20:
-            self.user_conversations[user_id] = history[-20:]
+            history = history[-20:]
+        self.user_conversations[k] = history
         self._save_chat_history()
 
-    def clear_history(self, user_id: int):
-        """Clears chat history for user and persists to disk."""
+    def clear_history(self, user_id: int, persona_key: Optional[str] = None):
+        """Clears chat history for this specific persona and persists to disk."""
+        k = self._conv_key(user_id, persona_key)
         if hasattr(self, "user_locked_outfit_prompts"):
             self.user_locked_outfit_prompts.pop(user_id, None)
-        if user_id in self.user_conversations:
+        if k in self.user_conversations:
+            self.user_conversations[k] = []
+        if not persona_key and user_id in self.user_conversations:
             self.user_conversations[user_id] = []
         self._save_chat_history()
 
-    def get_affinity(self, user_id: int) -> int:
-        """Returns affection points (0-100)."""
-        return self.user_affinity.get(user_id, 15)
+    def get_affinity(self, user_id: int, persona_key: Optional[str] = None) -> int:
+        """Returns affection points (0-100) partitioned per persona."""
+        k = self._conv_key(user_id, persona_key)
+        return self.user_affinity.get(k, self.user_affinity.get(user_id, 15))
 
-    def increase_affinity(self, user_id: int, delta: int = 1) -> int:
-        """Increases affection score smoothly."""
-        cur = self.get_affinity(user_id) + delta
+    def increase_affinity(self, user_id: int, delta: int = 1, persona_key: Optional[str] = None) -> int:
+        """Increases affection score smoothly for active persona."""
+        k = self._conv_key(user_id, persona_key)
+        cur = self.get_affinity(user_id, persona_key=persona_key) + delta
         new_val = min(max(cur, 0), 100)
-        self.user_affinity[user_id] = new_val
+        self.user_affinity[k] = new_val
         return new_val
 
-    def get_relationship_status(self, user_id: int) -> Tuple[int, str]:
-        """Returns (score, relationship_title)."""
-        score = self.get_affinity(user_id)
+    def get_relationship_status(self, user_id: int, persona_key: Optional[str] = None) -> Tuple[int, str]:
+        """Returns (score, relationship_title) for active persona."""
+        score = self.get_affinity(user_id, persona_key=persona_key)
         if score < 25:
             status = "🌱 Close Friends"
         elif score < 50:

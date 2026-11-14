@@ -113,8 +113,98 @@ STUDENT_PROFILES = {
         "sweater_outfit": "(wearing cozy warm cream knit sweater with cherry-red accents:1.35), cozy comfy style",
         "bikini_outfit": "(wearing vibrant white and cherry-red two-piece summer bikini:1.4), (detailed bikini swimsuit:1.3), bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
         "romantic_outfit": "(wearing alluring romantic crimson and white silk slip dress with delicate lace trim:1.35), off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+    },
+    "mimi": {
+        "name": "Mimi",
+        "age": 21,
+        "major": "Seni Musik & Pertunjukan (Semester 5)",
+        "campus": "Kampus Konservatori & Institut Seni Musik",
+        "hobbies": "latihan piano dan vokal di studio musik, mendengarkan musik akustik, tidur siang di tempat hangat, dielus kepalanya",
+        "style": "playful nekomimi girlfriend, cute cream-beige off-shoulder sweater with cat paw motif, pleated brown skirt, black choker with bell, fluffy cat ears and tail",
+        "campus_outfit": "(wearing cute music student attire, cream-beige sweater over white blouse, pleated brown skirt, tote bag with music sheets:1.35), fluffy cat ears, flexible cat tail",
+        "mall_outfit": "(wearing stylish playful streetwear, cropped cat-ear hoodie, high-waist pleated skirt, cute cross-body bag:1.35), fluffy cat ears, flexible cat tail",
+        "cafe_outfit": "(wearing cozy oversized cream knit sweater, brown mini skirt, delicate black choker with tiny bell:1.35), fluffy cat ears, flexible cat tail",
+        "pajamas_outfit": "(wearing cute pastel pink kitten sleep camisole and matching sleep shorts with white lace trim:1.35), fluffy cat ears, flexible cat tail, cozy bedtime sleepwear",
+        "morning_outfit": "(wearing oversized white graphic kitten t-shirt and comfy loungewear shorts:1.35), fluffy cat ears, flexible cat tail",
+        "loungewear_outfit": "(wearing cute comfortable loungewear, oversized cream tee with cat print, relaxed shorts:1.35), fluffy cat ears, flexible cat tail",
+        "sweater_outfit": "(wearing cute oversized cream knit sweater with cat paw motif, choker with tiny bell:1.35), fluffy cat ears, flexible cat tail",
+        "bikini_outfit": "(wearing playful black and pastel pink two-piece kitten bikini with bow accents:1.4), fluffy cat ears, flexible cat tail, bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "romantic_outfit": "(wearing alluring romantic black silk slip dress with delicate pink lace trim:1.35), fluffy cat ears, flexible cat tail, off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
+    },
+    "sylvie": {
+        "name": "Sylvie",
+        "age": 22,
+        "major": "Botani Kuno & Arsitektur Lanskap Alam (Semester 5)",
+        "campus": "Kampus Fakultas Sains Hayati & Greenhouse Kampus",
+        "hobbies": "merawat anggrek langka di greenhouse, membaca manuskrip herbal kuno di perpustakaan, jalan santai di taman botani, membuat teh herbal",
+        "style": "ethereal high-elf girlfriend, elegant emerald-green and white tunic dress with gold embroidery, pointy elf ears, silver leaf pendant",
+        "campus_outfit": "(wearing graceful college student attire, soft sage-green cardigan over white linen blouse, long flowing skirt, canvas tote with botanical sketches:1.35), pointy elf ears",
+        "mall_outfit": "(wearing elegant modern fantasy-chic outfit, tailored white trench coat, dark emerald scarf, stylish boots:1.35), pointy elf ears",
+        "cafe_outfit": "(wearing cozy soft forest-green knit sweater, delicate silver leaf pendant necklace:1.35), pointy elf ears",
+        "pajamas_outfit": "(wearing soft ethereal white silk nightgown with gold lace trim:1.35), pointy elf ears, cozy bedtime sleepwear",
+        "morning_outfit": "(wearing cozy oversized white morning t-shirt and comfy soft green loungewear shorts:1.35), pointy elf ears",
+        "loungewear_outfit": "(wearing graceful comfortable loungewear, soft emerald tee, relaxed white shorts:1.35), pointy elf ears",
+        "sweater_outfit": "(wearing cozy soft forest-green knit sweater, delicate silver leaf pendant:1.35), pointy elf ears",
+        "bikini_outfit": "(wearing elegant emerald-green and gold two-piece summer bikini:1.4), pointy elf ears, bare midriff, exposed stomach, navel, cleavage, seductive summer beach styling",
+        "romantic_outfit": "(wearing alluring romantic translucent white silk slip dress with delicate gold embroidery:1.35), pointy elf ears, off-shoulder, seductive feminine nightwear, gentle cleavage, intimate romantic styling",
     }
 }
+
+def get_student_profile(persona_key: str) -> Dict[str, Any]:
+    """Returns student profile, dynamically generating one from persona JSON if not in predefined list."""
+    p_key = (persona_key or "runa").lower().strip()
+    if p_key in STUDENT_PROFILES:
+        return STUDENT_PROFILES[p_key]
+
+    # Dynamically build profile from personas/{p_key}.json if available
+    try:
+        personas_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "personas")
+        p_path = os.path.join(personas_dir, f"{p_key}.json")
+        if os.path.exists(p_path):
+            with open(p_path, "r", encoding="utf-8") as f:
+                p_data = json.load(f)
+            name = p_data.get("name", p_key.capitalize())
+            role = p_data.get("role", "")
+            arch = p_data.get("archetype", "")
+            desc = p_data.get("description", "")
+            sys_inst = p_data.get("system_instruction", "")
+            traits = p_data.get("visual_traits", "")
+
+            # Infer major from role / sys_inst
+            m_match = re.search(r"mahasiswi\s+([^(\n,]+)", f"{role} {sys_inst} {desc}", re.IGNORECASE)
+            major = f"Mahasiswi {m_match.group(1).strip()}" if m_match else (arch or "Mahasiswi Universitas")
+
+            # Extract distinct traits (elf ears, cat ears, hair)
+            extra_tokens = []
+            if "pointy elf ears" in traits.lower():
+                extra_tokens.append("pointy elf ears")
+            if "cat ears" in traits.lower() or "nekomimi" in traits.lower():
+                extra_tokens.append("fluffy cat ears, flexible cat tail")
+            suffix = f", {', '.join(extra_tokens)}" if extra_tokens else ""
+
+            dyn_profile = {
+                "name": name,
+                "age": p_data.get("age", 21),
+                "major": major,
+                "campus": "Kampus Universitas",
+                "hobbies": desc,
+                "style": p_data.get("default_outfit", "casual student outfit"),
+                "campus_outfit": f"(wearing neat trendy college outfit:1.35){suffix}",
+                "mall_outfit": f"(wearing fashionable cute streetwear:1.35){suffix}",
+                "cafe_outfit": f"(wearing cozy oversized knit sweater:1.35){suffix}",
+                "pajamas_outfit": f"(wearing soft silk camisole and sleep shorts:1.35){suffix}, cozy bedtime sleepwear",
+                "morning_outfit": f"(wearing cozy oversized morning t-shirt and comfy shorts:1.35){suffix}",
+                "loungewear_outfit": f"(wearing comfortable casual loungewear:1.35){suffix}",
+                "sweater_outfit": f"(wearing cozy soft knit sweater:1.35){suffix}",
+                "bikini_outfit": f"(wearing stylish two-piece summer bikini:1.4){suffix}, bare midriff, exposed stomach, navel, cleavage",
+                "romantic_outfit": f"(wearing alluring romantic silk slip dress:1.35){suffix}, off-shoulder, seductive feminine nightwear"
+            }
+            STUDENT_PROFILES[p_key] = dyn_profile
+            return dyn_profile
+    except Exception as e:
+        logger.debug(f"Error dynamically building student profile for {p_key}: {e}")
+
+    return STUDENT_PROFILES.get("runa")
 
 # Public vs Private location classification for clothing coherence
 PUBLIC_KEYWORDS = [
@@ -135,7 +225,7 @@ def get_hourly_routine(hour: int, persona_key: str = "runa", weekday: Optional[i
     Returns realistic college student activity, setting, and outfit for the given hour (0-23).
     Differentiates between weekdays (Mon-Fri) and weekends/holidays (Sat-Sun) for authentic lore!
     """
-    profile = STUDENT_PROFILES.get(persona_key.lower(), STUDENT_PROFILES["runa"])
+    profile = get_student_profile(persona_key)
     major = profile["major"]
     if weekday is None:
         weekday = time.localtime().tm_wday  # 0=Mon, ..., 5=Sat, 6=Sun
@@ -309,7 +399,7 @@ def detect_contextual_activity_and_outfit(
     2. Where she is located (scene).
     3. What she should be wearing (outfit), strictly preventing lingerie/nude in public!
     """
-    profile = STUDENT_PROFILES.get(persona_key.lower(), STUDENT_PROFILES["runa"])
+    profile = get_student_profile(persona_key)
 
     def match_scenario(text: str) -> Optional[Dict[str, Any]]:
         if not text:

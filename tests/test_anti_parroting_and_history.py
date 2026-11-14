@@ -106,12 +106,12 @@ class TestAntiParrotingAndConversationHistory(unittest.TestCase):
 
     @patch("bot.is_port_listening", return_value=False)
     def test_contextual_fallback_reaction(self, mock_port):
-        """Provides natural contextual fallback for gathering and food when offline."""
+        """Verifies static cheesy fallbacks are disabled in favor of real LLM retry."""
         res_eat = bot.get_contextual_fallback_reaction("nanti mau makan siang")
-        self.assertIn("makan", res_eat.lower())
+        self.assertIsNone(res_eat)
 
         res_gather = bot.get_contextual_fallback_reaction("ada gathering kantor")
-        self.assertIn("kantor", res_gather.lower())
+        self.assertIsNone(res_gather)
 
     @patch("bot.bot")
     @patch("bot.scheduled_buffer")

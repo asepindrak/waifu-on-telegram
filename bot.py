@@ -3499,6 +3499,7 @@ def handle_persona(message):
             chosen = args[1].lower()
             if persona_mgr.set_active_persona(chosen):
                 update_env_variable("DEFAULT_PERSONA", chosen)
+                scheduled_buffer.clear_user_buffer(message.chat.id)
                 p = persona_mgr.get_active_persona()
                 img_p = get_persona_image_path(p)
                 if img_p and os.path.exists(img_p):
@@ -3531,6 +3532,7 @@ def callback_set_persona(call):
     chosen = call.data.split(":", 1)[1]
     if persona_mgr.set_active_persona(chosen):
         update_env_variable("DEFAULT_PERSONA", chosen)
+        scheduled_buffer.clear_user_buffer(call.message.chat.id)
         p = persona_mgr.get_active_persona()
         bot.answer_callback_query(call.id, f"Switched to {p.get('name')}!")
         try:
@@ -4793,10 +4795,20 @@ def handle_greetings_command(message):
 def handle_reset(message):
     if not is_authorized(message.from_user.id):
         return
-    persona_mgr.clear_history(message.from_user.id)
-    persona_mgr.reset_undress_stage(message.from_user.id)
+    p_key = persona_mgr.active_key
     persona = persona_mgr.get_active_persona()
-    bot.reply_to(message, f"🔄 Conversation memory cleared! I'm ready for our next fresh chat, sweetheart~ 🥰")
+    p_name = persona.get("name", "Waifu")
+    persona_mgr.clear_history(message.from_user.id, persona_key=p_key)
+    persona_mgr.reset_undress_stage(message.from_user.id)
+    memory_engine.clear_facts(message.from_user.id, persona_key=p_key)
+    scheduled_buffer.clear_user_buffer(message.from_user.id, persona_key=p_key)
+    bot.reply_to(
+        message,
+        f"🔄 **Memori percakapan dengan {p_name} telah di-reset bersih!** ✨\n\n"
+        f"• Riwayat chat dan memori dengan persona lain tetap aman tersimpan yaa.\n"
+        f"• {p_name} siap memulai obrolan baru yang fresh denganmu sekarang~ 🥰",
+        parse_mode="Markdown"
+    )
 
 
 SCENARIO_PROMPTS = {
@@ -6186,6 +6198,7 @@ def callback_persona_wizard(call):
         if ok:
             persona_mgr.set_active_persona(key)
             update_env_variable("DEFAULT_PERSONA", key)
+            scheduled_buffer.clear_user_buffer(user_id)
             USER_PERSONA_WIZARD.pop(user_id, None)
 
             initial_greeting = new_persona_dict.get("initial_greeting") or f"Hai! Senang banget bisa ketemu kamu! Mulai sekarang aku yang bakal nemenin hari-harimu yaa~ 💕"
@@ -7934,7 +7947,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 # Record activity for proactive check-ins & learn facts
                 proactive_engine.record_user_activity(message.from_user.id)
                 chat_history = persona_mgr.get_chat_history(message.from_user.id)
-                memory_engine.auto_extract_facts(user_text, message.from_user.id, history=chat_history)
+                memory_engine.auto_extract_facts(user_text, message.from_user.id, history=chat_history, persona_key=persona_mgr.active_key)
 
                 # Check if user explicitly asked what waifu is doing or invited waifu out
                 user_asked_activity = hangout_engine.detect_activity_query(user_text)
@@ -7943,7 +7956,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 # 4. Construct system instruction with injected student routine & memory context
                 cur_hour = time.localtime().tm_hour
                 routine = student_schedule.get_hourly_routine(cur_hour, persona_key=persona_mgr.active_key)
-                p_prof = student_schedule.STUDENT_PROFILES.get(persona_mgr.active_key.lower(), student_schedule.STUDENT_PROFILES["runa"])
+                p_prof = student_schedule.get_student_profile(persona_mgr.active_key)
                 p_name = persona.get("name", "Runa")
                 
                 # Check user calling preference / pet name request
@@ -8126,7 +8139,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     "8. FREKUENSI NAMA: JANGAN menyelipkan nama atau panggilan lawan bicaramu di setiap balasan! Berkomunikasilah secara mengalir santai menggunakan kata ganti 'kamu'; sebut nama hanya sesekali saja saat ada momen yang pas atau penting agar terdengar natural dan tidak kaku/robotik.\n"
                     "9. SIKAP BAIK, MANIS & ANTI-NYOLOT (SANGAT PENTING): Karaktermu adalah sosok pacar/teman yang baik hati, manis, ramah, lembut, pengertian, dan penuh kasih sayang. DILARANG KERAS bersikap nyolot, judes, ketus, sinis, sarkastik, menantang, atau meremehkan lawan bicaramu! Tanggapi selalu dengan kehangatan yang tulus dan menyejukkan."
                 )
-                mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
+                mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text, persona_key=persona_mgr.active_key)
                 if mem_context:
                     system_inst += "\n" + mem_context
 

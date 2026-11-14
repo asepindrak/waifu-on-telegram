@@ -183,10 +183,12 @@ class TestDynamicOutfitAndSession(unittest.TestCase):
         runa_bra_off = pm_runa.get_preset_outfit("bra_off")
         runa_lingerie = pm_runa.get_preset_outfit("lingerie")
 
-        self.assertIn("black lace bra with cute pink ribbon", runa_shirt_off["prompt"].lower())
-        self.assertIn("black lace bra and panties with pink bows", runa_bottoms_off["prompt"].lower())
-        self.assertIn("black lace panties with pink bows", runa_bra_off["prompt"].lower())
-        self.assertIn("black lace lingerie with cute pink ribbon bows", runa_lingerie["prompt"].lower())
+        self.assertIn("white", runa_shirt_off["prompt"].lower())
+        self.assertIn("black lace", runa_shirt_off["prompt"].lower())
+        self.assertIn("pink ribbon", runa_shirt_off["prompt"].lower())
+        self.assertIn("white and black lace bra and panties", runa_bottoms_off["prompt"].lower())
+        self.assertIn("white and black lace panties", runa_bra_off["prompt"].lower())
+        self.assertIn("white and black lace lingerie", runa_lingerie["prompt"].lower())
 
         # 3. Test multi-turn consistency for user in underwear stage
         pm_akira.set_undress_stage(self.user_id, 2)  # Stage 2: bra & panties

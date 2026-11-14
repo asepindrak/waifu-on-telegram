@@ -360,6 +360,100 @@ CURATED_PERSONA_ARCS = {
                 }
             ]
         }
+    ],
+    "mimi": [
+        {
+            "arc_title": "Persiapan Konser Akustik & Rekaman Studio Musik",
+            "episodes": [
+                {
+                    "day_theme": "Aransemen Lagu Baru di Studio Musik",
+                    "story_summary": "Mimi dan teman sekelompoknya mulai mengaransemen lagu pop akustik manis di studio musik kampus. Mimi mencoba kombinasi melodi piano dan vokal yang hangat.",
+                    "mood": "Ceria, bersemangat, & manja",
+                    "key_activity": "Latihan aransemen melodi piano dan nada vokal di ruang studio musik kampus",
+                    "photo_suggestion": "cozy music studio room, sitting at piano keyboard, sheet music, cream off-shoulder sweater, fluffy cat ears, flexible cat tail, bell choker, playful happy smile",
+                    "danbooru_tags": "music studio, piano, musical instruments, singing, cute fluffy cat ears, cat tail, bell choker, sheet music"
+                },
+                {
+                    "day_theme": "Rekaman Vokal & Take Nada Tinggi",
+                    "story_summary": "Sesi rekaman vokal perdana di bilik kedap suara. Mimi melatih pernapasan dan nada tingginya sampai menghasilkan rekaman yang jernih dan manis.",
+                    "mood": "Fokus, ekspresif, & bangga",
+                    "key_activity": "Berdiri di depan mikrofon rekaman studio mengenakan headphone studio",
+                    "photo_suggestion": "recording booth, professional microphone, wearing studio headphones, singing with emotion, cat ears, amber eyes",
+                    "danbooru_tags": "recording booth, microphone, headphones, singing, fluffy cat ears, cat tail, music notes"
+                },
+                {
+                    "day_theme": "Gladi Bersih Panggung Auditorium",
+                    "story_summary": "Latihan panggung penuh di auditorium kampus dengan tata lampu panggung. Mimi memetik gitar akustik sambil tersenyum manis ke arah kursi penonton.",
+                    "mood": "Antusias & sedikit berdebar",
+                    "key_activity": "Gladi bersih di auditorium kampus memainkan intro lagu akustik",
+                    "photo_suggestion": "auditorium stage, soft stage lighting, holding acoustic guitar, sitting on high stool, cute feline smile, cat ears",
+                    "danbooru_tags": "stage, acoustic guitar, stage lights, cat ears, cat tail, pleated skirt, sweet smile"
+                },
+                {
+                    "day_theme": "Konser Mini Akustik Kampus",
+                    "story_summary": "Hari pertunjukan tiba! Mimi tampil memukau di hadapan penonton dengan petikan piano dan suara lembutnya yang menghangatkan seluruh ruangan auditorium.",
+                    "mood": "Sangat bahagia, terharu, & bangga",
+                    "key_activity": "Tampil live di panggung konser mini membawakan lagu akustik penutup",
+                    "photo_suggestion": "stage performance, piano, sparkling ambient stage lights, graceful bowing with cat ears perked happily, sweet blushing smile",
+                    "danbooru_tags": "stage performance, piano, applause, sparkling lights, graceful nekomimi catgirl, sweet smile"
+                },
+                {
+                    "day_theme": "Perayaan Sukses Konser & Santai di Kafe",
+                    "story_summary": "Merayakan kesuksesan konser akustik dengan minum matcha latte hangat dan kue manis bersama pasangannya sambil bermanja-manja minta dielus kepalanya.",
+                    "mood": "Manja, rileks, & penuh cinta",
+                    "key_activity": "Nongkrong santai di kafe makan sepotong kue manis merayakan konser",
+                    "photo_suggestion": "cafe table, slice of cake, sweet drink, warm smile, resting chin on hand, bell choker, fluffy cat ears",
+                    "danbooru_tags": "cafe table, cake, warm drink, cat ears, cat tail, bell choker, cute affectionate smile"
+                }
+            ]
+        }
+    ],
+    "sylvie": [
+        {
+            "arc_title": "Pelestarian Anggrek Kuno & Konservasi Botani",
+            "episodes": [
+                {
+                    "day_theme": "Observasi Bibit Anggrek Kuno di Greenhouse",
+                    "story_summary": "Sylvie merawat tunas anggrek langka dari pegunungan kuno di greenhouse botani kampus, mengamati pertumbuhan helai daun pertamanya dengan penuh kasih sayang.",
+                    "mood": "Damai, anggun, & penuh takjub",
+                    "key_activity": "Menyiram dan mencatat pertumbuhan tunas anggrek langka di rumah kaca botani",
+                    "photo_suggestion": "botanical greenhouse, lush exotic flowers, watering can, delicate emerald tunic dress, long golden hair, pointy elf ears",
+                    "danbooru_tags": "greenhouse, lush plants, exotic flowers, watering can, pointy elf ears, emerald pendant, gentle smile"
+                },
+                {
+                    "day_theme": "Mempelajari Naskah Herbal di Perpustakaan",
+                    "story_summary": "Membaca herbarium kuno berdebu di sudut tenang lantai atas perpustakaan kampus untuk mencari formula pupuk organik alami bagi tanaman langka.",
+                    "mood": "Hening, tekun, & tenang",
+                    "key_activity": "Mempelajari manuskrip botani kuno di bawah cahaya lampu meja perpustakaan",
+                    "photo_suggestion": "quiet library corner, antique books, wooden desk, soft warm lamp light, pointy elf ears, thoughtful gentle expression",
+                    "danbooru_tags": "library desk, old books, botanical sketches, soft lamp light, pointy elf ears, braided hair"
+                },
+                {
+                    "day_theme": "Ekskursi Sketsa Flora di Taman Botani",
+                    "story_summary": "Berjalan santai di taman botani kampus sambil menggambar sketsa kelopak bunga dan pola serat daun di buku catatan botani pribadinya.",
+                    "mood": "Segar, terinspirasi, & bersyukur",
+                    "key_activity": "Duduk di bangku taman botani membuat sketsa tanaman dengan pensil",
+                    "photo_suggestion": "botanical garden, wooden park bench, sketchbook in lap, blooming garden background, dappled sunlight, pointy elf ears",
+                    "danbooru_tags": "botanical garden, sketchbook, pencil, blooming flowers, pointy elf ears, soft breeze"
+                },
+                {
+                    "day_theme": "Mekar Perdana Bunga Anggrek Kuno",
+                    "story_summary": "Kuncup bunga anggrek kuno yang dirawat Sylvie akhirnya mekar sempurna dengan kilau lembut dan aroma wangi menyejukkan yang memenuhi greenhouse.",
+                    "mood": "Terpukau, bahagia, & berseri-seri",
+                    "key_activity": "Mengagumi kelopak bunga bercahaya lembut di hadapannya sambil tersenyum haru",
+                    "photo_suggestion": "greenhouse, glowing rare blossom, close-up tender smile, emerald eyes sparkling, pointy elf ears, magical botanical ambiance",
+                    "danbooru_tags": "glowing exotic flower, greenhouse, delicate smile, pointy elf ears, emerald eyes, soft lighting"
+                },
+                {
+                    "day_theme": "Meracik Teh Herbal Bunga & Menikmati Senja",
+                    "story_summary": "Sylvie menyeduh teh herbal spesial dari kelopak bunga kering aromatik untuk diminum bersama pasangannya sambil menikmati matahari terbenam yang damai.",
+                    "mood": "Hangat, romantis, & menyejukkan",
+                    "key_activity": "Menyeduh teh herbal hangat di cangkir kaca sambil menikmati angin senja",
+                    "photo_suggestion": "outdoor veranda at sunset, glass tea cup with herbal steam, golden hour lighting, peaceful loving smile, pointy elf ears",
+                    "danbooru_tags": "veranda, warm tea cup, sunset golden hour, peaceful smile, pointy elf ears, emerald tunic"
+                }
+            ]
+        }
     ]
 }
 
@@ -405,12 +499,81 @@ class StoryEngine:
     def _save_unlocked(self):
         _atomic_write_json(self.data_file, self.storylines)
 
+    def _get_or_create_persona_arcs(self, persona_key: str) -> List[Dict[str, Any]]:
+        p_key = persona_key.lower().strip()
+        if p_key in CURATED_PERSONA_ARCS:
+            return CURATED_PERSONA_ARCS[p_key]
+
+        # Try to dynamically generate 5-day arc from personas/{p_key}.json
+        try:
+            personas_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "personas")
+            p_path = os.path.join(personas_dir, f"{p_key}.json")
+            if os.path.exists(p_path):
+                with open(p_path, "r", encoding="utf-8") as f:
+                    p_info = json.load(f)
+                name = p_info.get("name", p_key.capitalize())
+                role = p_info.get("role", "Mahasiswi Kampus")
+                arch = p_info.get("archetype", "Teman Cerita")
+                desc = p_info.get("description", "Aktivitas harian")
+
+                custom_arc = [
+                    {
+                        "arc_title": f"Keseharian & Proyek {name}",
+                        "episodes": [
+                            {
+                                "day_theme": f"Aktivitas Pagi & Persiapan Proyek {name}",
+                                "story_summary": f"{name} memulai harinya dengan semangat mempersiapkan aktivitas dan materi kuliah {role}.",
+                                "mood": "Semangat & ceria",
+                                "key_activity": f"Mempersiapkan materi dan tugas {role} di kampus",
+                                "photo_suggestion": f"standing on campus pathway, cheerful expression, holding study materials, {name} aesthetic",
+                                "danbooru_tags": f"campus, student, study materials, sweet smile, outdoor daylight"
+                            },
+                            {
+                                "day_theme": f"Eksplorasi Ide & Studi di Perpustakaan",
+                                "story_summary": f"{name} menghabiskan waktu di perpustakaan kampus mencari referensi mendalam terkait minatnya.",
+                                "mood": "Fokus & tenang",
+                                "key_activity": f"Membaca buku referensi di sudut tenang perpustakaan kampus",
+                                "photo_suggestion": f"library study table, open books, soft lamp light, focused gentle smile",
+                                "danbooru_tags": f"library, open book, desk, soft lighting, quiet smile"
+                            },
+                            {
+                                "day_theme": f"Kolaborasi Kampus & Diskusi Seru",
+                                "story_summary": f"{name} berdiskusi santai dengan rekan sekelompoknya di kafe kampus membicarakan ide kreatif.",
+                                "mood": "Antusias & hangat",
+                                "key_activity": f"Diskusi santai di kafe kampus sambil menikmati minuman favorit",
+                                "photo_suggestion": f"cafe table, holding warm drink, lively bokeh background, happy expression",
+                                "danbooru_tags": f"cafe, warm beverage, pleasant bokeh, friendly smile"
+                            },
+                            {
+                                "day_theme": f"Penyelesaian Tugas & Hasil Memuaskan",
+                                "story_summary": f"Tugas dan proyek yang dikerjakan {name} akhirnya selesai dengan sangat baik dan rapi.",
+                                "mood": "Lega & bangga",
+                                "key_activity": f"Menyelesaikan draf akhir proyeknya dengan senyum puas",
+                                "photo_suggestion": f"cozy desk, finished notebook, bright proud smile, warm indoor lighting",
+                                "danbooru_tags": f"study desk, happy expression, gentle pride, cozy room"
+                            },
+                            {
+                                "day_theme": f"Santai Sore Merayakan Hari Bersama",
+                                "story_summary": f"{name} merayakan selesainya pekan yang produktif dengan jalan santai sore dan berbagi cerita manis.",
+                                "mood": "Manis, rileks, & penuh cinta",
+                                "key_activity": f"Jalan-jalan sore menikmati udara segar dan mengobrol santai",
+                                "photo_suggestion": f"park pathway at dusk, golden hour lighting, sweet affectionate smile, relaxed posture",
+                                "danbooru_tags": f"park, dusk, golden hour, gentle breeze, affectionate expression"
+                            }
+                        ]
+                    }
+                ]
+                CURATED_PERSONA_ARCS[p_key] = custom_arc
+                return custom_arc
+        except Exception as e:
+            logger.debug(f"Error building dynamic arc for {p_key}: {e}")
+
+        return CURATED_PERSONA_ARCS["runa"]
+
     def _seed_persona_timeline(self, persona_key: str, start_date: Optional[datetime] = None):
         """Fills 5 days starting from today with the first curated arc for this persona."""
         p_key = persona_key.lower().strip()
-        arcs = CURATED_PERSONA_ARCS.get(p_key)
-        if not arcs:
-            arcs = CURATED_PERSONA_ARCS["runa"]
+        arcs = self._get_or_create_persona_arcs(p_key)
 
         base_date = start_date or datetime.now()
         chosen_arc = arcs[0]
@@ -472,7 +635,7 @@ class StoryEngine:
     def _extend_schedule_unlocked(self, persona_key: str, days_ahead: int = 5):
         """Extends timeline forward continuously so there is always a story without gaps."""
         p_key = persona_key.lower().strip()
-        arcs = CURATED_PERSONA_ARCS.get(p_key, CURATED_PERSONA_ARCS["runa"])
+        arcs = self._get_or_create_persona_arcs(p_key)
         p_data = self.storylines.setdefault(p_key, {
             "current_arc_title": arcs[0]["arc_title"],
             "current_arc_index": 0,

@@ -28,7 +28,14 @@ def _atomic_write_json(file_path: str, data: Any):
                 os.fsync(f.fileno())
             except Exception:
                 pass
-        os.replace(temp_file, file_path)
+        for attempt in range(5):
+            try:
+                os.replace(temp_file, file_path)
+                break
+            except (PermissionError, OSError) as pe:
+                if attempt == 4:
+                    raise pe
+                time.sleep(0.05 * (attempt + 1))
     except Exception as e:
         if os.path.exists(temp_file):
             try:
@@ -378,21 +385,32 @@ class MemoryEngine:
                         prof[k] = str(v).strip()
             self._save_data_unlocked()
 
+    def _mem_key(self, user_id: int, persona_key: Optional[str] = None) -> str:
+        """Returns isolated composite storage key for (user_id, persona_key)."""
+        s_uid = str(user_id)
+        if persona_key:
+            return f"{s_uid}:{persona_key.lower().strip()}"
+        return s_uid
+
     # --- Facts & Knowledge Management ---
 
-    def get_facts(self, user_id: int) -> List[Dict[str, Any]]:
+    def get_facts(self, user_id: int, persona_key: Optional[str] = None) -> List[Dict[str, Any]]:
         with self.lock:
-            s_uid = str(user_id)
-            return list(self.data.setdefault("facts", {}).setdefault(s_uid, []))
+            k = self._mem_key(user_id, persona_key)
+            if k in self.data.setdefault("facts", {}):
+                return list(self.data["facts"][k])
+            if persona_key:
+                return []
+            return list(self.data.setdefault("facts", {}).setdefault(str(user_id), []))
 
-    def add_fact(self, user_id: int, fact: str, category: str = "general") -> Optional[Dict[str, Any]]:
+    def add_fact(self, user_id: int, fact: str, category: str = "general", persona_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
         clean_fact = fact.strip().rstrip(".!~")
         if not clean_fact or len(clean_fact) < 3:
             return None
 
         with self.lock:
-            s_uid = str(user_id)
-            facts = self.data.setdefault("facts", {}).setdefault(s_uid, [])
+            k = self._mem_key(user_id, persona_key)
+            facts = self.data.setdefault("facts", {}).setdefault(k, [])
 
             # Avoid exact or very close duplicates
             for item in facts:
@@ -411,10 +429,10 @@ class MemoryEngine:
             self._save_data_unlocked()
             return new_item
 
-    def delete_fact(self, user_id: int, fact_id: int) -> bool:
+    def delete_fact(self, user_id: int, fact_id: int, persona_key: Optional[str] = None) -> bool:
         with self.lock:
-            s_uid = str(user_id)
-            facts = self.data.setdefault("facts", {}).setdefault(s_uid, [])
+            k = self._mem_key(user_id, persona_key)
+            facts = self.data.setdefault("facts", {}).setdefault(k, [])
             for i, item in enumerate(facts):
                 if item.get("id") == fact_id:
                     facts.pop(i)
@@ -424,10 +442,16 @@ class MemoryEngine:
                     return True
             return False
 
-    def clear_facts(self, user_id: int):
+    def clear_facts(self, user_id: int, persona_key: Optional[str] = None):
         with self.lock:
-            s_uid = str(user_id)
-            self.data.setdefault("facts", {})[s_uid] = []
+            k = self._mem_key(user_id, persona_key)
+            self.data.setdefault("facts", {})[k] = []
+            if not persona_key:
+                s_uid = str(user_id)
+                self.data.setdefault("facts", {})[s_uid] = []
+                for ex_k in list(self.data.get("facts", {}).keys()):
+                    if ex_k.startswith(f"{s_uid}:"):
+                        self.data["facts"][ex_k] = []
             self._save_data_unlocked()
 
     # --- Vector & Semantic Similarity Search ---
@@ -437,7 +461,8 @@ class MemoryEngine:
         user_id: int,
         query: str,
         top_k: int = 5,
-        threshold: float = 0.08
+        threshold: float = 0.08,
+        persona_key: Optional[str] = None
     ) -> List[Tuple[Dict[str, Any], float]]:
         """
         Performs semantic vector similarity search against all stored facts for the user.
@@ -451,7 +476,7 @@ class MemoryEngine:
         if not query_vec:
             return []
 
-        all_facts = self.get_facts(user_id)
+        all_facts = self.get_facts(user_id, persona_key=persona_key)
         if not all_facts:
             return []
 
@@ -542,14 +567,20 @@ class MemoryEngine:
 
     # --- Context Injection for LLM ---
 
-    def format_memory_context(self, user_id: int, query: Optional[str] = None, max_facts: int = 8) -> str:
+    def format_memory_context(
+        self,
+        user_id: int,
+        query: Optional[str] = None,
+        max_facts: int = 8,
+        persona_key: Optional[str] = None
+    ) -> str:
         """
         Constructs a concise, highly relevant prompt segment for system instruction.
         Uses semantic vector similarity to retrieve the most relevant facts if query is provided,
         blending relevant facts with recent facts so context is both topic-accurate and fresh.
         """
         prof = self.get_profile(user_id)
-        all_facts = self.get_facts(user_id)
+        all_facts = self.get_facts(user_id, persona_key=persona_key)
         lines = []
 
         if prof.get("name"):
@@ -567,7 +598,7 @@ class MemoryEngine:
 
         if query and all_facts:
             # 1. Retrieve semantically relevant facts via vector search
-            relevant_matches = self.search_facts(user_id, query, top_k=max_facts // 2 + 1)
+            relevant_matches = self.search_facts(user_id, query, top_k=max_facts // 2 + 1, persona_key=persona_key)
             for fact_item, _ in relevant_matches:
                 if fact_item["id"] not in selected_ids:
                     selected_facts.append(fact_item)
@@ -610,7 +641,13 @@ class MemoryEngine:
 
     # --- Automatic Memory Learning ---
 
-    def auto_extract_facts(self, user_text: str, user_id: int, history: Optional[List[Dict[str, Any]]] = None) -> List[str]:
+    def auto_extract_facts(
+        self,
+        user_text: str,
+        user_id: int,
+        history: Optional[List[Dict[str, Any]]] = None,
+        persona_key: Optional[str] = None
+    ) -> List[str]:
         """
         Analyzes user message for personal facts (likes, dislikes, allergies, routines,
         relationships, job, location, goals) and saves them automatically into vector memory.
@@ -678,7 +715,7 @@ class MemoryEngine:
                 # Proper title casing for name (e.g. "adens" -> "Adens")
                 formatted_name = " ".join(w[0].upper() + w[1:] if len(w) > 1 else w.upper() for w in detected_name.split())
                 self.update_profile(user_id, name=formatted_name, call_name=formatted_name)
-                self.add_fact(user_id, f"Nama: {formatted_name}", category="identity")
+                self.add_fact(user_id, f"Nama: {formatted_name}", category="identity", persona_key=persona_key)
                 learned.append(f"Nama: {formatted_name}")
 
         # 2. Favorite / Likes
@@ -692,7 +729,7 @@ class MemoryEngine:
             if m:
                 raw_fact = m.group(1).strip().rstrip(".!~")
                 if len(raw_fact) >= 3 and not raw_fact.startswith("kamu") and not raw_fact.startswith("apa"):
-                    f = self.add_fact(user_id, f"Suka {raw_fact}", category="likes")
+                    f = self.add_fact(user_id, f"Suka {raw_fact}", category="likes", persona_key=persona_key)
                     if f:
                         learned.append(f["fact"])
 
@@ -709,7 +746,7 @@ class MemoryEngine:
                 if len(raw_dislike) >= 3 and not raw_dislike.startswith("kamu"):
                     cat = "allergies" if ("alergi" in lower or "allergic" in lower) else "dislikes"
                     prefix = "Alergi" if cat == "allergies" else "Tidak suka"
-                    f = self.add_fact(user_id, f"{prefix} {raw_dislike}", category=cat)
+                    f = self.add_fact(user_id, f"{prefix} {raw_dislike}", category=cat, persona_key=persona_key)
                     if f:
                         learned.append(f["fact"])
 
@@ -727,7 +764,7 @@ class MemoryEngine:
                 raw_work = re.split(r"\s+(?:dan|tapi|sambil|namun|and)\s+", raw_work, flags=re.IGNORECASE)[0].strip()
                 if len(raw_work) >= 3:
                     self.update_profile(user_id, job=raw_work)
-                    f = self.add_fact(user_id, f"Bekerja/Studi: {raw_work}", category="work")
+                    f = self.add_fact(user_id, f"Bekerja/Studi: {raw_work}", category="work", persona_key=persona_key)
                     if f:
                         learned.append(f["fact"])
 
@@ -743,7 +780,7 @@ class MemoryEngine:
                 raw_loc = re.split(r"\s+(?:dan|tapi|sambil|namun|and)\s+", raw_loc, flags=re.IGNORECASE)[0].strip()
                 if len(raw_loc) >= 3:
                     self.update_profile(user_id, location=raw_loc.title())
-                    f = self.add_fact(user_id, f"Tinggal di {raw_loc.title()}", category="location")
+                    f = self.add_fact(user_id, f"Tinggal di {raw_loc.title()}", category="location", persona_key=persona_key)
                     if f:
                         learned.append(f["fact"])
 
@@ -757,7 +794,7 @@ class MemoryEngine:
             if m:
                 raw_pet = m.group(1).strip().rstrip(".!~")
                 if any(k in raw_pet for k in ("kucing", "anjing", "kelinci", "hamster", "burung", "ikan", "cat", "dog", "pet")):
-                    f = self.add_fact(user_id, f"Punya hewan peliharaan: {raw_pet}", category="pet")
+                    f = self.add_fact(user_id, f"Punya hewan peliharaan: {raw_pet}", category="pet", persona_key=persona_key)
                     if f:
                         learned.append(f["fact"])
 
@@ -771,7 +808,7 @@ class MemoryEngine:
             if m:
                 raw_rout = m.group(1).strip().rstrip(".!~")
                 if len(raw_rout) >= 3:
-                    f = self.add_fact(user_id, f"Kebiasaan: {raw_rout}", category="routine")
+                    f = self.add_fact(user_id, f"Kebiasaan: {raw_rout}", category="routine", persona_key=persona_key)
                     if f:
                         learned.append(f["fact"])
 
