@@ -27,12 +27,21 @@ ASSET_REGISTRY = {
         "name": "Qwen2.5-7B-Instruct-Abliterated (Natural Indonesian & Roleplay LLM)",
         "type": "llm_model",
         "filename": "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf",
-        "patterns": ["*Qwen2.5*7B*abliterated*.gguf", "*Qwen2.5-7B-Instruct-abliterated*.gguf", "*Qwen2.5*7B*.gguf", "*qwen2.5-7b*.gguf"],
+        "patterns": [
+            "*Qwen2.5*7B*abliterated*.gguf",
+            "*Qwen2.5*7B*abliterated-v2*.gguf",
+            "*Qwen2.5-7B-Instruct-abliterated*.gguf",
+            "Qwen2.5-7B-Instruct-abliterated-v2.Q4_K_M.gguf",
+            "*Qwen2.5*7B*.gguf",
+            "*qwen2.5-7b*.gguf"
+        ],
         "size_mb": 4466,
         "url": "https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf",
         "fallback_url": "https://hf-mirror.com/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf",
         "mirrors": [
             "https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf",
+            "https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-abliterated-v2-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated-v2.Q4_K_M.gguf",
+            "https://huggingface.co/QuantFactory/Qwen2.5-7B-Instruct-abliterated-v2-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated-v2.Q4_K_M.gguf",
             "https://hf-mirror.com/mradermacher/Qwen2.5-7B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
         ],
         "description": "Model chat/roleplay terbaik untuk Bahasa Indonesia (Qwen 2.5 7B abliterated uncensored, tata bahasa alami, tanpa delay thinking).",

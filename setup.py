@@ -470,6 +470,9 @@ def config_llm_model(env_vars):
         has_stheno = any("stheno" in mname.lower() for _, mname, _ in detected_llms)
         if not has_stheno:
             options.append(("L3-8B-Stheno-v3.4 (Uncensored RP • Download & Auto-select)", "download_stheno", "kobold", "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"))
+        has_qwen = any("qwen" in mname.lower() for _, mname, _ in detected_llms)
+        if not has_qwen:
+            options.append(("Qwen2.5-7B-Instruct-Abliterated (Natural Indonesian & Uncensored • Download & Auto-select)", "download_qwen", "kobold", "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"))
         has_nemo = any("nemo" in mname.lower() or "mistral" in mname.lower() for _, mname, _ in detected_llms)
         if not has_nemo:
             options.append(("Mistral-NeMo-12B-Instruct (128k Context RP • Download & Auto-select)", "download_nemo", "kobold", "Mistral-Nemo-12B-Instruct-v0.4.Q4_K_M.gguf"))
@@ -512,6 +515,19 @@ def config_llm_model(env_vars):
             env_vars["LOCAL_LLM_MODEL"] = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
             env_vars["NSFW_LLM_MODEL"] = "Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf"
             print(c(GREEN, "  ✓ Model aktif disetel ke: L3-8B-Stheno-v3.4"))
+        elif options[chosen_idx][1] == "download_qwen":
+            print(c(CYAN, "\n⏳ Downloading Qwen2.5-7B-Instruct-Abliterated (~4.7 GB)..."))
+            ok = asset_manager.download_asset("qwen25_7b") if asset_manager else False
+            if ok:
+                print(c(GREEN, "  ✓ Model successfully downloaded and verified!"))
+            else:
+                print(c(YELLOW, "  ⚠️ Auto-download failed. Please check internet connection."))
+            env_vars["LLM_BASE_URL"] = "http://127.0.0.1:5001/v1"
+            env_vars["LLM_API_KEY"] = "kobold"
+            env_vars["LLM_MODEL"] = "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+            env_vars["LOCAL_LLM_MODEL"] = "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+            env_vars["NSFW_LLM_MODEL"] = "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+            print(c(GREEN, "  ✓ Active model set to: Qwen2.5-7B-Instruct-Abliterated"))
         elif options[chosen_idx][1] == "download_nemo":
             print(c(CYAN, "\n⏳ Downloading Mistral-NeMo-12B-Instruct (~7.5 GB)..."))
             ok = asset_manager.download_asset("mistral_nemo_12b") if asset_manager else False

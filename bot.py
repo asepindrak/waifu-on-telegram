@@ -846,6 +846,10 @@ def apply_llm_choice(choice: str) -> str:
     elif choice in ("qwen", "qwen25", "qwen2.5", "qwen25_7b"):
         new_base = "http://127.0.0.1:5001/v1"
         new_model = "Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf"
+        for _, mname, _ in detected_llms:
+            if "qwen" in mname.lower() and "abliterated" in mname.lower():
+                new_model = mname
+                break
         label = "Qwen2.5-7B-Instruct-Abliterated (KoboldCPP)"
         update_env_variable("LOCAL_LLM_MODEL", new_model)
         update_env_variable("NSFW_LLM_MODEL", new_model)
@@ -2699,6 +2703,9 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
         has_huihui_split = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
         if not has_huihui_split:
             markup.add(types.InlineKeyboardButton("📥 Download & Select Huihui-Qwythos 9B (~5.5 GB • 100% Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
+        has_qwen_split = any("qwen" in mname.lower() for _, mname, _ in detected)
+        if not has_qwen_split:
+            markup.add(types.InlineKeyboardButton("📥 Download & Select Qwen2.5-7B (~4.7 GB • Natural ID & Uncensored)", callback_data="cfg_set_llm:qwen_auto"))
         has_nemo_split = any("nemo" in mname.lower() or "mistral" in mname.lower() for _, mname, _ in detected)
         if not has_nemo_split:
             markup.add(types.InlineKeyboardButton("📥 Download & Select Mistral-NeMo 12B (~7.5 GB • 128k Context)", callback_data="cfg_set_llm:mistral_nemo_auto"))
@@ -2712,6 +2719,9 @@ def show_llm_menu(chat_id: int, user_id: int, message_to_edit: Optional[int] = N
         has_huihui = any("huihui" in mname.lower() or "qwythos" in mname.lower() for _, mname, _ in detected)
         if not has_huihui:
             markup.add(types.InlineKeyboardButton("📥 Download & Select Huihui-Qwythos 9B (~5.5 GB • Default Uncensored)", callback_data="cfg_set_llm:huihui_auto"))
+        has_qwen = any("qwen" in mname.lower() for _, mname, _ in detected)
+        if not has_qwen:
+            markup.add(types.InlineKeyboardButton("📥 Download & Select Qwen2.5-7B (~4.7 GB • Natural ID & Uncensored)", callback_data="cfg_set_llm:qwen_auto"))
         has_nemo = any("nemo" in mname.lower() or "mistral" in mname.lower() for _, mname, _ in detected)
         if not has_nemo:
             markup.add(types.InlineKeyboardButton("📥 Download & Select Mistral-NeMo 12B (~7.5 GB • 128k Context)", callback_data="cfg_set_llm:mistral_nemo_auto"))
