@@ -3149,6 +3149,30 @@ def handle_status(message):
     bot.reply_to(message, report, reply_markup=markup, parse_mode="Markdown")
 
 
+@bot.message_handler(commands=['cuaca', 'weather'])
+def handle_cuaca_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    with ChatActionLoop(bot, message.chat.id, "typing"):
+        from weather_engine import weather_engine
+        w = weather_engine.get_weather_for_user(user_id=message.from_user.id)
+        cond_icon = "🌧️" if w.get("is_rain") else ("⛈️" if w.get("is_thunderstorm") else ("☁️" if w.get("is_cloudy") else "☀️"))
+        reply_msg = (
+            f"🌦️ **Laporan Cuaca Realtime** {cond_icon}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📍 **Wilayah / Kota** : `{w.get('city')}`\n"
+            f"🌡️ **Suhu Udara**     : `{w.get('temperature'):.1f}°C`\n"
+            f"💧 **Kelembapan**     : `{w.get('humidity')}%`\n"
+            f"☁️ **Tutupan Awan**   : `{w.get('cloud_cover')}%`\n"
+            f"🌧️ **Status Hujan**   : `{'Hujan Aktif' if w.get('is_rain') else 'Tidak Hujan'}`\n"
+            f"🌤️ **Kondisi**        : **{w.get('condition_id')}** ({w.get('condition_en')})\n\n"
+            f"📸 **Pengaruh ke Foto AI**:\n"
+            f"• Suasana: _{w.get('pos_prompt_indoor')}_\n\n"
+            f"💡 _Tip: Pencahayaan foto AI dan topik obrolan waifu otomatis sinkron dengan cuaca asli di kotamu._"
+        )
+        bot.reply_to(message, reply_msg, parse_mode="Markdown")
+
+
 @bot.message_handler(commands=['servers', 'preview', 'ports'])
 def handle_servers_command(message):
     if not is_authorized(message.from_user.id):
@@ -7814,6 +7838,15 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text)
                 if mem_context:
                     system_inst += "\n" + mem_context
+
+                # Realtime live weather context injection
+                try:
+                    from weather_engine import weather_engine
+                    weather_ctx = weather_engine.get_conversation_context(user_id=message.from_user.id)
+                    if weather_ctx:
+                        system_inst += f"\n{weather_ctx}"
+                except Exception as e_w:
+                    logger.debug(f"Live weather context skipped: {e_w}")
 
                 # Inject active project awareness ONLY when user asks about coding/project/workspace
                 if not is_nsfw_turn and long_form_req:

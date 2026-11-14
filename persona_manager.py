@@ -2156,12 +2156,13 @@ class PersonaManager:
     def get_realtime_lighting_and_atmosphere(
         self,
         user_text: str = "",
-        scene_desc: str = ""
+        scene_desc: str = "",
+        user_id: Optional[int] = None
     ) -> Tuple[str, str]:
         """
-        Synchronizes photo lighting and ambient atmosphere with real-world local time.
-        Ensures night photos don't generate daylight, and daytime photos look naturally lit.
-        Explicit user lighting requests override real-time defaults.
+        Synchronizes photo lighting and ambient atmosphere with real-world local time and live weather.
+        Ensures night photos don't generate daylight, and live weather (rain, clouds, sun) is naturally reflected.
+        Explicit user lighting/weather requests override real-time defaults.
         Returns: (positive_lighting_prompt, negative_lighting_prompt)
         """
         lower = (user_text or "").lower()
@@ -2189,25 +2190,38 @@ class PersonaManager:
             else:
                 pos = "(night:1.35), (nighttime:1.35), dark night sky, atmospheric street lamps, soft night illumination, gentle night shadows"
                 neg = "(day:1.5), (daytime:1.5), (bright daylight:1.5), (sunlight:1.5), (sunshine:1.5), (bright sun:1.5), sunny sky, clear blue sky, midday sun"
-            return (pos, neg)
 
         elif has_morning or (not (has_day or has_night or has_sunset) and (5 <= cur_hour < 9)):
             # Early morning (05:00 - 08:59)
             pos = "soft early morning sunrise light, gentle dawn glow, fresh morning ambience"
             neg = "(pitch black night:1.4), dark night sky, harsh night shadows"
-            return (pos, neg)
 
         elif has_sunset or (not (has_day or has_night or has_morning) and (17 <= cur_hour < 20)):
             # Sunset / Senja / Sore (17:00 - 19:59)
             pos = "golden hour sunset glow, warm orange twilight lighting, beautiful evening ambience"
             neg = "(harsh midday sun:1.4), (pitch black night:1.4)"
-            return (pos, neg)
 
         else:
             # Daytime (09:00 - 16:59)
             pos = "clear natural daylight, bright daytime lighting"
             neg = "(nighttime:1.4), (night:1.4), dark night sky, pitch black, night street lamps"
-            return (pos, neg)
+
+        # Synchronize with live realtime weather (Open-Meteo) if available
+        try:
+            from weather_engine import weather_engine
+            w_pos, w_neg = weather_engine.get_photo_weather_atmosphere(
+                user_text=user_text,
+                user_id=user_id,
+                is_indoor=is_indoor
+            )
+            if w_pos:
+                pos = f"{pos}, {w_pos}" if pos else w_pos
+            if w_neg:
+                neg = f"{neg}, {w_neg}" if neg else w_neg
+        except Exception as e_w:
+            logger.debug(f"Live weather atmosphere injection skipped: {e_w}")
+
+        return (pos, neg)
 
     def craft_visual_prompt_full(
         self,
@@ -2324,8 +2338,8 @@ class PersonaManager:
             anti_censor = "censored, mosaic, mosaic censor, bar censor, panties, underwear"
             extra_neg = f"{extra_neg}, {anti_censor}" if extra_neg else anti_censor
 
-        # Synchronize photo lighting and atmosphere with real-world local time
-        lighting_pos, lighting_neg = self.get_realtime_lighting_and_atmosphere(user_text, scene)
+        # Synchronize photo lighting and atmosphere with real-world local time & live weather
+        lighting_pos, lighting_neg = self.get_realtime_lighting_and_atmosphere(user_text, scene, user_id=user_id)
         if lighting_neg:
             extra_neg = f"{extra_neg}, {lighting_neg}" if extra_neg else lighting_neg
             if "(bright daylight:1.5)" in lighting_neg:
