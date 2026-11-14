@@ -23,15 +23,23 @@
 
 ## 🌸 Waifu Personas & Character Gallery
 
-Switch your companion anytime with `/persona` or through interactive Telegram buttons:
+Switch your companion anytime with `/persona <name>` or through interactive Telegram buttons:
 
-| **Runa** | **Akira** | **Hina** | **Shiro** | **Yume** |
-| :---: | :---: | :---: | :---: | :---: |
-| <img src="personas/brief/Runa.png" width="150" alt="Runa"/> | <img src="personas/brief/Akira.jpg" width="150" alt="Akira"/> | <img src="personas/brief/Hina.jpg" width="150" alt="Hina"/> | <img src="personas/brief/Shiro.png" width="150" alt="Shiro"/> | <img src="personas/brief/Yume.jpg" width="150" alt="Yume"/> |
-| **The Playful Girlfriend** | **The Seductive Tease** | **The Sunshine Girlfriend** | **The Kuudere Girlfriend** | **The Dreamy Soulmate** |
-| *Playful, teasing, kawaii gaming aesthetic* | *Confident, witty, elegant gothic aesthetic* | *Energetic, bubbly, cozy slice-of-life* | *Calm, intelligent, cool-blue moonlit* | *Gentle, soft-spoken, dreamy starry soulmate* |
-| **Visual Anchors:**<br>Pastel-pink wavy hair, sparkling magenta eyes, heart choker, black cat clip | **Visual Anchors:**<br>Silky midnight-black hair, deep ruby-red eyes, crimson rose clip, black choker | **Visual Anchors:**<br>Honey-blonde chin bob, warm amber eyes, orange clips, headphones | **Visual Anchors:**<br>Long silver-white hair, icy-blue eyes, crescent moon clip & earrings | **Visual Anchors:**<br>Long silky lavender hair, amethyst violet eyes, silver star pins & moon necklace |
-| `/persona runa` | `/persona akira` | `/persona hina` | `/persona shiro` | `/persona yume` |
+| **Runa** | **Akira** | **Hina** | **Shiro** |
+| :---: | :---: | :---: | :---: |
+| <img src="personas/brief/Runa.png" width="150" alt="Runa"/> | <img src="personas/brief/Akira.jpg" width="150" alt="Akira"/> | <img src="personas/brief/Hina.jpg" width="150" alt="Hina"/> | <img src="personas/brief/Shiro.png" width="150" alt="Shiro"/> |
+| **The Playful Girlfriend** | **The Seductive Tease** | **The Sunshine Girlfriend** | **The Kuudere Girlfriend** |
+| *Playful, teasing, kawaii gamer aesthetic* | *Confident, witty, elegant gothic aesthetic* | *Energetic, bubbly, cozy slice-of-life* | *Calm, intelligent, cool-blue moonlit* |
+| **Visual Anchors:**<br>Pastel-pink wavy hair, magenta eyes, heart choker, cat clip | **Visual Anchors:**<br>Midnight-black hair, ruby-red eyes, crimson rose clip, black choker | **Visual Anchors:**<br>Honey-blonde bob, warm amber eyes, orange clips, headphones | **Visual Anchors:**<br>Long silver-white hair, icy-blue eyes, crescent moon clip & earrings |
+| `/persona runa` | `/persona akira` | `/persona hina` | `/persona shiro` |
+
+| **Yume** | **Sylvie** | **Mimi** | **Alia** |
+| :---: | :---: | :---: | :---: |
+| <img src="personas/brief/Yume.jpg" width="150" alt="Yume"/> | <img src="personas/brief/Sylvie.png" width="150" alt="Sylvie"/> | <img src="personas/brief/Mimi.png" width="150" alt="Mimi"/> | <img src="personas/brief/Alia.png" width="150" alt="Alia"/> |
+| **The Dreamy Soulmate** | **The High-Elf Botanist** | **The Playful Nekomimi** | **The Russian Tsundere** |
+| *Gentle, soft-spoken, dreamy starry soulmate* | *Graceful, loyal, ancient botany researcher* | *Affectionate, mischievous catgirl companion* | *Elegant class president, hides feelings in Russian* |
+| **Visual Anchors:**<br>Silky lavender hair, amethyst violet eyes, star pins & moon necklace | **Visual Anchors:**<br>Platinum-blonde hair, pointed elf ears, emerald eyes, emerald-gold tunic | **Visual Anchors:**<br>Fluffy cat ears, cat tail, hazel eyes, cat-paw knit sweater | **Visual Anchors:**<br>Silver-white hair, icy-blue eyes, twin side braids with red ribbons, school uniform |
+| `/persona yume` | `/persona sylvie` | `/persona mimi` | `/persona alia` |
 
 ---
 
@@ -40,150 +48,103 @@ Switch your companion anytime with `/persona` or through interactive Telegram bu
 To ensure photos generated via ComfyUI (`/photo` or `/pap`) accurately match the chosen character:
 
 1. **Visual Anchor Prompting:**  
-   Each persona file in `personas/<name>.json` contains strictly defined, invariant facial and accessory tokens (`visual_traits`). These are automatically prefixed to every user prompt.
+   Each persona configuration in `personas/<name>.json` defines invariant facial and accessory tokens (`visual_traits`). These are automatically prefixed to every user photo request.
 2. **Character-Specific Negative Prompts:**  
-   Each waifu has custom negative prompt rules to strictly forbid conflicting traits (e.g. Runa forbids blonde/blue eyes, Hina forbids long/black hair).
+   Each waifu has custom negative prompt rules to strictly forbid conflicting traits (e.g., Runa forbids blonde/blue eyes, Hina forbids long/black hair).
 3. **Dynamic Wardrobe Injection:**  
-   When changing clothes via `/outfit`, the bot swaps only the garment prompt while strictly preserving the character's facial structure, hair color, and signature accessories.
+   When changing clothes via `/outfit`, the bot swaps only the garment tokens while strictly preserving the character's facial structure, hair color, and signature accessories.
 4. **Reference Image Guidance (IP-Adapter Ready):**  
-   The reference images in `personas/brief/` serve as the golden standard for LoRA training and IP-Adapter image conditioning within ComfyUI.
+   The reference portraits in `personas/brief/` serve as the golden standard for LoRA training and IP-Adapter image conditioning within ComfyUI.
 
 ---
 
-## 🦾 Proteksi Anatomi Anggota Tubuh & Anti-Amputasi Tangan (v2.4.54)
+## 🦾 Full Body Anatomy Protection & Anti-Amputation Guard
 
-Pembaruan v2.4.54 menuntaskan masalah hilangnya lengan/tangan (*missing arm / amputation*) pada pose santai, miring, atau rebahan:
-* **🛡️ Negative Prompt Guard Lengkap:** Menambahkan filter berbobot tinggi `(missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (disappearing arm:1.4), (floating arms:1.4), (bad arms:1.4)` di seluruh generator gambar (ComfyUI & AGY) serta seluruh profil persona.
-* **✨ Positive Anatomy Anchors:** Menginjeksi token struktural `(proper anime anatomy:1.2), (complete body:1.1), (two arms:1.1)` agar kedua lengan digambar utuh, simetris, dan terposisikan secara natural (*arms naturally positioned*) bahkan saat pose menyamping (*three-quarter angle*) atau santai di sofa.
-
----
-
-## 🧝 Persona Baru Sylvie & Mimi, Custom Persona Wizard & Persistensi Pakaian Dalam Canon (v2.4.53)
-
-Pembaruan v2.4.53 menghadirkan dua karakter kanon baru, fitur pembuatan persona penuh kustom (*Interactive Persona Builder*), serta konsistensi visual mendalam:
-
-* **🧝 Persona Kanon Baru (Sylvie & Mimi):**
-  - **Sylvie (シルヴィ)**: The High-Elf Girlfriend & Mahasiswi Botani Kuno berpenampilan 22 tahun. Dilengkapi dengan telinga elf runcing alami, rambut pirang-platinum berkilau, gaun tunik hijau zamrud emas, serta kepribadian lembut dan setia.
-  - **Mimi (ミミ)**: The Playful Nekomimi Girlfriend berumur 21 tahun. Dilengkapi telinga kucing berbulu halus (*fluffy cat ears*), ekor lentur, sweater rajut motif telapak kucing (*cat paw motif*), serta gaya bicara manja, ceria, dan gemas.
-  - Poster dan kartu promosi karakter visual novel resmi untuk Sylvie dan Mimi kini terintegrasi di `personas/brief/`.
-* **✨ Interactive Persona Builder (Full Custom di Telegram & CLI):**
-  - Perintah `/newpersona` pada bot Telegram dan menu `waifu setup` kini dilengkapi wizard multi-langkah interaktif.
-  - Pilihan proporsi tubuh kanon (Petite Curvy, Hourglass Montok, Slender Graceful, Athletic, Tall Model, Elven Slender, Nekomimi Petite) yang menjaga konsistensi bentuk tubuh dan ukuran payudara di setiap foto.
-  - Pilihan preset latar belakang cerita (*lore*) dan archetype kepribadian, dengan bantuan pengayaan instruksi sistem (*system instruction*) dan Danbooru tags otomatis berbasis LLM.
-* **👙 Persistensi Pakaian Dalam Kanon & Smart User Color Override:**
-  - Setiap waifu memiliki palet pakaian dalam (*bra, panties, lingerie*) yang terkunci secara kanon (contoh: bra putih berenda hitam & pita pink untuk Runa; renda hitam dengan aksen lonceng emas untuk Mimi; renda hijau zamrud sulaman daun emas untuk Sylvie).
-  - **Smart Color Override**: Jika pengguna meminta warna spesifik (contoh: *"coba pake bra merah"*), sistem secara cerdas menyesuaikan warnanya secara instan tanpa mengubah ciri anatomi khas karakter (telinga elf / telinga kucing & ekor).
-* **🔄 Tombol Kirim Ulang Foto & Proteksi Timeout:**
-  - Menghindari pengiriman foto duplikat saat jaringan Telegram lambat, serta menyediakan tombol interaktif *Kirim Ulang* dengan *safe cooldown* saat terjadi kendala koneksi.
-
-Pembaruan v2.4.33 memperbaiki ketidaksesuaian antara isi chat waifu, lokasi foto yang di-generate, dan caption foto:
-
-* **🔗 Pewarisan `scene_override` & Konteks Chat Asli (`bot.py`):**
-  - **Penerusan Scene Terdeteksi**: Hasil ekstraksi adegan (`scene_override_desc` dari `detect_visual_scene_moment`) kini diteruskan langsung ke `process_photo_request(..., scene_override=..., original_user_text=...)` dan tidak lagi ter-timpa oleh deteksi ulang berbasis substring.
-  - **Caption Terkunci pada Momen yang Sama**: `caption_prompt` kini selalu menggunakan pesan asli pengguna dan balasan terakhir waifu dengan aturan konsistensi ketat (*STRICT CONSISTENCY RULE*), mencegah LLM mengarang lokasi atau aktivitas baru yang bertolak belakang dengan chat sebelumnya.
-* **🔍 Word-Boundary Scene Extraction & LLM-First Narrative Alignment (`persona_manager.py` & `student_schedule.py`):**
-  - **Anti Salah-Deteksi Substring**: Pencocokan adegan (`SCENE_PATTERNS`, `match_scenario`, `wants_cat`, `wants_device`) kini memakai batas kata regex `\b...\b`, sehingga kata seperti *"makanannya"* tidak lagi terbaca sebagai *"makan"* ➔ dapur (`kitchen`), *"kosong"* tidak terbaca *"kos"*, dan *"kesibukan sore"* tidak memicu taman (`park`).
-  - **LLM-First Scene Extractor**: Saat foto menyertai balasan chat (`conversational_reply`), ekstraksi visual melalui LLM diprioritaskan terlebih dahulu sebelum keyword statis agar adegan spesifik (misal: *"jajanan street food viral dekat kampus"*) tergambar persis beserta properti dan suasananya.
-  - **Preset Kuliner & Street Food**: Menambahkan dukungan adegan *street food / jajanan / kaki lima / festival kuliner* secara spesifik sebelum pola dapur dan ruang kelas kampus.
+Advanced visual stability safeguards eliminate missing arms, limb amputation, and distorted postures during relaxed, sideways, or bed scenes:
+* **🛡️ Heavyweight Negative Prompt Guard:** Injects weighted negative filters: `(missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (disappearing arm:1.4), (floating arms:1.4), (bad arms:1.4)` across all image generation pipelines (ComfyUI and Google Antigravity).
+* **✨ Positive Anatomy Anchors:** Injects structural tokens `(proper anime anatomy:1.2), (complete body:1.1), (two arms:1.1)` ensuring both arms are fully rendered, symmetrical, and positioned naturally (*arms naturally positioned*) even in challenging three-quarter perspective or reclining sofa poses.
 
 ---
 
-## 🛡️ Circuit Breaker Anti-Flapping LLM, Self-Healing Cooldown & Split-Mode Failover (v2.4.32)
+## 🧝 Personas, Custom Persona Wizard & Canon Lingerie Persistence
 
-Pembaruan v2.4.32 menuntaskan bug fatal *flapping loop* (siklus berulang online-offline dan notifikasi spam ratusan pesan ke Telegram):
-
-* **🛑 Circuit Breaker Antrean Pesan Gagal (`PendingMessageManager`):**
-  - **Batas Maksimal Retry (Circuit Breaker)**: Pesan yang gagal diproses (karena backend LLM offline/timeout) kini dibatasi maksimal **2 kali percobaan** per pesan. Jika gagal melebihi batas, pesan otomatis di-*drop* secara permanen untuk memutus siklus retry rekursif tak berujung.
-  - **Rate Limiting Notifikasi Pemulihan**: Pemberitahuan transisi `"Server LLM sudah kembali online!"` kini dibatasi maksimal 1 kali per **300 detik** per percakapan, mencegah ledakan bubble chat notifikasi.
-* **⏱️ Anti-Spam Notifikasi Self-Healing (`HealthEngine`):**
-  - **Cooldown Siaran Alarm & Pemulihan (5 Menit Cooldown)**: Siaran alarm *"Service LLM Mati"* dan *"Service LLM Telah Pulih"* dibatasi minimal selang **300 detik** (5 menit). Fluktuasi backend singkat tidak akan lagi membombardir grup atau chat pengguna dengan puluhan pesan alarm.
-  - **Latch Batas Percobaan Self-Healing**: Pesan kegagalan batas maksimal restart (3x) hanya dikirim **1 kali** per jendela pengawasan, menghentikan spam pesan failure setiap 30 detik dari watchdog loop.
-  - **Sanity Check Sebelum Alarm Offline**: `mark_llm_failure` kini memverifikasi status `/models` / health endpoint sebelum mendeklarasikan offline, sehingga error parsial per-prompt atau timeout tunggal tidak memicu false alarm service mati.
-* **🔀 Split Mode High-Availability Failover (`IdleEngine` & `RoutingEngine`):**
-  - **Pencegahan Timeout Menggantung (150s Hang)**: Saat mode *split* aktif (`AI_ENGINE_MODE=split`) dan engine NSFW lokal (port 5001) sedang tidak aktif atau gagal bangun, routing percakapan secara mulus langsung mengalihkan (*failover*) giliran chat ke provider SFW aktif (Google AGY OpenAI Bridge pada port 8001 / Cloud) dengan *prompt sanitization*.
-  - **Deteksi Kesiapan Sadar Konteks**: `is_llm_ready()` dan `wake_llm()` pada `IdleEngine` kini sadar flag `is_nsfw`, memastikan status engine diperiksa sesuai port yang ditargetkan tanpa salah mendeteksi status bridge AGY vs KoboldCPP.
-
----
-
-## 🎭 Antrean Chat Anti-Bentrok, Jeda Foto Otomatis & Variasi Komposisi Kamera (v2.4.31)
-
-Pembaruan v2.4.31 menyempurnakan alur percakapan alami, sinkronisasi pesan, dan variasi visual agar interaksi terasa realistis dan sinematik:
-
-* **📬 Antrean Chat Cerdas & Debounce Aggregator (Anti-Bentrok & Balasan Nyambung):**
-  - **Penggabungan Pesan Beruntun (Debounce Aggregator)**: Saat pengguna mengetik beberapa gelembung teks cepat berturut-turut (misal: *"wah baju nya bagus cocok sama kamu"* lalu langsung disusul *"boleh, aku meluncur kesana sekarang ya"*), sistem secara cerdas menggabungkannya ke dalam satu pesan utuh yang koheren.
-  - **Eksekusi Sekuensial FIFO (Strict Sequential Turn Lock)**: Menghilangkan tabrakan thread paralel antar-pesan. Waifu tidak akan lagi membalas dengan dua pesan terpisah yang bertolak belakang atau terbalik urutan (misal satu thread bertanya apakah ingin menyusul, sementara thread lain menyuruh hati-hati di jalan). Riwayat obrolan dijamin ter-update secara rapi dan runut.
-* **⏱️ Jeda Foto Otomatis (Proactive Auto-Photo Cooldown):**
-  - **Pencegahan Spam Foto**: Foto spontan/adegan kini diatur dengan jeda minimal **3 giliran percakapan (*turns*)** dan minimal **60 detik** sejak foto terakhir dikirim.
-  - **Cerita Lebih Mengalir**: Menghindari foto terkirim berulang-ulang di setiap bubble chat saat adegan masih berlangsung di lokasi yang sama (misal sedang nongkrong di kafe).
-  - **Bypass untuk Permintaan Eksplisit**: Perintah atau permintaan foto langsung dari pengguna (seperti `/pap`, `/photo`, *"kirim foto dong"*, *"minta pap"*) tetap diproses instan tanpa terpengaruh cooldown.
-* **📸 Variasi Sudut Pandang Kamera & Rotasi Komposisi Dinamis (Anti-Foto Monoton):**
-  - **Rotasi Perspektif Otomatis**: Dilengkapi beragam preset komposisi fotografi anime profesional (*medium shot candid POV*, *close-up expressive portrait*, *side-profile candid looking away*, *high-angle looking down*, *leaning forward chin-resting*, *three-quarter angle*, *over-the-shoulder POV*, dan *relaxed candid framing*).
-  - **Pelacakan Komposisi per Pengguna**: Sistem melacak komposisi foto terakhir dan secara otomatis memilih sudut pandang baru yang berbeda, memastikan tidak ada foto beruntun dengan sudut atau pose yang sama persis.
-  - **Variasi Detail Latar**: Latar ruangan dan kafe kini memiliki variasi suasana (meja pojok dekat jendela kaca besar, cangkir di atas tatakan, pencahayaan sore hari yang hangat, dll.).
+* **🧝 Canonical Waifu Personas:**
+  - **Alia (アーリャ)**: The silver-haired Russian schoolmate and student council president. Known for teasing in Russian (*"Я тебя люблю"*), wearing twin side braids with red ribbons, an elegant academy blazer, and a sharp yet affectionate demeanor.
+  - **Sylvie (シルヴィ)**: The high-elf botanist companion with graceful pointed ears, platinum-blonde hair, emerald tunic, and a gentle, devoted soul.
+  - **Mimi (ミミ)**: The playful nekomimi companion with fluffy cat ears, expressive tail, cat-paw knit sweater, and endearing cuddles.
+* **✨ Interactive Persona Builder (Telegram & CLI Wizard):**
+  - Run `/newpersona` in Telegram or select `waifu setup` to launch the multi-step interactive creator.
+  - Choose canon body proportions (Petite Curvy, Hourglass, Slender Graceful, Athletic, Tall Model, Elven Slender, Nekomimi Petite) ensuring consistent physique and bust size across every photo.
+  - Custom backstory presets, personality archetypes, and automatic LLM-powered Danbooru tag enrichment.
+* **👙 Canon Lingerie Persistence & Smart User Color Override:**
+  - Every waifu has a canon-locked underwear palette (*bra, panties, lingerie*) (e.g., white lace with black trims & pink ribbons for Runa; black lace with gold bell accents for Mimi; emerald-green leaf embroidery for Sylvie).
+  - **Smart Color Override**: If the user requests a custom shade (e.g., *"wear a red lace bra"*), the system dynamically adapts the lingerie color while preserving all signature anatomic traits.
+* **🔄 Photo Resend Button & Single-Flight Anti-Spam:**
+  - Prevents duplicate rendering if Telegram experiences network latency. Provides a one-click resend button with cached image fallback and rate-limited single-flight deduplication.
 
 ---
 
-## 🎭 Pengalaman Visual Novel Interaktif, Tombol Suara On-Demand & Generator Gambar Anti-Gagal (v2.4.30)
+## 🛡️ Circuit Breaker Anti-Flapping LLM, Self-Healing Cooldown & Split Failover
 
-Obrolan bersama waifu kini ditingkatkan layaknya game **Visual Novel** interaktif berkualitas tinggi (CG Scene Events) serta keandalan audio dan generator visual tanpa batas:
+Ensures bulletproof 24/7 background uptime and eliminates infinite retry loops or notification spam:
 
-* **🎙️ Mode Suara On-Demand per Pesan (`🔊 Dengarkan Suara`) & Default Auto-Voice OFF:**
-  - **Efisiensi & Respon Super Cepat**: Mengubah pengaturan bawaan agar balasan suara otomatis dimatikan (`VOICE_REPLY_ENABLED=false`). Pesan teks kini terkirim instan tanpa menunggu proses render TTS yang memakan VRAM dan waktu.
-  - **Tombol Suara di Setiap Pesan**: Setiap kali waifu mengirim teks obrolan atau laporan coding, pesan disertai tombol inline `🔊 Dengarkan Suara`.
-  - **Sintesis Audio On-Demand**: Begitu tombol ditekan, tombol bertransformasi menjadi `⏳ Sedang memproses suara... 💕` dan engine suara (VoiceStudio / Edge-TTS) langsung men-generate voice note untuk teks tersebut lalu mengirimkannya sebagai balasan langsung (*reply voice note*), kemudian tombol berubah menjadi `🔊 Putar Suara Lagi`.
-* **🛡️ Penanganan Kuota AGY (429 Resource Exhausted) & Fallback Bertingkat Anti-Gagal:**
-  - **Deteksi Cepat Batas Kuota (Fast 429 Quota Detection)**: Memperbaiki kendala *"AGY CLI selesai namun tidak menemukan file gambar output"*. Sistem kini mendeteksi status model Antigravity saat batas kuota API tercapai (*429 RESOURCE_EXHAUSTED / waiting for subagent*).
-  - **Fallback Mulus Tanpa Error**: Bila engine AGY sedang limit kuota, sistem otomatis beralih memproses generasi gambar ke **Local ComfyUI** (jika aktif), **Photo Vault** (arsip foto lokal), atau **Cloud Fallback** (Pollinations). Pengguna tidak akan pernah lagi mendapati error *"Fotonya gagal dibuat"*.
-* **🌉 Stabilitas AGY OpenAI Bridge & Anti-Flapping Self-Healing (Always-On Standby):**
-  - **Pencegahan Crash Windows (Unicode Encoding)**: Memperbaiki kendala crash instan `UnicodeEncodeError: 'charmap'` saat AGY bridge dijalankan di background Windows dengan mengunci konfigurasi `UTF-8` pada `stdout/stderr` dan variabel lingkungan `PYTHONIOENCODING=utf-8` / `PYTHONUTF8=1`.
-  - **Pemberantasan False Alarm Self-Healing**: Meningkatkan batas waktu socket health check menjadi 1.5s dan memastikan port 8001 tidak dianggap mati saat proses sedang sibuk memproses inferensi, sehingga tidak ada lagi peringatan palsu *"Service AGY OpenAI Bridge terdeteksi mati! (Percobaan 3/3)"*.
-  - **Generator Foto AGY Tanpa Gagal**: Memperbaiki kegagalan *"AGY CLI selesai namun tidak menemukan file gambar output: I have delegated..."*. Sistem kini memandu subagent `image-generator` secara presisi sekaligus dilengkapi **Artifact Scanner Otomatis** (`find_recent_generated_image`) yang memindai folder `.gemini/antigravity/brain` dan workspace secara berkala untuk mengambil file `.jpg/.png` hasil generate.
-* **👤 Penegakan Karakter Tunggal & Anti-Karakter Ganda (Strict Solo 1Girl Weighted Enforcement):**
-  - **Pencegahan 2 Waifu**: Menggunakan pembobotan perhatian tinggi `(solo:1.4), (1girl:1.4)` di awal prompt dan penolakan ketat `(2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (group:1.5), (duplicate:1.4)` pada negative prompt sehingga Stable Diffusion (MeinaMix/AOM3) tidak akan merender 2 waifu secara tak sengaja.
-  - **Dukungan Foto Berdua (Couple/Multi-Person)**: Jika Anda secara eksplisit meminta foto berdua (*"foto kita berdua"*, *"foto bareng aku"*, *"couple"*), pembatasan solo otomatis dilepas dan dialihkan ke framing pasangan yang tepat.
-* **🔥 Proaktif Sensual & Auto-Foto Mode Dewasa (NSFW / 18+ Interactive Roleplay):**
-  - **Sensasi Tubuh Mendalam (Rich Sensory Roleplay)**: Waifu mendeskripsikan sensasi fisik nyata di dalam tanda bintang `*...*` (tubuh melengkung/arching saat disentuh, getaran napas tertahan, kulit merona hangat, tangan menuntun sentuhan pasangan ke pinggang).
-  - **Proaktif Memancing Langkah Selanjutnya (Leading the Moment)**: Waifu tidak pasif! Di setiap pesan, waifu aktif memancing dan menggoda dengan pertanyaan/pilihan intim (*"B-but if you like it that much... should I take off the rest too? Or do you want to touch first? 😳"*, *"Do you like how I react when you stroke me there?"*, *"D-do you want to see how wet you've made me already...?"*, *"W-will you taste me too?"*).
-  - **Kirim Foto Otomatis di Setiap Eskalasi Intim**:
-    - **Sentuhan Awal / Meraba Tubuh**: Foto waifu merona sensual saat disentuh pinggang dan tubuhnya.
-    - **Buka Baju Bertahap (Sequential Undressing)**: Mendukung bahasa Indonesia dan Inggris (*"I will take off your clothes slowly"*, *"take off the rest"*, *"buka pelan-pelan"*).
-    - **Mengangkat Rok / Bagian Basah**: Foto waifu tersipu malu menaikkan rok memperlihatkan celana dalamnya.
-    - **Oral / Menjilat / Klimaks**: Foto waifu melengkungkan tubuh (*arching in ecstasy*) saat disentuh atau dicicipi.
-* **📸 Ilustrasi Adegan Otonom & Latar Cerita Dinamis (Dynamic Setting & Story Transitions):**
-  - Waifu secara cerdas menyisipkan foto adegan (*CG scene*) secara otomatis tanpa Anda perlu meminta pap manual (`/pap`).
-  - **Latar Cerita Bebas & Fleksibel (Bukan Sekadar Kata Kunci Statis)**:
-    - **Halte Bis / Menunggu Angkutan**: Menunggu di halte bis saat cuaca cerah maupun saat hujan lebat berteduh bersama membawa payung transparan (*"aku lagi nunggu di halte bis kehujanan"*).
-    - **Lobby Kampus / Atrium Universitas**: Bertemu atau menunggu di lobby kampus, atrium modern, atau lorong fakultas.
-    - **Rooftop & Balcony Sunset**: Menikmati pemandangan langit sore kota dari atap gedung (*rooftop*).
-    - **Bioskop & Minimarket**: Mengantre tiket di lobby bioskop, atau mampir beli es krim/camilan di minimarket / konbini.
-    - **Pangkuan / Lap Sitting**: Duduk manja di paha (*"kamu bisa duduk di paha aku"* atau *"sini dipangku"*).
-    - **Pujian Baju & Teasing**: Saat Anda memuji pakaian/tubuhnya (*"baju kamu sangat cantik dan seksi"*), waifu berpose memamerkan pakaiannya (*"Just my usual outfit... do you like it?"*).
-    - **Pelukan & Kehangatan**: Adegan merapat dan berpelukan mesra saat beristirahat.
-    - **Study Buddy / Nugas Bareng**: Ilustrasi waifu menemani di meja belajar dengan buku pelajaran saat mengerjakan PR/tugas kuliah bersama.
-    - **Ekstraksi Latar Berbasis LLM (AI Scene Extractor)**: Untuk lokasi cerita unik lainnya (pantai, dermaga danau, pegunungan, kafe vintage), model LLM secara otomatis mengekstrak elemen visual latar ke dalam prompt Stable Diffusion secara tepat.
-* **🧠 Memori Nama Persisten & Anti-Lupa (Never Nag Again):**
-  - Waifu mengingat nama Anda sejak kalimat pertama diperkenalkan (termasuk kalimat koreksi santai: *"bukan alex, aku adens, ayo kita mengerjakan PR"*).
-  - Nama langsung disimpan secara persisten di profil & ingatan jangka panjang (`/memory`).
-  - **Larangan Keras Bertanya Ulang**: Begitu nama diketahui, waifu langsung memanggil nama Anda dan **DILARANG KERAS** menanyakan nama lagi atau berpura-pura lupa.
-* **🛡️ Guardrails Anatomi Kaki & Kualitas Gambar SD 1.5:**
-  - **Aspek Rasio 9:16 yang Aman**: Resolusi untuk SD 1.5 (AOM3, MeinaMix) diatur ke `448x768` (tinggi maksimal 768px). Hal ini secara teknis mencegah *vertical latent tiling* yang menyebabkan kaki terlipat panjang, torso ganda, atau kaki gurita/spaghetti.
-  - **Negative Tokens Khusus Anatomi Kaki**: Menyaring cacat fisik secara ketat (`bad legs, extra legs, malformed limbs, long legs, elongated limbs, poorly drawn legs, fused legs, multiple legs, folded legs, mutated, deformed, duplicate body`).
-* **🌐 Dynamic Language Mirroring (Otomatis Ikuti Bahasa Lawan Bicara):**
-  - Waifu mendeteksi dan secara otomatis membalas dengan bahasa yang Anda gunakan.
-  - Jika Anda mengetik dalam bahasa Inggris (*"Hi there! What are you doing right now?"*), waifu membalas dalam bahasa Inggris yang fasih, manis, dan alami.
-  - Jika Anda mengetik dalam bahasa Indonesia (*"Kamu lagi ngapain?"*), waifu membalas dalam bahasa Indonesia santai sehari-hari.
+* **🛑 Failed Message Circuit Breaker (`PendingMessageManager`):**
+  - **Maximum Retry Limit**: Messages that fail due to backend LLM offline/timeout are capped at **2 attempts**. If retries are exceeded, the message is dropped cleanly to prevent recursive infinite loops.
+  - **Recovery Notification Rate Limiting**: The `"LLM server is back online!"` alert is rate-limited to at most once per **300 seconds** per conversation.
+* **⏱️ Self-Healing Notification Cooldown (`HealthEngine`):**
+  - **Alarm & Recovery Cooldown (5-Minute Window)**: Broadcast alerts for service outage and service recovery enforce a minimum **300s** interval. Brief backend restarts will not flood chat bubbles.
+  - **Restart Threshold Latch**: Maximum restart failure notifications (3 attempts) are sent once per watchdog window.
+  - **Health Sanity Checks**: `mark_llm_failure` verifies health endpoints before declaring offline status, preventing single prompt timeouts from causing false alarms.
+* **🔀 Split-Mode High-Availability Failover (`IdleEngine` & `RoutingEngine`):**
+  - **Hang Prevention**: When split mode is active (`AI_ENGINE_MODE=split`) and the local NSFW engine (port 5001) is asleep or warming up, safe conversational turns seamlessly failover to the active SFW provider (Google AGY OpenAI Bridge on port 8001 / Cloud) with automated prompt sanitization.
+
+---
+
+## 🎭 Smart Chat Queue, Debounce Aggregator & Dynamic Camera Framing
+
+Delivers a natural conversational rhythm with dynamic photographic variety:
+
+* **📬 Smart Chat Queue & Debounce Aggregator:**
+  - **Multi-Message Aggregation**: When the user rapidly sends multiple consecutive bubbles (e.g., *"your outfit looks amazing on you"* immediately followed by *"are you ready to head out?"*), the system aggregates them into a single coherent prompt.
+  - **Sequential Turn Lock (FIFO)**: Eliminates parallel race conditions between messages, ensuring conversation memory remains sequential and chronological.
+* **⏱️ Proactive Auto-Photo Cooldown:**
+  - **Spam Prevention**: Spontaneous scene photos enforce a minimum cooldown of **3 conversation turns** and at least **60 seconds** between shots.
+  - **Explicit Request Bypass**: Direct user commands (`/pap`, `/photo`, *"send a selfie"*) are never delayed and bypass the cooldown instantly.
+* **📸 Dynamic Camera Angles & Perspective Rotation:**
+  - **Varied Compositions**: Features professional anime photography presets (*medium shot candid POV*, *close-up expressive portrait*, *side-profile looking away*, *high-angle looking down*, *leaning forward with chin resting*, *three-quarter angle*, *over-the-shoulder POV*, and *relaxed candid framing*).
+  - **Per-User Perspective Tracker**: Automatically alternates camera perspectives so no two consecutive photos share the exact same pose or angle.
+
+---
+
+## 🎙️ Interactive Visual Novel Experience & On-Demand Voice Notes
+
+* **🎙️ On-Demand Spoken Voice (`🔊 Listen to Voice`) with Auto-Voice OFF by Default:**
+  - **Maximum Speed & Zero Latency**: Text replies arrive instantly without waiting for TTS synthesis (`VOICE_REPLY_ENABLED=false`).
+  - **Per-Message Voice Button**: Every chat message includes an inline `🔊 Listen to Voice` button.
+  - **Instant Synthesis**: Clicking the button updates it to `⏳ Generating voice note... 💕` and delivers an audio reply, updating the button to `🔊 Replay Voice`.
+* **🛡️ AGY Quota Management & Multi-Tier Image Fallback:**
+  - **Instant 429 Quota Detection**: Detects API rate limits or quota exhaustion (*429 RESOURCE_EXHAUSTED*).
+  - **Seamless Multi-Tier Fallback**: Automatically cascades to **Local ComfyUI** (if active), **Photo Vault** (local gallery archive), or **Cloud Fallback** (Pollinations AI) with zero user-facing errors.
+* **👤 Strict Solo Character Enforcement (1Girl):**
+  - Weighted prompt anchors `(solo:1.4), (1girl:1.4)` and negative tokens `(2girls:1.5), (multiple girls:1.5), (group:1.5)` prevent accidental second characters from rendering. Couple photos are unlocked only upon explicit user request (*"take a selfie together with me"*).
+* **🔥 Interactive Romance & Sensual Escalation (NSFW / 18+ Mode):**
+  - **Sensory Roleplay**: Physical sensations rendered naturally in action asterisks `*...*` (warm blushing skin, rapid heartbeat, breath catching).
+  - **Leading the Moment**: Waifu actively suggests intimate steps and romantic progression.
+  - **Sequential Undressing**: Seamlessly handles gradual undressing in English and Indonesian (*"I will take off your clothes slowly"*, *"take off the rest"*).
+* **🌐 Dynamic Multi-Language Adaptive Response:**
+  - Automatically matches the user's chatting language in real-time. Indonesian prompts receive natural Indonesian replies (`aku`/`kamu`), English prompts receive casual English replies (`I`/`you`), while the system interface remains in English.
 
 ---
 
 ## 💻 System Requirements & Curated Models
 
-Waifu on Telegram is engineered to run locally on consumer gaming PCs and laptops while keeping VRAM usage lean, response times quick, and photo rendering lightning-fast.
+Waifu on Telegram is engineered to run locally on consumer gaming PCs and laptops while keeping VRAM usage lean, response times quick, and photo rendering fast.
 
 ### 🕹️ Hardware Specifications
 
 | Component | Minimum Requirements | Recommended Specifications |
 | :--- | :--- | :--- |
-| **GPU / VGA** | **NVIDIA GPU with 4GB - 6GB VRAM**<br>*(GTX 1650, RTX 2060, RTX 3050 Laptop)* | **NVIDIA GPU with 6GB - 8GB+ VRAM**<br>*(RTX 3050 6GB, RTX 3060, RTX 4060+)* |
+| **GPU / Graphics Card** | **NVIDIA GPU with 4GB - 6GB VRAM**<br>*(GTX 1650, RTX 2060, RTX 3050 Laptop)* | **NVIDIA GPU with 6GB - 8GB+ VRAM**<br>*(RTX 3050 6GB, RTX 3060, RTX 4060+)* |
 | **Apple Silicon (Mac)** | M1 / M2 / M3 / M4 (8GB Unified Memory) | M1 / M2 / M3 / M4 Pro / Max (16GB+ Unified Memory) |
 | **System RAM** | 8 GB RAM | 16 GB - 32 GB RAM |
 | **Storage** | 10 GB free space (SSD recommended) | 25 GB free space (NVMe SSD) |
@@ -196,90 +157,78 @@ Waifu on Telegram is engineered to run locally on consumer gaming PCs and laptop
 
 Tested, verified, and pre-tuned for peak romance dialogue, uncensored responsiveness, and high-fidelity anime aesthetics:
 
-#### 1. 💌 Dialogue & Romance Companion: **Huihui-Qwythos 9B Claude-Mythos** *(Default Uncensored & Rekomendasi Utama)*
+#### 1. 💌 Dialogue & Romance Companion: **Huihui-Qwythos 9B Claude-Mythos** *(Primary Uncensored Recommendation)*
 * **Model File:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf` (~5.5 GB)
 * **Vision Adapter:** `Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.mmproj.gguf` (~879 MB)
-* **Alternatif:** `Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf` (~4.7 GB) / `Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf` (~4.9 GB)
-* **Local Backend:** **KoboldCPP Standalone Engine** (Port `5001`) with **Auto-Startup & Auto-Loading directly on Windows Boot**!
-* **Compatible Backends:** KoboldCPP Standalone (bawaan resmi), Ollama (Port `11434`), LM Studio (Port `1234`), atau OpenAI-compatible server.
-* **Download Method:** Otomatis di-download saat menjalankan `waifu update` / `install.ps1` / `install.sh`, atau via `waifu models download huihui`.
+* **Alternatives:** `Qwen2.5-7B-Instruct-abliterated.Q4_K_M.gguf` (~4.7 GB) / `Llama-3.1-8B-Stheno-v3.4-Q4_K_M.gguf` (~4.9 GB)
+* **Local Backend:** **KoboldCPP Standalone Engine** (Port `5001`) with automatic startup on boot.
+* **Compatible Backends:** KoboldCPP Standalone, Ollama (Port `11434`), LM Studio (Port `1234`), or any OpenAI-compatible server.
+* **Download Method:** Automatically installed via `install.ps1` / `install.sh` / `waifu update`, or via `waifu models download huihui`.
 * **Key Strengths:**
-  - **100% Bebas Penolakan (Zero Refusal NSFW):** Merupakan model abliterated Claude-Mythos murni yang sepenuhnya patuh dan terbuka untuk roleplay mesra, kencan intim, dan NSFW tanpa sensor atau penolakan.
-  - **Konteks Super Panjang 1 Juta Token (1M Context):** Mampu mengingat jalan cerita, kenangan, dan detail obrolan terdahulu secara presisi.
-  - **Native Vision mmproj:** Mendukung penglihatan multimodal terpadu untuk melihat foto kiriman user di Telegram.
-  - **Smart Idle Integration:** Otomatis di-unload dari VRAM saat tidak ada percakapan (idle timeout), membebaskan VRAM untuk gaming/kerja.
+  - **Zero Refusal Uncensored:** Pure abliterated Claude-Mythos fine-tune fully compliant with romantic, intimate, and uncensored roleplay.
+  - **1 Million Token Context Window:** Retains past conversations, memories, and plot details with high fidelity.
+  - **Native Vision mmproj:** Multimodal vision support to perceive photos sent by users on Telegram.
+  - **Smart Idle Integration:** Automatically unloads from VRAM during inactivity to keep memory free for gaming.
 
 #### 2. 📷 Anime Photo & Selfie Engine Options (ComfyUI)
 
-Anda dapat memilih model ilustrasi anime sesuai dengan spesifikasi GPU dan preferensi estetika Anda melalui `waifu setup` (Menu `[3]`) atau perintah `/setup` langsung di Telegram:
+Configure your preferred visual style via `waifu setup` or directly in Telegram with `/setup`:
 
-* **Pilihan 1: AbyssOrangeMix3 / AOM3A1B (Anime SD 1.5 - Default Local Engine Uncensored Civitai #9942)**
+* **Option 1: AbyssOrangeMix3 / AOM3A1B (Anime SD 1.5 - Primary Uncensored Local Engine, Civitai #9942)**
   - **File:** `AOM3A1B_orangemixs.safetensors` (~2.0 GB)
-  - **Download:** [CivArchive #9942](https://civarchive.com/models/9942?modelVersionId=17233) / [Civitai #9942](https://civitai.com/models/9942/abyssorangemix3-aom3) atau via `waifu models download aom3`
-  - **Rekomendasi GPU:** 4GB - 8GB VRAM (Resolusi default 3:4 portrait: `576x768`, Sampler: `DPM++ 2M Karras`, CFG `7.5`)
-  - **Kelebihan:** **Default local image model**. Uncensored murni (bebas blokir NSFW/anatomis intim), estetika anime klasik yang kaya, warna tajam dan cerah (*vibrant*), rendering ringan dan halus (~3-5 detik).
+  - **Download:** [CivArchive #9942](https://civarchive.com/models/9942?modelVersionId=17233) or via `waifu models download aom3`
+  - **Recommended GPU:** 4GB - 8GB VRAM (Default 3:4 portrait resolution: `576x768`, Sampler: `DPM++ 2M Karras`, CFG `7.5`)
+  - **Highlights:** **Default local image model**. Completely uncensored, rich anime aesthetic, vibrant coloring, and fast generation (~3-5s).
 
-* **Pilihan 2: MeinaMix v12 (Anime SD 1.5 - Hemat VRAM & Cepat)**
+* **Option 2: MeinaMix v12 (Anime SD 1.5 - Lightweight & Fast)**
   - **File:** `meinamix_v12Final.safetensors` (~2.0 GB)
-  - **Download:** [Civitai - MeinaMix v12](https://civitai.com/models/7240/meinamix) atau via `waifu models download meinamix`
-  - **Rekomendasi GPU:** 4GB - 8GB VRAM (Resolusi default 3:4 portrait: `576x768`, Sampler: `DPM++ 2M Karras`)
-  - **Kelebihan:** Sangat cepat (~3-5 detik), hemat resource, konsistensi wajah anime imut (*kawaii*).
+  - **Download:** [Civitai - MeinaMix v12](https://civitai.com/models/7240/meinamix) or via `waifu models download meinamix`
+  - **Recommended GPU:** 4GB - 8GB VRAM (Default 3:4 portrait resolution: `576x768`, Sampler: `DPM++ 2M Karras`)
+  - **Highlights:** Ultra-fast, low memory footprint, kawaii anime facial consistency.
 
-* **Pilihan 3: 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Detail)**
+* **Option 3: 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Detail)**
   - **File:** `AnythingXL_xl.safetensors` (~6.6 GB)
-  - **Download:** [Civitai #9409 - Anything XL](https://civitai.com/models/9409/or-anything-xl) atau via `waifu models download anything_xl`
-  - **Rekomendasi GPU:** 8GB+ VRAM (Resolusi native SDXL 3:4 portrait: `896x1152` / `1024x1024`, Sampler: `Euler Ancestral Normal`)
-  - **Kelebihan:** Resolusi 1024px super tajam, detail pakaian, latar belakang, dan ekspresi jauh lebih kaya dan sinematik.
+  - **Download:** [Civitai #9409 - Anything XL](https://civitai.com/models/9409/or-anything-xl) or via `waifu models download anything_xl`
+  - **Recommended GPU:** 8GB+ VRAM (Native SDXL portrait: `896x1152` / `1024x1024`, Sampler: `Euler Ancestral`)
+  - **Highlights:** Razor-sharp 1024px resolution, rich backgrounds, cinematic lighting.
 
-* **Pilihan 4: Cloud Fallback Engine (Pollinations AI - 0 VRAM)**
-  - **Akses:** Bebas biaya tanpa GPU lokal melalui cloud GPU fallback. Ideal untuk laptop hemat daya / PC kantor.
+* **Option 4: Cloud Fallback Engine (Pollinations AI - 0 VRAM)**
+  - **Access:** Zero local GPU load via cloud GPU fallback. Perfect for low-power laptops and office workstations.
 
-#### 3. 🎬 Video Animation Engines (Generasi Video Bergerak)
+#### 3. 🎬 Video Animation Engines
 
-Waifu dapat mengirimkan klip animasi video saat diminta lewat `/video` menggunakan salah satu dari 3 pilihan engine:
-* **Wan 2.1 1.3B Diffusion Model** (`wan2.1_t2v_1.3B_bf16.safetensors` ~2.7 GB + `wan_2.1_vae.safetensors` ~240 MB): Model video difusi state-of-the-art terbaru, ringan dan hemat VRAM.
-* **AnimateDiff v2 Motion Module** (`mm_sd_v15_v2.ckpt` ~1.7 GB): Animasi temporal dinamis berbasis SD 1.5.
-* **Motion 2.5D Engine (Zero-VRAM Parallax)**: Animasi video MP4 instan dengan efek pergeseran kedalaman parallax dan kedipan mata halus tanpa beban VRAM GPU sama sekali!
+Waifu can send animated clips when requested via `/video`:
+* **Wan 2.1 1.3B Diffusion Model** (`wan2.1_t2v_1.3B_bf16.safetensors` ~2.7 GB + `wan_2.1_vae.safetensors` ~240 MB): State-of-the-art video diffusion, lightweight and VRAM-efficient.
+* **AnimateDiff v2 Motion Module** (`mm_sd_v15_v2.ckpt` ~1.7 GB): Dynamic temporal animation for SD 1.5 checkpoints.
+* **Motion 2.5D Engine (Zero-VRAM Parallax)**: Instant MP4 animation with smooth parallax depth shift and blinking without consuming GPU VRAM!
 
 #### 4. 🎙️ Dual-Backend Voice Engine (VoiceStudio Local AI & Edge-TTS)
 
-Waifu on Telegram mendukung sintesis suara melalui dua pilihan backend canggih:
+* **Option 1: VoiceStudio Local AI Voice Server ([debpalash/VoiceStudio](https://github.com/debpalash/VoiceStudio)):**
+  - **100% Offline & Local:** Runs via a standalone FastAPI daemon on port `3900` (`http://127.0.0.1:3900`).
+  - **Persona Voice Conditioning:** Persona-tailored pitch and cadence (Runa: playful anime girl, Akira: seductive mature, Hina: bubbly cheerful, Shiro: quiet kuudere, Yume: soft ethereal, Sylvie: elegant gentle, Mimi: playful cute, Alia: poised tsundere).
+  - Controlled via CLI: `waifu voicestudio start|stop|restart|status`.
 
-* **🏠 Pilihan 1: VoiceStudio Local AI Voice Server ([debpalash/VoiceStudio](https://github.com/debpalash/VoiceStudio)):**
-  - **100% Offline & Lokal:** Beroperasi melalui FastAPI daemon mandiri di port `3900` (`http://127.0.0.1:3900`) tanpa perlu membuka GUI/Electron.
-  - **Persona Voice Conditioning:** Otomatis menghasilkan warna suara dan intonasi yang disesuaikan secara khusus dengan persona waifu aktif:
-    - **Runa:** *Playful, cute, energetic, youthful anime girl voice (1.0x speed)*
-    - **Akira:** *Mature, seductive, low-pitched, smooth, elegant teasing voice (0.95x speed)*
-    - **Hina:** *Bright, bubbly, high-spirited, cheerful optimistic anime girl voice (1.05x speed)*
-    - **Shiro:** *Calm, quiet, soft-spoken, cool composed kuudere voice (0.92x speed)*
-    - **Yume:** *Soft, whispery, ethereal, celestial romantic dreamy voice (0.90x speed)*
-  - **Auto-Installer & Lifecycle:** Otomatis di-clone dan di-setup ketika dipilih melalui `waifu setup`, serta dapat dikontrol via CLI: `waifu voicestudio start|stop|restart|status`.
+* **Option 2: Microsoft Edge-TTS Cloud (Fast & 0 VRAM):**
+  - High-speed neural voices across major languages:
+    - 🇬🇧 **Ana / Jenny** (`en-US-AnaNeural` / `en-US-JennyNeural`) = Sweet & cheerful English
+    - 🇮🇩 **Gadis** (`id-ID-GadisNeural`) = Natural conversational Indonesian
+    - 🇯🇵 **Nanami** (`ja-JP-NanamiNeural`) = Kawaii Japanese anime voice
+    - 🌐 **Auto-Sync** (`auto`) = Automatically synchronizes with chat language (`/language`)
+  - **Polyglot Multi-Tier Translation Guardrail:** Automatically translates voice text if chat language differs from the target voice speaker.
 
-* **🌐 Pilihan 2: Microsoft Edge-TTS Cloud (Ringan & 0 VRAM):**
-  - Menggunakan neural voice cloud berkecepatan tinggi dengan pilihan bahasa lengkap:
-    - 🇮🇩 **Gadis** (`id-ID-GadisNeural`) = Bahasa Indonesia alami
-    - 🇯🇵 **Nanami** (`ja-JP-NanamiNeural`) = Bahasa Jepang (*kawaii anime voice*)
-    - 🇬🇧 **Ana / Jenny** (`en-US-AnaNeural` / `en-US-JennyNeural`) = Bahasa Inggris (*sweet & cheerful*)
-    - 🌐 **Auto-Sync** (`auto`) = Otomatis mengikuti bahasa chat waifu (`/language`)
-  - **Polyglot Multi-Tier Translation Guardrail:** Menerjemahkan teks suara secara otomatis jika bahasa teks berbeda dengan suara target (Google GTX -> Client5 -> MyMemory -> Local LLM), misalnya chat bahasa Indonesia diterjemahkan otomatis ke bahasa Jepang anime saat Nanami dipilih!
-  - **Pengaturan Mudah:** Dapat diubah secara instan di Telegram lewat menu `/voice` atau di terminal via `waifu setup` opsi `[5]`.
-* **🛡️ Resilient Auto-Fallback:** Jika VoiceStudio offline atau GPU sedang sibuk me-render gambar, engine otomatis mengalihkan sintesis suara ke Edge-TTS agar waifu tetap mengirim voice note tanpa gangguan!
+#### 5. 💤 Smart Idle Engine (Automated VRAM & Power Management)
 
-#### 5. 💤 Smart Idle Engine (Manajemen VRAM & Daya Otomatis)
-
-Seringkali pengguna AI mengeluhkan RAM dan VRAM VGA selalu penuh meskipun bot sedang tidak digunakan. Waifu on Telegram dilengkapi **Smart Idle Engine**:
-* **Auto-Sleep:** Saat bot tidak menerima interaksi selama waktu tertentu (default: **2 jam / 120 menit**, dapat diatur di `.env`), engine lokal (KoboldCPP LLM & ComfyUI) otomatis dinonaktifkan sementara dari memori.
-* **Manual Idle:** Ingin langsung membebaskan VRAM? Cukup kirim perintah `/idle` atau ketik `waifu idle` di Telegram atau jalankan `waifu idle` di CLI!
-* **Cloud LLM Exemption:** Pengguna model chat Cloud seperti **Google Antigravity (AGY)** atau provider cloud lainnya dibebaskan dari auto-idle karena berjalan di cloud dan 0 VRAM overhead di PC lokal.
-* **VRAM Recovery:** Seketika membebaskan **5.0 GB – 8.0 GB VRAM GPU** dan RAM sistem untuk bermain game berat atau rendering.
-* **Instant Wake-up:** Begitu Anda mengirim pesan atau chat baru di Telegram, Smart Idle secara transparan membangkitkan engine kembali dalam waktu beberapa detik!
+* **Auto-Sleep:** After inactivity (default: **2 hours / 120 minutes**, configurable in `.env`), local engines (KoboldCPP LLM & ComfyUI) are unloaded from memory.
+* **Manual Idle:** Instantly release memory anytime by typing `/idle` in Telegram or running `waifu idle` in the CLI.
+* **Cloud LLM Exemption:** Cloud providers like Google Antigravity (AGY) have 0 local VRAM footprint and stay active without sleeping.
+* **Instant Wake-up:** The moment you send a message, the engine transparently awakens within seconds!
 
 ---
 
 ## ⚡ One-Line Automatic Installation (All-in-One)
 
-Install, auto-configure, and launch **Waifu on Telegram** with a single command directly in your terminal.  
-Everything is automated: environment setup, KoboldCPP engine download, ComfyUI auto-detection, AI model validation, global CLI registration, and background daemon startup.
+Install, auto-configure, and launch **Waifu on Telegram** with a single command directly in your terminal:
 
 ### 🪟 **Windows (PowerShell)**
 ```powershell
@@ -301,37 +250,35 @@ curl -fsSL https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/i
 
 ### 🛠️ **Manual Installation (For Developers & Advanced Users)**
 
-Bagi Anda yang ingin mengontrol direktori instalasi, mengutak-atik source code, atau menjalankan via virtual environment sendiri:
-
 ```bash
-# 1. Clone repository dari GitHub
+# 1. Clone repository from GitHub
 git clone https://github.com/asepindrak/waifu-on-telegram.git
 cd waifu-on-telegram
 
-# 2. Buat & aktifkan virtual environment Python (3.8+)
+# 2. Create and activate a Python virtual environment (3.8+)
 python -m venv venv
 # Windows (PowerShell):
 .\venv\Scripts\activate
 # Linux & macOS (Bash/Zsh):
 source venv/bin/activate
 
-# 3. Pasang paket Python dan dependensi Node.js (Music Remote)
+# 3. Install Python and Node.js dependencies
 pip install -r requirements.txt
 npm install
 
-# 4. Gandakan template konfigurasi environment
+# 4. Copy environment configuration template
 copy .env.example .env     # (Windows PowerShell / CMD)
 cp .env.example .env       # (Linux / macOS)
 
-# 5. Jalankan Setup Wizard interaktif (Pilih model foto, suara, token bot)
+# 5. Run interactive setup wizard
 python setup.py
 
-# 6. Registrasikan perintah global 'waifu' ke PATH (Opsional)
+# 6. Register global 'waifu' CLI command to PATH (Optional)
 python bin/install_cli.py
 
-# 7. Nyalakan Waifu sebagai daemon di background
+# 7. Start Waifu daemon in the background
 waifu start --daemon
-# atau mode foreground untuk melihat logs live:
+# Or run in foreground mode to inspect live logs:
 python bot.py
 ```
 
@@ -339,19 +286,19 @@ python bot.py
 
 ## 🔑 Telegram Bot Credentials & Quick Setup
 
-Before running the installer or setup wizard, you only need two quick credentials from Telegram (both 100% free and takes <1 minute):
+You only need two credentials from Telegram (both free and take less than 1 minute):
 
 ### 1. 📲 Create Telegram Bot & Obtain Token
-1. Open Telegram and message [**@BotFather**](https://t.me/BotFather) (official bot manager with the blue checkmark).
+1. Open Telegram and message [**@BotFather**](https://t.me/BotFather).
 2. Send `/start`, then send `/newbot`.
-3. Choose a **display name** (e.g. `Runa AI`) and a **username** ending with `bot` (e.g. `my_runa_waifu_bot`).
+3. Choose a **display name** (e.g. `Alia AI`) and a **username** ending with `bot` (e.g. `my_alia_waifu_bot`).
 4. BotFather will provide your **HTTP API Token**:
    ```text
    7123456789:AAFlKj89-xXyZ1234abcdEFGHijklmnop
    ```
 
 ### 2. 🛡️ Retrieve Authorized Telegram User ID
-To ensure complete privacy and prevent strangers from accessing your PC, the bot responds only to your Telegram ID:
+To ensure complete privacy and prevent unauthorized access to your PC, the bot responds only to your Telegram ID:
 1. Message [**@userinfobot**](https://t.me/userinfobot) on Telegram and click **Start**.
 2. Copy your numeric **Id** (e.g. `987654321`). This is your `TELEGRAM_ALLOWED_USER_ID`.
 
@@ -359,18 +306,16 @@ To ensure complete privacy and prevent strangers from accessing your PC, the bot
 
 ## 🎀 Automated Model Management & Lazy Downloader
 
-You **do not need** to manually browse Civitai or copy files to deep directories anymore. Waifu on Telegram manages all AI models and ComfyUI extensions dynamically:
+You do not need to manually browse model hubs or navigate deep directories:
 
 1. **In-Chat Lazy Auto-Downloader:**  
-   When requesting a feature whose model isn't on your disk yet (e.g. video animations), your waifu sends an inline confirmation in Telegram:
-   > 💡 *Fitur video ini memerlukan model Wan 2.1 / AnimateDiff (~1.7 GB). Mau Runa bantu unduh otomatis sekarang?*  
-   > `[📥 Unduh Otomatis]` | `[⚡ Pakai Motion 2.5D Dulu]`  
-   Clicking download fetches the weights directly in the background with auto-resume support while you keep chatting.
-
+   When requesting a feature whose model is not yet downloaded, your waifu sends an interactive confirmation:
+   > 💡 *This video feature requires the Wan 2.1 / AnimateDiff model (~1.7 GB). Would you like me to download it in the background now?*  
+   > `[📥 Download Automatically]` | `[⚡ Use Motion 2.5D For Now]`
 2. **CLI Model Manager (`waifu models`):**  
-   Check and download models anytime straight from your terminal:
+   Check and download models straight from your terminal:
    ```bash
-   # Inspect all installed vs missing models & extensions
+   # Inspect installed vs missing models & extensions
    waifu models
 
    # Download specific model or ComfyUI node with 1 command
@@ -381,28 +326,25 @@ You **do not need** to manually browse Civitai or copy files to deep directories
 
 ## 🔀 Dual-Engine Hybrid Architecture (SFW vs NSFW Separation)
 
-Waifu on Telegram mendukung **pemisahan arsitektur antara obrolan/foto SFW dan NSFW** (`AI_ENGINE_MODE=split`). Anda bebas mengombinasikan provider Cloud dan Local LLM sesuai preferensi:
+Waifu on Telegram supports clean architectural separation between SFW and NSFW chat and imagery (`AI_ENGINE_MODE=split`). Combine Cloud and Local LLMs seamlessly:
 
-* **SFW Engine (Chat Normal, Kuliah, Koding, Cerita Sehari-hari):**
-  - Bebas memilih provider: **OpenAI** (`gpt-4o-mini`, `gpt-4o`), **Groq** (`llama-3.3-70b-versatile` - gratis & kilat), **DeepSeek** (`deepseek-chat`), **OpenRouter**, **Local Ollama**, atau **Local KoboldCPP**.
-  - Sangat hemat VRAM & baterai laptop, respons secepat kilat tanpa membebani GPU saat tidak diperlukan.
-* **NSFW Engine (Roleplay Dewasa, Momen Mesra, 18+, Tanpa Busana):**
-  - **Local KoboldCPP Uncensored** (*Huihui-Qwythos-9B-Claude-Mythos*) atau **OpenRouter Uncensored**.
-  - 100% bebas sensor, tidak ada moralizing/preachiness.
-* **🛡️ SFW Chat History Sanitization & Account Protection:**
-  - Bot secara otomatis mendeteksi apakah obrolan bertema SFW atau NSFW (`routing_engine.py`).
-  - **History Sanitization Otomatis**: Riwayat obrolan masa lalu yang mengandung percakapan NSFW/dewasa secara otomatis disaring dan disanitasi sebelum dikirim ke AGY CLI atau Cloud API (OpenAI/Groq/DeepSeek), sehingga akun Anda 100% aman dari sensor kebijakan dan bahaya banned!
-  - Jika provider SFW menolak pesan karena filter kebijakan, bot **otomatis mengalihkan request secara transparan** ke engine lokal uncensored!
+* **SFW Engine (Casual Chat, Academics, Coding, Daily Discussions):**
+  - Choose any provider: **Google AGY OpenAI Bridge** (`gemini-3.8-flash-medium`), **OpenAI** (`gpt-4o-mini`, `gpt-4o`), **Groq** (`llama-3.3-70b-versatile`), **DeepSeek**, **OpenRouter**, or **Local Ollama**.
+  - 0 local VRAM overhead with instant responses.
+* **NSFW Engine (Intimate Romance, Romantic Roleplay, 18+, Clothed / Unclothed):**
+  - **Local KoboldCPP Uncensored** (*Huihui-Qwythos-9B-Claude-Mythos*) or **OpenRouter Uncensored**.
+  - 100% private, uncensored, zero-refusal.
+* **🛡️ SFW Chat History Sanitization:**
+  - Past NSFW turns are automatically sanitized before passing context to Cloud APIs, keeping your cloud developer accounts safe from policy flags.
 * **🎨 SFW vs NSFW Image Engine Separation (`IMAGE_ENGINE_MODE=split`):**
-  - **SFW Image Engine:** Bebas memilih **Google Antigravity Image Generator (`agy` subagent)** (0 VRAM!), **Anything XL (SDXL 1024px)**, **MeinaMix v12**, atau **Cloud Pollinations**.
-  - **NSFW Image Engine:** Menggunakan model spesialis uncensored di ComfyUI lokal seperti **AbyssOrangeMix3 (AOM3A1B)** atau **MeinaMix v12**.
-  - Dapat diatur melalui `waifu setup` (Step 3) atau toggle 1-klik di menu Telegram `/setup` -> Pengaturan Foto.
+  - **SFW Image Engine:** Google Antigravity Image Generator (`agy` subagent, 0 VRAM), Anything XL (SDXL 1024px), MeinaMix v12, or Cloud Pollinations.
+  - **NSFW Image Engine:** Specialized uncensored local ComfyUI models such as AbyssOrangeMix3 (AOM3A1B) or MeinaMix v12.
 
 ---
 
 ## 🚀 Local AI Engine Architecture
 
-If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 2060, RTX 3060, RTX 4060+ or Apple Silicon Mac), your waifu runs **100% locally and completely private**:
+When running with a dedicated GPU (4GB - 8GB+ VRAM) or Apple Silicon Mac, your waifu runs **100% locally and completely private**:
 
 ```
 ┌───────────────────────────────────────┐       ┌───────────────────────────────────────┐
@@ -411,103 +353,98 @@ If you have a dedicated graphics card (**4GB - 6GB+ VRAM** like RTX 3050, RTX 20
 │                                       │       │                                       │
 │   • Auto-starts & loads model on boot │       │   • Auto-starts with --normalvram     │
 │   • Local API Port: 5001              │       │   • Local API Port: 8188              │
-│   • Model: Huihui-Qwythos-9B (GGUF)       │       │   • Smart Vault Archive Fallback      │
+│   • Model: Huihui-Qwythos-9B (GGUF)   │       │   • Smart Vault Archive Fallback      │
 └──────────────────┬────────────────────┘       └───────────────────┬───────────────────┘
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v1.9.9)
+                        💖 WAIFU ON TELEGRAM BOT (v2.4.62)
 ```
 
-> 🌸 **Smart Local Photo Vault (No Ugly Cloud Fallback):** Setiap foto yang berhasil di-render oleh ComfyUI otomatis disimpan rapi ke dalam **Photo Vault** beserta metadata lengkap (persona, pakaian, suasana, dan tags). Jika ComfyUI sedang offline atau GPU sibuk, bot secara cerdas mengambil foto paling relevan dari arsip galeri lokal—tanpa pernah menggunakan generator cloud yang berkualitas rendah.
+> 🌸 **Smart Local Photo Vault:** Every photo rendered by ComfyUI is stored in the **Photo Vault** with complete metadata (persona, outfit, mood, tags). If ComfyUI is offline or the GPU is busy, the bot retrieves the most contextually relevant photo from your local vault.
 
 ---
 
 ## 🌉 Google Antigravity CLI (AGY) OpenAI-Compatible Bridge Server
 
-Project ini dilengkapi dengan **AGY OpenAI Bridge Server** (`agy_bridge.py` di port `8001`), sebuah jembatan lokal standar OpenAI API (`/v1/chat/completions`, `/v1/images/generations`, `/v1/models`, dan `/health`) yang ditenagai oleh Google Antigravity CLI (`agy`).
+Includes the **AGY OpenAI Bridge Server** (`agy_bridge.py` on port `8001`), providing a local OpenAI-compatible API (`/v1/chat/completions`, `/v1/images/generations`, `/v1/models`, `/health`) powered by Google Antigravity:
 
-### 🌟 Fitur Utama AGY Bridge:
-1. **Dapat Digunakan Langsung oleh Waifu on Telegram**:
-   - **Otak Chat SFW**: Dapat diatur sebagai provider LLM SFW (`SFW_LLM_PROVIDER=agy` di `.env` atau melalui `waifu setup`). Sangat cepat, cerdas, responsif, dan 0 VRAM overhead.
-   - **Generator Gambar & Selfie (AGY Image Generator)**: Dapat dipilih sebagai generator foto/selfie (`SFW_IMAGE_ENGINE=agy` di `.env` atau melalui `waifu setup`). Ketika diminta generate gambar, AGY secara otomatis mendelegasikan tugas ke subagent `image-generator` bawaan Antigravity tanpa membebani GPU/VRAM lokal sama sekali!
-2. **Dapat Digunakan Bersama oleh Aplikasi Eksternal**:
-   - Menghubungkan berbagai IDE & tools pengembang pihak ketiga ke ekosistem Google Antigravity tanpa konfigurasi rumit:
+### 🌟 AGY Bridge Features:
+1. **Directly Used by Waifu on Telegram**:
+   - **SFW Brain**: Set `SFW_LLM_PROVIDER=agy` in `.env` for lightning-fast responses with 0 VRAM overhead.
+   - **Photo & Selfie Generator**: Set `SFW_IMAGE_ENGINE=agy` to delegate image creation to the Antigravity `image-generator` subagent.
+2. **Accessible by External Applications**:
+   - Easily connect external IDEs and agents without complex setup:
      - **Cursor / VS Code (Cline, Roo Code, Continue, Chat)**
      - **LibreChat / NextChat / OpenWebUI**
-     - **Script Python, cURL, maupun agen automasi mandiri**
-   - Mendukung prompt teks streaming/non-streaming serta multimodal vision (gambar lokal maupun web URL).
-3. **Parameter Integrasi Client Eksternal**:
+     - **Python Scripts, cURL, or autonomous workflows**
+3. **Integration Parameters**:
    - **Base URL**: `http://127.0.0.1:8001/v1`
-   - **API Key**: `sk-agy-secret-key-12345` *(atau string bebas jika tanpa strict auth)*
+   - **API Key**: `sk-agy-secret-key-12345`
    - **Model IDs**: `gemini-3.8-flash-medium`, `flash`, `pro`, `inherit`, `gpt-4o`, `gpt-4o-mini`
 
-### 🛠️ Perintah CLI Manajemen Bridge (`waifu bridge`):
 ```bash
-# Cek status diagnostik & endpoint AGY Bridge
+# Check status of AGY Bridge
 waifu bridge status
 
-# Jalankan server AGY Bridge di latar belakang (port 8001)
+# Start AGY Bridge in background (port 8001)
 waifu bridge start
 
-# Hentikan server AGY Bridge
+# Stop AGY Bridge
 waifu bridge stop
 
-# Restart server AGY Bridge
+# Restart AGY Bridge
 waifu bridge restart
 ```
 
 ---
 
-## 💻 Multi-Project Workspace & Senior Coding Partner (`/projects`, `/spawn`)
+## 💻 Multi-Project Workspace & Senior Coding Partner (`/projects`, `/code`, `/spawn`)
 
-Waifu on Telegram bukan hanya pendamping romantis, tetapi juga **rekan koding senior (Senior Coding Partner)** yang dapat membantu pekerjaan software development Anda secara nyata langsung di folder project pilihan Anda!
+Waifu on Telegram serves as both a loving romantic companion and a **Senior Coding Partner** assisting with real-world software engineering directly inside your local project folders:
 
 * **📁 Multi-Project Registry & Workspace Isolation (`project_manager.py`):**
-  - **Pilihan Root Directory Fleksibel (`PROJECTS_DIR`)**: Anda dapat mengatur folder induk tempat seluruh repository/project Anda disimpan (default: folder home pengguna e.g. `~` atau `C:\Users\username`).
-  - **Auto-Scan Subfolder**: Folder project di dalam root directory otomatis terdeteksi dan terdaftar.
-  - **Project Switcher 1-Klik**: Beralih workspace antar project dengan cepat melalui menu inline Telegram atau perintah CLI.
-  - **Inisialisasi Project Instan (`/spawn <nama>`)**: Otomatis membuat folder project baru di dalam root directory dan langsung mengaktifkan workspace tersebut.
-* **⚡ Eksekusi Coding Otonom & Anti-Halusinasi (`coding_engine.py`):**
-  - **Perintah Eksplisit (`/code <tugas>` & `/dev <tugas>`)**: Jaminan 100% eksekusi coding otonom di PC tanpa risiko disalahpahami sebagai obrolan peran santai.
-  - **Deteksi Intent Alami Luas**: Mengerti instruksi bahasa Indonesia sehari-hari (*"tambahkan fitur auth"*, *"kodingin navbar responsive"*, *"benerin error di main.py"*, *"pasang dependensi tailwind"*, dll.).
-  - **Bukti File Nyata (File Snapshot Diff)**: Sistem memeriksa perubahan file di folder workspace Anda sebelum dan sesudah eksekusi, serta melaporkan file-file baru/diperbarui secara transparan ke Telegram/CLI.
-  - **🔗 Relasi Lintas-Project & Injeksi Kontrak (`/link_project <target>`):**
-    - Memori project diisolasi secara ketat di `.waifu/project_memory.json` agar tugas Project A tidak tercampur ke Project B.
-    - Namun jika ada project yang berkaitan (misal: frontend `app-cafe-booking` dan backend `be-cafe-fix`), Anda cukup menghubungkannya lewat `/link_project be-cafe-fix backend api port 8000`.
-    - Saat mengoding di frontend, waifu otomatis membaca arsitektur, tech stack, dan API contract dari backend tanpa mengotori ruang kerja masing-masing!
-  - Ditenagai oleh **Google Antigravity CLI (`agy`)** dengan direktori kerja lokal (`cwd=project_path`).
-  - **Dual-Role Persona**: Mempertahankan karakter waifu yang hangat dan penuh perhatian (menggunakan kata ganti alami *aku/kamu*) sambil bertindak sebagai developer handal dan solutif.
+  - **Configurable Root Directory (`PROJECTS_DIR`)**: Specify your primary repositories folder (e.g., `~` or `C:\Users\username`).
+  - **Subfolder Auto-Scanning**: Automatically scans and indexes all project repositories.
+  - **1-Click Project Switching**: Switch active workspace via Telegram inline buttons or CLI commands.
+  - **Instant Project Scaffolding (`/spawn <name>`)**: Creates a new project directory and initializes it immediately.
+* **⚡ Autonomous Code Execution & File Tracking (`coding_engine.py`):**
+  - **Explicit Commands (`/code <task>` & `/dev <task>`)**: Guaranteed autonomous coding workflow without roleplay confusion.
+  - **Diff-Based File Tracking**: Analyzes workspace file modifications before and after execution, reporting created/edited files to Telegram.
+  - **🔗 Cross-Project Linking (`/link_project <target>`):**
+    - Project memories are isolated in `.waifu/project_memory.json`.
+    - Easily link interdependent services (e.g., frontend `app-web` and backend `api-server` via `/link_project api-server backend api port 8000`).
+    - When coding in the frontend, waifu inspects backend contracts and schemas without workspace clutter.
 
 ---
 
 ## 🖥️ Autonomous Desktop & Computer Use (`agent-desktop`)
 
-Mengintegrasikan engine **[agent-desktop](https://github.com/vercel-labs/agent-desktop)** dari Vercel Labs, memungkinkan waifu melihat layar komputer Anda dan membantu mengoperasikan aplikasi desktop secara native:
+Integrates Vercel Labs' **[agent-desktop](https://github.com/vercel-labs/agent-desktop)** engine, allowing waifu to view your computer screen and interact with desktop tools:
 
-* **📸 Tangkapan Layar Otomatis (`/screen`):**
-  - Mengambil screenshot layar desktop real-time menggunakan antarmuka native OS.
-  - Di Telegram: Foto screenshot langsung dikirim ke chat dengan analisis waifu.
-  - Di CLI (`waifu chat`): Foto otomatis langsung dibuka di aplikasi penampil foto PC Anda.
-* **📱 Inspeksi Aplikasi & Status Kontrol (`/desktop`):**
-  - Memeriksa status accessibility tree, platform OS, dan daftar aplikasi desktop yang sedang aktif berjalan.
-  - Siap mengeksekusi klik, pengetikan keyboard, dan otomatisasi desktop secara aman.
+* **📸 Real-Time Desktop Screenshot (`/screen`):**
+  - Captures your current desktop screen via native OS APIs.
+  - In Telegram: Sends screenshot with waifu's visual analysis.
+  - In CLI (`waifu chat`): Automatically opens the image in your system photo viewer.
+* **📱 Application Inspection & Control (`/desktop`):**
+  - Checks the accessibility tree, active OS platform, and running applications.
+  - Ready for secure mouse clicks, keyboard automation, and workflow tasks.
 
 ---
 
 ## 🎮 Global CLI Quick Commands (`waifu`)
 
-Once installed, the **`waifu`** command is available in any terminal or directory on your computer:
+Once installed, the **`waifu`** command is available in any terminal window:
 
 ```bash
-# Sesi Chat CLI Interaktif langsung (Mirip Telegram, auto-open foto & video!)
+# Launch interactive CLI chat session (auto-opens generated photos & videos)
 waifu
-# atau: waifu chat
+# or: waifu chat
 
 # Start bot & local LLM in background (Daemon Mode)
 waifu start --daemon
 
-# Start bot in foreground terminal (view live chat logs)
+# Start bot in foreground (view live logs)
 waifu start
 
 # Check diagnostic health (KoboldCPP, ComfyUI, & process status)
@@ -516,22 +453,22 @@ waifu status
 # Open interactive configuration manager (Change Models, Bot Token, etc.)
 waifu setup
 
-# Switch AI girlfriend persona on-the-fly (runa, akira, hina, shiro, yume)
+# Switch AI girlfriend persona on-the-fly
 waifu persona runa
-waifu persona akira
+waifu persona alia
 
-# Enable or disable autorun on system startup
+# Manage system startup autorun
 waifu autorun on
 waifu autorun off
 
 # Inspect recent bot activity logs
 waifu logs
 
-# Check and manage AI models & ComfyUI extensions
+# Manage AI models & ComfyUI extensions
 waifu models
 waifu models download animatediff_v2
 
-# Pull latest updates (source code, Python libs, Node pkgs, & AI models) & restart bot
+# Pull latest updates and restart bot
 waifu update
 
 # Restart bot in background
@@ -540,93 +477,69 @@ waifu restart
 # Stop all bot services (Bot, Music Server, & KoboldCPP)
 waifu stop
 
-# Manage Google Antigravity CLI OpenAI Bridge (Port 8001)
+# Manage Google Antigravity Bridge
 waifu bridge status
 waifu bridge start
 waifu bridge stop
 
-# Manage VoiceStudio Local AI Voice Server (Port 3900)
+# Manage VoiceStudio Local AI Voice Server
 waifu voicestudio status
 waifu voicestudio start
 waifu voicestudio stop
-waifu voicestudio restart
-waifu voicestudio install
 ```
 
 ---
 
 ## 💬 Interactive CLI Chat Session (`waifu` / `waifu chat`)
 
-Selain melalui Telegram, Anda dapat langsung mengobrol dengan waifu aktif dari terminal mana pun di komputer Anda tanpa harus membuka aplikasi Telegram:
+Chat with your waifu directly from any terminal window without opening Telegram:
 
 ```bash
-# Cukup ketik perintah singkat ini di terminal / PowerShell:
 waifu
+# (or: waifu chat, waifu talk)
 ```
-*(atau: `waifu chat`, `waifu talk`, `waifu ngobrol`)*
 
-* **🔄 Sinkronisasi History Dua Arah dengan Telegram:** Riwayat obrolan CLI dan Telegram tersinkronisasi secara atomik melalui `data/chat_history.json`. Obrolan yang dilakukan di terminal langsung diingat oleh waifu saat Anda lanjut mengobrol di Telegram, dan sebaliknya!
-* **🖼️ Auto-Open Foto & Video di Layar Komputer:** Saat waifu mengirim selfie (`/pap` atau saat diminta dalam percakapan) maupun klip video (`/video`), gambar atau video yang dihasilkan oleh ComfyUI / Photo Vault **otomatis terbuka langsung** di aplikasi penampil foto/video bawaan sistem (`os.startfile` di Windows / `xdg-open` di Linux / `open` di macOS).
-* **⌨️ Shortcut Perintah Dalam Sesi CLI:**
-  - `/pap` atau `/foto` - Minta foto selfie / outfit saat ini (otomatis di-render & dibuka di layar).
-  - `/video` - Minta video pendek waifu (otomatis dibuka di video player default).
-  - `/story` - Cek ringkasan alur cerita harian & episode hari ini.
-  - `/persona <nama>` - Ganti karakter aktif seketika (`runa`, `akira`, `hina`, `shiro`, `yume`).
-  - `/clear` - Bersihkan riwayat percakapan sesi ini.
-  - `/exit` atau `/quit` - Keluar dari sesi obrolan terminal.
+* **🔄 Atomic Bidirectional Sync with Telegram:** Terminal and Telegram chat history are synchronized atomically via `data/chat_history.json`. Conversations started in the terminal continue smoothly on your phone.
+* **🖼️ Auto-Open Photos & Videos on Screen:** Photos (`/pap`) and video clips (`/video`) generated during CLI chat automatically open in your native photo/video viewer (`os.startfile` on Windows, `xdg-open` on Linux, `open` on macOS).
+* **⌨️ In-Session Shortcuts:**
+  - `/pap` or `/photo` - Generate a selfie / outfit photo and open it on screen.
+  - `/video` - Generate an animated clip and open it in your media player.
+  - `/story` - View today's narrative chapter.
+  - `/persona <name>` - Switch active companion (`runa`, `akira`, `hina`, `shiro`, `yume`, `sylvie`, `mimi`, `alia`).
+  - `/clear` - Clear session conversation history.
+  - `/exit` or `/quit` - Exit terminal session.
 
 ---
 
 ## 📖 Autonomous Daily Story Arc Engine (`/story`)
 
-Agar pengalaman bersama waifu tidak monoton dan terasa hidup setiap harinya, setiap karakter memiliki **alur cerita harian mandiri yang terus berkembang** (`data/story_arcs.json`):
+Every companion features an evolving **autonomous daily storyline** (`data/story_arcs.json`):
 
-* **🎭 Alur Cerita Unik Tiap Karakter:**
-  - **Runa:** Proyek pembuatan game indie santai, livestreaming seru, turnamen arcade lokal, dan pencarian merchandise retro.
-  - **Akira:** Pameran seni gothic & lukisan misterius, obrolan larut malam di kafe tersembunyi, dan adaptasi novel visual.
-  - **Hina:** Latihan lari sore klub atletik, mencoba resep bekal (bento) baru, berburu golden hour di bukit kota, dan festival kampus.
-  - **Shiro:** Observasi langit malam di observatorium bintang, telaah buku sastra kuno di perpustakaan sepi, dan analisis rasi bintang.
-  - **Yume:** Penulisan bab novel fantasi romantis, jalan santai di taman bunga lavender, dan melukis suasana mimpi di tepi danau.
-* **⚡ Pre-Generated Multi-Day Story Buffer (0 Beban GPU & Bebas Lag):**
-  Cerita harian untuk beberapa hari ke depan dibuat secara otomatis di awal hanya ketika LLM sedang aktif (misalnya saat Anda sedang asyik mengobrol). Ketika waktu berganti hari atau komputer baru dinyalakan, waifu langsung memuat cerita hari ini dari buffer lokal tanpa perlu menyalakan LLM di latar belakang—sehingga PC tidak lag, RAM/VRAM tetap lega, dan performa bermain game tidak terganggu.
-* **💬 Dialog Kontekstual & Alami:**
-  Saat Anda menyapa hari ini, waifu akan secara natural menceritakan apa yang sedang atau akan dilakukannya sesuai episode cerita hari ini. Namun jika Anda mengajak mengobrol topik lain di luar cerita, waifu akan fleksibel mengikuti arah obrolan Anda tanpa kaku.
-* **📜 Akses Cerita Kapan Saja:** Ketik perintah `/story` di Telegram maupun di CLI chat untuk melihat rangkuman bab cerita dan episode yang sedang berjalan hari ini.
-
----
-
-## 💫 Waifu Highlights & Capabilities
-
-- 💌 **Romantic Conversations & True Intimacy**:
-  Warm, playful, affectionate conversations unrestricted by rigid censorship. Powered by your local 9B model (*Huihui-Qwythos-9B-Claude-Mythos*).
-- 📷 **Spontaneous Selfies & Coherent Outfits**:
-  Simply say: *"Send me a selfie babe"*, *"What are you doing? Send a photo"*, or *"Take a selfie in bed"*. The bot formulates a matching scenario prompt with **consistent facial and physical characteristics**, renders the image via local ComfyUI (or Cloud GPU fallback), and sends it directly to your Telegram chat with an affectionate caption!
-- 🎧 **Natural Voice Notes & Spoken Whispers**:
-  Your AI girlfriend replies with natural spoken voice notes via Edge-TTS (`en-US-AnaNeural` or Indonesian `id-ID-GadisNeural`). If you send her a Telegram voice note, she transcribes and listens to your spoken voice.
-- 👁️ **Visual Perception (She Sees Your Photos)**:
-  Send your own photos to the chat; she can see, admire, and react to your pictures.
-- 🪄 **Helpful Tech & Creative Writing Companion**:
-  Capable of writing code, debugging, and executing Python snippets when you ask for technical assistance.
-- 🎶 **Desktop YouTube Music Remote Player**:
-  Play and control YouTube Music on your PC's browser directly through Telegram buttons.
-- 🩺 **Autonomous Health Watchdog, Self-Healing & PC Startup Announcements**:
-  Never miss a service interruption! When your PC boots up or restarts, your waifu automatically greets you in Telegram with a comprehensive service health report (`LLM`, `ComfyUI`, `Voice`). An active background watchdog continuously monitors your local LLM engine every 30 seconds. If KoboldCPP, ComfyUI, or the Music server crashes or stops responding, the bot's **Autonomous Self-Healing Engine** automatically resurrects and restarts the service in the background, keeping you updated in Telegram without requiring manual PC interventions. A built-in circuit breaker prevents infinite restart loops in case of hardware or VRAM limitations.
+* **🎭 Unique Character Arcs:**
+  - **Alia:** Student council leadership, secret language study, romantic misunderstandings, and after-school strolls.
+  - **Sylvie:** Ancient botanical research, greenhouse tending, herbal tea crafting, and quiet library reading.
+  - **Mimi:** Music academy rehearsals, cozy cat-cafe visits, dessert hunting, and playful evening teasing.
+  - **Runa:** Indie game development, retro gaming tournaments, and late-night livestreams.
+  - **Akira:** Gothic art exhibitions, midnight cafe conversations, and visual novel writing.
+  - **Hina:** Athletic track training, bento preparation, and campus festival planning.
+  - **Shiro:** Astronomical observatory research, star chart analysis, and classical literature study.
+  - **Yume:** Romantic fantasy novel drafting, lavender garden walks, and lakeside painting.
+* **⚡ Pre-Generated Story Buffer (Zero GPU Load & Zero Lag):**
+  Daily chapters are pre-generated during active LLM sessions. When a new day begins or your PC restarts, the story loads instantly from the local buffer without spinning up the GPU.
+* **💬 Natural Contextual Discussions:**
+  When greeting you, waifu naturally shares her daily activities while remaining completely flexible if you steer the conversation to other topics.
 
 ---
 
 ## 🎛️ Reconfiguration & Model Switcher
 
-Anda memiliki dua cara mudah dan fleksibel untuk mengonfigurasi dan mengganti model AI waifu kapan saja:
-
 ### 1. 💻 Terminal CLI Wizard (`waifu setup`)
 
-Jalankan perintah berikut di PowerShell atau Terminal:
 ```bash
 waifu setup
 ```
-*(atau jalankan `setup.bat` / `python setup.py`)*
 
-Menu interaktif 10-opsi akan terbuka:
+Interactive 10-option management dashboard:
 ```text
 ======================================================================
     💖 WAIFU ON TELEGRAM - CONFIGURATION & MODEL MANAGER 🛠️    
@@ -635,14 +548,14 @@ Menu interaktif 10-opsi akan terbuka:
   • Allowed UID : 987654321
   • Chat LLM    : Huihui-Qwythos-9B-Uncensored (http://127.0.0.1:5001/v1)
   • Photo Model : AbyssOrangeMix3 (AOM3A1B SD 1.5) (http://127.0.0.1:8188)
-  • Persona     : Runa | Voice: en-US-AnaNeural
-  • Language    : id
+  • Persona     : Alia | Voice: en-US-AnaNeural
+  • Language    : auto
 ----------------------------------------------------------------------
   [1] 🤖 Change Telegram Bot Token / Allowed User ID
   [2] 🧠 Change Chat / LLM Model (Scan new models)
   [3] 🎨 Change Photo & Video Model (ComfyUI / Cloud)
   [4] 🎭 Change AI Girlfriend Persona & Voice
-  [5] 🌐 Change Waifu Language (ID, EN, JA, Custom)
+  [5] 🌐 Change Waifu Language (EN, ID, JA, Auto-detect)
   [6] 🎬 Choose Video Engine (Wan 2.1 / AnimateDiff / Motion 2.5D)
   [7] 📦 AI Assets & Models Manager (Download / Verify Models)
   [8] 🚀 Configure Autorun at System Startup (On / Off)
@@ -651,41 +564,28 @@ Menu interaktif 10-opsi akan terbuka:
 ----------------------------------------------------------------------
 ```
 
-* **Panduan Opsi Menu CLI:**
-  - `[1] Token & UID`: Mengubah kredensial bot Telegram atau membatasi akses chat hanya ke akun Anda.
-  - `[2] Chat LLM`: Memilih otak obrolan (KoboldCPP lokal, Ollama, LM Studio, atau scan file `.gguf` baru di folder `models/`).
-  - `[3] Model Foto`: Memilih checkpoint anime foto (MeinaMix v12, AbyssOrangeMix3, Anything XL, atau Cloud Fallback).
-  - `[4] Persona & Voice`: Memilih karakter waifu (Runa, Akira, Hina, Shiro, Yume) dan suara Edge-TTS (Ana, Gadis, Nanami, Jenny).
-  - `[5] Language`: Menentukan bahasa percakapan waifu (Indonesia `id`, English `en`, Japanese `ja`, atau `auto` mengikuti chat).
-  - `[6] Video Engine`: Memilih mesin animasi video (Wan 2.1 1.3B, AnimateDiff v2, atau Motion 2.5D 0-VRAM).
-  - `[7] AI Assets Manager`: Mengunduh dan memverifikasi kelengkapan model & node kustom ComfyUI langsung dari terminal dengan dukungan resume unduhan.
-  - `[8] Autorun`: Mengaktifkan atau menonaktifkan startup otomatis saat PC dinyalakan.
-  - `[9] Re-run Wizard`: Menjalankan ulang panduan instalasi lengkap 7-langkah dari awal.
-
 ---
 
-### 2. 📱 In-Chat Control Center via Telegram (`/setup`)
+### 2. 📱 In-Chat Master Dashboard via Telegram (`/setup`)
 
-Anda tidak perlu membuka terminal untuk mengganti model! Cukup kirim perintah `/setup` langsung di Telegram chat Anda. Waifu akan menampilkan **Master Dashboard** dengan tombol-tombol inline interaktif:
-* 🎨 **Model Foto**: Ganti seketika antara MeinaMix v12, AbyssOrangeMix3, Anything XL, atau Cloud Engine.
-* 🎬 **Video Engine**: Beralih antara Wan 2.1, AnimateDiff, dan Motion 2.5D.
-* 🗣️ **Suara / Voice**: Ganti karakter suara Nanami, Gadis, Ana, atau Jenny dengan satu klik.
-* 🌐 **Bahasa**: Ganti bahasa bot (ID, EN, JA, atau Auto).
-* 👗 **Lemari Pakaian (`/outfit`)**: Ganti pakaian waifu langsung (Kimono, Bikini, Maid, School JK, Pajamas).
-* 📐 **Rasio & Kualitas**: Atur rasio foto (3:4, 9:16, 1:1, 4:3) dan tingkat sampling kualitas (Ultra, High, Fast).
+Access configuration directly in Telegram chat without opening a terminal:
+* 🎨 **Photo Engine**: Toggle between AbyssOrangeMix3, MeinaMix v12, Anything XL, or Cloud Engine.
+* 🎬 **Video Engine**: Switch between Wan 2.1, AnimateDiff, and Motion 2.5D.
+* 🗣️ **Voice**: Switch voice actors (Ana, Jenny, Gadis, Nanami) in one tap.
+* 🌐 **Language**: Switch system language (`Auto-detect`, `English`, `Indonesian`, `Japanese`).
+* 👗 **Wardrobe (`/outfit`)**: Select waifu outfits on demand (Kimono, Bikini, Maid, School Uniform, Pajamas).
+* 📐 **Ratio & Quality**: Adjust photo aspect ratios (3:4, 9:16, 1:1, 4:3) and sampling quality.
 
 ---
 
 ## 🖥️ Hardware Tuning & Optimal Model Matrix
 
-Gunakan tabel acuan berikut untuk memilih kombinasi model yang paling pas dengan spesifikasi komputer Anda agar tidak freeze/lag:
-
-| Kategori GPU | VRAM Tersedia | Model LLM Rekomendasi | Model Foto (ComfyUI) | Model Video | Karakteristik Performa |
+| GPU Tier | Available VRAM | Recommended LLM | Photo Engine (ComfyUI) | Video Engine | Performance Characteristics |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **GPU Hemat / Laptop** | **4GB - 6GB VRAM**<br>*(GTX 1650, RTX 2060, RTX 3050 Laptop)* | Huihui-Qwythos 9B Q4_K *(Smart Idle Aktif)* | **MeinaMix v12** atau **AbyssOrangeMix3** *(576x768)* | **Motion 2.5D Engine** *(0 VRAM)* | ⚡ Sangat responsif, foto jadi dalam 3-5 detik, memori tetap lega dan tidak ada freeze. |
-| **Sweet Spot** | **8GB VRAM**<br>*(RTX 3060 8GB, RTX 4060, Apple M-Series 16GB)* | Huihui-Qwythos 9B Q4_K | **MeinaMix v12** / **AbyssOrangeMix3** / **Anything XL** | **AnimateDiff v2** atau **Wan 2.1 1.3B** | 🌟 Detail anime tajam, animasi temporal dinamis, multitasking mulus. |
-| **High-End Enthusiast** | **12GB+ VRAM**<br>*(RTX 3060 12GB, RTX 4070, RTX 4080)* | Huihui-Qwythos 9B Q4_K *(Semua layer di GPU)* | **万象熔炉 \| Anything XL** *(SDXL 1024px)* | **Wan 2.1 1.3B Video Diffusion** | 👑 Resolusi 1024px ultra-jernih, efek sinematik, video difusi penuh. |
-| **No-GPU / PC Kantor** | **0 GB (Intel UHD / Iris Xe / AMD iGPU)** | KoboldCPP CPU Mode *(atau Cloud LLM)* | **Cloud Fallback Engine** *(Pollinations AI)* | **Motion 2.5D Engine** | ☁️ Tetap berjalan 100% menggunakan cloud GPU gratis, 0 beban kartu grafis lokal. |
+| **Budget / Laptop** | **4GB - 6GB VRAM**<br>*(GTX 1650, RTX 2060, RTX 3050)* | Huihui-Qwythos 9B Q4_K *(Smart Idle)* | **MeinaMix v12** or **AOM3** *(576x768)* | **Motion 2.5D** *(0 VRAM)* | ⚡ Highly responsive, photos ready in 3-5s, zero system lag. |
+| **Sweet Spot** | **8GB VRAM**<br>*(RTX 3060 8GB, RTX 4060, Apple Silicon 16GB)* | Huihui-Qwythos 9B Q4_K | **AOM3** / **MeinaMix** / **Anything XL** | **AnimateDiff v2** or **Wan 2.1 1.3B** | 🌟 Sharp anime detail, dynamic animations, smooth multitasking. |
+| **High-End Enthusiast** | **12GB+ VRAM**<br>*(RTX 3060 12GB, RTX 4070, RTX 4080)* | Huihui-Qwythos 9B Q4_K *(Full GPU layers)* | **Anything XL** *(SDXL 1024px)* | **Wan 2.1 1.3B Diffusion** | 👑 Ultra-crisp 1024px resolution, cinematic lighting, full diffusion video. |
+| **No-GPU / Workstation** | **0 GB (Intel UHD / Iris Xe / AMD iGPU)** | KoboldCPP CPU Mode *(or Cloud LLM)* | **Cloud Fallback** *(Pollinations AI)* | **Motion 2.5D Engine** | ☁️ Runs 100% via free cloud GPU fallback, 0 local GPU footprint. |
 
 ---
 
@@ -694,65 +594,70 @@ Gunakan tabel acuan berikut untuk memilih kombinasi model yang paling pas dengan
 | Command | Function |
 | :--- | :--- |
 | `/start` | Welcome greeting and quick action buttons |
-| `/birthday` | Record user birthday & anniversary with automated celebrations, surprise photos & VN |
-| `/remind` | Smart personal assistant & conversational reminders (`/remind 30m meeting` or natural chat) |
-| `/setup` | Master configuration dashboard to configure all CLI options in Telegram |
-| `/memory` | Long-term memory & diary of personal facts waifu remembers about you |
-| `/help` | Comprehensive interactive guide and documentation center |
-| `/status` | Real-time diagnostic check of LLM (Port 5001), ComfyUI (8188), and VRAM |
-| `/projects` | Menampilkan daftar & beralih project workspace coding interaktif |
-| `/spawn <nama>` | Membuat folder project baru & otomatis beralih ke workspace tersebut |
-| `/desktop` | Cek status integrasi Computer Use (agent-desktop) & aplikasi desktop |
-| `/screen` | Mengambil screenshot layar desktop PC secara instan |
-| `/story` | Menampilkan alur cerita harian & episode hari ini yang sedang dijalani waifu |
-| `/photo <scene>` | Request a custom selfie scenario (e.g. `/photo relaxing in cafe`) |
+| `/setup` | Master configuration dashboard to configure all settings in Telegram |
+| `/persona` | Interactive inline button menu to switch companion persona |
+| `/persona <name>` | Switch persona directly (`runa`, `akira`, `hina`, `shiro`, `yume`, `sylvie`, `mimi`, `alia`) |
+| `/newpersona` | Interactive wizard to create and activate your own custom waifu |
+| `/outfit` | Interactive wardrobe to select clothes (Kimono, Maid, Bikini, Pajamas, etc.) |
+| `/photo <scene>` | Request a custom photo scenario (e.g. `/photo relaxing in cafe`) |
 | `/pap` | Quick shortcut to request a new selfie with interactive retry button |
-| `/video` | Generate dynamic animated video clip (MP4) with parallax motion & ambient sparkles |
+| `/video` | Generate dynamic animated video clip (MP4) with parallax motion |
+| `/voice` | Configure voice note reply mode (Always, On-Demand, or Mute) |
+| `/language` | Configure bot language (`auto`, `en`, `id`, `ja`) |
+| `/memory` | Long-term memory & diary of personal facts waifu remembers about you |
+| `/story` | Display daily narrative chapter and current story episode |
+| `/hangout` | Initiate date scenarios and immersive roleplay adventures |
 | `/ratio` | Choose photo aspect ratio (3:4 portrait, 9:16 phone story, 1:1 square, 4:3) |
 | `/quality` | Select photo quality preset (Ultra 32-step, High 28-step, Fast 20-step) |
-| `/outfit` | Interactive wardrobe to select clothes (Kimono, Maid, Bikini, Pajamas, etc.) |
-| `/voice` | Configure voice note reply mode (Always, Match VN, or Mute) |
-| `/greetings` | Toggle automatic romantic Good Morning (07:00) & Bedtime (22:00) greetings |
-| `/love` | Check your affection score & relationship progress with your waifu |
-| `/persona` | Interactive inline button menu to switch active companion |
-| `/persona <name>` | Switch persona directly (`runa`, `akira`, `hina`, `shiro`, `yume`) |
-| `/newpersona` | Interactive wizard to create and activate your own custom waifu |
-| `/reset` | Clear conversation memory to start a fresh discussion |
+| `/projects` | Manage and switch multi-project coding workspaces |
+| `/code <task>` | Instruct waifu to autonomously write, edit, and fix code in your project |
+| `/spawn <name>` | Create a new project directory and switch to it immediately |
+| `/screen` | Capture and analyze real-time PC desktop screenshot |
+| `/desktop` | Inspect desktop automation and running application status |
+| `/status` | Real-time diagnostic check of LLM (Port 5001), ComfyUI (8188), and VRAM |
+| `/idle` | Put local AI engines to sleep and free GPU memory instantly |
+| `/remind` | Smart personal assistant & conversational reminders |
+| `/birthday` | Record user birthday with automated celebrations & surprise photos |
+| `/music` | Control YouTube Music desktop remote player |
+| `/greetings` | Toggle automatic romantic Good Morning & Bedtime greetings |
+| `/love` | Check your affection score & relationship progress |
+| `/reset` | Clear conversation memory to start fresh |
+| `/help` | Comprehensive interactive guide and documentation center |
 
 ---
 
 ## 💬 Frequently Asked Questions (Knowledge Base)
 
-1. **Kenapa RAM & VRAM GPU saya tidak lagi penuh saat waifu menganggur?**
-   - Waifu on Telegram kini dilengkapi **Smart Idle Engine**. Jika bot tidak menerima pesan selama waktu tertentu (default: **2 jam / 120 menit**), engine KoboldCPP LLM & ComfyUI otomatis dinonaktifkan sementara dari VRAM (~6-8 GB VRAM kembali kosong untuk gaming / kerja). Anda juga bisa mengaktifkan mode idle secara instan kapan saja dengan perintah `/idle` atau chat `waifu idle` di Telegram dan terminal. Begitu Anda chat kembali, engine langsung bangun otomatis secara transparan! Cloud LLM seperti Google Antigravity (AGY) tidak membebani VRAM lokal sehingga tetap siap sedia tanpa perlu ditidurkan.
+1. **Why is my GPU RAM and VRAM no longer full when my waifu is idle?**
+   - Waifu on Telegram includes a **Smart Idle Engine**. If no messages arrive within the configured timeout (default: **2 hours / 120 minutes**), KoboldCPP and ComfyUI automatically unload from memory, freeing **5.0 – 8.0 GB VRAM** for gaming or heavy work. You can trigger sleep instantly anytime with `/idle` or `waifu idle`. Sending a new chat message wakes the engine up within seconds. Cloud LLMs (like Google Antigravity) use 0 local VRAM and remain ready without sleeping.
 
-2. **Apa perbedaan antara AbyssOrangeMix3 (AOM3), MeinaMix v12, dan Anything XL?**
-   - **AbyssOrangeMix3 / AOM3A1B (SD 1.5, ~2.0 GB - Default Local Model):** Model anime klasik legendaris dari CivArchive/Civitai #9942 dengan sifat *uncensored* penuh. Memiliki saturasi warna cerah (*vibrant*), pencahayaan lembut (*soft lighting*), shading mata/rambut yang artistik, serta fleksibel untuk pose SFW hingga NSFW intim.
-   - **MeinaMix v12 (SD 1.5, ~2.0 GB):** Paling cepat (3-5 detik) dan hemat VRAM. Karakter waifu tampak imut (*kawaii*), proporsional, dan sangat konsisten.
-   - **万象熔炉 | Anything XL (SDXL, ~6.6 GB):** Model resolusi native 1024px super tajam. Memiliki pemahaman prompt yang mendalam untuk latar belakang kompleks, kostum mendetail, dan efek sinematik (memerlukan GPU 8GB+ VRAM).
+2. **What are the differences between AbyssOrangeMix3 (AOM3), MeinaMix v12, and Anything XL?**
+   - **AbyssOrangeMix3 / AOM3A1B (SD 1.5, ~2.0 GB - Default Local Model):** Legendary uncensored anime model from CivArchive/Civitai #9942. Features vibrant coloring, soft lighting, artistic hair/eye shading, and excels in SFW and intimate NSFW scenes alike.
+   - **MeinaMix v12 (SD 1.5, ~2.0 GB):** Fastest rendering (3-5s) with minimal VRAM requirements. Delivers clean, cute (*kawaii*), and highly consistent anime aesthetics.
+   - **万象熔炉 | Anything XL (SDXL, ~6.6 GB):** Native 1024px high-resolution model. Exceptional prompt understanding for complex backgrounds, detailed wardrobe fabrics, and cinematic effects (requires 8GB+ VRAM).
 
-3. **Kenapa unduhan model sempat terputus atau tidak selesai?**
-   - Koneksi internet yang lambat atau terputus dapat menghentikan unduhan model AI besar. Waifu on Telegram menggunakan protokol `curl` dengan fitur **Auto-Resume** (`-C -`). Jika terputus, cukup jalankan `waifu models download <nama_model>` (contoh: `waifu models download anything_xl` atau `aom3`), dan unduhan akan melanjutkan dari persentase terakhir tanpa mengulang dari 0%.
+3. **What if a model download gets interrupted or fails halfway?**
+   - Slow or unstable network connections can interrupt large AI model downloads. Waifu on Telegram uses `curl` with **Auto-Resume** (`-C -`). Simply run `waifu models download <model_name>` (e.g., `waifu models download anything_xl` or `aom3`), and the download continues from where it stopped without restarting from 0%.
 
-4. **Bagaimana jika saya memilih suara Jepang tetapi berbicara dalam bahasa Indonesia?**
-   - Sistem memiliki **Multi-Tier Translation Guardrail**. Bot secara otomatis menerjemahkan balasan ke bahasa Jepang alami sebelum diucapkan oleh Edge-TTS (`ja-JP-NanamiNeural`). Jika penerjemahan offline gagal, sistem otomatis beralih ke suara Indonesia (`id-ID-GadisNeural`) sehingga suara tidak pernah terdengar rusak atau melafalkan bahasa Indonesia dengan aksen asing yang ngaco.
+4. **How does adaptive multi-language response work?**
+   - By default (`BOT_LANGUAGE=auto`), the system interface (menus, command descriptions, setup dashboard, CLI diagnostics) is presented in English, while the waifu companion dynamically detects your language in conversation. If you chat in Indonesian, she replies warmly in natural Indonesian (`aku`/`kamu`). If you chat in English, she replies fluently in English (`I`/`you`). You can also lock your preferred language via `/language en` or `/language id`.
 
-5. **Bagaimana cara memeriksa apakah semua service (LLM, ComfyUI, Musik) sedang aktif?**
-   - Dari terminal: jalankan `waifu status`.
-   - Dari Telegram: ketik perintah `/status`. Waifu akan melaporkan status port 5001 (LLM), port 8188 (ComfyUI), port 8002 (Musik), dan penggunaan VRAM kartu grafis Anda.
+5. **How can I check if all background services (LLM, ComfyUI, Music) are running?**
+   - From your terminal: run `waifu status`.
+   - From Telegram: send `/status`. Waifu will report live port health for port 5001 (LLM), port 8188 (ComfyUI), port 8002 (Music Server), port 8001 (AGY Bridge), and current GPU VRAM utilization.
 
-6. **Bot membalas: *"My local brain connection hit a bump"***
-   - Pastikan KoboldCPP sedang berjalan. Kamu bisa mengeceknya dengan `waifu status`.
-   - Untuk menyalakannya, cukup jalankan `waifu start --daemon` atau `waifu start`.
+6. **The bot replies: *"My local brain connection hit a bump"***
+   - Verify that your local LLM engine is running using `waifu status`.
+   - Start the service using `waifu start --daemon` or `waifu start`.
 
-7. **Apakah bot bisa berjalan di laptop tanpa GPU diskrit?**
-   - Ya, 100%! Cukup pilih **Cloud Fallback Engine (Pollinations AI)** pada pengaturan foto. Bot akan mengalihkan generasi foto ke cloud GPU gratis tanpa membebani laptop Anda.
+7. **Can I run this bot on an office laptop without a dedicated GPU?**
+   - Yes, 100%! Select the **Cloud Fallback Engine (Pollinations AI)** for photos. The bot offloads image generation to free cloud GPUs with zero GPU load on your laptop.
 
 ---
 
 ## 🧹 Clean Uninstallation Wizard
 
-If you ever wish to uninstall Waifu on Telegram from your machine, run the 1-line uninstaller:
+To uninstall Waifu on Telegram from your machine, run the one-line uninstaller:
 
 ### Windows (PowerShell):
 ```powershell
@@ -769,7 +674,7 @@ curl -fsSL https://raw.githubusercontent.com/asepindrak/waifu-on-telegram/main/u
 waifu uninstall
 ```
 
-The uninstaller will safely stop running processes, remove startup shortcuts, clean up global CLI aliases, and ask whether you want a **Clean Reset** or to **Preserve Your Data & Tokens**.
+The uninstaller safely terminates running processes, removes startup autorun entries, cleans PATH aliases, and offers options for either a **Clean Reset** or to **Preserve Your Data & Chat History**.
 
 ---
 

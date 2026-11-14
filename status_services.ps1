@@ -1,4 +1,4 @@
-﻿# Health & Status Checker for Waifu on Telegram
+# Health & Status Checker for Waifu on Telegram
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 $bullet = [char]0x2022
 $vPath = Join-Path $PSScriptRoot "VERSION"
