@@ -934,38 +934,32 @@ def _execute_update():
             sz = info_huihui.get("current_size_mb", 0) if info_huihui else 0
             print(c(GREEN, f"  ✓ Core Chat Brain '{info_huihui['name']}' is ready ({sz} MB)."))
 
-        # Auto-switch to Huihui if user has other models (Qwen, Stheno, Llama)
+        # Ensure a default uncensored model is set if none is configured
         try:
             from setup import read_env, write_env
             env_dict = read_env()
-            cur_llm = env_dict.get("LLM_MODEL", "").lower()
-            cur_local = env_dict.get("LOCAL_LLM_MODEL", "").lower()
-            cur_nsfw = env_dict.get("NSFW_LLM_MODEL", "").lower()
+            cur_llm = env_dict.get("LLM_MODEL", "").strip()
+            cur_local = env_dict.get("LOCAL_LLM_MODEL", "").strip()
+            cur_nsfw = env_dict.get("NSFW_LLM_MODEL", "").strip()
             huihui_fn = "Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q4_K.gguf"
-            is_using_other = any(
-                "qwen" in m or "stheno" in m or "llama" in m
-                for m in [cur_llm, cur_local, cur_nsfw]
-            )
-            if is_using_other:
-                print(c(CYAN, f"\n🔄 Activating default uncensored Huihui model: {huihui_fn}..."))
-                changed = False
-                if any(x in cur_llm for x in ("qwen", "stheno", "llama")):
-                    env_dict["LLM_MODEL"] = huihui_fn
-                    os.environ["LLM_MODEL"] = huihui_fn
-                    changed = True
-                if any(x in cur_local for x in ("qwen", "stheno", "llama")):
-                    env_dict["LOCAL_LLM_MODEL"] = huihui_fn
-                    os.environ["LOCAL_LLM_MODEL"] = huihui_fn
-                    changed = True
-                if any(x in cur_nsfw for x in ("qwen", "stheno", "llama")):
-                    env_dict["NSFW_LLM_MODEL"] = huihui_fn
-                    os.environ["NSFW_LLM_MODEL"] = huihui_fn
-                    changed = True
-                if changed:
-                    write_env(env_dict)
-                    print(c(GREEN, f"  ✓ Default uncensored Huihui model ({huihui_fn}) successfully activated!"))
+            changed = False
+            if not cur_local or cur_local.lower() in ("default", "none"):
+                env_dict["LOCAL_LLM_MODEL"] = huihui_fn
+                os.environ["LOCAL_LLM_MODEL"] = huihui_fn
+                changed = True
+            if not cur_nsfw or cur_nsfw.lower() in ("default", "none"):
+                env_dict["NSFW_LLM_MODEL"] = huihui_fn
+                os.environ["NSFW_LLM_MODEL"] = huihui_fn
+                changed = True
+            if not cur_llm or cur_llm.lower() in ("default", "none"):
+                env_dict["LLM_MODEL"] = huihui_fn
+                os.environ["LLM_MODEL"] = huihui_fn
+                changed = True
+            if changed:
+                write_env(env_dict)
+                print(c(GREEN, f"  ✓ Default uncensored model ({huihui_fn}) configured."))
         except Exception as e_env:
-            logger.debug(f"Auto-select error: {e_env}")
+            logger.debug(f"Default model init error: {e_env}")
 
         # 2. Vision Adapter for Huihui: qwythos_vision mmproj
         info_vis = asset_manager.get_asset_info("qwythos_vision")
