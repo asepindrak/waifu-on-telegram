@@ -5281,13 +5281,46 @@ def sanitize_waifu_tone_and_pronouns(text: Optional[str]) -> str:
     return res
 
 
+def is_duplicate_or_near_echo(candidate: Optional[str], reference: Optional[str]) -> bool:
+    """
+    Checks if a candidate caption or message duplicates or near-echoes a reference text
+    (e.g. preventing a follow-up photo caption from repeating the conversational chat reply).
+    """
+    if not candidate or not reference:
+        return False
+
+    c_norm = re.sub(r'[*_`~]', '', candidate).strip().lower()
+    r_norm = re.sub(r'[*_`~]', '', reference).strip().lower()
+    if not c_norm or not r_norm:
+        return False
+
+    if c_norm == r_norm:
+        return True
+
+    # Check substantial substring match
+    if len(c_norm) >= 20 and (c_norm in r_norm or r_norm in c_norm):
+        return True
+
+    # Word-level overlap: if >= 65% of words in candidate already appear in reference
+    c_words = [w for w in re.findall(r'\b\w{3,}\b', c_norm)]
+    r_words = set(re.findall(r'\b\w{3,}\b', r_norm))
+    if len(c_words) >= 4 and r_words:
+        common = [w for w in c_words if w in r_words]
+        overlap_ratio = len(common) / float(len(c_words))
+        if overlap_ratio >= 0.65:
+            return True
+
+    return False
+
+
 def sanitize_chat_caption(
     text: Optional[str],
     fallback: str,
     user_prompt: str = "",
-    detected_scene: str = ""
+    detected_scene: str = "",
+    previous_reply: Optional[str] = None
 ) -> str:
-    """Cleans up influencer, YouTuber, vlogger, AI refusal, and hallucinated location/furniture discrepancies from captions."""
+    """Cleans up influencer, YouTuber, vlogger, AI refusal, hallucinated location/furniture discrepancies, and duplicate replies from captions."""
     if not text:
         return fallback
     clean = text.strip()
@@ -5298,6 +5331,9 @@ def sanitize_chat_caption(
         clean = clean[1:-1].strip()
     if is_ai_refusal(clean):
         logger.warning(f"AI refusal detected in unquoted caption ('{clean[:60]}...'). Reverting to sweet fallback.")
+        return fallback
+    if previous_reply and is_duplicate_or_near_echo(clean, previous_reply):
+        logger.warning(f"Caption duplicates previous conversational reply ('{clean[:60]}...'). Reverting to distinct fallback.")
         return fallback
     # Strip social media greetings & broadcast phrases
     clean = re.sub(r'^(?:sori\s+gaes|halo\s+gaes|hai\s+gaes|gaes|guys|temen-temen|teman-teman)[,\s!.]*', '', clean, flags=re.IGNORECASE)
@@ -5605,6 +5641,9 @@ def process_photo_request(
 
             history = persona_mgr.get_chat_history(user_id)
             clean_recent_turns = [m for m in history[-8:] if not m.get("content", "").startswith("[")][-6:]
+            if conversational_reply and clean_recent_turns and clean_recent_turns[-1].get("role") == "assistant":
+                if is_duplicate_or_near_echo(clean_recent_turns[-1].get("content", ""), conversational_reply):
+                    clean_recent_turns = clean_recent_turns[:-1]
 
             # Notify user if primary image engine failed and fallback was used
             # Suppress noisy warning banner when smart daily fallback is already active for the day
@@ -5673,15 +5712,16 @@ def process_photo_request(
                     caption_user_prompt = (
                         f"Recent chat exchange:\n"
                         f"- Your partner said: \"{actual_user_msg}\"\n"
-                        f"- You just replied: \"{conversational_reply}\"\n\n"
+                        f"- You already replied in chat: \"{conversational_reply[:120]}...\"\n\n"
                         f"Photo context you are sending now:\n"
                         f"- Scene & setting: {detected_scene}\n"
                         f"{outfit_context}\n\n"
-                        f"CAPTION GUIDELINES (STRICT CONSISTENCY RULE):\n"
-                        f"1. Write 1 sweet, playful, and affectionate caption sentence in natural English continuing the conversation above.\n"
-                        f"2. Match the setting ('{detected_scene}') and outfit ('{outfit_label}').\n"
-                        f"3. Focus on feelings, intimacy, and sweet interaction.\n"
-                        f"4. Write ONLY the caption sentence (10-25 words, maximum 1-2 sentences):"
+                        f"CAPTION GUIDELINES (STRICT ANTI-DUPLICATION RULE):\n"
+                        f"1. DO NOT REPEAT or copy your previous chat reply! This photo caption MUST be a completely NEW and DIFFERENT sentence.\n"
+                        f"2. Write 1 sweet, playful, or blushing caption sentence while handing over this photo (natural English, 10-25 words, maximum 1-2 sentences).\n"
+                        f"3. Match the setting ('{detected_scene}') and outfit ('{outfit_label}').\n"
+                        f"4. Focus on feelings, intimacy, and sweet interaction.\n"
+                        f"5. Write ONLY the new caption sentence (maximum 1-2 sentences):"
                     )
                 else:
                     caption_user_prompt = (
@@ -5699,19 +5739,20 @@ def process_photo_request(
                 )
                 if conversational_reply:
                     caption_user_prompt = (
-                        f"Obrolan terakhir:\n"
+                        f"Konteks Interaksi:\n"
                         f"- Pasanganmu berkata: \"{actual_user_msg}\"\n"
-                        f"- Kamu baru saja membalas di chat: \"{conversational_reply}\"\n\n"
+                        f"- Kamu sudah membalas di pesan chat: \"{conversational_reply[:120]}...\"\n\n"
                         f"Konteks foto yang kamu kirimkan saat ini:\n"
                         f"- Lokasi & Suasana Nyata di Foto: {indo_scene} ({detected_scene})\n"
                         f"{outfit_context}\n\n"
-                        f"PETUNJUK CAPTION FOTO (WAJIB DIPATUHI - STRICT CONSISTENCY RULE):\n"
-                        f"1. Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, gunakan 'aku' dan 'kamu') yang MELANJUTKAN ALAMI alur obrolan di atas.\n"
-                        f"2. KESELARASAN LOKASI (MUTLAK): Lokasi nyata kamu di foto adalah {indo_scene}! DILARANG menyebut sofa jika di foto sedang di kasur/kamar tidur, DILARANG menyebut kasur jika di sofa/dapur/meja, dan DILARANG menyebut 'sebelum berangkat' jika tidak ada obrolan mau pergi/berangkat!\n"
-                        f"3. FOKUS PADA AKSI, PERASAAN & INTERAKSI: Bicarakan apa yang sedang kalian rasakan atau lakukan secara natural (contoh: 'Udah nyaman banget rebahan di kasur nih, jangan berhenti mijit kakiku ya, enak banget~').\n"
-                        f"4. JANGAN MEMAKSAKAN MENYEBUT NAMA BAJU: Jangan menyebut nama pakaian secara kaku KECUALI jika pasanganmu memang sedang bertanya soal baju atau sedang pamer outfit baru!\n"
-                        f"5. DILARANG membuat caption generik seperti 'ini pap buat kamu' jika sedang membicarakan kegiatan/topik tertentu!\n"
-                        f"6. Tulis langsung caption pendekmu (maksimal 1-2 kalimat):"
+                        f"PETUNJUK CAPTION FOTO (WAJIB DIPATUHI - STRICT ANTI-DUPLICATION):\n"
+                        f"1. DILARANG KERAS MENGULANG atau MENYALIN isi balasan chat kamu sebelumnya! Caption foto ini WAJIB kalimat BARU yang segar dan berbeda dari pesan chat.\n"
+                        f"2. Tulis 1 kalimat caption manis, manja, atau sedikit malu saat memperlihatkan fotomu ini ke pasanganmu (Bahasa Indonesia, gunakan 'aku' dan 'kamu', maksimal 1-2 kalimat pendek).\n"
+                        f"3. KESELARASAN LOKASI (MUTLAK): Lokasi nyata kamu di foto adalah {indo_scene}! DILARANG menyebut sofa jika di foto sedang di kasur/kamar tidur, DILARANG menyebut kasur jika di sofa/dapur/meja, dan DILARANG menyebut 'sebelum berangkat' jika tidak ada obrolan mau pergi/berangkat!\n"
+                        f"4. FOKUS PADA AKSI, PERASAAN & INTERAKSI: Bicarakan apa yang sedang kalian rasakan atau lakukan secara natural.\n"
+                        f"5. JANGAN MEMAKSAKAN MENYEBUT NAMA BAJU: Jangan menyebut nama pakaian secara kaku KECUALI jika pasanganmu memang sedang bertanya soal baju atau sedang pamer outfit baru!\n"
+                        f"6. DILARANG membuat caption generik seperti 'ini pap buat kamu' jika sedang membicarakan kegiatan/topik tertentu!\n"
+                        f"7. Tulis langsung caption barumu (maksimal 1-2 kalimat):"
                     )
                 else:
                     caption_user_prompt = (
@@ -5738,6 +5779,41 @@ def process_photo_request(
                 caption, _ = llm_client.chat(caption_prompt, max_tokens=110, is_nsfw=is_nsfw_caption)
                 if caption:
                     caption = enforce_concise_chat_reply(caption, max_sentences=2, max_chars=220)
+                if conversational_reply and caption and is_duplicate_or_near_echo(caption, conversational_reply):
+                    logger.warning(
+                        f"Photo caption echoed conversational reply! (Caption: '{caption[:50]}...'). "
+                        f"Retrying with negative constraint..."
+                    )
+                    retry_cap_prompt = [
+                        {
+                            "role": "system",
+                            "content": (
+                                persona.get("system_instruction", "") +
+                                nude_guidance +
+                                cap_guide
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Tulis 1 kalimat caption BARU yang manis, manja, dan santai (maksimal 15 kata) "
+                                f"saat kamu memperlihatkan fotomu ({indo_scene}, {outfit_label}). "
+                                f"DILARANG MENGULANG kalimat ini: \"{conversational_reply[:80]}\"."
+                                if not is_en else
+                                f"Write 1 completely NEW, sweet, and cute caption sentence (max 15 words) "
+                                f"as you share your photo ({detected_scene}, {outfit_label}). "
+                                f"DO NOT REPEAT this text: \"{conversational_reply[:80]}\"."
+                            )
+                        }
+                    ]
+                    try:
+                        retry_cap, _ = llm_client.chat(retry_cap_prompt, max_tokens=60, is_nsfw=is_nsfw_caption)
+                        if retry_cap and not is_duplicate_or_near_echo(retry_cap, conversational_reply):
+                            caption = enforce_concise_chat_reply(retry_cap, max_sentences=2, max_chars=220)
+                        else:
+                            caption = None
+                    except Exception:
+                        caption = None
             except Exception as e_cap:
                 logger.warning(f"Could not generate dynamic photo caption from LLM: {e_cap}")
                 caption = None
@@ -5826,7 +5902,7 @@ def process_photo_request(
                     fallback_caption = "Ini foto manis dari galeri albumku yaa~ 🥰"
                 else:
                     fallback_caption = "Ini pap spesial buat kamu, suka ga? 🥰"
-            clean_caption = sanitize_chat_caption(caption, fallback_caption, user_prompt=actual_user_msg, detected_scene=detected_scene)
+            clean_caption = sanitize_chat_caption(caption, fallback_caption, user_prompt=actual_user_msg, detected_scene=detected_scene, previous_reply=conversational_reply)
             fallback_tag = " _(Automatic Fallback)_" if fallback_notice else ""
             full_caption = f"{format_roleplay_italics(clean_caption, character_name=persona.get('name', 'Runa'))}\n\n📷 *Model:* `{source}`{fallback_tag}"
 
@@ -6087,6 +6163,9 @@ def process_video_request(
 
             history = persona_mgr.get_chat_history(user_id)
             clean_recent_turns = [m for m in history[-4:] if not m.get("content", "").startswith("[")]
+            if conversational_reply and clean_recent_turns and clean_recent_turns[-1].get("role") == "assistant":
+                if is_duplicate_or_near_echo(clean_recent_turns[-1].get("content", ""), conversational_reply):
+                    clean_recent_turns = clean_recent_turns[:-1]
 
             nude_guidance = ""
             if is_nude:
@@ -6114,10 +6193,11 @@ def process_video_request(
                 caption_prompt.append({
                     "role": "user",
                     "content": (
-                        f"Boyfriend said: \"{user_text}\".\n"
-                        f"You already replied in chat: \"{conversational_reply}\".\n"
+                        f"Interaction Context:\n"
+                        f"- Boyfriend said: \"{user_text}\".\n"
+                        f"- You already replied in chat: \"{conversational_reply[:120]}...\".\n\n"
                         f"Now you are delivering the video clip you just recorded (Setting: '{detected_scene}', wearing: '{outfit_label}').\n"
-                        f"Write 1 sweet, natural, playful girlfriend delivery caption for this video (1-2 short sentences):"
+                        f"STRICT ANTI-DUPLICATION RULE: DO NOT REPEAT your previous chat reply! Write 1 completely NEW, sweet, natural, and playful girlfriend delivery caption for this video (1-2 short sentences):"
                     )
                 })
             else:
@@ -6132,6 +6212,9 @@ def process_video_request(
 
             try:
                 caption, _ = llm_client.chat(caption_prompt, max_tokens=120, is_nsfw=is_nude)
+                if conversational_reply and caption and is_duplicate_or_near_echo(caption, conversational_reply):
+                    logger.warning("Video caption duplicated conversational reply, discarding duplicate.")
+                    caption = None
             except Exception:
                 caption = None
 
@@ -6144,7 +6227,7 @@ def process_video_request(
                 fallback_caption = "Pagi sayang! Semangat ya hari ini, ini video manis buat kamu~ 💕"
             else:
                 fallback_caption = "Ini video manis buat kamu sayang, suka ga? 🥰"
-            clean_caption = sanitize_chat_caption(caption, fallback_caption, user_prompt=user_text, detected_scene=detected_scene)
+            clean_caption = sanitize_chat_caption(caption, fallback_caption, user_prompt=user_text, detected_scene=detected_scene, previous_reply=conversational_reply)
 
             if status_msg and hasattr(status_msg, "message_id"):
                 try:

@@ -131,6 +131,62 @@ class TestAntiParrotingAndConversationHistory(unittest.TestCase):
         self.assertEqual(history[0]["role"], "assistant")
         self.assertIn("makan siang", history[0]["content"].lower())
 
+    def test_is_duplicate_or_near_echo_catches_repetition(self):
+        """Detects exact and near-echo repetition between photo caption and chat reply."""
+        prev_reply = (
+            "Runa spats softly against her lower stomach before reaching down to unlasp the metal clasp of her panties with trembling fingers.\n\n"
+            "Wahh… makasih dong pujiannya sampai tiba-tiba bikin aku kaget. Makin deg-degan kalau harus ngaku lagi apa-apaan di depan Adens."
+        )
+
+        # 1. Exact identical match
+        self.assertTrue(bot.is_duplicate_or_near_echo(prev_reply, prev_reply))
+
+        # 2. Markdown variation / minor whitespace
+        cand_md = f"*{prev_reply}*"
+        self.assertTrue(bot.is_duplicate_or_near_echo(cand_md, prev_reply))
+
+        # 3. Substring of dialogue or roleplay paragraph
+        cand_sub = "Wahh… makasih dong pujiannya sampai tiba-tiba bikin aku kaget. Makin deg-degan kalau harus ngaku lagi apa-apaan di depan Adens."
+        self.assertTrue(bot.is_duplicate_or_near_echo(cand_sub, prev_reply))
+
+        # 4. Completely different caption sentence -> must return False
+        distinct_caption = "Sekarang cuma pakai BH sama celana dalam aja... jangan diliatin terus dong, malu tau~ 😳💕"
+        self.assertFalse(bot.is_duplicate_or_near_echo(distinct_caption, prev_reply))
+
+        distinct_en = "Just in my delicate lace lingerie set for you... don't stare too much sweetie~ 😳💕"
+        self.assertFalse(bot.is_duplicate_or_near_echo(distinct_en, prev_reply))
+
+        # 5. Empty or None handling
+        self.assertFalse(bot.is_duplicate_or_near_echo("", prev_reply))
+        self.assertFalse(bot.is_duplicate_or_near_echo(distinct_caption, None))
+
+    def test_sanitize_chat_caption_rejects_duplicate_previous_reply(self):
+        """Sanitizer safely intercepts duplicate captions and substitutes distinct context fallback."""
+        prev_chat = "Wahh makasih banyak ya sayang udah muji aku, jadi tersipu malu deh."
+        dup_caption = "Wahh makasih banyak ya sayang udah muji aku, jadi tersipu malu deh."
+        fallback = "Ini foto spesial buat kamu sayang, suka ga? 🥰"
+
+        res = bot.sanitize_chat_caption(
+            dup_caption,
+            fallback=fallback,
+            user_prompt="buka celanamu",
+            detected_scene="bedroom",
+            previous_reply=prev_chat
+        )
+        self.assertEqual(res, fallback)
+
+        # Distinct caption is preserved
+        fresh_caption = "Kancing celananya udah kebuka nih... kamu suka liatnya? 🙈💕"
+        res_fresh = bot.sanitize_chat_caption(
+            fresh_caption,
+            fallback=fallback,
+            user_prompt="buka celanamu",
+            detected_scene="bedroom",
+            previous_reply=prev_chat
+        )
+        self.assertIn("kebuka", res_fresh)
+        self.assertNotEqual(res_fresh, fallback)
+
 
 if __name__ == "__main__":
     unittest.main()
