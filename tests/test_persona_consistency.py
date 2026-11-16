@@ -1,0 +1,91 @@
+import unittest
+from persona_manager import PersonaManager, DEFAULT_PERSONAS, PERSONA_OUTFIT_COLORS
+from student_schedule import STUDENT_PROFILES
+
+class TestPersonaConsistency(unittest.TestCase):
+    def setUp(self):
+        self.pm = PersonaManager()
+
+    def test_sylvie_hair_and_accessory_consistency(self):
+        sylvie = self.pm.personas.get("sylvie")
+        self.assertIsNotNone(sylvie)
+        vt = sylvie.get("visual_traits", "")
+        np = sylvie.get("negative_prompt", "")
+
+        # Sylvie hair must be explicitly weighted golden-blonde
+        self.assertIn("golden-blonde hair", vt)
+        self.assertNotIn("golden-platinum", vt)
+        
+        # Leaf clip must be golden to prevent green color bleeding into hair
+        self.assertIn("golden leaf hair clip", vt)
+        self.assertNotIn("emerald leaf hair ornament", vt)
+
+        # Negative prompt must strictly forbid green and white/silver hair
+        self.assertIn("(green hair:1.6)", np)
+        self.assertIn("(white hair:1.6)", np)
+        self.assertIn("(silver hair:1.6)", np)
+
+    def test_shiro_visual_traits_isolated_from_outfit(self):
+        shiro = self.pm.personas.get("shiro")
+        vt = shiro.get("visual_traits", "")
+        # Should not have hardcoded jacket, blouse, or bedroom
+        self.assertNotIn("dark navy jacket", vt)
+        self.assertNotIn("lying on bed", vt)
+        self.assertNotIn("bedroom background", vt)
+        # Should ban blonde/pink/green hair
+        np = shiro.get("negative_prompt", "")
+        self.assertIn("(blonde hair:1.6)", np)
+        self.assertIn("(pink hair:1.5)", np)
+
+    def test_yume_visual_traits_isolated_from_outfit(self):
+        yume = self.pm.personas.get("yume")
+        vt = yume.get("visual_traits", "")
+        # Should not have hardcoded cardigan
+        self.assertNotIn("oversized lavender cardigan", vt)
+        # Should ban conflicting hair colors
+        np = yume.get("negative_prompt", "")
+        self.assertIn("(blonde hair:1.6)", np)
+        self.assertIn("(green hair:1.5)", np)
+
+    def test_all_personas_have_strict_hair_negative_prompts(self):
+        for key in ["runa", "akira", "hina", "shiro", "yume", "sylvie", "mimi", "alia"]:
+            p = self.pm.personas.get(key)
+            self.assertIsNotNone(p, f"Persona {key} missing")
+            np = p.get("negative_prompt", "")
+            if key == "runa":
+                self.assertIn("blonde hair", np)
+                self.assertIn("black hair", np)
+            elif key == "akira":
+                self.assertIn("blonde hair", np)
+                self.assertIn("white hair", np)
+            elif key == "hina":
+                self.assertIn("black hair", np)
+                self.assertIn("pink hair", np)
+            elif key == "sylvie":
+                self.assertIn("green hair", np)
+                self.assertIn("white hair", np)
+            elif key == "alia":
+                self.assertIn("blonde hair", np)
+                self.assertIn("green hair", np)
+
+    def test_auto_outfit_defaults_to_iconic_outfit_when_no_scenario(self):
+        # When user just asks "pap dong" with auto outfit mode, waifu should wear iconic default outfit
+        user_id = 998877
+        self.pm.set_active_persona("sylvie")
+        self.pm.set_user_outfit(user_id, "default")
+        outfit_prompt, outfit_neg, is_nude, outfit_name = self.pm.detect_clothing_intent("pap dong", user_id=user_id)
+        self.assertIn("Pakaian Khas Karakter", outfit_name)
+        self.assertIn("emerald-green and white tunic dress", outfit_prompt)
+
+    def test_sylvie_and_mimi_schedule_palette_alignment(self):
+        # Sylvie pajamas and romantic outfits in student_schedule match PERSONA_OUTFIT_COLORS
+        sylvie_sched = STUDENT_PROFILES["sylvie"]
+        self.assertIn("emerald-green and white silk camisole", sylvie_sched["pajamas_outfit"])
+        self.assertIn("sheer white and emerald silk slip dress", sylvie_sched["romantic_outfit"])
+
+        # Mimi pajamas match PERSONA_OUTFIT_COLORS
+        mimi_sched = STUDENT_PROFILES["mimi"]
+        self.assertIn("cream silk camisole", mimi_sched["pajamas_outfit"])
+
+if __name__ == "__main__":
+    unittest.main()
