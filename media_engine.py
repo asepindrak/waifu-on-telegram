@@ -552,9 +552,9 @@ class MediaEngine:
                 if progress_callback and (time.time() - last_cb_time >= 3.0):
                     last_cb_time = time.time()
                     if elapsed_sec < 10:
-                        progress_callback(f"Memuat model {m_label} ke GPU... ({elapsed_sec}s)")
+                        progress_callback(f"Loading {m_label} model into GPU... ({elapsed_sec}s)")
                     else:
-                        progress_callback(f"Merender gambar waifu ({m_label}, {elapsed_sec}s)...")
+                        progress_callback(f"Rendering image ({m_label}, {elapsed_sec}s)...")
 
                 try:
                     h_res = requests.get(f"{self.comfyui_url}/history/{prompt_id}", timeout=5)
@@ -580,7 +580,7 @@ class MediaEngine:
                         outputs = task.get("outputs", {})
                         if "9" in outputs and "images" in outputs["9"]:
                             if progress_callback:
-                                progress_callback("Mendekode gambar & menyempurnakan hasil... ✨")
+                                progress_callback("Decoding latent & refining image... ✨")
                             img_info = outputs["9"]["images"][0]
                             img_name = img_info["filename"]
                             subfolder = img_info.get("subfolder", "")
@@ -745,7 +745,7 @@ class MediaEngine:
                         import bot
                         if hasattr(bot, "idle_engine") and bot.idle_engine:
                             if progress_callback:
-                                progress_callback("Membangunkan studio foto lokal ComfyUI... ⏳")
+                                progress_callback("Waking up local ComfyUI studio... ⏳")
                             bot.idle_engine.wake_comfyui()
                     except Exception as e_wake:
                         logger.warning(f"Could not wake ComfyUI on-demand: {e_wake}")
@@ -869,7 +869,7 @@ class MediaEngine:
             return None
 
         if progress_callback:
-            progress_callback("Menghubungkan ke Google Antigravity (AGY Image Generator)... 🎨")
+            progress_callback("Connecting to Google Antigravity (AGY Image Generator)... 🎨")
 
         agy_effective_prompt = prompt
         if negative_prompt:
@@ -915,7 +915,7 @@ class MediaEngine:
                 "response_format": "b64_json"
             }
             if progress_callback:
-                progress_callback("AGY image-generator sedang merender gambar... ✨")
+                progress_callback("AGY image-generator is rendering photo... ✨")
             res = requests.post(bridge_url, json=req_body, timeout=120)
             if res.status_code == 200:
                 data = res.json()
@@ -950,7 +950,7 @@ class MediaEngine:
         t0 = time.time()
         try:
             if progress_callback:
-                progress_callback("Menjalankan subagent image-generator via agy CLI... ✨")
+                progress_callback("Running image-generator subagent via agy CLI... ✨")
             proc = subprocess.run(
                 [agy_bin, "-p", instruction, "--dangerously-skip-permissions"],
                 capture_output=True,

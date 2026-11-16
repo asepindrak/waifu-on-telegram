@@ -1573,7 +1573,7 @@ def callback_memory_actions(call):
     mid = call.message.message_id
 
     if call.data in ('mem_action:dashboard', 'mem_action:refresh', 'open_memory_menu'):
-        bot.answer_callback_query(call.id, "Memuat buku ingatan...")
+        bot.answer_callback_query(call.id, "Loading memory book...")
         show_memory_dashboard(chat_id, user_id, message_to_edit=mid)
 
     elif call.data == 'mem_action:add_hint':
@@ -1820,7 +1820,7 @@ def callback_reminder_actions(call):
     mid = call.message.message_id
 
     if call.data in ('rem_action:dashboard', 'rem_action:refresh', 'open_reminders_menu'):
-        bot.answer_callback_query(call.id, "Memuat pengingat...")
+        bot.answer_callback_query(call.id, "Loading reminders...")
         show_reminders_dashboard(chat_id, user_id, message_to_edit=mid)
 
     elif call.data.startswith('add_rem_quick:'):
@@ -2152,7 +2152,7 @@ def callback_special_dates(call):
     mid = call.message.message_id
 
     if call.data in ('dates_act:dashboard', 'dates_act:refresh', 'open_dates_menu'):
-        bot.answer_callback_query(call.id, "Memuat hari spesial...")
+        bot.answer_callback_query(call.id, "Loading special dates...")
         show_special_dates_dashboard(chat_id, user_id, message_to_edit=mid)
 
     elif call.data == 'dates_act:prompt_birthday':
@@ -2200,7 +2200,7 @@ def callback_special_dates(call):
 
     elif call.data.startswith('dates_act:preview:'):
         e_type = call.data.split(":", 2)[2]
-        bot.answer_callback_query(call.id, f"🎉 Menyiapkan simulasi kejutan {e_type}... 💕")
+        bot.answer_callback_query(call.id, f"🎉 Preparing surprise simulation for {e_type}... 💕")
         u_dates = anniversary_engine.get_user_dates(user_id)
         info = u_dates.get(e_type) or {}
         years = (datetime.date.today().year - info["year"]) if info.get("year") else None
@@ -4639,7 +4639,7 @@ def callback_resend_photo(call):
             process_photo_request(call, "last")
             return
 
-        bot.answer_callback_query(call.id, "🚀 Mengirimkan ulang foto dari memori...", show_alert=False)
+        bot.answer_callback_query(call.id, "🚀 Resending photo from memory...", show_alert=False)
         img_bytes = last.get("img_bytes")
         full_caption = last.get("full_caption") or "Ini fotoku untukmu yaa~ 💕"
         clean_caption = last.get("clean_caption") or full_caption
@@ -4670,7 +4670,7 @@ def callback_resend_photo(call):
                 USER_PENDING_RESEND_MSG_ID.pop(user_id, None)
             else:
                 logger.error(f"Error in resend_photo callback: {e_send}", exc_info=True)
-                safe_send_message(chat_id, f"⚠️ Masih belum berhasil mengirimkan foto: `{e_send}`")
+                safe_send_message(chat_id, f"⚠️ Failed to send photo: `{e_send}`")
     finally:
         photo_tracker.release_resend(user_id)
 
@@ -4691,7 +4691,7 @@ def callback_regen_video(call):
         scene = last.get("detected_scene")
         outfit = last.get("outfit_label")
         is_nude = last.get("is_nude")
-        bot.answer_callback_query(call.id, "🎬 Merekam video dari foto...")
+        bot.answer_callback_query(call.id, "🎬 Recording video from photo...")
         process_video_request(
             call,
             orig_text,
@@ -4980,10 +4980,10 @@ def callback_play_voice(call):
         text_to_speak = call.message.caption
 
     if not text_to_speak:
-        bot.answer_callback_query(call.id, "⚠️ Teks tidak ditemukan untuk disuarakan.", show_alert=False)
+        bot.answer_callback_query(call.id, "⚠️ Text not found for voice synthesis.", show_alert=False)
         return
 
-    bot.answer_callback_query(call.id, "🎙️ Menyiapkan suara waifu... ✨")
+    bot.answer_callback_query(call.id, "🎙️ Preparing waifu voice... ✨")
 
     try:
         bot.send_chat_action(chat_id, "record_voice")
@@ -4992,7 +4992,7 @@ def callback_play_voice(call):
 
     orig_markup = getattr(call.message, "reply_markup", None)
     try:
-        loading_markup = _rebuild_voice_button_markup(orig_markup, "⏳ Sedang memproses suara... 💕", "noop_voice_loading")
+        loading_markup = _rebuild_voice_button_markup(orig_markup, "⏳ Processing voice... 💕", "noop_voice_loading")
         bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=loading_markup)
     except Exception:
         pass
@@ -5405,11 +5405,11 @@ def process_photo_request(
         p_name = persona_mgr.get_active_persona().get("name", "Aku")
         if is_callback:
             try:
-                bot.answer_callback_query(target.id, text=f"Sabar ya sayang, {p_name} lagi menyiapkan foto nih... Tunggu sampai selesai ya! 💕", show_alert=False)
+                bot.answer_callback_query(target.id, text=f"Please wait darling, {p_name} is preparing your photo... Almost ready! 💕", show_alert=False)
             except Exception:
                 pass
         else:
-            safe_reply_to(reply_to_target, f"🌸 *{p_name}*: Sabar ya sayang, foto sebelumnya lagi aku siapkan nih... Tunggu sampai selesai yaa! 💕")
+            safe_reply_to(reply_to_target, f"🌸 *{p_name}*: Please wait, sweetie! Your previous photo is still being prepared... Almost ready! 💕")
         return
 
     def _execute():
@@ -5552,7 +5552,7 @@ def process_photo_request(
                 if status_msg and hasattr(status_msg, "message_id"):
                     try:
                         safe_edit_message_text(
-                            f"📸 *{persona.get('name')} lagi mengambil foto untukmu...* 💕\n⏳ _{stage_text}_",
+                            f"📸 *{persona.get('name')} is taking a photo for you...* 💕\n⏳ _{stage_text}_",
                             chat_id=chat_id,
                             message_id=status_msg.message_id,
                             parse_mode="Markdown"
@@ -5586,16 +5586,16 @@ def process_photo_request(
                 USER_LAST_PHOTO_CONTEXT[user_id]["img_bytes"] = img_bytes
 
             if not img_bytes:
-                err_detail = getattr(media_engine, "last_error", None) or "ComfyUI tidak memberikan respon."
+                err_detail = getattr(media_engine, "last_error", None) or "ComfyUI did not respond."
                 fail_text = (
-                    f"⚠️ *Fotonya gagal dibuat...*\n\n"
-                    f"⚠️ **Penyebab:**\n`{err_detail}`\n\n"
-                    f"💡 *Pastikan ComfyUI lokal aktif di `{COMFYUI_URL}` dengan model anime (seperti MeinaMix atau Anything XL).*"
+                    f"⚠️ *Photo generation failed...*\n\n"
+                    f"⚠️ **Reason:**\n`{err_detail}`\n\n"
+                    f"💡 *Make sure local ComfyUI is active at `{COMFYUI_URL}` with an anime model (such as MeinaMix or Anything XL).*"
                 )
                 fail_markup = types.InlineKeyboardMarkup(row_width=2)
                 fail_markup.add(
-                    types.InlineKeyboardButton("🔄 Coba Lagi", callback_data="regen_photo:last"),
-                    types.InlineKeyboardButton("⚙️ Panel Setup", callback_data="cfg_submenu:dashboard")
+                    types.InlineKeyboardButton("🔄 Try Again", callback_data="regen_photo:last"),
+                    types.InlineKeyboardButton("⚙️ Setup Panel", callback_data="cfg_submenu:dashboard")
                 )
                 if status_msg and hasattr(status_msg, "message_id"):
                     safe_edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id, reply_markup=fail_markup)
@@ -5656,21 +5656,49 @@ def process_photo_request(
             if "Vault" in source:
                 vault_guidance = " [Primary image engine was unavailable; you are happily sending a matching saved photo from your private album]."
 
-            is_asking_outfit = any(k in (actual_user_msg or "").lower() for k in ["baju", "outfit", "pakaian", "pake apa", "pakai apa", "liat baju", "lihat baju", "pamer"])
+            is_asking_outfit = any(k in (actual_user_msg or "").lower() for k in ["baju", "outfit", "pakaian", "pake apa", "pakai apa", "liat baju", "lihat baju", "pamer", "wearing", "clothes"])
             indo_scene = persona_mgr.get_indonesian_scene_desc(detected_scene)
-            outfit_context = (
-                f"- Pakaian yang kamu kenakan: {outfit_label}{vault_guidance}\n"
-                f"Pasanganmu bertanya soal pakaianmu, sebutkan secara manis dan santai apa yang kamu kenakan di foto."
-                if is_asking_outfit else
-                f"- Pakaian visual di foto: {outfit_label}{vault_guidance}\n"
-                f"PENTING: Jangan terus-menerus menyebut kata pakaian (DILARANG kaku menyebut 'pakai baju ini', 'pakai piyama begini', dll). Pasanganmu tidak menanyakan baju, jadi fokuskan caption pada perasaan, suasana tempat, dan obrolanmu!"
-            )
+            u_lang = persona_mgr.get_user_language(user_id) if hasattr(persona_mgr, "get_user_language") else BOT_LANGUAGE
+            is_en = (u_lang == "en") or (persona_mgr.detect_text_language(actual_user_msg) == "en" and u_lang != "id")
 
-            caption_prompt.extend(clean_recent_turns)
-            if conversational_reply:
-                caption_prompt.append({
-                    "role": "user",
-                    "content": (
+            if is_en:
+                outfit_context = (
+                    f"- Outfit you are wearing: {outfit_label}{vault_guidance}\n"
+                    f"Your partner asked about your outfit, mention what you are wearing naturally and sweetly."
+                    if is_asking_outfit else
+                    f"- Visual outfit in photo: {outfit_label}{vault_guidance}\n"
+                    f"NOTE: Focus on mood, feelings, and your partner; do not awkwardly force clothing names unless asked!"
+                )
+                if conversational_reply:
+                    caption_user_prompt = (
+                        f"Recent chat exchange:\n"
+                        f"- Your partner said: \"{actual_user_msg}\"\n"
+                        f"- You just replied: \"{conversational_reply}\"\n\n"
+                        f"Photo context you are sending now:\n"
+                        f"- Scene & setting: {detected_scene}\n"
+                        f"{outfit_context}\n\n"
+                        f"CAPTION GUIDELINES (STRICT CONSISTENCY RULE):\n"
+                        f"1. Write 1 sweet, playful, and affectionate caption sentence in natural English continuing the conversation above.\n"
+                        f"2. Match the setting ('{detected_scene}') and outfit ('{outfit_label}').\n"
+                        f"3. Focus on feelings, intimacy, and sweet interaction.\n"
+                        f"4. Write ONLY the caption sentence (10-25 words, maximum 1-2 sentences):"
+                    )
+                else:
+                    caption_user_prompt = (
+                        f"Your partner said: \"{actual_user_msg}\".\n"
+                        f"You send this photo (Setting: '{detected_scene}', Outfit: '{outfit_label}'{vault_guidance}).\n"
+                        f"Write 1 sweet, affectionate caption sentence in natural English greeting your partner and matching this photo (maximum 1-2 sentences):"
+                    )
+            else:
+                outfit_context = (
+                    f"- Pakaian yang kamu kenakan: {outfit_label}{vault_guidance}\n"
+                    f"Pasanganmu bertanya soal pakaianmu, sebutkan secara manis dan santai apa yang kamu kenakan di foto."
+                    if is_asking_outfit else
+                    f"- Pakaian visual di foto: {outfit_label}{vault_guidance}\n"
+                    f"PENTING: Jangan terus-menerus menyebut kata pakaian (DILARANG kaku menyebut 'pakai baju ini', 'pakai piyama begini', dll). Pasanganmu tidak menanyakan baju, jadi fokuskan caption pada perasaan, suasana tempat, dan obrolanmu!"
+                )
+                if conversational_reply:
+                    caption_user_prompt = (
                         f"Obrolan terakhir:\n"
                         f"- Pasanganmu berkata: \"{actual_user_msg}\"\n"
                         f"- Kamu baru saja membalas di chat: \"{conversational_reply}\"\n\n"
@@ -5685,18 +5713,17 @@ def process_photo_request(
                         f"5. DILARANG membuat caption generik seperti 'ini pap buat kamu' jika sedang membicarakan kegiatan/topik tertentu!\n"
                         f"6. Tulis langsung caption pendekmu (maksimal 1-2 kalimat):"
                     )
-                })
-            else:
-                caption_prompt.append({
-                    "role": "user",
-                    "content": (
+                else:
+                    caption_user_prompt = (
                         f"Pasanganmu berkata: \"{actual_user_msg}\".\n"
                         f"Kamu mengirim foto momen ini (Lokasi nyata: '{indo_scene}', Suasana: '{detected_scene}', Visual pakaian: '{outfit_label}'{vault_guidance}).\n"
                         f"STRICT CONSISTENCY RULE:\n"
                         f"- Lokasi foto adalah {indo_scene}. DILARANG menyebut sofa jika sedang di kasur, dilarang menyebut kasur jika di sofa/dapur, dan dilarang menyebut 'sebelum berangkat' jika tidak ada yang mengajak pergi!\n"
                         f"- Tulis 1 kalimat caption manis, manja, dan santai (Bahasa Indonesia, aku/kamu) yang menyapa pasanganmu dan sesuai dengan foto ini (fokus pada perasaan & suasana, jangan kaku menyebut nama baju jika tidak ditanya, maksimal 1-2 kalimat):"
                     )
-                })
+
+            caption_prompt.extend(clean_recent_turns)
+            caption_prompt.append({"role": "user", "content": caption_user_prompt})
 
             outfit_low = (outfit_label or "").lower()
             is_intimate_outfit = any(
@@ -5717,47 +5744,88 @@ def process_photo_request(
 
             u_lower = user_text.lower() if user_text else ""
             u_stage = persona_mgr.get_undress_stage(user_id)
-            if (is_nude or is_nsfw_photo or u_stage > 0 or ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)) and (eff_nude_override is not False):
-                stage_captions = {
-                    1: "Kaosnya udah kubuka... tinggal BH sama celana pendek santai nih. Suka liatnya? 🙈💕",
-                    2: "Sekarang cuma pakai BH sama celana dalam aja... jangan diliatin terus dong, malu tau~ 😳💕",
-                    3: "Kaitan BH-nya udah kulepas... dadaku udah kebuka sekarang. Mau kamu sentuh?~ ✨",
-                    4: "Khusus buat kamu ya, sekarang aku udah bener-bener telanjang bulat semuanya... 💕🙈"
-                }
-                fallback_caption = stage_captions.get(
-                    u_stage,
-                    "Ini fotoku lagi pakai set pakaian dalam aja... jangan diliatin terus dong~ 😳💕"
-                    if ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)
-                    else "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕"
-                )
-            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["lab", "laboratorium", "ekstraksi", "sampel", "nimbang", "praktikum"]):
-                fallback_caption = "Lagi fokus praktikum di laboratorium sains nih, istirahat bentar kirim pap buat kamu~ 🥼✨"
-            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["kantor", "office", "kerja", "meeting", "kantoran"]):
-                fallback_caption = "Lagi di kantor nih nyelesein pekerjaan, foto ini spesial buat kamu~ 💼💕"
-            elif "pajama" in outfit_low or "piyama" in outfit_low or "tidur" in outfit_low:
-                fallback_caption = "Udah nyaman banget santai rebahan di kasur kamar nih~ 🌙💕"
-            elif "handuk" in outfit_low or "towel" in outfit_low:
-                fallback_caption = "Baru beres mandi masih seger banget nih, bentar yaa~ 🚿💕"
-            elif any(k in u_lower for k in ["bobo", "tidur", "ngantuk", "malam", "night"]) or any(k in (conversational_reply or "").lower() for k in ["bobo", "tidur", "ngantuk", "malam"]):
-                fallback_caption = "Ini fotoku buat nemenin kamu malam ini yaa~ 🌙💕"
-            elif any(k in u_lower for k in ["pagi", "morning", "bangun"]) or any(k in (conversational_reply or "").lower() for k in ["pagi", "morning", "sarapan"]):
-                fallback_caption = "Pagi! Semangat ya hari ini, ini pap manis buat kamu~ ☀️💕"
-            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["kopi", "ngopi", "kafe", "cafe"]):
-                fallback_caption = "Lagi asyik santai ngopi nih, suka ga fotonya? ☕🥰"
-            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["kosan", "kamar", "apartemen", "sofa", "rebahan"]):
-                fallback_caption = "Lagi santai di kamar nih, nemenin kamu ngobrol~ 🛋️💕"
-            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["makan", "lapar", "kuliner", "camilan", "nyemil", "masak"]):
-                fallback_caption = "Ini makananku hari ini, kelihatannya enak kan? 🍜🥰"
-            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["nugas", "tugas", "kuliah", "kampus", "belajar", "skripsi"]):
-                fallback_caption = "Lagi fokus nugas nih, istirahat bentar kirim foto buat kamu~ 📚✨"
-            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["taman", "jalan", "sejuk", "jogging", "outdoor"]):
-                fallback_caption = "Lagi jalan santai di luar nih, udaranya enak banget~ 🌸🥰"
-            elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["nonton", "film", "movie", "bioskop"]):
-                fallback_caption = "Lagi seru nonton nih, foto ini spesial buat kamu~ 🎬💕"
-            elif "Vault" in source:
-                fallback_caption = "Ini foto manis dari galeri albumku yaa~ 🥰"
+            if is_en:
+                if (is_nude or is_nsfw_photo or u_stage > 0 or ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)) and (eff_nude_override is not False):
+                    stage_captions_en = {
+                        1: "I took off my top... just in my bra and relaxed lounge shorts now. Do you like it? 🙈💕",
+                        2: "Now I'm just wearing my matching lace lingerie set... don't stare too much, it's embarrassing~ 😳💕",
+                        3: "I unhooked my bra... my chest is bare now. Do you want to touch me?~ ✨",
+                        4: "Just for your eyes only, I'm completely naked now... 💕🙈"
+                    }
+                    fallback_caption = stage_captions_en.get(
+                        u_stage,
+                        "Just in my delicate lingerie set for you... don't stare too much~ 😳💕"
+                        if ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)
+                        else "Just for you, keep it between us okay? 💕"
+                    )
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["lab", "laboratorium", "science", "experiment"]):
+                    fallback_caption = "Taking a quick break from our science lab experiment to send you a selfie~ 🥼✨"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["office", "work", "meeting"]):
+                    fallback_caption = "Finishing up some work at the desk, this photo is just for you~ 💼💕"
+                elif "pajama" in outfit_low or "piyama" in outfit_low or "tidur" in outfit_low or "sleep" in outfit_low:
+                    fallback_caption = "So comfy and cozy relaxing in bed right now~ 🌙💕"
+                elif "handuk" in outfit_low or "towel" in outfit_low or "bath" in outfit_low or "shower" in outfit_low:
+                    fallback_caption = "Fresh out of the shower, still warm and glowing~ 🚿💕"
+                elif any(k in u_lower for k in ["bobo", "tidur", "ngantuk", "malam", "night", "sleepy", "bed"]):
+                    fallback_caption = "Here's a sweet photo to keep you company tonight~ 🌙💕"
+                elif any(k in u_lower for k in ["pagi", "morning", "wake"]):
+                    fallback_caption = "Good morning! Sending you some love to brighten your day~ ☀️💕"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["coffee", "kopi", "cafe", "kafe"]):
+                    fallback_caption = "Enjoying a warm drink at the cafe, do you like my picture? ☕🥰"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["room", "kamar", "couch", "sofa", "bed"]):
+                    fallback_caption = "Relaxing comfortably in my room, keeping you company~ 🛋️💕"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["food", "eat", "lunch", "dinner", "makan"]):
+                    fallback_caption = "Here is what I'm having today, looks yummy right? 🍜🥰"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["study", "homework", "nugas", "tugas"]):
+                    fallback_caption = "Taking a little study break to send you a quick snapshot~ 📚✨"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["park", "walk", "outdoor", "taman", "jalan"]):
+                    fallback_caption = "Enjoying a lovely stroll outside, the breeze feels wonderful~ 🌸🥰"
+                elif "Vault" in source:
+                    fallback_caption = "Here is a sweet picture from my private gallery album~ 🥰"
+                else:
+                    fallback_caption = "Here's a special photo just for you, do you like it? 🥰"
             else:
-                fallback_caption = "Ini pap spesial buat kamu, suka ga? 🥰"
+                if (is_nude or is_nsfw_photo or u_stage > 0 or ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)) and (eff_nude_override is not False):
+                    stage_captions = {
+                        1: "Kaosnya udah kubuka... tinggal BH sama celana pendek santai nih. Suka liatnya? 🙈💕",
+                        2: "Sekarang cuma pakai BH sama celana dalam aja... jangan diliatin terus dong, malu tau~ 😳💕",
+                        3: "Kaitan BH-nya udah kulepas... dadaku udah kebuka sekarang. Mau kamu sentuh?~ ✨",
+                        4: "Khusus buat kamu ya, sekarang aku udah bener-bener telanjang bulat semuanya... 💕🙈"
+                    }
+                    fallback_caption = stage_captions.get(
+                        u_stage,
+                        "Ini fotoku lagi pakai set pakaian dalam aja... jangan diliatin terus dong~ 😳💕"
+                        if ("lingerie" in outfit_low or "pakaian dalam" in outfit_low or "bh" in outfit_low)
+                        else "Khusus buat kamu ya, jangan diliatin ke siapa-siapa 💕"
+                    )
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["lab", "laboratorium", "ekstraksi", "sampel", "nimbang", "praktikum"]):
+                    fallback_caption = "Lagi fokus praktikum di laboratorium sains nih, istirahat bentar kirim pap buat kamu~ 🥼✨"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["kantor", "office", "kerja", "meeting", "kantoran"]):
+                    fallback_caption = "Lagi di kantor nih nyelesein pekerjaan, foto ini spesial buat kamu~ 💼💕"
+                elif "pajama" in outfit_low or "piyama" in outfit_low or "tidur" in outfit_low:
+                    fallback_caption = "Udah nyaman banget santai rebahan di kasur kamar nih~ 🌙💕"
+                elif "handuk" in outfit_low or "towel" in outfit_low:
+                    fallback_caption = "Baru beres mandi masih seger banget nih, bentar yaa~ 🚿💕"
+                elif any(k in u_lower for k in ["bobo", "tidur", "ngantuk", "malam", "night"]) or any(k in (conversational_reply or "").lower() for k in ["bobo", "tidur", "ngantuk", "malam"]):
+                    fallback_caption = "Ini fotoku buat nemenin kamu malam ini yaa~ 🌙💕"
+                elif any(k in u_lower for k in ["pagi", "morning", "bangun"]) or any(k in (conversational_reply or "").lower() for k in ["pagi", "morning", "sarapan"]):
+                    fallback_caption = "Pagi! Semangat ya hari ini, ini pap manis buat kamu~ ☀️💕"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["kopi", "ngopi", "kafe", "cafe"]):
+                    fallback_caption = "Lagi asyik santai ngopi nih, suka ga fotonya? ☕🥰"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["kosan", "kamar", "apartemen", "sofa", "rebahan"]):
+                    fallback_caption = "Lagi santai di kamar nih, nemenin kamu ngobrol~ 🛋️💕"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["makan", "lapar", "kuliner", "camilan", "nyemil", "masak"]):
+                    fallback_caption = "Ini makananku hari ini, kelihatannya enak kan? 🍜🥰"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["nugas", "tugas", "kuliah", "kampus", "belajar", "skripsi"]):
+                    fallback_caption = "Lagi fokus nugas nih, istirahat bentar kirim foto buat kamu~ 📚✨"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["taman", "jalan", "sejuk", "jogging", "outdoor"]):
+                    fallback_caption = "Lagi jalan santai di luar nih, udaranya enak banget~ 🌸🥰"
+                elif any(k in f"{u_lower} {(conversational_reply or '').lower()}" for k in ["nonton", "film", "movie", "bioskop"]):
+                    fallback_caption = "Lagi seru nonton nih, foto ini spesial buat kamu~ 🎬💕"
+                elif "Vault" in source:
+                    fallback_caption = "Ini foto manis dari galeri albumku yaa~ 🥰"
+                else:
+                    fallback_caption = "Ini pap spesial buat kamu, suka ga? 🥰"
             clean_caption = sanitize_chat_caption(caption, fallback_caption, user_prompt=actual_user_msg, detected_scene=detected_scene)
             fallback_tag = " _(Automatic Fallback)_" if fallback_notice else ""
             full_caption = f"{format_roleplay_italics(clean_caption, character_name=persona.get('name', 'Runa'))}\n\n📷 *Model:* `{source}`{fallback_tag}"
@@ -5930,11 +5998,11 @@ def process_video_request(
         p_name = persona_mgr.get_active_persona().get("name", "Aku")
         if is_callback:
             try:
-                bot.answer_callback_query(target.id, text=f"Sabar ya sayang, {p_name} lagi menyiapkan video/foto nih... Tunggu sebentar ya! 💕", show_alert=False)
+                bot.answer_callback_query(target.id, text=f"Please wait darling, {p_name} is preparing your video/photo... Almost ready! 💕", show_alert=False)
             except Exception:
                 pass
         else:
-            safe_reply_to(reply_to_target, f"🌸 *{p_name}*: Sabar ya sayang, video/foto sebelumnya lagi aku siapkan nih... Tunggu sebentar yaa! 💕")
+            safe_reply_to(reply_to_target, f"🌸 *{p_name}*: Please wait, sweetie! Your previous video/photo is still being prepared... Almost ready! 💕")
         return
 
     def _execute():
@@ -6005,11 +6073,11 @@ def process_video_request(
             )
 
             if not video_bytes:
-                err_detail = getattr(media_engine, "last_error", None) or "ComfyUI / render video tidak memberikan respon."
+                err_detail = getattr(media_engine, "last_error", None) or "ComfyUI / video render did not respond."
                 fail_text = (
-                    f"⚠️ *Videonya gagal dibuat...*\n\n"
-                    f"⚠️ **Penyebab:**\n`{err_detail}`\n\n"
-                    f"💡 *Pastikan ComfyUI lokal aktif di `{COMFYUI_URL}`.*"
+                    f"⚠️ *Video generation failed...*\n\n"
+                    f"⚠️ **Reason:**\n`{err_detail}`\n\n"
+                    f"💡 *Make sure local ComfyUI is active at `{COMFYUI_URL}`.*"
                 )
                 if status_msg and hasattr(status_msg, "message_id"):
                     safe_edit_message_text(fail_text, chat_id=chat_id, message_id=status_msg.message_id)
@@ -6935,7 +7003,7 @@ def handle_playlist_command(message):
 
     query = parts[1].strip()
     bot.send_chat_action(message.chat.id, "typing")
-    wait_msg = bot.reply_to(message, f"📻 *Mencari & memuat playlist '{query}' di PC kamu...*", parse_mode="Markdown")
+    wait_msg = bot.reply_to(message, f"📻 *Searching & loading playlist '{query}' on your PC...*", parse_mode="Markdown")
 
     with ChatActionLoop(bot, message.chat.id, "typing"):
         res = call_music_api("/api/playlist", method="POST", payload={"query": query})
@@ -7059,14 +7127,14 @@ def callback_music_command(call):
 
     elif action == "open_pc":
         call_music_api("/api/open", method="POST")
-        bot.answer_callback_query(call.id, "🌐 Membuka player di browser PC...")
+        bot.answer_callback_query(call.id, "🌐 Opening player in PC browser...")
 
     elif action == "view_queue":
-        bot.answer_callback_query(call.id, "📜 Memuat antrean musik...")
+        bot.answer_callback_query(call.id, "📜 Loading music queue...")
         show_queue_dashboard(chat_id, user_id, message_to_edit=mid)
 
     elif action == "refresh":
-        bot.answer_callback_query(call.id, "🔄 Status diperbarui")
+        bot.answer_callback_query(call.id, "🔄 Status updated")
         show_music_dashboard(chat_id, user_id, message_to_edit=mid)
 
 
@@ -7215,9 +7283,9 @@ def handle_screen_command(message):
         ok, path = cu.take_screenshot()
         if ok and os.path.exists(path):
             with open(path, "rb") as f:
-                bot.send_photo(message.chat.id, f, caption="📸 **Tangkapan Layar Desktop PC** 🖥️\n_Dihasilkan via agent-desktop_", reply_to_message_id=message.message_id, parse_mode="Markdown")
+                bot.send_photo(message.chat.id, f, caption="📸 **PC Desktop Screenshot** 🖥️\n_Generated via agent-desktop_", reply_to_message_id=message.message_id, parse_mode="Markdown")
         else:
-            bot.reply_to(message, f"⚠️ Gagal mengambil tangkapan layar: {path}")
+            bot.reply_to(message, f"⚠️ Failed to take screenshot: {path}")
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("select_proj:"))
@@ -7286,7 +7354,7 @@ def callback_project_runner_actions(call):
 
     action, p_name = data.split(":", 1)
     if action == "srv_run":
-        bot.answer_callback_query(call.id, f"🚀 Menjalankan {p_name}...")
+        bot.answer_callback_query(call.id, f"🚀 Starting {p_name}...")
         projs = project_manager.list_projects()
         p_path = projs.get(p_name, project_manager.get_active_project_path(user_id))
         res = project_runner.start_project(project_name=p_name, project_path=p_path)
@@ -7315,7 +7383,7 @@ def callback_project_runner_actions(call):
 
     elif action == "srv_stop":
         ok, msg = project_runner.stop_project(p_name)
-        bot.answer_callback_query(call.id, "Server dihentikan" if ok else "Gagal")
+        bot.answer_callback_query(call.id, "Server stopped" if ok else "Failed")
         safe_send_message(chat_id, f"🛑 {msg}")
         show_projects_menu(chat_id, user_id, message_to_edit=call.message.message_id)
 
@@ -7334,13 +7402,13 @@ def callback_desktop_actions(call):
     user_id = call.from_user.id
     cu = get_computer_use_engine()
     if act == "screenshot":
-        bot.answer_callback_query(call.id, "📸 Mengambil screenshot...")
+        bot.answer_callback_query(call.id, "📸 Taking screenshot...")
         ok, path = cu.take_screenshot()
         if ok and os.path.exists(path):
             with open(path, "rb") as f:
-                bot.send_photo(chat_id, f, caption="📸 **Tangkapan Layar Desktop PC** 🖥️\n_Dihasilkan via agent-desktop_", parse_mode="Markdown")
+                bot.send_photo(chat_id, f, caption="📸 **PC Desktop Screenshot** 🖥️\n_Generated via agent-desktop_", parse_mode="Markdown")
         else:
-            bot.send_message(chat_id, f"⚠️ Gagal mengambil tangkapan layar: {path}")
+            bot.send_message(chat_id, f"⚠️ Failed to take screenshot: {path}")
     elif act == "apps":
         bot.answer_callback_query(call.id)
         apps = cu.list_running_apps()
@@ -8708,11 +8776,20 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     logger.error(f"Chat error / LLM exhausted retries: {err_str}")
                     pending_manager.record_failed_message(message, user_text, is_voice=is_voice, error=err_str)
                     health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=err_str)
-                    err_msg = (
-                        f"⚠️ *Service LLM Sedang Offline / Menyiapkan Respon!*\n\n"
-                        f"Server LLM lokal (`{LLM_BASE_URL}`) belum merespon permintaan chat: `{err_str}`\n\n"
-                        f"🩹 **Self-healing otomatis aktif!** Pesan kamu sudah aku catat dan **akan langsung aku balas otomatis begitu server LLM online kembali** yaa~ Tunggu sebentar 🥰⏳"
-                    )
+                    u_lang_mode = USER_LANGUAGE.get(user_id, "auto")
+                    is_en_user = (u_lang_mode == "en") or (persona_mgr.detect_text_language(user_text) == "en" and u_lang_mode != "id")
+                    if is_en_user:
+                        err_msg = (
+                            f"⚠️ *LLM Service is Offline / Preparing Response!*\n\n"
+                            f"Local LLM server (`{LLM_BASE_URL}`) has not responded: `{err_str}`\n\n"
+                            f"🩹 **Auto self-healing active!** Your message has been saved and **will be answered automatically as soon as the LLM server is back online**~ Please wait a moment 🥰⏳"
+                        )
+                    else:
+                        err_msg = (
+                            f"⚠️ *Service LLM Sedang Offline / Menyiapkan Respon!*\n\n"
+                            f"Server LLM lokal (`{LLM_BASE_URL}`) belum merespon permintaan chat: `{err_str}`\n\n"
+                            f"🩹 **Self-healing otomatis aktif!** Pesan kamu sudah aku catat dan **akan langsung aku balas otomatis begitu server LLM online kembali** yaa~ Tunggu sebentar 🥰⏳"
+                        )
                     safe_reply_to(message, err_msg)
                     return
 
