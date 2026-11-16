@@ -1238,7 +1238,7 @@ class PersonaManager:
         return base
 
     def set_active_persona(self, key: str) -> bool:
-        """Switches active persona key, resetting transient session states and undress states."""
+        """Switches active persona key, resetting transient session states, undress states, and locked locations."""
         key = key.lower()
         if key in self.personas:
             self.active_key = key
@@ -1246,12 +1246,16 @@ class PersonaManager:
                 self.user_locked_outfit_prompts.clear()
             if hasattr(self, "session_outfits"):
                 self.session_outfits.clear()
-            # Ensure fresh start: reset any temporary undress stages so new persona is clothed
+            if hasattr(self, "user_locations"):
+                self.user_locations.clear()
+                self._save_user_locations()
+            # Ensure fresh start: reset any temporary undress stages or session outfits so new persona is clothed in her default outfit
             for uid in list(self.user_outfits.keys()):
                 rec = self.user_outfits.get(uid)
-                if isinstance(rec, dict) and rec.get("undress_stage", 0) > 0:
-                    rec["undress_stage"] = 0
-                    if rec.get("key") in ("shirt_off", "bottoms_off", "bra_off", "nude"):
+                if isinstance(rec, dict):
+                    if rec.get("undress_stage", 0) > 0 or rec.get("mode") == "session":
+                        rec["undress_stage"] = 0
+                        rec["mode"] = "auto"
                         rec["key"] = "default"
                     self.user_outfits[uid] = rec
             self._save_user_outfits()

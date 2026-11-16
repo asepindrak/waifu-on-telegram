@@ -87,5 +87,56 @@ class TestPersonaConsistency(unittest.TestCase):
         mimi_sched = STUDENT_PROFILES["mimi"]
         self.assertIn("cream silk camisole", mimi_sched["pajamas_outfit"])
 
+    def test_persona_switch_isolation_no_leakage(self):
+        uid = 556677
+        self.pm.clear_history(uid, "runa")
+        self.pm.clear_history(uid, "sylvie")
+        # 1. Start with Runa, send chat messages and set undress/session/location state
+        self.pm.set_active_persona("runa")
+        self.pm.add_message(uid, "user", "Halo Runa, kamu lagi apa?")
+        self.pm.add_message(uid, "assistant", "Halo sayang! Aku lagi nyiapin game baru nih.")
+        self.pm.set_user_outfit(uid, "maid", is_locked=False, duration_seconds=1800)
+        self.pm.set_undress_stage(uid, 2)
+        self.pm.set_user_location(uid, "bathroom")
+
+        # Verify Runa has history
+        runa_history = self.pm.get_chat_history(uid)
+        self.assertEqual(len(runa_history), 2)
+        self.assertEqual(self.pm.get_undress_stage(uid), 2)
+
+        # 2. Switch persona to Sylvie
+        self.pm.set_active_persona("sylvie")
+
+        # Chat history with Sylvie must be completely fresh/empty!
+        sylvie_history = self.pm.get_chat_history(uid)
+        self.assertEqual(len(sylvie_history), 0, "Sylvie must NOT inherit Runa's chat history!")
+
+        # Undress stage must be reset to 0 (clothed)
+        self.assertEqual(self.pm.get_undress_stage(uid), 0, "Undress stage must reset to 0 on persona switch!")
+
+        # Location must be cleared
+        self.assertIsNone(self.pm.get_user_location(uid), "Location must not leak to new persona!")
+
+        # Session outfit must be cleared to auto
+        outfit_details = self.pm.get_user_outfit_details(uid)
+        self.assertEqual(outfit_details["mode"], "auto", "Session outfit must revert to auto!")
+
+        # 3. Add chat to Sylvie
+        self.pm.add_message(uid, "user", "Halo Sylvie, suka bunga apa?")
+        self.pm.add_message(uid, "assistant", "Bunga anggrek hutan kuno, menyejukkan sekali.")
+        self.assertEqual(len(self.pm.get_chat_history(uid)), 2)
+
+        # 4. Switch back to Runa - Runa's history must still be preserved and not overwritten!
+        self.pm.set_active_persona("runa")
+        restored_runa_history = self.pm.get_chat_history(uid)
+        self.assertEqual(len(restored_runa_history), 2)
+        self.assertEqual(restored_runa_history[0]["content"], "Halo Runa, kamu lagi apa?")
+
+        # Sylvie's history must also be preserved separately
+        self.pm.set_active_persona("sylvie")
+        restored_sylvie_history = self.pm.get_chat_history(uid)
+        self.assertEqual(len(restored_sylvie_history), 2)
+        self.assertEqual(restored_sylvie_history[0]["content"], "Halo Sylvie, suka bunga apa?")
+
 if __name__ == "__main__":
     unittest.main()
