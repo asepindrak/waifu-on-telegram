@@ -138,5 +138,60 @@ class TestPersonaConsistency(unittest.TestCase):
         self.assertEqual(len(restored_sylvie_history), 2)
         self.assertEqual(restored_sylvie_history[0]["content"], "Halo Sylvie, suka bunga apa?")
 
+    def test_undress_and_body_photo_triggers(self):
+        # Test Indonesian triggers
+        id_phrases = [
+            "buka baju",
+            "buka baju dong",
+            "buka celana",
+            "buka pakaian kamu",
+            "lepas baju",
+            "buka bra kamu",
+            "coba lihat tubuh kamu",
+            "lihat tubuh kamu",
+            "lihat badan kamu dong",
+            "tunjukin tubuh kamu",
+            "coba telanjang",
+            "lihat kamu telanjang",
+            "lihat dada kamu"
+        ]
+        for phrase in id_phrases:
+            is_media, media_type = self.pm.detect_media_request(phrase)
+            self.assertTrue(is_media, f"Expected media trigger for ID phrase: '{phrase}'")
+            self.assertEqual(media_type, "photo", f"Expected photo type for ID phrase: '{phrase}'")
+            # Standalone commands should directly trigger photo without conversational delay
+            is_conv = self.pm.is_conversational_media_request(phrase)
+            self.assertFalse(is_conv, f"Direct command should not be conversational: '{phrase}'")
+
+        # Test English triggers
+        en_phrases = [
+            "take off your clothes",
+            "take off your shirt",
+            "take off your pants",
+            "take off your bra",
+            "show me your body",
+            "show your body",
+            "let me see your body",
+            "can i see your body",
+            "show me your boobs",
+            "show me your chest",
+            "show me naked",
+            "undress for me",
+            "strip naked"
+        ]
+        for phrase in en_phrases:
+            is_media, media_type = self.pm.detect_media_request(phrase)
+            self.assertTrue(is_media, f"Expected media trigger for EN phrase: '{phrase}'")
+            self.assertEqual(media_type, "photo", f"Expected photo type for EN phrase: '{phrase}'")
+            is_conv = self.pm.is_conversational_media_request(phrase)
+            self.assertFalse(is_conv, f"Direct command should not be conversational: '{phrase}'")
+
+        # Test conversational request (contains dialogue + photo intent)
+        conv_phrase = "kamu cantik banget sayang, aku kangen pengen lihat tubuh kamu, coba buka baju dong?"
+        is_media, media_type = self.pm.detect_media_request(conv_phrase)
+        self.assertTrue(is_media)
+        self.assertEqual(media_type, "photo")
+        self.assertTrue(self.pm.is_conversational_media_request(conv_phrase), "Expected conversational photo request")
+
 if __name__ == "__main__":
     unittest.main()

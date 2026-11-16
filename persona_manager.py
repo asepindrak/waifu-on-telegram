@@ -167,7 +167,18 @@ PHOTO_INTENT_KEYWORDS = [
     r"\bwhat\s*are\s*you\s*wearing\b",
     r"\bselfie\s*dong\b",
     r"\bpose\s*dong\b",
-    r"\b(ambilin|ambilkan)\s*foto\b"
+    r"\b(ambilin|ambilkan)\s*foto\b",
+    # Undressing & Clothing Removal Triggers (ID & EN)
+    r"\b(?:coba\s+|tolong\s+|ayo\s+|mau\s+|pengen\s+|bisa\s+)?(?:buka|lepas|copot|turunkan|tarik|jatuhkan)\s+(?:baju|kaos|atasan|celana|rok|bh|bra|cd|kutang|pakaian|celana\s+dalam|handuk|busana|semua|semuanya)(?:mu|nya)?\b",
+    r"\b(?:take\s+off|remove|strip|slide\s+off|drop)\s+(?:your\s+)?(?:clothes|clothing|shirt|top|pants|skirt|bra|panties|underwear|towel|everything|it\s+all|the\s+rest)\b",
+    r"\b(?:undress|strip\s+naked|get\s+naked|strip\s+for\s+me|take\s+it\s+all\s+off)\b",
+    r"\b(?:buka\s+lagi|lanjut\s+buka|buka\s+pelan|buka\s+satu\s*satu|buka\s+berikutnya|tahap\s+berikutnya)\b",
+    # Body Exposure & Revealing Visual Triggers (ID & EN)
+    r"\b(?:coba\s+|mau\s+|pengen\s+|minta\s+|tolong\s+)?(?:liat(?:in)?|lihat(?:in)?|tunjuk+in|tunjuk+an|perlihatkan|spill|intip)\s+(?:tubuh|badan|dada|aurat|payudara|nenen|toket|bentuk\s+tubuh)(?:mu|nya|\s+kamu)?\b",
+    r"\b(?:show|let\s+me\s+see|can\s+i\s+see|want\s+to\s+see)\s+(?:me\s+)?(?:your\s+)?(?:body|curves|figure|chest|breasts|boobs|tits|cleavage)\b",
+    r"\b(?:show|let\s+me\s+see|can\s+i\s+see|want\s+to\s+see)\s+(?:me\s+)?(?:you\s+)?(?:naked|nude|unclothed|topless|without\s+clothes)\b",
+    r"\b(?:liat(?:in)?|lihat(?:in)?|tunjuk+in|tunjuk+an|perlihatkan)\s+kamu\s+(?:telanjang|bugil|tanpa\s+baju|tanpa\s+busana|tanpa\s+pakaian)\b",
+    r"\b(?:telanjang|bugil)\s*(?:dong|donk|ya|yaa|deh|in|nya|cepet|sekarang)?\b"
 ]
 
 CAMERA_ANGLES = [
@@ -1302,10 +1313,14 @@ class PersonaManager:
         # Strip common standalone media nouns, verbs, pronouns, and fillers
         media_tokens = [
             r"\b(foto|gambar|selfie|pap|pic|picture|photo|video|animasi)\b",
-            r"\b(minta|kirim|liat|lihat|bagi|kasih|send|show|take|make|record|bikin|buat)\b",
-            r"\b(kamu|dirimu|mu|lu|lo|you|your|diri)\b",
-            r"\b(sayang|ayang|beb|babe|cinta|honey|dear)\b",
-            r"\b(dong|donk|ya|yaa|deh|sih|plis|please|pls|now|sekarang|cepet|coba|ayo|yuk|sekali)\b"
+            r"\b(minta|kirim|liat(?:in)?|lihat(?:in)?|tunjuk+in|tunjuk+an|perlihatkan|bagi|kasih|send|show|take|make|record|bikin|buat)\b",
+            r"\b(kamu|dirimu|mu|lu|lo|you|your|diri|me|for|to|please|plz|pls|aku|ku|us)\b",
+            r"\b(sayang|ayang|beb|babe|cinta|honey|dear|baby)\b",
+            r"\b(dong|donk|ya|yaa|deh|sih|plis|please|pls|now|sekarang|cepet|coba|ayo|yuk|sekali)\b",
+            r"\b(baju|kaos|atasan|celana|rok|bh|bra|cd|kutang|pakaian|busana|handuk|semua|semuanya)\b",
+            r"\b(clothes|clothing|shirt|top|pants|skirt|panties|underwear|towel|everything|rest|all)\b",
+            r"\b(tubuh|badan|dada|aurat|payudara|toket|nenen|body|figure|curves|chest|breasts|boobs)\b",
+            r"\b(buka|lepas|copot|turunkan|tarik|jatuhkan|off|undress|strip|naked|nude|telanjang|bugil)\b"
         ]
         for token_pat in media_tokens:
             cleaned = re.sub(token_pat, " ", cleaned)
@@ -1855,6 +1870,25 @@ class PersonaManager:
                 return (4, "menurunkan celana dalamnya hingga terlepas, kini sepenuhnya telanjang bulat tanpa busana", True)
             else:
                 return (current_stage, "celana dalam sudah terlepas sebelumnya", False)
+
+        # 7. General body exposure / see body trigger: 'lihat tubuh kamu', 'show me your body', 'let me see your body'
+        if re.search(r"\b(?:(?:coba\s+|mau\s+|pengen\s+|minta\s+|tolong\s+)?(?:liat(?:in)?|lihat(?:in)?|tunjuk+in|tunjuk+an|perlihatkan|spill|intip)\s+(?:tubuh|badan|bentuk\s+tubuh)(?:mu|nya|\s+kamu)?|(?:show|let\s+me\s+see|can\s+i\s+see|want\s+to\s+see)\s+(?:me\s+)?(?:your\s+)?(?:body|curves|figure))\b", lower):
+            if current_stage == 0:
+                return (1, "memperlihatkan lekuk tubuhnya dengan melepas baju luarnya, tersisa pakaian dalam dan celana santai", True)
+            elif current_stage < 4:
+                next_st = current_stage + 1
+                return (next_st, "memperlihatkan tubuhnya lebih lanjut dengan menanggalkan lapisan pakaian berikutnya", True)
+
+        # 8. Chest / breasts exposure: 'lihat dada kamu', 'show me your boobs', 'show your chest'
+        if re.search(r"\b(?:(?:coba\s+|mau\s+|pengen\s+|minta\s+|tolong\s+)?(?:liat(?:in)?|lihat(?:in)?|tunjuk+in|tunjuk+an|perlihatkan|spill|intip)\s+(?:dada|payudara|nenen|toket)(?:mu|nya|\s+kamu)?|(?:show|let\s+me\s+see|can\s+i\s+see)\s+(?:me\s+)?(?:your\s+)?(?:chest|breasts|boobs|tits|cleavage))\b", lower):
+            if current_stage < 3:
+                return (3, "membuka kaitan BH-nya dan memperlihatkan dadanya secara topless", True)
+            elif current_stage == 3:
+                return (4, "menanggalkan celana dalamnya juga, kini sepenuhnya telanjang tanpa busana", True)
+
+        # 9. Direct naked trigger: 'lihat kamu telanjang', 'show me naked', 'coba telanjang'
+        if re.search(r"\b(?:(?:coba\s+|mau\s+|pengen\s+|minta\s+|tolong\s+)?(?:liat(?:in)?|lihat(?:in)?|tunjuk+in|tunjuk+an|perlihatkan)\s+kamu\s+(?:telanjang|bugil|tanpa\s+baju|tanpa\s+busana)|(?:show|let\s+me\s+see|can\s+i\s+see)\s+(?:me\s+)?(?:you\s+)?(?:naked|nude|unclothed)|telanjang\s*(?:dong|cepet|sekarang)?)\b", lower):
+            return (4, "menanggalkan seluruh pakaiannya hingga telanjang bulat tanpa busana", True)
 
         # General undress trigger without specific part (e.g. 'buka dong', 'ayo buka')
         if re.search(r"\b(buka|lepas|copot)\s+(?:dong|sayang|ya|sekarang|pelan)\b", lower):
