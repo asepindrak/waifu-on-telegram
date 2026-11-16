@@ -272,8 +272,8 @@ INTIMATE_SEX_POSITIONS = [
     # Doggy style / Menungging / All fours
     (
         [r"\b(doggy(\s*style)?|doggystyle|nungging|posisi\s+nungging|menungging|posisi\s+dari\s+belakang|gaya\s+dari\s+belakang|all\s+fours|on\s+all\s+fours)\b"],
-        "rear view from behind, (on all fours:1.4), (doggy style:1.4), on hands and knees, arched back, looking back over shoulder at viewer, seductive blush, passionate intimate gaze",
-        "standing, supine, front view, face close-up"
+        "rear view from behind, (on all fours kneeling on bed:1.4), (kneeling pose:1.3), two legs, arched back, looking back over shoulder towards camera, seductive blush, passionate intimate gaze",
+        "(extra legs:1.5), (three legs:1.5), (multiple legs:1.5), (standing leg:1.4), standing upright, supine, front view, face close-up"
     ),
     # Missionary / Misionaris / Telentang paha terbuka
     (
@@ -2613,7 +2613,8 @@ class PersonaManager:
         self,
         user_text: str = "",
         scene_desc: str = "",
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        is_nude: bool = False
     ) -> Tuple[str, str]:
         """
         Synchronizes photo lighting and ambient atmosphere with real-world local time and live weather.
@@ -2633,10 +2634,14 @@ class PersonaManager:
         # Determine time-of-day category from local clock
         cur_hour = time.localtime().tm_hour
 
+        is_explicit_outdoor = bool(re.search(
+            r"\b(pantai|beach|kolam|pool|taman|park|garden|jalan|street|luar|outdoor|balkon|balcony|hutan|forest)\b",
+            f"{scene_lower} {lower}"
+        ))
         is_indoor = bool(re.search(
             r"\b(bedroom|bed|room|kosan|kost|kamar|apartemen|apartment|sofa|indoor|dapur|kitchen|bathroom|mandi|perpustakaan|library|cafe|kafe|kelas|classroom|mall|gym|lobby)\b",
             f"{scene_lower} {lower}"
-        ))
+        )) or (is_nude and not is_explicit_outdoor) or bool(re.search(r"\b(telanjang|nude|topless|lingerie|underwear|pajamas|piyama|kasur|bed|ranjang|all fours|nungging)\b", f"{scene_lower} {lower}"))
 
         if has_night or (not (has_day or has_morning or has_sunset) and (cur_hour >= 20 or cur_hour < 5)):
             # Night time / Dini hari (20:00 - 04:59)
@@ -2724,7 +2729,7 @@ class PersonaManager:
         if not wants_multi:
             # Strictly enforce single character solo shot (prevents accidental 2 waifus in image)
             cleaned_base = re.sub(r'^(?:solo,\s*)*(?:1girl,\s*)*', '', base_visual, flags=re.IGNORECASE).strip()
-            base_visual = f"solo, 1girl, (solo:1.4), (1girl:1.4), (only one girl:1.4), (single character:1.4), (single head:1.4), (single face:1.4), (proper anime anatomy:1.2), (complete body:1.1), (two arms:1.1), {cleaned_base}"
+            base_visual = f"solo, 1girl, (solo:1.4), (1girl:1.4), (only one girl:1.4), (single character:1.4), (single head:1.4), (single face:1.4), (two arms:1.2), (two legs:1.2), (exactly two legs:1.2), (two feet:1.1), (proper anime anatomy:1.3), (complete body:1.1), {cleaned_base}"
 
             solo_guard_neg = (
                 "(2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), "
@@ -2755,12 +2760,14 @@ class PersonaManager:
             "(missing arm:1.5), (missing arms:1.5), (missing hand:1.5), (missing hands:1.5), "
             "(missing limbs:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), "
             "(disappearing arm:1.4), (partially submerged arm:1.3), (floating limbs:1.4), (floating arms:1.4), "
-            "(extra arms:1.4), (bad arms:1.4), (mutated arms:1.4), (deformed arms:1.4), (fused arms:1.4), "
+            "(extra arms:1.5), (bad arms:1.4), (mutated arms:1.4), (deformed arms:1.4), (fused arms:1.4), "
             "(bad hands:1.4), (mutated hands:1.4), (missing fingers:1.4), (extra fingers:1.4), (fused fingers:1.4), "
             "(malformed hands:1.4), (poorly drawn hands:1.4), (poorly drawn arms:1.4), "
-            "bad legs, extra legs, malformed limbs, long legs, elongated limbs, poorly drawn legs, "
-            "fused legs, multiple legs, mutated legs, folded legs, cross-legged error, distorted legs, "
-            "mutated, deformed, duplicate body, unnatural body proportions, distorted body"
+            "(extra legs:1.5), (three legs:1.5), (multiple legs:1.5), (extra limbs:1.5), (mutated legs:1.4), "
+            "(deformed legs:1.4), (malformed limbs:1.4), (fused legs:1.4), (bad legs:1.4), (folded legs error:1.3), "
+            "(extra feet:1.4), (three feet:1.4), (bad feet:1.4), (poorly drawn legs:1.4), (poorly drawn feet:1.4), "
+            "(duplicate body:1.4), (mutated:1.3), (deformed:1.3), (unnatural body proportions:1.3), (distorted body:1.3), "
+            "(watermark:1.4), (text:1.4), (logo:1.4), (signature:1.4), (artist name:1.4), (copyright:1.4), (caption:1.4), (subtitles:1.4)"
         )
         extra_neg = f"{extra_neg}, {anatomy_guard_neg}" if extra_neg else anatomy_guard_neg
 
@@ -2822,8 +2829,12 @@ class PersonaManager:
             anti_censor = "censored, mosaic, mosaic censor, bar censor, panties, underwear"
             extra_neg = f"{extra_neg}, {anti_censor}" if extra_neg else anti_censor
 
+        # Ensure intimate/nude photos have a coherent private background instead of abstract voids
+        if (is_nude or is_nsfw) and (not scene or not any(k in scene.lower() for k in ["bed", "room", "kamar", "bath", "beach", "pool", "outdoor", "onsen", "pantai", "taman"])):
+            scene = "luxurious cozy bedroom setting, soft warm ambient lighting, comfortable bed with silk sheets, elegant private aesthetic"
+
         # Synchronize photo lighting and atmosphere with real-world local time & live weather
-        lighting_pos, lighting_neg = self.get_realtime_lighting_and_atmosphere(user_text, scene, user_id=user_id)
+        lighting_pos, lighting_neg = self.get_realtime_lighting_and_atmosphere(user_text, scene, user_id=user_id, is_nude=is_nude)
         if lighting_neg:
             extra_neg = f"{extra_neg}, {lighting_neg}" if extra_neg else lighting_neg
             if "(bright daylight:1.5)" in lighting_neg:
