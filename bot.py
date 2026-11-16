@@ -5540,9 +5540,10 @@ def process_photo_request(
                 and cur_out_det.get("key", "default") != "default"
                 and (cur_out_det.get("is_locked") or cur_out_det.get("source") == "manual")
             )
+            cur_u_st = persona_mgr.get_undress_stage(user_id) if user_id else 0
             prompt_source_text = (
                 (actual_user_msg or user_text)
-                if (conversational_reply and has_explicit_outfit)
+                if (conversational_reply and (has_explicit_outfit or cur_u_st > 0))
                 else (f"{actual_user_msg} {conversational_reply}".strip() if conversational_reply else user_text)
             )
             visual_prompt, extra_neg, is_nude, outfit_label = persona_mgr.craft_visual_prompt_full(
@@ -5553,7 +5554,7 @@ def process_photo_request(
                 is_nsfw=is_nsfw_photo,
                 allow_undress_advance=(not is_followup),
             )
-            if eff_nude_override is not None:
+            if eff_nude_override is not None and cur_u_st == 0:
                 is_nude = eff_nude_override
                 if not is_nude and any(nud_kw in outfit_label.lower() for nud_kw in ["telanjang", "nude", "topless", "bra_off"]):
                     ctx_clothed = student_schedule.detect_contextual_activity_and_outfit(user_text, [], persona_key=persona_mgr.active_key)
@@ -8478,13 +8479,23 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         is_nsfw_turn = True
                 elif cur_undress_stage > 0 and not is_nsfw_turn:
                     # Inactivity / Casual Topic Recovery:
-                    # If current user message is casual daily conversation without NSFW intent,
-                    # the previous intimate moment has ended. Restore clothes automatically!
-                    logger.info(f"Casual conversation turn ('{user_text[:30]}') during undressed state. Resetting undress stage {cur_undress_stage} -> 0 (clothed).")
-                    persona_mgr.reset_undress_stage(message.from_user.id)
-                    cur_undress_stage = 0
-                    if cur_outfit_key in ("shirt_off", "bottoms_off", "bra_off", "nude"):
-                        cur_outfit_key = "default"
+                    # Only reset if user explicitly shifts to casual daily/public topics
+                    t_low = user_text.lower()
+                    intimate_cues = [
+                        "seksi", "sexy", "hot", "cantik", "manis", "tubuh", "badan", "paha", "dada", "toket", "nenen",
+                        "buka", "lepas", "sentuh", "raba", "peluk", "cium", "elus", "kasur", "kamar", "ranjang",
+                        "bh", "bra", "kutang", "cd", "panties", "lingerie", "pose", "foto", "pap", "lagi", "terus",
+                        "ganti", "liat", "lihat", "tunjuk", "senang", "suka", "deg-degan", "malu"
+                    ]
+                    has_intimate_cue = any(w in t_low for w in intimate_cues)
+                    if not has_intimate_cue:
+                        logger.info(f"Casual conversation turn ('{user_text[:30]}') during undressed state. Resetting undress stage {cur_undress_stage} -> 0 (clothed).")
+                        persona_mgr.reset_undress_stage(message.from_user.id)
+                        cur_undress_stage = 0
+                        if cur_outfit_key in ("shirt_off", "bottoms_off", "bra_off", "nude"):
+                            cur_outfit_key = "default"
+                    else:
+                        is_nsfw_turn = True
 
                 # Check explicit clothing reset
                 if any(k in user_text.lower() for k in ["selesai", "sudah dulu", "pake baju", "pakai baju", "berpakaian"]):
@@ -9078,14 +9089,19 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                     def _send_followup_photo():
                         try:
-                            # Casual cadence/lifestyle is forced SFW (nude_override=False).
-                            # Intimate turns allow natural clothing / undress progression (nude_override=None).
-                            is_explicit_intimate = is_nsfw_turn and (is_undress_trans or is_intimate_action)
-                            nude_override = None if is_explicit_intimate else False
+                            # Intimate turns allow natural clothing / undress progression
+                            cur_st = persona_mgr.get_undress_stage(message.from_user.id)
+                            is_explicit_intimate = is_nsfw_turn and (is_undress_trans or is_intimate_action or cur_st > 0)
+                            if cur_st >= 3:
+                                nude_override = True
+                            elif cur_st in (1, 2):
+                                nude_override = False
+                            else:
+                                nude_override = None if is_explicit_intimate else False
 
                             if is_nsfw_turn and is_explicit_intimate:
                                 action_ctx = undress_desc if undress_desc else ""
-                                photo_prompt = f"{action_ctx}, {user_text}, {clean_reply}".strip(", ")
+                                photo_prompt = f"{action_ctx}, {user_text}".strip(", ")
                             else:
                                 photo_prompt = clean_reply if clean_reply else user_text
                             process_photo_request(

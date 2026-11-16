@@ -193,5 +193,59 @@ class TestPersonaConsistency(unittest.TestCase):
         self.assertEqual(media_type, "photo")
         self.assertTrue(self.pm.is_conversational_media_request(conv_phrase), "Expected conversational photo request")
 
+    def test_sequential_undress_clothing_consistency_across_turns(self):
+        """Verifies that sequential undressing retains matching panties and never hallucinates a slip dress."""
+        test_uid = 99887711
+        self.pm.set_active_persona("runa")
+        self.pm.reset_undress_stage(test_uid)
+
+        # Step 1: User says 'buka celana' when at stage 1 (or stage 0->1->2)
+        self.pm.set_undress_stage(test_uid, 1)
+        st, desc, trans = self.pm.detect_undress_intent("sexy banget runa, sekarang buka celananya", current_stage=1)
+        self.assertTrue(trans)
+        self.assertEqual(st, 2)
+        self.pm.set_undress_stage(test_uid, 2)
+
+        prompt1, neg1, is_nude1, name1 = self.pm.detect_clothing_intent("sexy banget runa, sekarang buka celananya", user_id=test_uid, is_nsfw=True)
+        self.assertIn("matching sheer white and black lace bra and panties", prompt1)
+        self.assertNotIn("slip dress", prompt1)
+        self.assertFalse(is_nude1)
+
+        # Context shift guard: intimate dialogue must NOT reset undress stage
+        shifted = self.pm.check_context_shift(test_uid, "sekarang buka BH di kasur yuk")
+        self.assertFalse(shifted, "Intimate bed/bra request must not trigger context shift reset")
+        self.assertEqual(self.pm.get_undress_stage(test_uid), 2)
+
+        # Step 2: User says 'sekarang buka BH'
+        st2, desc2, trans2 = self.pm.detect_undress_intent("sekarang buka BH", current_stage=2)
+        self.assertTrue(trans2)
+        self.assertEqual(st2, 3)
+        self.pm.set_undress_stage(test_uid, 3)
+
+        prompt2, neg2, is_nude2, name2 = self.pm.detect_clothing_intent("sekarang buka BH", user_id=test_uid, is_nsfw=True)
+        self.assertIn("topless", prompt2)
+        # Panties MUST match previous set: sheer white and black lace with pink ribbon!
+        self.assertIn("tiny sheer white and black lace panties with pink ribbon", prompt2)
+        self.assertNotIn("slip dress", prompt2)
+        self.assertNotIn("black silk", prompt2)
+        self.assertTrue(is_nude2)
+
+        # Verify negative prompt strictly forbids slip dress and regular clothes
+        self.assertIn("slip dress", neg2)
+        self.assertIn("dress", neg2)
+        self.assertIn("fully naked", neg2)
+
+        # Full prompt synthesis guard: scene must not leak 'skirt' or 'slip dress'
+        vis_prompt, extra_neg, vis_nude, vis_name = self.pm.craft_visual_prompt_full(
+            "sekarang buka BH",
+            user_id=test_uid,
+            scene_override="standing in bedroom, admiring her clothes",
+            is_nsfw=True
+        )
+        self.assertNotIn("admiring her clothes", vis_prompt)
+        self.assertIn("topless", vis_prompt)
+        self.assertIn("white and black lace panties", vis_prompt)
+        self.assertIn("slip dress", extra_neg)
+
 if __name__ == "__main__":
     unittest.main()

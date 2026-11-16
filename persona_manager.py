@@ -436,12 +436,12 @@ OUTFIT_PRESETS = {
     "bottoms_off": {
         "name": "💋 Celana Terlepas (Set Pakaian Dalam: BH & Celana Dalam)",
         "prompt": "(wearing only matching sheer lace bra and panties:1.45), pants removed, bare thighs, slender legs, exposed stomach, navel, alluring cleavage, seductive lingerie set, intimate bedroom setting",
-        "negative": "shirt, t-shirt, blouse, pants, long pants, trousers, slacks, denim, jeans, shorts, skirt, dress, hoodie, coat, jacket, pajamas, naked, topless"
+        "negative": "(dress:1.5), (slip dress:1.5), (nightwear:1.5), (gown:1.5), (clothes:1.5), (clothing:1.5), (skirt:1.5), (shirt:1.5), (top:1.5), (blouse:1.5), (jacket:1.5), (hoodie:1.5), (sweater:1.5), (pants:1.5), (jeans:1.5), (trousers:1.5), shirt, t-shirt, blouse, pants, long pants, trousers, slacks, denim, jeans, shorts, skirt, dress, hoodie, coat, jacket, pajamas, naked, topless"
     },
     "bra_off": {
         "name": "🔞 BH Terlepas (Topless & Celana Dalam)",
         "prompt": "(topless:1.45), (bare natural breasts:1.4), detailed exposed breasts, nipples, exposed chest, bare collarbone, wearing only tiny lace panties:1.35, sensual blush, intimate bedroom atmosphere",
-        "negative": "bra, shirt, top, clothes, dress, pants, jeans, denim, trousers, skirt, jacket, pajamas, fully naked"
+        "negative": "(dress:1.5), (slip dress:1.5), (nightwear:1.5), (gown:1.5), (clothes:1.5), (clothing:1.5), (skirt:1.5), (shirt:1.5), (top:1.5), (blouse:1.5), (bra:1.5), (brassiere:1.5), (jacket:1.5), (hoodie:1.5), (sweater:1.5), (pajamas:1.5), (pants:1.5), (jeans:1.5), (trousers:1.5), fully naked, uncovered lower body, bra, shirt, top, clothes, dress, pants, jeans, denim, trousers, skirt, jacket, pajamas, fully naked"
     },
     "nude": {
         "name": "🔞 Tanpa Busana (Full Nude)",
@@ -1425,9 +1425,11 @@ class PersonaManager:
         outfit_triggers_r = [
             r"\b(glances\s+down\s+at\s+her\s+own\s+clothes|tugs\s+at\s+her\s+skirt|usual\s+outfit|show\s+a\s+bit\s+more\s+skin|bajuku|outfitku)\b"
         ]
-        if (any(re.search(pat, u_low) for pat in outfit_triggers_u) and any(re.search(pat, r_low) for pat in outfit_triggers_r)) or \
-           (any(re.search(pat, u_low) for pat in outfit_triggers_u) and any(w in u_low for w in ["cantik", "seksi", "sexy", "gorgeous"])):
-            return True, "standing and showing cute outfit, tugging skirt playfully, blushing sweet smile, charming pose, admiring her clothes"
+        is_undressing = bool(re.search(r"\b(buka|lepas|copot|turunkan|strip|undress|telanjang|naked|nude|bh|bra|panties|celana\s+dalam)\b", comb))
+        if not is_undressing:
+            if (any(re.search(pat, u_low) for pat in outfit_triggers_u) and any(re.search(pat, r_low) for pat in outfit_triggers_r)) or \
+               (any(re.search(pat, u_low) for pat in outfit_triggers_u) and any(w in u_low for w in ["cantik", "seksi", "sexy", "gorgeous"])):
+                return True, "standing and showing cute outfit, tugging skirt playfully, blushing sweet smile, charming pose, admiring her clothes"
 
         # 4. Intimate Cuddling / Hugging
         cuddle_triggers_u = [r"\b(sambil\s+peluk|hangat\s+sambil\s+peluk|peluk\s+kamu|boleh\s+peluk|cuddle|hug\s+you|snuggle\s+together)\b"]
@@ -1915,9 +1917,25 @@ class PersonaManager:
         cur_undress = self.get_undress_stage(uid)
 
         t = (user_text or "").lower()
+
+        # NEVER shift or reset undress stage if current turn has NSFW intent, undress intent, or intimate bedroom context
+        from routing_engine import detect_nsfw_intent
+        is_nsfw = detect_nsfw_intent(user_text)
+        _, _, is_undress_req = self.detect_undress_intent(user_text, current_stage=cur_undress)
+        intimate_words = [
+            "buka", "lepas", "sentuh", "raba", "cium", "elus", "remas", "peluk",
+            "jilat", "isap", "desah", "posisi", "rebahan", "kasur", "kamar",
+            "nenen", "toket", "memek", "pepek", "vagina", "paha", "pantat", "bokong",
+            "telanjang", "basah", "enak", "geli", "ah", "uh", "sensual", "mesra",
+            "bh", "bra", "kutang", "cd", "celana dalam", "panties", "lingerie", "seksi", "sexy"
+        ]
+        has_intimate = any(w in t for w in intimate_words)
+        if is_nsfw or is_undress_req or (cur_undress > 0 and has_intimate):
+            return False
+
         # Routine shifts and normal daily topics that invalidate previous intimate/costume state:
         SHIFT_TRIGGERS = [
-            r"\b(tidur|bobo|rebahan|ngantuk|good\s*night|selamat\s*malam|mimpi\s*indah)\b",
+            r"\b(tidur|bobo|ngantuk|good\s*night|selamat\s*malam|mimpi\s*indah)\b",
             r"\b(mandi|keramas|shower|bath|handuk)\b",
             r"\b(lab|laboratorium|ekstraksi|sampel|praktikum|kampus|kuliah|kelas|dosen|makul|matkul|skripsi|perpustakaan|perpus)\b",
             r"\b(kantor|kerja|kantoran|meeting|proyek|tugas|lembur)\b",
@@ -1926,7 +1944,7 @@ class PersonaManager:
             r"\b(mall|belanja|shopping|bioskop|jalan-jalan|taman)\b",
             r"\b(makan|lapar|kuliner|masak|sarapan|lunch|dinner)\b",
             r"\b(gym|olahraga|fitness|workout|jogging)\b",
-            r"\b(pulang\s+ke\s+rumah|udah\s+di\s+rumah|santai\s+di\s+rumah|istirahat\s+di\s+kamar|kosan|kost)\b"
+            r"\b(pulang\s+ke\s+rumah|udah\s+di\s+rumah|santai\s+di\s+rumah)\b"
         ]
 
         shifted = False
@@ -2572,7 +2590,21 @@ class PersonaManager:
                 if cur_stage in stage_map:
                     k, is_n = stage_map[cur_stage]
                     preset = self.get_preset_outfit(k)
-                    return _finalize(preset["prompt"], preset["negative"], is_n, preset["name"])
+                    neg_prompt = preset.get("negative", "")
+                    if k == "bra_off":
+                        neg_prompt = (
+                            "(dress:1.5), (slip dress:1.5), (nightwear:1.5), (gown:1.5), (clothes:1.5), (clothing:1.5), "
+                            "(skirt:1.5), (shirt:1.5), (top:1.5), (blouse:1.5), (bra:1.5), (brassiere:1.5), (jacket:1.5), "
+                            "(hoodie:1.5), (sweater:1.5), (pajamas:1.5), (pants:1.5), (jeans:1.5), (trousers:1.5), "
+                            "fully naked, uncovered lower body, " + neg_prompt
+                        )
+                    elif k in ("bottoms_off", "lingerie"):
+                        neg_prompt = (
+                            "(dress:1.5), (slip dress:1.5), (nightwear:1.5), (gown:1.5), (clothes:1.5), (clothing:1.5), "
+                            "(skirt:1.5), (shirt:1.5), (top:1.5), (blouse:1.5), (jacket:1.5), (hoodie:1.5), (sweater:1.5), "
+                            "(pants:1.5), (jeans:1.5), (trousers:1.5), " + neg_prompt
+                        )
+                    return _finalize(preset["prompt"], neg_prompt, is_n, preset["name"])
 
         # 5. Clothed Intimate / Roleplay Coherence:
         # When at Stage 0 (clothed) or early in an intimate scene without explicit undress commands,
@@ -2746,6 +2778,13 @@ class PersonaManager:
 
         hist = history or (self.get_chat_history(user_id) if user_id else [])
         scene = scene_override or self.extract_contextual_scene(user_text, user_id=user_id, history=hist, is_nsfw=is_nsfw)
+        cur_u_stage = self.get_undress_stage(user_id) if user_id else 0
+        if cur_u_stage > 0 and scene:
+            scene = re.sub(
+                r'(?i)\b(?:tugging\s+skirt\s+playfully|showing\s+cute\s+outfit|admiring\s+her\s+clothes|skirt|dress|slip\s+dress|jacket|hoodie|sweater|shirt)\b',
+                'relaxing intimately',
+                scene
+            ).strip(', ')
         outfit_prompt, extra_neg, is_nude, outfit_name = self.detect_clothing_intent(
             user_text,
             user_id=user_id,
