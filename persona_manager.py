@@ -2724,9 +2724,14 @@ class PersonaManager:
         if not wants_multi:
             # Strictly enforce single character solo shot (prevents accidental 2 waifus in image)
             cleaned_base = re.sub(r'^(?:solo,\s*)*(?:1girl,\s*)*', '', base_visual, flags=re.IGNORECASE).strip()
-            base_visual = f"solo, 1girl, (solo:1.4), (1girl:1.4), (proper anime anatomy:1.2), (complete body:1.1), (two arms:1.1), {cleaned_base}"
+            base_visual = f"solo, 1girl, (solo:1.4), (1girl:1.4), (only one girl:1.4), (single character:1.4), (single head:1.4), (single face:1.4), (proper anime anatomy:1.2), (complete body:1.1), (two arms:1.1), {cleaned_base}"
 
-            solo_guard_neg = "(2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), (extra characters:1.5), (duplicate character:1.4), (duplicate:1.4), (split screen:1.3)"
+            solo_guard_neg = (
+                "(2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), "
+                "(extra characters:1.5), (extra heads:1.5), (extra head:1.5), (extra faces:1.5), (extra face:1.5), "
+                "(two heads:1.5), (two faces:1.5), (multiple heads:1.5), (multiple faces:1.5), (fused bodies:1.4), "
+                "(conjoined:1.4), (cloned face:1.4), (duplicate character:1.4), (duplicate:1.4), (split screen:1.3)"
+            )
             extra_neg = f"{extra_neg}, {solo_guard_neg}" if extra_neg else solo_guard_neg
 
         # Check if persona is a nekomimi or user explicitly requested a cat/pet/animal in prompt
