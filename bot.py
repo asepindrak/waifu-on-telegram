@@ -8662,13 +8662,17 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 chat_max_tokens = 450 if long_form_req else (150 if (is_nsfw_turn or is_conversational_media) else 120)
 
                 reply_text = None
-                max_retries = 3
-                retry_delays = [3, 5, 8]
+                max_retries = 5
+                retry_delays = [2, 4, 6, 8, 10]
                 last_chat_err = None
 
                 for attempt in range(max_retries):
                     try:
                         idle_engine.ensure_llm_active(bot=bot, chat_id=message.chat.id, is_nsfw=is_nsfw_turn)
+                        try:
+                            bot.send_chat_action(message.chat.id, "typing")
+                        except Exception:
+                            pass
                         res_chat, _ = llm_client.chat(messages, max_tokens=chat_max_tokens, is_nsfw=is_nsfw_turn)
                         if res_chat and res_chat.strip():
                             reply_text = res_chat.strip()
@@ -8678,6 +8682,26 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         logger.warning(f"LLM chat attempt {attempt + 1}/{max_retries} failed: {e}")
                     if attempt < max_retries - 1:
                         time.sleep(retry_delays[attempt])
+
+                # Emergency High-Availability Fallback:
+                # If primary engine timed out or was empty, attempt SFW engine fallback before marking failure
+                if not reply_text or not reply_text.strip():
+                    try:
+                        from idle_engine import is_port_listening
+                        if is_port_listening(8001) or (hasattr(llm_client, "is_sfw_cloud") and llm_client.is_sfw_cloud()):
+                            logger.warning("Local engine timed out/empty. Attempting Emergency SFW Fallback...")
+                            from routing_engine import sanitize_messages_for_sfw
+                            fallback_msgs = sanitize_messages_for_sfw(messages)
+                            try:
+                                bot.send_chat_action(message.chat.id, "typing")
+                            except Exception:
+                                pass
+                            sfw_res, _ = llm_client.chat(fallback_msgs, max_tokens=chat_max_tokens, is_nsfw=False)
+                            if sfw_res and sfw_res.strip():
+                                reply_text = sfw_res.strip()
+                                logger.info("✓ Emergency SFW Fallback succeeded!")
+                    except Exception as e_fb:
+                        logger.warning(f"Emergency SFW Fallback failed: {e_fb}")
 
                 if not reply_text or not reply_text.strip():
                     err_str = str(last_chat_err or "Server LLM tidak merespons balasan chat.")
@@ -9369,8 +9393,22 @@ def main():
     stat = llm_client.check_health()
     if stat.get("online"):
         logger.info(f"✓ Local LLM is ONLINE ({stat.get('backend')} - {stat.get('model')})")
+        if pending_manager.get_pending_count() > 0:
+            logger.info("Found pending unreplied messages at startup! Triggering auto-reply dispatch...")
+            threading.Thread(target=pending_manager.retry_all_pending, args=(bot, process_text_chat), daemon=True).start()
     else:
         logger.warning(f"⚠️ Local LLM is OFFLINE: {stat.get('error')}")
+        if pending_manager.get_pending_count() > 0:
+            def _startup_pending_watcher():
+                logger.info("Background pending watcher waiting for LLM to come online...")
+                for _ in range(30):
+                    time.sleep(5)
+                    s = llm_client.check_health()
+                    if s.get("online"):
+                        logger.info("LLM is now online! Flushing startup pending messages...")
+                        pending_manager.retry_all_pending(bot, process_text_chat)
+                        break
+            threading.Thread(target=_startup_pending_watcher, daemon=True).start()
 
     while True:
         try:

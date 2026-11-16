@@ -629,6 +629,18 @@ class HybridLLMClient:
             )
             reply_text, reasoning = reply_tuple if isinstance(reply_tuple, tuple) else (reply_tuple, "")
 
+            # Check if LLM returned an empty response
+            if not reply_text or not reply_text.strip():
+                if target_client == self.nsfw_client or "5001" in str(client_url):
+                    logger.warning("Local NSFW LLM returned empty reply. Triggering seamless fallback to SFW engine...")
+                    from idle_engine import is_port_listening
+                    if is_port_listening(8001) or self.is_sfw_cloud():
+                        fallback_msgs = sanitize_messages_for_sfw(messages) if self.is_split_mode() else messages
+                        sfw_res = self.sfw_client.chat(fallback_msgs, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
+                        self._record_used_engine(self.sfw_client, is_nsfw=False, label="SFW-Fallback")
+                        return sfw_res
+                raise RuntimeError("Server LLM lokal tidak menghasilkan balasan chat (empty reply).")
+
             # Check if LLM returned an AI safety refusal message
             if is_ai_refusal(reply_text):
                 logger.warning(f"Safety refusal returned by {target_label} engine: '{reply_text[:60]}...'")
@@ -659,7 +671,7 @@ class HybridLLMClient:
             # If primary provider rejected prompt or is unreachable, seamlessly retry with backup engine!
             err_str = str(e).lower()
             is_policy_violation = any(k in err_str for k in ["policy", "filter", "safety", "moderation", "violat", "blocked", "forbidden", "400"])
-            is_conn_error = any(k in err_str for k in ["connection", "timeout", "refused", "10061", "max retries"])
+            is_conn_error = any(k in err_str for k in ["connection", "timeout", "refused", "10061", "max retries", "tidak merespons", "tidak menghasilkan", "empty", "offline"])
 
             if target_client != self.nsfw_client and (is_policy_violation or is_conn_error):
                 logger.warning(f"SFW LLM rejection / failure ({e}). Auto-redirecting to NSFW Uncensored Engine...")
@@ -673,7 +685,7 @@ class HybridLLMClient:
                 return fallback_res
 
             # High-Availability fallback between port 8001 (AGY) and port 5001 (KoboldCPP)
-            if is_conn_error:
+            if is_conn_error or target_client == self.nsfw_client or "5001" in str(client_url):
                 from idle_engine import is_port_listening
                 from lu_llm_client import LocallyUncensoredClient
 
@@ -684,8 +696,8 @@ class HybridLLMClient:
                     self._record_used_engine(backup, is_nsfw=is_nsfw, label="Local-Backup")
                     return backup_res
 
-                elif "5001" in str(client_url) and (is_port_listening(8001) or self.is_sfw_cloud()):
-                    logger.warning(f"Local KoboldCPP unreachable ({e}). Seamlessly falling back to SFW engine...")
+                elif ("5001" in str(client_url) or target_client == self.nsfw_client) and (is_port_listening(8001) or self.is_sfw_cloud()):
+                    logger.warning(f"Local KoboldCPP error/timeout ({e}). Seamlessly falling back to SFW engine...")
                     fallback_msgs = sanitize_messages_for_sfw(messages) if self.is_split_mode() else messages
                     sfw_res = self.sfw_client.chat(fallback_msgs, temperature=temperature, max_tokens=max_tokens, image_bytes=image_bytes)
                     self._record_used_engine(self.sfw_client, is_nsfw=False, label="SFW-Fallback")

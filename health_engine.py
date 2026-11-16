@@ -951,7 +951,7 @@ class HealthEngine:
             self.broadcast_failure(bot, recipients, err_stat)
 
         # Trigger self-healing in background thread
-        if self.self_healing_enabled and bot and recipients:
+        if self.self_healing_enabled and self.can_attempt_heal("llm"):
             threading.Thread(
                 target=self.attempt_heal_service,
                 args=("llm", bot, recipients, False),
@@ -971,6 +971,10 @@ class HealthEngine:
                 # 1. LLM Health Check
                 stat = self.llm_client.check_health()
                 online = bool(stat.get("online"))
+                is_split = stat.get("mode") == "split"
+                sfw_online = stat.get("sfw", {}).get("online", False) if is_split else online
+                nsfw_online = stat.get("nsfw", {}).get("online", False) if is_split else online
+                any_llm_online = bool(online or sfw_online or nsfw_online)
                 is_sleeping = bool(self.idle_engine and self.idle_engine.enabled and self.idle_engine.is_llm_sleeping)
 
                 with self.lock:
@@ -989,6 +993,26 @@ class HealthEngine:
                             self.last_llm_online = False
                             self.llm_offline_alert_sent = True
                             self.broadcast_failure(bot, recipients, stat)
+
+                # Proactive Pending Chat Checker:
+                # If any LLM engine is online and there are unreplied pending messages, immediately retry them!
+                if any_llm_online and bot:
+                    try:
+                        from pending_message_manager import get_pending_message_manager
+                        p_mgr = getattr(self, "pending_manager", None) or get_pending_message_manager()
+                        if p_mgr and p_mgr.get_pending_count() > 0:
+                            proc_fn = getattr(self, "process_text_chat", None)
+                            if not proc_fn:
+                                try:
+                                    import bot as main_bot
+                                    proc_fn = getattr(main_bot, "process_text_chat", None)
+                                except Exception:
+                                    pass
+                            if proc_fn:
+                                logger.info(f"🔄 Proactive Pending Watcher: Found {p_mgr.get_pending_count()} unreplied chat(s) while LLM is online. Resuming conversation...")
+                                p_mgr.retry_all_pending(bot, proc_fn)
+                    except Exception as e_pend:
+                        logger.debug(f"Proactive pending chat retry error: {e_pend}")
 
                 # If LLM is offline, not intentionally sleeping, and self-healing enabled, attempt automatic self-healing
                 if not online and not is_sleeping and self.self_healing_enabled and self.can_attempt_heal("llm"):

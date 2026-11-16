@@ -109,7 +109,10 @@ class TestPendingMessageManager(unittest.TestCase):
         self.mgr.retry_all_pending(mock_bot, mock_process)
 
         # Allow background thread to execute
-        time.sleep(0.5)
+        for _ in range(30):
+            if len(processed_calls) > 0:
+                break
+            time.sleep(0.1)
 
         self.assertEqual(len(processed_calls), 1)
         self.assertEqual(processed_calls[0][1], "bikin landing page")

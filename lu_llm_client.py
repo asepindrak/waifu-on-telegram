@@ -256,7 +256,7 @@ class LocallyUncensoredClient:
             "presence_penalty": 0.35,
             "frequency_penalty": 0.35,
             "repetition_penalty": 1.15,
-            "max_tokens": max_tokens,
+            "max_tokens": max(max_tokens, 280) if is_local_gguf else max_tokens,
             "chat_template_kwargs": {"enable_thinking": False},
             "reasoning_budget": 0,
             "stream": False

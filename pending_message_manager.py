@@ -21,9 +21,9 @@ class PendingMessageManager:
     these messages are retrieved and re-dispatched so the conversation resumes seamlessly.
     """
 
-    def __init__(self, storage_path: Optional[str] = None, max_age_seconds: int = 900):
-        self.max_age_seconds = max_age_seconds  # Default 15 minutes
-        self.max_retries = 2
+    def __init__(self, storage_path: Optional[str] = None, max_age_seconds: int = 3600):
+        self.max_age_seconds = max_age_seconds  # Default 1 hour (was 15 minutes)
+        self.max_retries = 5  # Allow up to 5 attempts during progressive service recovery
         self.storage_path = storage_path or os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "data", "pending_chat_retries.json"
         )
@@ -32,6 +32,44 @@ class PendingMessageManager:
         self._lock = threading.Lock()
         self._retrying_chats = set()  # prevent duplicate simultaneous retries
         self._load_from_disk()
+
+    def is_chat_already_replied(self, user_id: int, user_text: str, persona_mgr=None) -> bool:
+        """
+        Checks whether this user_text has already received a response from the waifu in persona history.
+        Prevents double-replying if user already chatted and got an answer.
+        """
+        if not user_id or not user_text:
+            return False
+        try:
+            if not persona_mgr:
+                try:
+                    import bot
+                    persona_mgr = getattr(bot, "persona_mgr", None)
+                except Exception:
+                    persona_mgr = None
+            if not persona_mgr:
+                from persona_manager import PersonaManager
+                persona_mgr = PersonaManager()
+
+            history = persona_mgr.get_chat_history(user_id)
+            if not history:
+                return False
+            u_clean = user_text.strip().lower()
+            # Search backwards for the last user message
+            for i in range(len(history) - 1, -1, -1):
+                turn = history[i]
+                if turn.get("role") == "user":
+                    t_content = str(turn.get("content", "")).strip().lower()
+                    if t_content == u_clean:
+                        # Found matching user turn. Is there an assistant turn after it?
+                        if i + 1 < len(history) and history[i + 1].get("role") == "assistant":
+                            a_content = str(history[i + 1].get("content", "")).strip()
+                            if a_content:
+                                return True
+                        return False
+        except Exception as e:
+            logger.debug(f"Could not verify chat reply history: {e}")
+        return False
 
     def _load_from_disk(self):
         """Loads non-expired pending messages from disk storage on startup."""
@@ -200,13 +238,19 @@ class PendingMessageManager:
 
             user_text = item.get("user_text", "")
             is_voice = item.get("is_voice", False)
+            user_id = item.get("user_id") or chat_id
             msg_obj = item.get("message_obj")
+
+            # Check if waifu already replied to this message in chat history
+            if self.is_chat_already_replied(user_id, user_text):
+                logger.info(f"Skipping pending retry for chat {chat_id}: message '{user_text[:30]}' was already replied to.")
+                return
 
             # If message object not preserved in memory, reconstruct synthetic Message
             if not msg_obj:
                 msg_obj = self._create_synthetic_message(item)
 
-            logger.info(f"🚀 Retrying pending message for chat {chat_id}: '{user_text[:40]}...'")
+            logger.info(f"🚀 Retrying unreplied pending message for chat {chat_id}: '{user_text[:40]}...'")
 
             # Rate-limit transition ack: at most once every 300s per chat to prevent alert spam
             with self._lock:
