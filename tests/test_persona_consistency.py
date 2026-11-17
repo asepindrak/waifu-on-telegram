@@ -247,5 +247,28 @@ class TestPersonaConsistency(unittest.TestCase):
         self.assertIn("white and black lace panties", vis_prompt)
         self.assertIn("slip dress", extra_neg)
 
+    def test_user_persona_isolation_and_identity_negative_injection(self):
+        """Verifies per-user persona isolation and injection of persona negative prompt (locks hair and body)."""
+        uid_runa = 11223344
+        uid_yume = 55667788
+
+        # Explicitly assign personas to different users
+        self.pm.set_user_persona(uid_runa, "runa")
+        self.pm.set_user_persona(uid_yume, "yume")
+
+        self.assertEqual(self.pm.get_active_persona_key(uid_runa), "runa")
+        self.assertEqual(self.pm.get_active_persona_key(uid_yume), "yume")
+
+        # Test prompt generation for Runa user: must contain pastel pink hair and forbid purple hair
+        vis_runa, neg_runa, _, _ = self.pm.craft_visual_prompt_full("foto dong", user_id=uid_runa)
+        self.assertIn("pink hair", vis_runa.lower())
+        self.assertIn("purple hair", neg_runa.lower())
+        self.assertIn("flat chest", neg_runa.lower())
+
+        # Test prompt generation for Yume user: must contain lavender hair and forbid pink hair
+        vis_yume, neg_yume, _, _ = self.pm.craft_visual_prompt_full("foto dong", user_id=uid_yume)
+        self.assertIn("lavender", vis_yume.lower())
+        self.assertIn("pink hair", neg_yume.lower())
+
 if __name__ == "__main__":
     unittest.main()

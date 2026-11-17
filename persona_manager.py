@@ -16,9 +16,9 @@ DEFAULT_PERSONAS = {
         "role": "The Playful Girlfriend & Mahasiswi Game Dev (Semester 5)",
         "description": "Mahasiswi semester 5 berumur 21 tahun yang genit, manja, jahil, penuh kasih sayang, playful, dan suka menggoda dengan senyuman manis dan tatapan penuh cinta.",
         "language_style": "Adaptive & bilingual (Indonesian & English). Santai, manja, genit, jahil, hangat, dan playful layaknya pacar visual novel idaman.",
-        "visual_traits": "1girl, 21yo young adult anime woman, mature cute college face, defined feminine jawline, very long voluminous pastel pink hair, soft cotton-candy pink tones with pale peach and rose highlights, silky fluffy layered hair, thick soft bangs sweeping across eyes, delicate loose strands framing cheeks, large sparkling pink-magenta anime eyes, intricate heart-shaped highlights, long dark eyelashes, soft pink eye makeup, porcelain skin, naturally rosy cheeks, charming open-mouth smile revealing small teeth and soft pink tongue, teasing affectionate mischievous expression, petite curvy adult body, natural C-cup medium breasts, slender waist, delicate collarbones, soft feminine curves, large black ribbon bow on side of hair, small black cat-shaped hair clip with tiny pink heart detail, two slim black hairpins, fitted black choker with metallic silver heart ring and dangling pink heart pendant, glossy pastel pink nails, masterpiece, best quality, highly detailed anime visual novel artwork",
+        "visual_traits": "1girl, 21yo young adult anime woman, mature cute college face, defined feminine jawline, (pastel pink hair:1.4), (pink hair:1.3), very long voluminous pastel pink hair, soft cotton-candy pink tones with pale peach and rose highlights, silky fluffy layered hair, thick soft bangs sweeping across eyes, delicate loose strands framing cheeks, (large sparkling pink-magenta anime eyes:1.4), (magenta eyes:1.3), intricate heart-shaped highlights, long dark eyelashes, soft pink eye makeup, porcelain skin, naturally rosy cheeks, charming open-mouth smile revealing small teeth and soft pink tongue, teasing affectionate mischievous expression, (petite curvy adult body:1.3), (natural C-cup medium breasts:1.35), (slender waist:1.25), delicate collarbones, (soft feminine curves:1.3), large black ribbon bow on side of hair, small black cat-shaped hair clip with tiny pink heart detail, two slim black hairpins, fitted black choker with metallic silver heart ring and dangling pink heart pendant, glossy pastel pink nails, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "oversized black gothic-kawaii hoodie casually slipped off shoulders exposing collarbones, large loose sleeves, cute pink cat graphic emblem, delicate white camisole with thin black shoulder straps, black lace trim and small pink ribbon bow, fitted black choker with silver heart ring and dangling pink heart pendant",
-        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), (blonde hair:1.6), (black hair:1.5), (brown hair:1.5), (green hair:1.5), (blue hair:1.5), (white hair:1.5), (silver hair:1.5), blue eyes, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.4), (flat chest:1.4), (small breasts:1.3), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), (purple hair:1.6), (dark purple hair:1.6), (violet hair:1.6), (navy hair:1.6), (blonde hair:1.6), (black hair:1.5), (brown hair:1.5), (green hair:1.5), (blue hair:1.5), (white hair:1.5), (silver hair:1.5), blue eyes, green eyes, dark eyes, short hair, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Playful, cute, flirtatious, energetic, youthful 21yo anime girlfriend voice, cheerful, affectionate, warm, and teasing conversational tone.",
         "voicestudio_voice": "runa",
         "voicestudio_model": "omnivoice",
@@ -90,7 +90,7 @@ DEFAULT_PERSONAS = {
         "language_style": "Adaptive & bilingual (Indonesian & English). Lembut, manis, genit, manja, jahil, romantis, penuh kasih sayang, dan menenangkan layaknya pacar impian (dreamy girlfriend).",
         "visual_traits": "1girl, 21yo graceful adult anime woman, soft mature feminine facial contours, gentle romantic expression, very long silky pastel lavender-purple hair with soft violet gradients and luminous reflections, wispy bangs framing forehead, side locks framing face, three silver star-shaped hairpins on viewer's right, small silver star hair clip on viewer's left, delicate drop earrings, captivating dreamy lavender-violet anime eyes with starlight highlights and intricate purple gradients, porcelain skin, naturally rosy blushing cheeks, sweet loving gentle smile, delicate silver necklace with crescent-moon pendant, soft slender feminine body, natural shapely C-cup medium breasts, delicate slender waist, soft feminine curves, masterpiece, best quality, highly detailed anime visual novel artwork",
         "default_outfit": "cozy oversized lavender cardigan over delicate white pleated camisole dress with lace trim, silver crescent-moon necklace, silver star-shaped hairpins",
-        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.3), (flat chest:1.2), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), (blonde hair:1.6), (black hair:1.5), (white hair:1.5), (silver hair:1.5), (green hair:1.5), (brown hair:1.4), (yellow hair:1.5), short hair, dark eyes, missing star hairpins, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
+        "negative_prompt": "worst quality, low quality, (child:1.4), (loli:1.4), (kid:1.4), (baby face:1.3), (immature body:1.4), (flat chest:1.4), (small breasts:1.3), (huge oversized breasts:1.2), (bad breasts:1.3), (unnatural body proportions:1.3), (mutated body:1.3), (missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), (bad arms:1.4), (pink hair:1.6), (blonde hair:1.6), (black hair:1.5), (white hair:1.5), (silver hair:1.5), (green hair:1.5), (brown hair:1.4), (yellow hair:1.5), short hair, dark eyes, missing star hairpins, bad anatomy, deformed hands, phone, smartphone, holding phone, camera, mirror, cat ears, animal ears, animal tail",
         "voice_character": "Soft, whispery, ethereal, celestial, gentle, slow-paced, and tender romantic anime girl voice with dreamy warmth.",
         "voicestudio_voice": "yume",
         "voicestudio_model": "omnivoice",
@@ -786,16 +786,60 @@ class PersonaManager:
         self.user_recent_angles: Dict[int, List[str]] = {}
         self.user_locked_outfit_prompts: Dict[int, Dict[str, Any]] = {}
         self.user_languages: Dict[int, str] = {}
+        self.user_personas: Dict[int, str] = {}
         self.outfits_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_outfits.json")
         self.locations_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_locations.json")
         self.languages_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_languages.json")
+        self.personas_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_personas.json")
         self.history_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "chat_history.json")
         self._history_mtime = 0.0
         self._load_all_personas()
+        self._load_user_personas()
         self._load_user_outfits()
         self._load_user_locations()
         self._load_user_languages()
         self._load_chat_history()
+
+    def _load_user_personas(self):
+        """Loads user persona selections from persistent JSON storage."""
+        self.user_personas = {}
+        if os.path.exists(self.personas_file):
+            try:
+                with open(self.personas_file, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                    for k, v in raw.items():
+                        if str(k).isdigit() and str(v).lower() in self.personas:
+                            self.user_personas[int(k)] = str(v).lower()
+            except Exception as e:
+                logger.error(f"Error loading user personas: {e}")
+
+    def _save_user_personas(self):
+        """Saves user persona selections to persistent JSON storage."""
+        d = os.path.dirname(self.personas_file)
+        if d and not os.path.exists(d):
+            os.makedirs(d, exist_ok=True)
+        try:
+            with open(self.personas_file, "w", encoding="utf-8") as f:
+                json.dump({str(k): v for k, v in self.user_personas.items()}, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving user personas: {e}")
+
+    def get_active_persona_key(self, user_id: Optional[int] = None) -> str:
+        """Returns the active persona key for a user, or global active_key fallback."""
+        if user_id:
+            uid = int(user_id)
+            if uid in self.user_personas:
+                return self.user_personas[uid]
+        return (self.active_key or "runa").lower()
+
+    def set_user_persona(self, user_id: int, key: str) -> bool:
+        """Sets and persists the active persona for a specific user."""
+        k = key.lower()
+        if k in self.personas:
+            self.user_personas[int(user_id)] = k
+            self._save_user_personas()
+            return True
+        return False
 
     def _load_user_languages(self):
         """Loads user language preferences from persistent JSON storage."""
@@ -1235,9 +1279,10 @@ class PersonaManager:
         else:
             return f"{cur_lang.title()} ✏️"
 
-    def get_active_persona(self, lang: Optional[str] = None, user_text: Optional[str] = None) -> Dict[str, Any]:
+    def get_active_persona(self, lang: Optional[str] = None, user_text: Optional[str] = None, user_id: Optional[int] = None) -> Dict[str, Any]:
         """Returns the currently active persona with strict language enforcement injected."""
-        base = self.personas.get(self.active_key, DEFAULT_PERSONAS["runa"]).copy()
+        p_key = self.get_active_persona_key(user_id)
+        base = self.personas.get(p_key, DEFAULT_PERSONAS["runa"]).copy()
         raw_inst = base.get("system_instruction", "")
         # Remove any old generic language rule that might confuse local LLMs
         clean_inst = re.sub(r"IMPORTANT LANGUAGE RULE:[^.]*\.[^.]*\.[^.]*\.", "", raw_inst).strip()
@@ -1248,11 +1293,13 @@ class PersonaManager:
         base["system_instruction"] = f"{clean_inst} {lang_rule}"
         return base
 
-    def set_active_persona(self, key: str) -> bool:
+    def set_active_persona(self, key: str, user_id: Optional[int] = None) -> bool:
         """Switches active persona key, resetting transient session states, undress states, and locked locations."""
         key = key.lower()
         if key in self.personas:
             self.active_key = key
+            if user_id:
+                self.set_user_persona(user_id, key)
             if hasattr(self, "user_locked_outfit_prompts"):
                 self.user_locked_outfit_prompts.clear()
             if hasattr(self, "session_outfits"):
@@ -1262,6 +1309,8 @@ class PersonaManager:
                 self._save_user_locations()
             # Ensure fresh start: reset any temporary undress stages or session outfits so new persona is clothed in her default outfit
             for uid in list(self.user_outfits.keys()):
+                if user_id and uid != int(user_id):
+                    continue
                 rec = self.user_outfits.get(uid)
                 if isinstance(rec, dict):
                     if rec.get("undress_stage", 0) > 0 or rec.get("mode") == "session":
@@ -2773,7 +2822,7 @@ class PersonaManager:
         Builds visual prompt dynamically with student routine & clothing coherence.
         Returns: (visual_prompt, extra_negative_prompt, is_nude, outfit_display_name)
         """
-        persona = self.get_active_persona()
+        persona = self.get_active_persona(user_id=user_id)
         base_visual = persona.get("visual_traits", DEFAULT_PERSONAS["runa"]["visual_traits"])
 
         hist = history or (self.get_chat_history(user_id) if user_id else [])
@@ -2793,6 +2842,11 @@ class PersonaManager:
             is_nsfw=is_nsfw,
             allow_undress_advance=allow_undress_advance,
         )
+
+        # Inject persona-specific identity negative constraints (locks hair color, eye color, and body proportions)
+        p_neg = persona.get("negative_prompt", "")
+        if p_neg:
+            extra_neg = f"{extra_neg}, {p_neg}" if extra_neg else p_neg
 
         # Prevent hardcoded uniform/cardigan clauses in persona traits (e.g. Shiro/Yume) from clashing with dynamic outfits
         if outfit_prompt:
@@ -2823,7 +2877,8 @@ class PersonaManager:
             extra_neg = f"{extra_neg}, {solo_guard_neg}" if extra_neg else solo_guard_neg
 
         # Check if persona is a nekomimi or user explicitly requested a cat/pet/animal in prompt
-        is_neko_persona = self.active_key == "mimi" or any(k in persona.get("visual_traits", "").lower() for k in ["cat ears", "nekomimi"])
+        p_active_key = self.get_active_persona_key(user_id)
+        is_neko_persona = p_active_key == "mimi" or any(k in persona.get("visual_traits", "").lower() for k in ["cat ears", "nekomimi"])
         wants_cat = bool(re.search(r"\b(kucing|cat|kitten|anabul|pet|hewan)\b", (user_text or "").lower()))
         if not is_neko_persona and not wants_cat:
             cat_neg = "cat, kitten, feline, animal, pet, animal ears, cat ears"

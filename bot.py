@@ -3703,10 +3703,11 @@ def handle_persona(message):
         args = raw.split()
         if len(args) > 1:
             chosen = args[1].lower()
-            if persona_mgr.set_active_persona(chosen):
+            if persona_mgr.set_active_persona(chosen, user_id=message.from_user.id):
                 update_env_variable("DEFAULT_PERSONA", chosen)
+                persona_mgr.set_user_persona(message.from_user.id, chosen)
                 scheduled_buffer.clear_user_buffer(message.chat.id)
-                p = persona_mgr.get_active_persona()
+                p = persona_mgr.get_active_persona(user_id=message.from_user.id)
                 img_p = get_persona_image_path(p)
                 if img_p and os.path.exists(img_p):
                     with open(img_p, "rb") as f:
@@ -3736,10 +3737,11 @@ def callback_set_persona(call):
         return
 
     chosen = call.data.split(":", 1)[1]
-    if persona_mgr.set_active_persona(chosen):
+    if persona_mgr.set_active_persona(chosen, user_id=call.from_user.id):
         update_env_variable("DEFAULT_PERSONA", chosen)
+        persona_mgr.set_user_persona(call.from_user.id, chosen)
         scheduled_buffer.clear_user_buffer(call.message.chat.id)
-        p = persona_mgr.get_active_persona()
+        p = persona_mgr.get_active_persona(user_id=call.from_user.id)
         bot.answer_callback_query(call.id, f"Switched to {p.get('name')}!")
         try:
             bot.edit_message_text(
@@ -8463,7 +8465,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 return
 
             u_lang = persona_mgr.get_user_language(message.from_user.id) if hasattr(persona_mgr, 'get_user_language') else "auto"
-            persona = persona_mgr.get_active_persona(lang=u_lang, user_text=user_text)
+            persona = persona_mgr.get_active_persona(lang=u_lang, user_text=user_text, user_id=message.from_user.id)
 
             with ChatActionLoop(bot, message.chat.id, "typing") as typing_loop:
                 # 1. Expire stale session outfits and undress stage when switching to casual daily topics
