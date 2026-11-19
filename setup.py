@@ -635,8 +635,8 @@ def config_image_model(env_vars):
         agy_ready = bool(shutil.which("agy") or shutil.which("agy.cmd"))
         sfw_options = [
             (f"🌉 Google Antigravity Image Generator (AGY Subagent) {'[TERPASANG - 0 VRAM]' if agy_ready else '[Bebas VRAM]'}", "agy", "agy", "agy"),
-            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Uncensored, Cepat & Halus)", "comfyui", "AOM3A1B_orangemixs.safetensors", "aom3"),
-            ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Jernih 1024px)", "comfyui", "AnythingXL_xl.safetensors", "anything_xl"),
+            ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Rekomendasi Default 1024px Ultra Jernih)", "comfyui", "AnythingXL_xl.safetensors", "anything_xl"),
+            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Uncensored, Cepat & Hemat VRAM)", "comfyui", "AOM3A1B_orangemixs.safetensors", "aom3"),
             ("✨ MeinaMix v12 (Anime SD 1.5 - Cepat & Hemat VRAM)", "comfyui", "meinamix_v12Final.safetensors", "meinamix"),
             ("🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif)", "comfyui", "", "auto"),
             ("☁️ Cloud Fallback Engine (Pollinations AI - Free Cloud GPU, 0 VRAM)", "cloud", "", "cloud")
@@ -666,9 +666,9 @@ def config_image_model(env_vars):
 
         print(c(BOLD + MAGENTA, "\n--- [B] Konfigurasi Image Engine NSFW (Selfie Privat, Lingerie, Bikini, Nude 18+) ---"))
         nsfw_options = [
-            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Civitai #9942, Rekomendasi Uncensored)", "AOM3A1B_orangemixs.safetensors", "aom3"),
+            ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Rekomendasi Default 1024px Ultra Jernih)", "AnythingXL_xl.safetensors", "anything_xl"),
+            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Civitai #9942, Uncensored & Hemat VRAM)", "AOM3A1B_orangemixs.safetensors", "aom3"),
             ("✨ MeinaMix v12 (Anime SD 1.5 - Uncensored Art)", "meinamix_v12Final.safetensors", "meinamix"),
-            ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0)", "AnythingXL_xl.safetensors", "anything_xl"),
             ("🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif)", "", "auto")
         ]
         for idx, (label, ckpt, key) in enumerate(nsfw_options, 1):
@@ -696,9 +696,9 @@ def config_image_model(env_vars):
     else:
         env_vars["IMAGE_ENGINE_MODE"] = "unified"
         options = [
-            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Civitai #9942, Rekomendasi Uncensored & Ringan)", "aom3", "AOM3A1B_orangemixs.safetensors"),
+            ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Rekomendasi Default 1024px Ultra Jernih)", "anything_xl", "AnythingXL_xl.safetensors"),
+            ("🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - Civitai #9942, Uncensored & Ringan)", "aom3", "AOM3A1B_orangemixs.safetensors"),
             ("✨ MeinaMix v12 (Anime SD 1.5 - Cepat & Hemat VRAM)", "meinamix", "meinamix_v12Final.safetensors"),
-            ("🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - Ultra Jernih 1024px)", "anything_xl", "AnythingXL_xl.safetensors"),
             ("🎯 Local ComfyUI Standard (Auto-detect checkpoint aktif)", "auto", ""),
             ("🌉 Google Antigravity Image Generator (AGY Subagent)", "agy", "agy"),
             ("☁️ Cloud Fallback Engine (Pollinations AI - 0 VRAM)", "cloud", ""),

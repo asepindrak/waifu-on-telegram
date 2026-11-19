@@ -154,23 +154,23 @@ class MediaEngine:
         if ckpts:
             valid_ckpts = [c for c in ckpts if not ("basnsfw" in c.lower() and "base" in c.lower())] or ckpts
             for c in valid_ckpts:
+                if any(k in c.lower() for k in ["anything", "xl"]):
+                    return c
+            for c in valid_ckpts:
                 if any(k in c.lower() for k in ["aom", "orange"]):
                     return c
             for c in valid_ckpts:
                 if "meina" in c.lower():
-                    return c
-            for c in valid_ckpts:
-                if any(k in c.lower() for k in ["anything", "xl"]):
                     return c
             return valid_ckpts[0]
         if env_ckpt:
             return env_ckpt
         try:
             import asset_manager
-            info = asset_manager.get_asset_info("aom3")
+            info = asset_manager.get_asset_info("anything_xl")
             if info and info.get("installed") and info.get("target_path"):
                 return os.path.basename(info["target_path"])
-            info = asset_manager.get_asset_info("anything_xl")
+            info = asset_manager.get_asset_info("aom3")
             if info and info.get("installed") and info.get("target_path"):
                 return os.path.basename(info["target_path"])
             info = asset_manager.get_asset_info("meinamix")
@@ -178,7 +178,7 @@ class MediaEngine:
                 return os.path.basename(info["target_path"])
         except Exception:
             pass
-        return "AOM3A1B_orangemixs.safetensors"
+        return "AnythingXL_xl.safetensors"
 
     def get_available_checkpoints(self) -> list:
         """Queries ComfyUI for available checkpoint models."""
@@ -413,24 +413,24 @@ class MediaEngine:
         if not valid_ckpts:
             valid_ckpts = ckpts
 
-        # 2. Prefer AbyssOrangeMix3 (AOM3 / OrangeMix) if present (Default SD 1.5 anime uncensored model)
+        # 2. Prefer Anything XL if present (Default SDXL 1024px anime model)
+        if not chosen_ckpt:
+            for c in valid_ckpts:
+                if any(k in c.lower() for k in ["anything", "xl"]):
+                    chosen_ckpt = c
+                    break
+
+        # 3. Prefer AbyssOrangeMix3 (AOM3 / OrangeMix) if present (SD 1.5 anime uncensored model)
         if not chosen_ckpt:
             for c in valid_ckpts:
                 if any(k in c.lower() for k in ["aom", "orange"]):
                     chosen_ckpt = c
                     break
 
-        # 3. Prefer MeinaMix if present in folder (SD 1.5 anime model with CLIP & VAE, handles SFW & NSFW)
+        # 4. Prefer MeinaMix if present in folder (SD 1.5 anime model with CLIP & VAE, handles SFW & NSFW)
         if not chosen_ckpt:
             for c in valid_ckpts:
                 if "meina" in c.lower():
-                    chosen_ckpt = c
-                    break
-
-        # 4. Prefer Anything XL if present
-        if not chosen_ckpt:
-            for c in valid_ckpts:
-                if any(k in c.lower() for k in ["anything", "xl"]):
                     chosen_ckpt = c
                     break
 

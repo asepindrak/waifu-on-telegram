@@ -196,7 +196,7 @@ try {
     if (-not $imgMode) { $imgMode = "unified" }
     $imgModeLabel = if ($imgMode -eq "split") { "Split Hybrid (SFW + NSFW)" } else { "Unified (Single Model)" }
     $uniCkpt = $env:COMFYUI_CHECKPOINT
-    if (-not $uniCkpt) { $uniCkpt = "AOM3A1B_orangemixs.safetensors" }
+    if (-not $uniCkpt) { $uniCkpt = "AnythingXL_xl.safetensors" }
     $sfwImg = $env:SFW_IMAGE_ENGINE
     if (-not $sfwImg) { $sfwImg = "comfyui" }
     $nsfwImg = $env:NSFW_IMAGE_ENGINE
@@ -205,7 +205,7 @@ try {
         $sfwCkpt = $env:SFW_COMFYUI_CHECKPOINT
         if (-not $sfwCkpt) { $sfwCkpt = $uniCkpt }
         $nsfwCkpt = $env:NSFW_COMFYUI_CHECKPOINT
-        if (-not $nsfwCkpt) { $nsfwCkpt = "AOM3A1B_orangemixs.safetensors" }
+        if (-not $nsfwCkpt) { $nsfwCkpt = "AnythingXL_xl.safetensors" }
     } else {
         $sfwCkpt = $uniCkpt
         $nsfwCkpt = $uniCkpt

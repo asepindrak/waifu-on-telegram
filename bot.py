@@ -1374,8 +1374,8 @@ def render_setup_dashboard(user_id: int) -> Tuple[str, types.InlineKeyboardMarku
     if cur_img_mode in ("split", "hybrid"):
         sfw_e = os.environ.get("SFW_IMAGE_ENGINE", "agy").lower()
         sfw_lbl = "AGY" if sfw_e == "agy" else ("Cloud" if sfw_e == "cloud" else "ComfyUI")
-        nsfw_c = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "aom3").lower()
-        nsfw_lbl = "AOM3" if any(k in nsfw_c for k in ["aom", "orange"]) else ("MeinaMix" if "meina" in nsfw_c else "ComfyUI")
+        nsfw_c = os.environ.get("NSFW_COMFYUI_CHECKPOINT", "anything_xl").lower()
+        nsfw_lbl = "Anything XL" if any(k in nsfw_c for k in ["anything", "xl"]) else ("AOM3" if any(k in nsfw_c for k in ["aom", "orange"]) else ("MeinaMix" if "meina" in nsfw_c else "ComfyUI"))
         cur_ckpt = f"Split ({sfw_lbl}/{nsfw_lbl})"
     else:
         cur_ckpt = os.environ.get("COMFYUI_CHECKPOINT", "")

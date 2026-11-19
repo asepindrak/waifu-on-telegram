@@ -462,12 +462,12 @@ function Select-And-Download-AnimeCheckpoint {
     $defaultLabel = "AbyssOrangeMix3 AOM3A1B (SD 1.5 Uncensored)"
     $recVideo = "animatediff"
     if ($vramMB -ge 5800) {
-        $defaultChoice = "3"
-        $defaultLabel = "Anything XL (SDXL 1024px Ultra Jernih)"
+        $defaultChoice = "1"
+        $defaultLabel = "Anything XL (SDXL 1024px Ultra Jernih - Default)"
         $recVideo = "wan21"
     } elseif ($vramMB -ge 2000) {
         $defaultChoice = "1"
-        $defaultLabel = "AbyssOrangeMix3 AOM3A1B (SD 1.5 Cepat & Uncensored)"
+        $defaultLabel = "Anything XL (SDXL 1024px Ultra Jernih - Default)"
         $recVideo = "animatediff"
     } else {
         $defaultChoice = "4"
@@ -479,42 +479,42 @@ function Select-And-Download-AnimeCheckpoint {
     Write-Host "  💡 Rekomendasi Auto-Tuning: [$defaultChoice] $defaultLabel (Video: $recVideo)" -ForegroundColor Green
 
     Write-Host "`n  🎨 Pilih Model Ilustrasi Anime untuk Generasi Foto Waifu (ComfyUI):" -ForegroundColor Cyan
-    Write-Host "    [1] 🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - ~2.0 GB) [Civitai #9942: Cepat, Uncensored, Halus & Dinamis]" -ForegroundColor White
-    Write-Host "    [2] ✨ MeinaMix v12 (Anime SD 1.5 - ~2.0 GB) [Rekomendasi GPU 4GB VRAM: Cepat & Ringan]" -ForegroundColor White
-    Write-Host "    [3] 🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - ~6.6 GB) [Rekomendasi GPU 6GB - 8GB+ VRAM: 1024px Ultra Jernih]" -ForegroundColor White
+    Write-Host "    [1] 🌟 万象熔炉 | Anything XL (Anime SDXL 1.0 - ~6.6 GB) [Rekomendasi Default: 1024px Ultra Jernih]" -ForegroundColor White
+    Write-Host "    [2] 🍊 AbyssOrangeMix3 AOM3A1B (Anime SD 1.5 - ~2.0 GB) [Civitai #9942: Cepat, Uncensored, Hemat VRAM]" -ForegroundColor White
+    Write-Host "    [3] ✨ MeinaMix v12 (Anime SD 1.5 - ~2.0 GB) [Alternatif GPU 4GB VRAM: Cepat & Ringan]" -ForegroundColor White
     Write-Host "    [4] ☁️ Lewati download model sekarang (Gunakan Cloud Fallback Engine / Unduh nanti)" -ForegroundColor White
     $imgChoice = Read-Host "  Pilih model foto [1/2/3/4, default: $defaultChoice]"
     $imgChoice = $imgChoice.Trim()
     if (-not $imgChoice) { $imgChoice = $defaultChoice }
 
-    $selectedCkpt = "AOM3A1B_orangemixs.safetensors"
+    $selectedCkpt = "AnythingXL_xl.safetensors"
     if ($imgChoice -eq "1") {
-        $aomUrl = "https://huggingface.co/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors"
-        $aomFallback = "https://hf-mirror.com/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors"
-        $aomDest = "$ckptDir\AOM3A1B_orangemixs.safetensors"
-        Download-FileWithProgress -Url $aomUrl -DestinationPath $aomDest -Description "AbyssOrangeMix3 AOM3A1B SD 1.5 (~2.0 GB)" -FallbackUrl $aomFallback -MinExpectedBytes ([long](1500*1024*1024))
-        $selectedCkpt = "AOM3A1B_orangemixs.safetensors"
-    } elseif ($imgChoice -eq "2") {
-        $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
-        $meinaDest = "$ckptDir\meinamix_v12Final.safetensors"
-        $meinaFallback = "https://hf-mirror.com/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
-        Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11/v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback -MinExpectedBytes ([long](1500*1024*1024))
-        $selectedCkpt = "meinamix_v12Final.safetensors"
-    } elseif ($imgChoice -eq "3") {
         $xlUrl = "https://huggingface.co/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors"
         $xlFallback = "https://hf-mirror.com/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors"
         $xlDest = "$ckptDir\AnythingXL_xl.safetensors"
         Download-FileWithProgress -Url $xlUrl -DestinationPath $xlDest -Description "万象熔炉 | Anything XL SDXL (~6.6 GB)" -FallbackUrl $xlFallback -MinExpectedBytes ([long](4500*1024*1024))
         $selectedCkpt = "AnythingXL_xl.safetensors"
-    } elseif ($imgChoice -eq "4") {
-        Write-Host "  [INFO] Melewati unduhan model lokal. Foto waifu dapat menggunakan Cloud Fallback Engine." -ForegroundColor DarkGray
-        $selectedCkpt = ""
-    } else {
+    } elseif ($imgChoice -eq "2") {
         $aomUrl = "https://huggingface.co/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors"
         $aomFallback = "https://hf-mirror.com/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors"
         $aomDest = "$ckptDir\AOM3A1B_orangemixs.safetensors"
         Download-FileWithProgress -Url $aomUrl -DestinationPath $aomDest -Description "AbyssOrangeMix3 AOM3A1B SD 1.5 (~2.0 GB)" -FallbackUrl $aomFallback -MinExpectedBytes ([long](1500*1024*1024))
         $selectedCkpt = "AOM3A1B_orangemixs.safetensors"
+    } elseif ($imgChoice -eq "3") {
+        $meinaUrl = "https://huggingface.co/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
+        $meinaDest = "$ckptDir\meinamix_v12Final.safetensors"
+        $meinaFallback = "https://hf-mirror.com/Meina/MeinaMix/resolve/main/Meina%20V11%20-%20baked%20VAE.safetensors"
+        Download-FileWithProgress -Url $meinaUrl -DestinationPath $meinaDest -Description "MeinaMix v11/v12 Anime SD 1.5 (~2 GB)" -FallbackUrl $meinaFallback -MinExpectedBytes ([long](1500*1024*1024))
+        $selectedCkpt = "meinamix_v12Final.safetensors"
+    } elseif ($imgChoice -eq "4") {
+        Write-Host "  [INFO] Melewati unduhan model lokal. Foto waifu dapat menggunakan Cloud Fallback Engine." -ForegroundColor DarkGray
+        $selectedCkpt = ""
+    } else {
+        $xlUrl = "https://huggingface.co/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors"
+        $xlFallback = "https://hf-mirror.com/artificialguybr/Anything-XL/resolve/main/AnythingXL_xl.safetensors"
+        $xlDest = "$ckptDir\AnythingXL_xl.safetensors"
+        Download-FileWithProgress -Url $xlUrl -DestinationPath $xlDest -Description "万象熔炉 | Anything XL SDXL (~6.6 GB)" -FallbackUrl $xlFallback -MinExpectedBytes ([long](4500*1024*1024))
+        $selectedCkpt = "AnythingXL_xl.safetensors"
     }
 
     $envFile = "$installDir\.env"
