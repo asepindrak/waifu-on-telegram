@@ -320,6 +320,12 @@ class HybridLLMClient:
         sfw_client: Optional[LocallyUncensoredClient] = None,
         nsfw_client: Optional[LocallyUncensoredClient] = None
     ):
+        self._custom_sfw_client = sfw_client
+        self._custom_nsfw_client = nsfw_client
+        self.reload_from_env(mode=mode)
+
+    def reload_from_env(self, mode: Optional[str] = None):
+        """Reloads mode, providers, and SFW/NSFW clients in-place from os.environ."""
         self.mode = (mode or os.environ.get("AI_ENGINE_MODE", "unified")).lower().strip()
         if self.mode not in ("split", "hybrid"):
             self.mode = "unified"
@@ -329,8 +335,8 @@ class HybridLLMClient:
         self.nsfw_provider = os.environ.get("NSFW_LLM_PROVIDER", "local").lower().strip()
 
         # Initialize SFW client
-        if sfw_client:
-            self.sfw_client = sfw_client
+        if getattr(self, "_custom_sfw_client", None):
+            self.sfw_client = self._custom_sfw_client
         else:
             if self.mode == "unified" and self.sfw_provider in ("", "local", "kobold", "ollama", "lm-studio") and os.environ.get("LLM_BASE_URL"):
                 sfw_base = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:5001/v1")
@@ -343,8 +349,8 @@ class HybridLLMClient:
             self.sfw_client = LocallyUncensoredClient(base_url=sfw_base, api_key=sfw_key, model=sfw_model)
 
         # Initialize NSFW client
-        if nsfw_client:
-            self.nsfw_client = nsfw_client
+        if getattr(self, "_custom_nsfw_client", None):
+            self.nsfw_client = self._custom_nsfw_client
         else:
             nsfw_base = os.environ.get("NSFW_LLM_BASE_URL", "http://127.0.0.1:5001/v1")
             nsfw_key = os.environ.get("NSFW_LLM_API_KEY", "auto")
@@ -712,6 +718,8 @@ _GLOBAL_HYBRID_CLIENT: Optional[HybridLLMClient] = None
 def get_hybrid_llm_client(force_reload: bool = False) -> HybridLLMClient:
     """Returns singleton HybridLLMClient instance configured from environment."""
     global _GLOBAL_HYBRID_CLIENT
-    if _GLOBAL_HYBRID_CLIENT is None or force_reload:
+    if _GLOBAL_HYBRID_CLIENT is None:
         _GLOBAL_HYBRID_CLIENT = HybridLLMClient()
+    elif force_reload:
+        _GLOBAL_HYBRID_CLIENT.reload_from_env()
     return _GLOBAL_HYBRID_CLIENT
