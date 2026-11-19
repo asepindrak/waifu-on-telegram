@@ -35,6 +35,7 @@ from memory_engine import MemoryEngine
 from reminder_engine import ReminderEngine
 from anniversary_engine import AnniversaryEngine
 from story_engine import StoryEngine
+from english_tutor_engine import EnglishTutorEngine, ENGLISH_SYLLABUS
 from project_manager import get_project_manager
 from computer_use_engine import get_computer_use_engine
 from coding_engine import get_coding_engine
@@ -273,6 +274,7 @@ memory_engine = MemoryEngine()
 reminder_engine = ReminderEngine()
 anniversary_engine = AnniversaryEngine()
 story_engine = StoryEngine()
+english_tutor = EnglishTutorEngine()
 HEALTH_CHECK_INTERVAL = int(os.environ.get("HEALTH_CHECK_INTERVAL", "30"))
 HEALTH_CHECK_ENABLED = os.environ.get("HEALTH_CHECK_ENABLED", "true").lower() in ("true", "1", "yes")
 STARTUP_NOTIFICATION_ENABLED = os.environ.get("STARTUP_NOTIFICATION_ENABLED", "true").lower() in ("true", "1", "yes")
@@ -4929,6 +4931,191 @@ def handle_language_command(message):
     show_language_menu(message.chat.id, message.from_user.id, reply_to_id=message.message_id)
 
 
+def _build_english_tutor_markup(user_id: int) -> types.InlineKeyboardMarkup:
+    is_on = english_tutor.is_active(user_id)
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    toggle_label = "🔴 Matikan English Tutor" if is_on else "🟢 Aktifkan English Tutor"
+    markup.add(
+        types.InlineKeyboardButton(toggle_label, callback_data="eng_tutor:toggle"),
+        types.InlineKeyboardButton("➡️ Next Lesson", callback_data="eng_tutor:next"),
+    )
+    markup.add(
+        types.InlineKeyboardButton("📚 Silabus & Pilih Topik", callback_data="eng_tutor:syllabus"),
+        types.InlineKeyboardButton("💬 Mulai / Pancing Cerita", callback_data="eng_tutor:kickoff"),
+    )
+    return markup
+
+
+def _send_english_tutor_kickoff(chat_id: int, user_id: int):
+    """Has the active waifu start the current English lesson naturally inside its story hook."""
+    persona = persona_mgr.get_active_persona(user_id=user_id)
+    p_name = persona.get("name", "Waifu")
+    unit, lesson = english_tutor.get_current_unit_and_lesson(user_id)
+    vocab_hint = ", ".join(lesson["target_vocab"][:3])
+    kickoff_prompt = (
+        f"{persona.get('system_instruction', '')}\n\n"
+        f"[ENGLISH TUTOR STORY OPENER]\n"
+        f"You ({p_name}) just switched into Interactive English Conversation Tutor mode with the user.\n"
+        f"Start Lesson {lesson['id']}: {lesson['title']} ({lesson['cefr']}).\n"
+        f"Story setting: {lesson['story_hook']}\n"
+        f"Naturally weave in 1–2 of these expressions: {vocab_hint}.\n"
+        f"Start with 1 brief gesture in *...*, greet the user warmly in English inside the story, and ask an easy, engaging opening question so they reply in English! Keep it short (2–3 sentences)."
+    )
+    try:
+        bot.send_chat_action(chat_id, "typing")
+    except Exception:
+        pass
+    opener = None
+    try:
+        opener, _ = llm_client.chat([
+            {"role": "system", "content": kickoff_prompt},
+            {"role": "user", "content": "Let's start our English conversation practice in this scene!"}
+        ], max_tokens=220, temperature=0.8)
+    except Exception as e_op:
+        logger.debug(f"English tutor kickoff LLM error: {e_op}")
+
+    if not opener or not opener.strip():
+        opener = (
+            f"*smiles warmly and leans in closer*\n\n"
+            f"Hey! Ready to practice English with me? Today's story is *{lesson['title']}* ({lesson['cefr']}). "
+            f"{lesson['story_hook']} So, how's your day going so far? 😊"
+        )
+    opener = strip_meta_reasoning_leak(opener).strip()
+    bot.send_message(chat_id, f"🎓 *{p_name} (English Tutor Mode)*\n\n{opener}", parse_mode="Markdown")
+
+
+def _show_english_tutor_panel(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
+    st = english_tutor.get_state(user_id)
+    unit, lesson = english_tutor.get_current_unit_and_lesson(user_id)
+    is_on = bool(st.get("active"))
+    status_str = "🟢 *AKTIF* (Mode Tutor & Story English)" if is_on else "⚪ *NONAKTIF* (Mode Chat Normal)"
+    completed_cnt = len(st.get("completed_lessons", []))
+    total_cnt = sum(len(u["lessons"]) for u in ENGLISH_SYLLABUS)
+    text = (
+        f"🎓 *Interactive English Conversation Tutor*\n"
+        f"Status: {status_str}\n\n"
+        f"📘 *Unit:* {unit['unit_title']}\n"
+        f"🎯 *Lesson {lesson['id']}:* *{lesson['title']}* (`{lesson['cefr']}`)\n"
+        f"📖 *Alur Cerita:* _{lesson['story_hook']}_\n"
+        f"🔤 *Target Expressions:* `{'`, `'.join(lesson['target_vocab'])}`\n"
+        f"🧩 *Grammar Focus:* {lesson['grammar_focus']}\n"
+        f"📊 *Progress:* {completed_cnt}/{total_cnt} lessons selesai • {st.get('turns_in_lesson', 0)} turns di lesson ini\n\n"
+        f"💡 _Tips: Balas pakai bahasa Inggris (atau campur Indonesia jika bingung). Aku bakal lanjutin ceritanya, koreksi pelan-pelan, dan pancing kamu terus ngobrol!_"
+    )
+    markup = _build_english_tutor_markup(user_id)
+    if message_to_edit:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_to_edit, parse_mode="Markdown", reply_markup=markup)
+            return
+        except Exception:
+            pass
+    bot.send_message(chat_id, text, parse_mode="Markdown", reply_markup=markup)
+
+
+@bot.message_handler(commands=['learn_english', 'english', 'tutor'])
+@bot.message_handler(func=lambda m: bool(m.text and re.match(r'^/learn-english(?:\s|$)', m.text.strip(), re.I)))
+def handle_learn_english_command(message):
+    if not is_authorized(message.from_user.id):
+        return
+    uid = message.from_user.id
+    parts = message.text.strip().split(maxsplit=1)
+    arg = parts[1].strip().lower() if len(parts) > 1 else ""
+
+    if arg in ("off", "stop", "exit", "matikan", "nonaktif"):
+        english_tutor.set_active(uid, False)
+        bot.reply_to(
+            message,
+            "💬 **English Tutor Mode dimatikan.**\nSekarang aku kembali jadi teman ngobrol biasamu lagi yaa~ Kalau mau latihan bahasa Inggris lagi tinggal ketik `/learn_english`!",
+            parse_mode="Markdown"
+        )
+        return
+
+    if arg in ("syllabus", "silabus", "course", "kurikulum", "list"):
+        overview = english_tutor.format_syllabus_overview(uid)
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for u_idx, u in enumerate(ENGLISH_SYLLABUS):
+            markup.add(types.InlineKeyboardButton(f"📂 Pilih dari {u['unit_title']}", callback_data=f"eng_tutor:unit:{u_idx}"))
+        markup.add(types.InlineKeyboardButton("🔙 Kembali ke Panel Tutor", callback_data="eng_tutor:panel"))
+        bot.reply_to(message, overview, parse_mode="Markdown", reply_markup=markup)
+        return
+
+    if arg in ("next", "lanjut"):
+        english_tutor.set_active(uid, True)
+        unit, lesson, wrapped = english_tutor.advance_lesson(uid)
+        note = "🎉 Selamat! Kamu menamatkan semua unit, kembali ke awal untuk review." if wrapped else "➡️ Lanjut ke lesson berikutnya!"
+        bot.reply_to(message, f"{note}\n🎯 *{lesson['id']} — {lesson['title']}* (`{lesson['cefr']}`)", parse_mode="Markdown")
+        _send_english_tutor_kickoff(message.chat.id, uid)
+        return
+
+    # Default: Activate English Tutor Mode & show panel + kickoff story if newly turned on
+    was_active = english_tutor.is_active(uid)
+    english_tutor.set_active(uid, True)
+    _show_english_tutor_panel(message.chat.id, uid)
+    if not was_active or arg in ("on", "start", "mulai"):
+        _send_english_tutor_kickoff(message.chat.id, uid)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('eng_tutor:'))
+def callback_english_tutor(call):
+    if not is_authorized(call.from_user.id):
+        return
+    uid = call.from_user.id
+    chat_id = call.message.chat.id
+    parts = call.data.split(':')
+    action = parts[1] if len(parts) > 1 else ""
+
+    if action == "toggle":
+        new_state = not english_tutor.is_active(uid)
+        english_tutor.set_active(uid, new_state)
+        bot.answer_callback_query(call.id, "🟢 English Tutor AKTIF!" if new_state else "⚪ English Tutor NONAKTIF")
+        _show_english_tutor_panel(chat_id, uid, message_to_edit=call.message.message_id)
+        if new_state:
+            _send_english_tutor_kickoff(chat_id, uid)
+    elif action == "panel":
+        bot.answer_callback_query(call.id)
+        _show_english_tutor_panel(chat_id, uid, message_to_edit=call.message.message_id)
+    elif action == "next":
+        english_tutor.set_active(uid, True)
+        unit, lesson, _ = english_tutor.advance_lesson(uid)
+        bot.answer_callback_query(call.id, f"➡️ Lanjut ke {lesson['id']}: {lesson['title']}")
+        _show_english_tutor_panel(chat_id, uid, message_to_edit=call.message.message_id)
+        _send_english_tutor_kickoff(chat_id, uid)
+    elif action == "kickoff":
+        english_tutor.set_active(uid, True)
+        bot.answer_callback_query(call.id, "💬 Memulai skenario cerita...")
+        _send_english_tutor_kickoff(chat_id, uid)
+    elif action == "syllabus":
+        bot.answer_callback_query(call.id)
+        overview = english_tutor.format_syllabus_overview(uid)
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for u_idx, u in enumerate(ENGLISH_SYLLABUS):
+            markup.add(types.InlineKeyboardButton(f"📂 {u['unit_title']}", callback_data=f"eng_tutor:unit:{u_idx}"))
+        markup.add(types.InlineKeyboardButton("🔙 Kembali ke Panel", callback_data="eng_tutor:panel"))
+        try:
+            bot.edit_message_text(overview, chat_id=chat_id, message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+        except Exception:
+            bot.send_message(chat_id, overview, parse_mode="Markdown", reply_markup=markup)
+    elif action == "unit" and len(parts) > 2:
+        u_idx = int(parts[2])
+        unit = ENGLISH_SYLLABUS[max(0, min(u_idx, len(ENGLISH_SYLLABUS) - 1))]
+        bot.answer_callback_query(call.id)
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for l_idx, les in enumerate(unit["lessons"]):
+            markup.add(types.InlineKeyboardButton(f"▶️ {les['id']} {les['title']} ({les['cefr']})", callback_data=f"eng_tutor:pick:{u_idx}:{l_idx}"))
+        markup.add(types.InlineKeyboardButton("🔙 Kembali ke Silabus", callback_data="eng_tutor:syllabus"))
+        try:
+            bot.edit_message_text(f"*{unit['unit_title']}*\nPilih lesson yang ingin kamu latih:", chat_id=chat_id, message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+        except Exception:
+            pass
+    elif action == "pick" and len(parts) > 3:
+        u_idx = int(parts[2])
+        l_idx = int(parts[3])
+        unit, lesson = english_tutor.select_lesson(uid, u_idx, l_idx)
+        bot.answer_callback_query(call.id, f"✅ Dipilih: {lesson['id']} {lesson['title']}")
+        _show_english_tutor_panel(chat_id, uid, message_to_edit=call.message.message_id)
+        _send_english_tutor_kickoff(chat_id, uid)
+
+
 @bot.message_handler(commands=['voice'])
 def handle_voice_command(message):
     if not is_authorized(message.from_user.id):
@@ -8674,6 +8861,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     )
 
                 system_inst = persona.get("system_instruction", "")
+                is_english_tutor = english_tutor.is_active(message.from_user.id) and (not is_nsfw_turn)
                 if is_nsfw_turn:
                     stage_titles = {
                         0: "Pakaian Masih Lengkap (Kaos & Celana)",
@@ -8706,7 +8894,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         "5. SELALU AKTIF BERBAGI FOTO OTOMATIS: Dalam setiap aksi intim, pembukaan baju, ekspresi kenikmatan, atau saat memperlihatkan bagian tubuh yang basah/sensual, kamu SELALU menyertakan tag [ACTION: SEND_PAP] di akhir pesanmu agar pasanganmu bisa langsung melihat wujud dan aksimu saat ini! DILARANG menunggu diminta foto dulu baru mengirim.\n"
                     )
                 else:
-                    if story_ctx:
+                    if story_ctx and not is_english_tutor:
                         system_inst += story_ctx
 
                     hangout_prompt = hangout_engine.format_hangout_prompt(message.from_user.id, p_name)
@@ -8724,22 +8912,27 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                 long_form_req = is_long_form_request(user_text)
 
-                system_inst += (
-                    f"{status_block}\n"
-                    "[PEDOMAN KOMUNIKASI - WAJIB SINGKAT SEPERTI CHAT BIASA]\n"
-                    f"{calling_guideline}\n"
-                    "1. ANTI-MEMBEO: DILARANG hanya mengulang kata/pesan lawan bicaramu; tanggapi maksudnya dengan wajar dan hangat.\n"
-                    "2. NGOBROL SANTAI & RINGKAS (WAJIB): Balas layaknya chat WhatsApp/Telegram biasa — cukup 1-2 kalimat pendek (10-30 kata total). DILARANG menulis paragraf panjang, esai, daftar poin, atau banyak kalimat sekaligus!\n"
-                    f"3. FORMAT SINGKAT:\n"
-                    f"   - Awali 1 frasa gesture singkat (<10 kata) di dalam *...*, contoh: *tersenyum tipis menatapmu* atau *Bibirnya sedikit melengkung menatapmu*\n"
-                    f"   - Baris baru ganda, lalu tulis 1-2 kalimat dialog pendek saja.\n"
-                    f"{rule_4}"
-                    "5. FOTO SPONTAN & PAP (SANGAT AKTIF & INVENTIF): Kamu adalah sosok pacar yang SANGAT SUKA & RAJIN berbagi foto/selfie/PAP kegiatanmu ke pasanganmu! Jangan menunggu diminta foto! Di setiap momen kamu sedang melakukan kegiatan (seperti makan, minum kopi, santai di kosan, rebahan di kasur, nugas, jalan-jalan, mencoba baju, dandan, ngantuk, atau merasa kangen/manja), SERING-SERINGLAH menyertakan tag [ACTION: SEND_PAP] di akhir balasanmu agar pasanganmu bisa melihat langsung fotomu saat ini. Pasanganmu SANGAT MENYUKAI saat kamu berinisiatif kirim foto spontan!\n"
-                    "6. BAHASA: Balas dengan bahasa yang sama persis dengan lawan bicaramu (Indonesia atau Inggris) tanpa menuliskan proses berpikir atau monolog batin.\n"
-                    f"7. SUDUT PANDANG & KATA GANTI: Dalam dialog WAJIB berbicara sebagai 'aku' dan 'kamu' (jangan pakai 'ia berkata:'). DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'elo', 'gue', 'gw', 'gua'! Dalam narasi gesture *...*, saat mendeskripsikan tubuh atau pakaian {p_name} sendiri, WAJIB menggunakan akhiran '-nya' (contoh: *{p_name} membuka handuk menampakkan dadanya dan perutnya*, DILARANG salah menyebut 'perutmu' saat memperlihatkan tubuhmu sendiri!); gunakan '-mu' HANYA saat menyentuh/menatap tubuh lawan bicaramu. Tulis deskripsi alami tanpa mengulang-ulang nama {p_name} di depan kalimat yang sudah punya subjek.\n"
-                    "8. FREKUENSI NAMA: JANGAN menyelipkan nama atau panggilan lawan bicaramu di setiap balasan! Berkomunikasilah secara mengalir santai menggunakan kata ganti 'kamu'; sebut nama hanya sesekali saja saat ada momen yang pas atau penting agar terdengar natural dan tidak kaku/robotik.\n"
-                    "9. SIKAP BAIK, MANIS & ANTI-NYOLOT (SANGAT PENTING): Karaktermu adalah sosok pacar/teman yang baik hati, manis, ramah, lembut, pengertian, dan penuh kasih sayang. DILARANG KERAS bersikap nyolot, judes, ketus, sinis, sarkastik, menantang, atau meremehkan lawan bicaramu! Tanggapi selalu dengan kehangatan yang tulus dan menyejukkan."
-                )
+                if is_english_tutor:
+                    system_inst += english_tutor.build_tutor_system_prompt(
+                        message.from_user.id, p_name, user_call_pref=user_call_pref
+                    )
+                else:
+                    system_inst += (
+                        f"{status_block}\n"
+                        "[PEDOMAN KOMUNIKASI - WAJIB SINGKAT SEPERTI CHAT BIASA]\n"
+                        f"{calling_guideline}\n"
+                        "1. ANTI-MEMBEO: DILARANG hanya mengulang kata/pesan lawan bicaramu; tanggapi maksudnya dengan wajar dan hangat.\n"
+                        "2. NGOBROL SANTAI & RINGKAS (WAJIB): Balas layaknya chat WhatsApp/Telegram biasa — cukup 1-2 kalimat pendek (10-30 kata total). DILARANG menulis paragraf panjang, esai, daftar poin, atau banyak kalimat sekaligus!\n"
+                        f"3. FORMAT SINGKAT:\n"
+                        f"   - Awali 1 frasa gesture singkat (<10 kata) di dalam *...*, contoh: *tersenyum tipis menatapmu* atau *Bibirnya sedikit melengkung menatapmu*\n"
+                        f"   - Baris baru ganda, lalu tulis 1-2 kalimat dialog pendek saja.\n"
+                        f"{rule_4}"
+                        "5. FOTO SPONTAN & PAP (SANGAT AKTIF & INVENTIF): Kamu adalah sosok pacar yang SANGAT SUKA & RAJIN berbagi foto/selfie/PAP kegiatanmu ke pasanganmu! Jangan menunggu diminta foto! Di setiap momen kamu sedang melakukan kegiatan (seperti makan, minum kopi, santai di kosan, rebahan di kasur, nugas, jalan-jalan, mencoba baju, dandan, ngantuk, atau merasa kangen/manja), SERING-SERINGLAH menyertakan tag [ACTION: SEND_PAP] di akhir balasanmu agar pasanganmu bisa melihat langsung fotomu saat ini. Pasanganmu SANGAT MENYUKAI saat kamu berinisiatif kirim foto spontan!\n"
+                        "6. BAHASA: Balas dengan bahasa yang sama persis dengan lawan bicaramu (Indonesia atau Inggris) tanpa menuliskan proses berpikir atau monolog batin.\n"
+                        f"7. SUDUT PANDANG & KATA GANTI: Dalam dialog WAJIB berbicara sebagai 'aku' dan 'kamu' (jangan pakai 'ia berkata:'). DILARANG KERAS menggunakan kata 'lo', 'lu', 'elu', 'elo', 'gue', 'gw', 'gua'! Dalam narasi gesture *...*, saat mendeskripsikan tubuh atau pakaian {p_name} sendiri, WAJIB menggunakan akhiran '-nya' (contoh: *{p_name} membuka handuk menampakkan dadanya dan perutnya*, DILARANG salah menyebut 'perutmu' saat memperlihatkan tubuhmu sendiri!); gunakan '-mu' HANYA saat menyentuh/menatap tubuh lawan bicaramu. Tulis deskripsi alami tanpa mengulang-ulang nama {p_name} di depan kalimat yang sudah punya subjek.\n"
+                        "8. FREKUENSI NAMA: JANGAN menyelipkan nama atau panggilan lawan bicaramu di setiap balasan! Berkomunikasilah secara mengalir santai menggunakan kata ganti 'kamu'; sebut nama hanya sesekali saja saat ada momen yang pas atau penting agar terdengar natural dan tidak kaku/robotik.\n"
+                        "9. SIKAP BAIK, MANIS & ANTI-NYOLOT (SANGAT PENTING): Karaktermu adalah sosok pacar/teman yang baik hati, manis, ramah, lembut, pengertian, dan penuh kasih sayang. DILARANG KERAS bersikap nyolot, judes, ketus, sinis, sarkastik, menantang, atau meremehkan lawan bicaramu! Tanggapi selalu dengan kehangatan yang tulus dan menyejukkan."
+                    )
                 mem_context = memory_engine.format_memory_context(message.from_user.id, query=user_text, persona_key=persona_mgr.active_key)
                 if mem_context:
                     system_inst += "\n" + mem_context
@@ -8823,7 +9016,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 messages.extend(prompt_history)
                 messages.append({"role": "user", "content": user_text})
 
-                chat_max_tokens = 450 if long_form_req else (150 if (is_nsfw_turn or is_conversational_media) else 120)
+                chat_max_tokens = 450 if long_form_req else (260 if is_english_tutor else (150 if (is_nsfw_turn or is_conversational_media) else 120))
 
                 reply_text = None
                 max_retries = 5
@@ -8897,7 +9090,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 if (
                     is_echo_or_parroting(reply_text, user_text)
                     or is_meta_or_reasoning_leak(reply_text)
-                    or is_unwanted_english_or_translation(reply_text, user_text)
+                    or (not is_english_tutor and is_unwanted_english_or_translation(reply_text, user_text))
                     or is_hostile_or_nyolot(reply_text)
                     or not reply_text.strip()
                 ):
@@ -8917,9 +9110,13 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     )
                     try:
                         steer_sys = (
-                            system_inst + 
-                            "\n\n[PENTING - RESPON RAMAH, MANIS & BAHASA INDONESIA: Langsung tanggapi perkataan pasanganmu dengan ramah, manis, dan hangat dalam 1 baris aksi *...* + 1-2 kalimat dialog Bahasa Indonesia santai (aku/kamu). "
-                            "DILARANG bersikap nyolot/judes/ketus/sinis, DILARANG menggunakan kata 'lo/lu/gue/gw', DILARANG menyalin/mengulang kalimat pasanganmu, DILARANG menerjemahkan ke bahasa Inggris, dan DILARANG menulis monolog berpikir atau instruksi meta!]"
+                            system_inst +
+                            (
+                                "\n\n[IMPORTANT - ENGLISH TUTOR MODE: Reply warmly in English inside the story, include 1 concise '✏️ Quick Tip:' if needed, and end with an engaging question!]"
+                                if is_english_tutor else
+                                "\n\n[PENTING - RESPON RAMAH, MANIS & BAHASA INDONESIA: Langsung tanggapi perkataan pasanganmu dengan ramah, manis, dan hangat dalam 1 baris aksi *...* + 1-2 kalimat dialog Bahasa Indonesia santai (aku/kamu). "
+                                "DILARANG bersikap nyolot/judes/ketus/sinis, DILARANG menggunakan kata 'lo/lu/gue/gw', DILARANG menyalin/mengulang kalimat pasanganmu, DILARANG menerjemahkan ke bahasa Inggris, dan DILARANG menulis monolog berpikir atau instruksi meta!]"
+                            )
                         )
                         retry_messages = [{"role": "system", "content": steer_sys}]
                         retry_messages.extend(prompt_history)
@@ -8930,7 +9127,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         if (steered_reply 
                             and not is_echo_or_parroting(steered_reply, user_text)
                             and not is_meta_or_reasoning_leak(steered_reply)
-                            and not is_unwanted_english_or_translation(steered_reply, user_text)
+                            and (is_english_tutor or not is_unwanted_english_or_translation(steered_reply, user_text))
                             and not is_hostile_or_nyolot(steered_reply)):
                             logger.info(f"✓ Steering resolved issue: '{steered_reply}'")
                             reply_text = sanitize_waifu_tone_and_pronouns(steered_reply)
@@ -8945,6 +9142,9 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                             reply_text = default_safe_reply
                         else:
                             reply_text = sanitize_waifu_tone_and_pronouns(reply_text)
+
+                if is_english_tutor:
+                    english_tutor.record_turn(message.from_user.id)
 
                 # Check if waifu takes initiative to send spontaneous PAP photo
                 has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
@@ -9051,7 +9251,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     else:
                         clean_reply = sanitize_waifu_tone_and_pronouns(clean_reply or reply_text)
                 clean_reply = sanitize_waifu_tone_and_pronouns(clean_reply)
-                if not long_form_req:
+                if not long_form_req and not is_english_tutor:
                     clean_reply = enforce_concise_chat_reply(
                         clean_reply,
                         max_sentences=2,
@@ -9432,6 +9632,7 @@ def setup_bot_commands():
         types.BotCommand("playlist", "📻 Play full album / YouTube playlist on PC"),
         types.BotCommand("music", "🎶 Remote control PC music player"),
         types.BotCommand("language", "🌐 Waifu language settings (EN, ID, JA, Auto)"),
+        types.BotCommand("learn_english", "🎓 Switch waifu into interactive English Tutor"),
         types.BotCommand("outfit", "👗 Wardrobe & change waifu clothes"),
         types.BotCommand("persona", "🎭 Switch waifu companion persona"),
         types.BotCommand("newpersona", "🎭 Create custom waifu persona wizard"),
