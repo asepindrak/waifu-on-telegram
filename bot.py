@@ -8443,33 +8443,35 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
     """Executes a single conversational turn synchronously inside the worker thread."""
     def _execute():
         try:
-            # Check Computer Use Intent (screenshot / desktop control)
-            if coding_engine.is_computer_use_intent(user_text):
-                process_computer_request(message, user_text)
-                return
-
-            # Check Conversational Project & Memory Intent (Zero-command project awareness)
-            p_intent = project_intent_router.route_intent(user_text, user_id=message.from_user.id)
-            if p_intent.intent_type != "NONE":
-                p_persona = persona_mgr.get_active_persona()
-                p_name = p_persona.get("name", "Akira")
-                ok, reply_msg = project_intent_router.handle_project_intent(
-                    intent=p_intent,
-                    user_id=message.from_user.id,
-                    persona_name=p_name
-                )
-                if ok:
-                    proj_markup = attach_voice_button(None, reply_msg, message.from_user.id)
-                    safe_reply_to(message, reply_msg, reply_markup=proj_markup)
-                    # If this was switch/create AND the user also gave a coding prompt, continue to coding off-queue
-                    if p_intent.intent_type in ("SWITCH", "CREATE") and coding_engine.is_coding_intent(user_text, user_id=message.from_user.id):
-                        _dispatch_coding_background(message, user_text, is_voice=is_voice)
+            in_english_tutor = english_tutor.is_active(message.from_user.id)
+            if not in_english_tutor:
+                # Check Computer Use Intent (screenshot / desktop control)
+                if coding_engine.is_computer_use_intent(user_text):
+                    process_computer_request(message, user_text)
                     return
 
-            # Check Coding Intent (programming / workspace tasks) without stalling casual chat queue
-            if coding_engine.is_coding_intent(user_text, user_id=message.from_user.id):
-                _dispatch_coding_background(message, user_text, is_voice=is_voice)
-                return
+                # Check Conversational Project & Memory Intent (Zero-command project awareness)
+                p_intent = project_intent_router.route_intent(user_text, user_id=message.from_user.id)
+                if p_intent.intent_type != "NONE":
+                    p_persona = persona_mgr.get_active_persona()
+                    p_name = p_persona.get("name", "Akira")
+                    ok, reply_msg = project_intent_router.handle_project_intent(
+                        intent=p_intent,
+                        user_id=message.from_user.id,
+                        persona_name=p_name
+                    )
+                    if ok:
+                        proj_markup = attach_voice_button(None, reply_msg, message.from_user.id)
+                        safe_reply_to(message, reply_msg, reply_markup=proj_markup)
+                        # If this was switch/create AND the user also gave a coding prompt, continue to coding off-queue
+                        if p_intent.intent_type in ("SWITCH", "CREATE") and coding_engine.is_coding_intent(user_text, user_id=message.from_user.id):
+                            _dispatch_coding_background(message, user_text, is_voice=is_voice)
+                        return
+
+                # Check Coding Intent (programming / workspace tasks) without stalling casual chat queue
+                if coding_engine.is_coding_intent(user_text, user_id=message.from_user.id):
+                    _dispatch_coding_background(message, user_text, is_voice=is_voice)
+                    return
 
             is_media, media_type = persona_mgr.detect_media_request(user_text)
             is_conversational_media = is_media and persona_mgr.is_conversational_media_request(user_text)

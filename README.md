@@ -358,7 +358,7 @@ When running with a dedicated GPU (4GB - 8GB+ VRAM) or Apple Silicon Mac, your w
                    │                                                │
                    └───────────────────────┬────────────────────────┘
                                            ▼
-                        💖 WAIFU ON TELEGRAM BOT (v2.4.69)
+                        💖 WAIFU ON TELEGRAM BOT (v2.4.70)
 ```
 
 > 🌸 **Smart Local Photo Vault:** Every photo rendered by ComfyUI is stored in the **Photo Vault** with complete metadata (persona, outfit, mood, tags). If ComfyUI is offline or the GPU is busy, the bot retrieves the most contextually relevant photo from your local vault.
