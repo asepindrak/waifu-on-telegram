@@ -5713,6 +5713,9 @@ def process_photo_request(
             if not detected_scene:
                 if is_nsfw_photo:
                     detected_scene = "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows, warm intimate atmosphere"
+                elif english_tutor.is_active(user_id):
+                    _, cur_les = english_tutor.get_current_unit_and_lesson(user_id)
+                    detected_scene = cur_les.get("story_hook", "cozy aesthetic cafe interior, warm ambient lighting")
                 else:
                     story_photo = story_engine.get_story_photo_suggestion(persona_mgr.active_key)
                     if story_photo and story_photo.get("danbooru_tags"):
@@ -5722,6 +5725,11 @@ def process_photo_request(
                 if active_date and active_date.get("scene_prompt"):
                     detected_scene = active_date["scene_prompt"]
                 hangout_engine.record_date_photo(user_id)
+            elif english_tutor.is_active(user_id) and not is_nsfw_photo and not scene_override:
+                loc_kws = ["bed", "room", "kamar", "bath", "beach", "pool", "park", "cafe", "coffee", "campus", "classroom", "library", "kitchen", "street", "mall", "cinema", "office", "lab", "rooftop", "apartment", "restaurant", "shop", "store", "hotel", "airport", "table", "desk"]
+                if not any(k in detected_scene.lower() for k in loc_kws):
+                    _, cur_les = english_tutor.get_current_unit_and_lesson(user_id)
+                    detected_scene = f"{cur_les.get('story_hook', '')}, {detected_scene}".strip(", ")
 
             cur_out_det = persona_mgr.get_user_outfit_details(user_id) if user_id else {}
             has_explicit_outfit = (

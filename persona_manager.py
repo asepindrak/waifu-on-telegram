@@ -625,14 +625,14 @@ PERSONA_OUTFIT_COLORS = {
 
 # Diverse camera compositions & perspectives for natural rotation (prevents repeated identical angles)
 CAMERA_COMPOSITION_PRESETS = [
-    "medium shot candid POV, hands resting naturally on table, conversational eye contact, warm natural lighting",
-    "close-up expressive portrait, sweet gentle smile, affectionate eye contact, cinematic shallow depth of field",
-    "side-profile candid view, looking slightly away with a shy sweet smile, soft bokeh background",
-    "high-angle POV looking down, waifu looking up affectionately at viewer, gentle blushing cheeks",
-    "candid snapshot, leaning forward with chin resting on hand, charming relaxed posture, natural lighting",
-    "three-quarter angle candid perspective, relaxed natural posture, both arms naturally positioned, expressive warm gaze, cinematic atmosphere",
-    "over-the-shoulder POV perspective, glancing back towards viewer with playful teasing smile",
-    "relaxed candid framing, tilting head playfully, arms resting comfortably, warm soft glow, natural snapshot feel"
+    "medium shot candid POV, conversational eye contact, detailed environmental background",
+    "upper body portrait, sweet gentle smile, affectionate eye contact, rich detailed surroundings",
+    "cowboy shot candid view, looking affectionately at viewer, detailed interior or outdoor scenery",
+    "high-angle POV looking down, waifu looking up affectionately at viewer, detailed room or venue background",
+    "candid snapshot, leaning forward with chin resting on hand, charming relaxed posture, detailed background scenery",
+    "three-quarter angle candid perspective, relaxed natural posture, both arms naturally positioned, detailed environment",
+    "over-the-shoulder POV perspective, glancing back towards viewer with playful teasing smile, detailed scenery",
+    "relaxed candid framing, tilting head playfully, arms resting comfortably, natural snapshot feel, detailed background"
 ]
 
 
@@ -2894,6 +2894,7 @@ class PersonaManager:
         if not wants_multi:
             # Strictly enforce adult woman solo shot without wasting CLIP token budget on redundant pseudo-tags
             cleaned_base = re.sub(r'^(?:masterpiece,\s*)*(?:best quality,\s*)*(?:solo,\s*)*(?:1girl,\s*)*', '', base_visual, flags=re.IGNORECASE).strip()
+            cleaned_base = re.sub(r',?\s*masterpiece,\s*best quality,\s*highly detailed.*$', '', cleaned_base, flags=re.IGNORECASE).strip()
             base_visual = f"masterpiece, best quality, 1girl, solo, (mature female:1.2), (adult woman:1.2), {cleaned_base}"
 
             solo_guard_neg = (
@@ -2996,9 +2997,26 @@ class PersonaManager:
             anti_censor = "censored, mosaic, mosaic censor, bar censor, panties, underwear"
             extra_neg = f"{extra_neg}, {anti_censor}" if extra_neg else anti_censor
 
-        # Ensure intimate/nude photos have a coherent private background instead of abstract voids
-        if (is_nude or is_nsfw) and (not scene or not any(k in scene.lower() for k in ["bed", "room", "kamar", "bath", "beach", "pool", "outdoor", "onsen", "pantai", "taman"])):
+        # Ensure every photo has a concrete physical location background (prevents Anything XL from rendering plain gradients)
+        location_kws = [
+            "bed", "room", "kamar", "bath", "beach", "pool", "outdoor", "onsen", "pantai", "taman",
+            "cafe", "coffee", "campus", "classroom", "lecture", "library", "kitchen", "park", "street",
+            "station", "mall", "cinema", "office", "lab", "rooftop", "balcony", "apartment", "restaurant",
+            "shop", "store", "hallway", "garden", "hotel", "airport", "sofa", "desk", "table", "window", "interior"
+        ]
+        has_concrete_location = bool(scene and any(k in scene.lower() for k in location_kws))
+
+        if (is_nude or is_nsfw) and not has_concrete_location:
             scene = "luxurious cozy bedroom setting, soft warm ambient lighting, comfortable bed with silk sheets, elegant private aesthetic"
+        elif not has_concrete_location:
+            active_loc = self.get_user_location(user_id) if user_id else None
+            if active_loc and active_loc.get("prompt"):
+                loc_scene = active_loc["prompt"]
+            else:
+                import datetime
+                routine = get_hourly_routine(datetime.datetime.now().hour, persona_key=p_active_key)
+                loc_scene = routine.get("scene", "cozy modern apartment room with warm lamp lighting, bookshelf, window")
+            scene = f"{loc_scene}, {scene}".strip(", ") if scene else loc_scene
 
         # Synchronize photo lighting and atmosphere with real-world local time & live weather
         lighting_pos, lighting_neg = self.get_realtime_lighting_and_atmosphere(user_text, scene, user_id=user_id, is_nude=is_nude)
@@ -3013,13 +3031,17 @@ class PersonaManager:
                     flags=re.IGNORECASE
                 )
 
-        prompt_elements = [base_visual, outfit_prompt, scene, lighting_pos, chosen_angle]
+        anti_blank_bg_neg = "(simple background:1.45), (white background:1.45), (plain background:1.45), (gradient background:1.45), (blank background:1.45), (grey background:1.4), (abstract background:1.35)"
+        extra_neg = f"{extra_neg}, {anti_blank_bg_neg}" if extra_neg else anti_blank_bg_neg
+
+        emphasized_scene = f"(detailed background:1.25), (scenery:1.2), ({scene}:1.2)" if scene else "(detailed background:1.25), cozy modern room interior"
+        prompt_elements = [base_visual, outfit_prompt, emphasized_scene, lighting_pos, chosen_angle]
         if anatomy_cue:
             prompt_elements.append(anatomy_cue)
             logger.info(f"Intimate anatomy cues injected: {anatomy_cue}")
         if not (anatomy_cue and any(k in anatomy_cue for k in ["pussy", "crotch"])):
             prompt_elements.append("detailed eyes")
-        prompt_elements.extend(["masterpiece quality", "high resolution anime art"])
+        prompt_elements.extend(["high resolution anime art"])
 
         visual_prompt = ", ".join(p for p in prompt_elements if p)
         return (visual_prompt, extra_neg, is_nude, outfit_name)

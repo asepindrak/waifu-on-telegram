@@ -87,6 +87,7 @@ def extract_combo_choices(raw_field: Any) -> List[str]:
 
 DEFAULT_ANIME_NEGATIVE_PROMPT = (
     "(worst quality, low quality:1.4), bad anatomy, deformed eyes, "
+    "(simple background:1.45), (white background:1.45), (plain background:1.45), (gradient background:1.45), (blank background:1.45), (grey background:1.4), (abstract background:1.35), "
     "(immature body:1.4), (baby face:1.4), (chibi:1.4), (petite:1.3), (short stature:1.3), (flat chest:1.3), (underdeveloped body:1.4), "
     "(missing arm:1.5), (missing hand:1.5), (amputation:1.5), (amputee:1.5), (severed arm:1.5), (stump:1.5), "
     "(disappearing arm:1.4), (floating arms:1.4), (fused arms:1.4), (bad arms:1.4), (extra arms:1.4), extra limbs, bad hands, "
