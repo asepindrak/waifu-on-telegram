@@ -4934,14 +4934,14 @@ def handle_language_command(message):
 def _build_english_tutor_markup(user_id: int) -> types.InlineKeyboardMarkup:
     is_on = english_tutor.is_active(user_id)
     markup = types.InlineKeyboardMarkup(row_width=2)
-    toggle_label = "🔴 Matikan English Tutor" if is_on else "🟢 Aktifkan English Tutor"
+    toggle_label = "🔴 Disable English Tutor" if is_on else "🟢 Enable English Tutor"
     markup.add(
         types.InlineKeyboardButton(toggle_label, callback_data="eng_tutor:toggle"),
         types.InlineKeyboardButton("➡️ Next Lesson", callback_data="eng_tutor:next"),
     )
     markup.add(
-        types.InlineKeyboardButton("📚 Silabus & Pilih Topik", callback_data="eng_tutor:syllabus"),
-        types.InlineKeyboardButton("💬 Mulai / Pancing Cerita", callback_data="eng_tutor:kickoff"),
+        types.InlineKeyboardButton("📚 Syllabus & Topics", callback_data="eng_tutor:syllabus"),
+        types.InlineKeyboardButton("💬 Start / Prompt Story", callback_data="eng_tutor:kickoff"),
     )
     return markup
 
@@ -4988,7 +4988,7 @@ def _show_english_tutor_panel(chat_id: int, user_id: int, message_to_edit: Optio
     st = english_tutor.get_state(user_id)
     unit, lesson = english_tutor.get_current_unit_and_lesson(user_id)
     is_on = bool(st.get("active"))
-    status_str = "🟢 *AKTIF* (Mode Tutor & Story English)" if is_on else "⚪ *NONAKTIF* (Mode Chat Normal)"
+    status_str = "🟢 *ACTIVE* (Story-Driven English Tutor)" if is_on else "⚪ *INACTIVE* (Normal Chat Mode)"
     completed_cnt = len(st.get("completed_lessons", []))
     total_cnt = sum(len(u["lessons"]) for u in ENGLISH_SYLLABUS)
     text = (
@@ -4996,11 +4996,11 @@ def _show_english_tutor_panel(chat_id: int, user_id: int, message_to_edit: Optio
         f"Status: {status_str}\n\n"
         f"📘 *Unit:* {unit['unit_title']}\n"
         f"🎯 *Lesson {lesson['id']}:* *{lesson['title']}* (`{lesson['cefr']}`)\n"
-        f"📖 *Alur Cerita:* _{lesson['story_hook']}_\n"
+        f"📖 *Story Setting:* _{lesson['story_hook']}_\n"
         f"🔤 *Target Expressions:* `{'`, `'.join(lesson['target_vocab'])}`\n"
         f"🧩 *Grammar Focus:* {lesson['grammar_focus']}\n"
-        f"📊 *Progress:* {completed_cnt}/{total_cnt} lessons selesai • {st.get('turns_in_lesson', 0)} turns di lesson ini\n\n"
-        f"💡 _Tips: Balas pakai bahasa Inggris (atau campur Indonesia jika bingung). Aku bakal lanjutin ceritanya, koreksi pelan-pelan, dan pancing kamu terus ngobrol!_"
+        f"📊 *Progress:* {completed_cnt}/{total_cnt} lessons completed • {st.get('turns_in_lesson', 0)} turns in this lesson\n\n"
+        f"💡 _Tip: Reply in English! I'll keep the story flowing naturally, give gentle corrections, and keep you engaged._"
     )
     markup = _build_english_tutor_markup(user_id)
     if message_to_edit:
@@ -5021,28 +5021,28 @@ def handle_learn_english_command(message):
     parts = message.text.strip().split(maxsplit=1)
     arg = parts[1].strip().lower() if len(parts) > 1 else ""
 
-    if arg in ("off", "stop", "exit", "matikan", "nonaktif"):
+    if arg in ("off", "stop", "exit", "disable"):
         english_tutor.set_active(uid, False)
         bot.reply_to(
             message,
-            "💬 **English Tutor Mode dimatikan.**\nSekarang aku kembali jadi teman ngobrol biasamu lagi yaa~ Kalau mau latihan bahasa Inggris lagi tinggal ketik `/learn_english`!",
+            "💬 **English Tutor Mode disabled.**\nI'm back to your regular companion mode now~ Whenever you want to practice English again, just type `/learn_english`!",
             parse_mode="Markdown"
         )
         return
 
-    if arg in ("syllabus", "silabus", "course", "kurikulum", "list"):
+    if arg in ("syllabus", "course", "curriculum", "list"):
         overview = english_tutor.format_syllabus_overview(uid)
         markup = types.InlineKeyboardMarkup(row_width=1)
         for u_idx, u in enumerate(ENGLISH_SYLLABUS):
-            markup.add(types.InlineKeyboardButton(f"📂 Pilih dari {u['unit_title']}", callback_data=f"eng_tutor:unit:{u_idx}"))
-        markup.add(types.InlineKeyboardButton("🔙 Kembali ke Panel Tutor", callback_data="eng_tutor:panel"))
+            markup.add(types.InlineKeyboardButton(f"📂 Browse {u['unit_title']}", callback_data=f"eng_tutor:unit:{u_idx}"))
+        markup.add(types.InlineKeyboardButton("🔙 Back to Tutor Panel", callback_data="eng_tutor:panel"))
         bot.reply_to(message, overview, parse_mode="Markdown", reply_markup=markup)
         return
 
-    if arg in ("next", "lanjut"):
+    if arg in ("next", "continue"):
         english_tutor.set_active(uid, True)
         unit, lesson, wrapped = english_tutor.advance_lesson(uid)
-        note = "🎉 Selamat! Kamu menamatkan semua unit, kembali ke awal untuk review." if wrapped else "➡️ Lanjut ke lesson berikutnya!"
+        note = "🎉 Congratulations! You completed all units — cycling back to the start for review." if wrapped else "➡️ Advanced to the next lesson!"
         bot.reply_to(message, f"{note}\n🎯 *{lesson['id']} — {lesson['title']}* (`{lesson['cefr']}`)", parse_mode="Markdown")
         _send_english_tutor_kickoff(message.chat.id, uid)
         return
@@ -5051,7 +5051,7 @@ def handle_learn_english_command(message):
     was_active = english_tutor.is_active(uid)
     english_tutor.set_active(uid, True)
     _show_english_tutor_panel(message.chat.id, uid)
-    if not was_active or arg in ("on", "start", "mulai"):
+    if not was_active or arg in ("on", "start"):
         _send_english_tutor_kickoff(message.chat.id, uid)
 
 
@@ -5067,7 +5067,7 @@ def callback_english_tutor(call):
     if action == "toggle":
         new_state = not english_tutor.is_active(uid)
         english_tutor.set_active(uid, new_state)
-        bot.answer_callback_query(call.id, "🟢 English Tutor AKTIF!" if new_state else "⚪ English Tutor NONAKTIF")
+        bot.answer_callback_query(call.id, "🟢 English Tutor ENABLED!" if new_state else "⚪ English Tutor DISABLED")
         _show_english_tutor_panel(chat_id, uid, message_to_edit=call.message.message_id)
         if new_state:
             _send_english_tutor_kickoff(chat_id, uid)
@@ -5077,12 +5077,12 @@ def callback_english_tutor(call):
     elif action == "next":
         english_tutor.set_active(uid, True)
         unit, lesson, _ = english_tutor.advance_lesson(uid)
-        bot.answer_callback_query(call.id, f"➡️ Lanjut ke {lesson['id']}: {lesson['title']}")
+        bot.answer_callback_query(call.id, f"➡️ Next: {lesson['id']} {lesson['title']}")
         _show_english_tutor_panel(chat_id, uid, message_to_edit=call.message.message_id)
         _send_english_tutor_kickoff(chat_id, uid)
     elif action == "kickoff":
         english_tutor.set_active(uid, True)
-        bot.answer_callback_query(call.id, "💬 Memulai skenario cerita...")
+        bot.answer_callback_query(call.id, "💬 Starting story prompt...")
         _send_english_tutor_kickoff(chat_id, uid)
     elif action == "syllabus":
         bot.answer_callback_query(call.id)
@@ -5090,7 +5090,7 @@ def callback_english_tutor(call):
         markup = types.InlineKeyboardMarkup(row_width=1)
         for u_idx, u in enumerate(ENGLISH_SYLLABUS):
             markup.add(types.InlineKeyboardButton(f"📂 {u['unit_title']}", callback_data=f"eng_tutor:unit:{u_idx}"))
-        markup.add(types.InlineKeyboardButton("🔙 Kembali ke Panel", callback_data="eng_tutor:panel"))
+        markup.add(types.InlineKeyboardButton("🔙 Back to Panel", callback_data="eng_tutor:panel"))
         try:
             bot.edit_message_text(overview, chat_id=chat_id, message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
         except Exception:
@@ -5102,16 +5102,16 @@ def callback_english_tutor(call):
         markup = types.InlineKeyboardMarkup(row_width=1)
         for l_idx, les in enumerate(unit["lessons"]):
             markup.add(types.InlineKeyboardButton(f"▶️ {les['id']} {les['title']} ({les['cefr']})", callback_data=f"eng_tutor:pick:{u_idx}:{l_idx}"))
-        markup.add(types.InlineKeyboardButton("🔙 Kembali ke Silabus", callback_data="eng_tutor:syllabus"))
+        markup.add(types.InlineKeyboardButton("🔙 Back to Syllabus", callback_data="eng_tutor:syllabus"))
         try:
-            bot.edit_message_text(f"*{unit['unit_title']}*\nPilih lesson yang ingin kamu latih:", chat_id=chat_id, message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+            bot.edit_message_text(f"*{unit['unit_title']}*\nSelect a lesson to practice:", chat_id=chat_id, message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
         except Exception:
             pass
     elif action == "pick" and len(parts) > 3:
         u_idx = int(parts[2])
         l_idx = int(parts[3])
         unit, lesson = english_tutor.select_lesson(uid, u_idx, l_idx)
-        bot.answer_callback_query(call.id, f"✅ Dipilih: {lesson['id']} {lesson['title']}")
+        bot.answer_callback_query(call.id, f"✅ Selected: {lesson['id']} {lesson['title']}")
         _show_english_tutor_panel(chat_id, uid, message_to_edit=call.message.message_id)
         _send_english_tutor_kickoff(chat_id, uid)
 

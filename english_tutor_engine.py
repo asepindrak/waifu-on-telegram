@@ -303,14 +303,14 @@ class EnglishTutorEngine:
         st = self.get_state(user_id)
         cur_unit, cur_lesson = self.get_current_unit_and_lesson(user_id)
         completed = set(st.get("completed_lessons", []))
-        status_badge = "🟢 AKTIF" if st.get("active") else "⚪ NONAKTIF"
+        status_badge = "🟢 ACTIVE" if st.get("active") else "⚪ INACTIVE"
 
         lines = [
             f"📚 *English Conversation Course & Syllabus* ({status_badge})",
-            f"🎯 *Lesson Aktif:* `{cur_lesson['id']}` — *{cur_lesson['title']}* (`{cur_lesson['cefr']}`)",
-            f"📖 *Alur Cerita:* _{cur_lesson['story_hook']}_",
+            f"🎯 *Active Lesson:* `{cur_lesson['id']}` — *{cur_lesson['title']}* (`{cur_lesson['cefr']}`)",
+            f"📖 *Story Setting:* _{cur_lesson['story_hook']}_",
             f"🔤 *Target Expressions:* `{'`, `'.join(cur_lesson['target_vocab'])}`",
-            f"📊 *Progress:* {len(completed)}/{sum(len(u['lessons']) for u in ENGLISH_SYLLABUS)} lessons selesai · {st.get('turns_in_lesson', 0)} turns di lesson ini\n",
+            f"📊 *Progress:* {len(completed)}/{sum(len(u['lessons']) for u in ENGLISH_SYLLABUS)} lessons completed · {st.get('turns_in_lesson', 0)} turns in this lesson\n",
             "━━━━━━━━━━━━━━━━━━━━"
         ]
         for u_idx, u in enumerate(ENGLISH_SYLLABUS):
@@ -357,8 +357,8 @@ class EnglishTutorEngine:
             f"1. STORY FIRST, NATURAL FLOW: Stay inside the story scene! Start with 1 brief gesture/action in *...* (e.g., *smiles warmly and slides a cup of coffee toward you*), then speak in clear, natural English matching level {lesson['cefr']}. Do NOT sound like a robotic textbook!\n"
             f"2. ACTIVE CORRECTION & FEEDBACK (MANDATORY): Carefully inspect the user's message:\n"
             f"   - If the user makes grammar, word-choice, or phrasing mistakes (or mixes Indonesian & English), gently correct it in a short block right below or before your story reply:\n"
-            f"     ✏️ *Quick Tip:* \"<better natural English phrasing>\" — (<1 concise sentence explaining why in casual Indonesian so it's crystal clear!>)\n"
-            f"   - If the user wrote completely in Indonesian, warmly encourage them by showing how to say their sentence in natural English (`💡 Try saying: \"...\"`), then continue the story in English!\n"
+            f"     ✏️ *Quick Tip:* \"<better natural English phrasing>\" — (<1 concise, friendly sentence explaining why in simple English>)\n"
+            f"   - If the user wrote in another language (e.g. Indonesian), warmly show how to say their sentence in natural English (`💡 Try saying: \"...\"`), then continue the story in English!\n"
             f"   - If the user's English is already great, give 1 quick praise (e.g., `✨ Nice phrasing!`) and optionally share 1 more native-sounding alternative.\n"
             f"3. BE PROACTIVE & KEEP THE USER TALKING: NEVER let the conversation stall! ALWAYS end your reply with an engaging open-ended question, a fun choice inside the story, or a mini prompt using one of the target expressions ({vocab_str}) so the user wants to reply in English!\n"
             f"4. CONCISE CHAT FORMAT: Keep total reply crisp and readable (3–5 short lines max, around 35–85 words), NOT a long lecture.{progress_hint}\n"
