@@ -9019,7 +9019,8 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 chat_max_tokens = 450 if long_form_req else (260 if is_english_tutor else (150 if (is_nsfw_turn or is_conversational_media) else 120))
 
                 reply_text = None
-                max_retries = 5
+                is_remote_or_agy = (":8001" in str(getattr(llm_client, "base_url", "")) or (hasattr(llm_client, "is_sfw_cloud") and llm_client.is_sfw_cloud())) and (not is_nsfw_turn)
+                max_retries = 2 if is_remote_or_agy else 5
                 retry_delays = [2, 4, 6, 8, 10]
                 last_chat_err = None
 

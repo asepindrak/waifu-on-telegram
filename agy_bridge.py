@@ -185,7 +185,7 @@ def run_agy_cli(full_prompt: str, target_model: str, effort: str) -> str:
     """Executes Antigravity CLI ('agy -p <prompt>') synchronously with large context buffer support."""
     temp_prompt_file = None
     exec_prompt = full_prompt
-    if len(full_prompt) > 7500:
+    if len(full_prompt) > 24000:
         try:
             buffer_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "temp_prompts")
             os.makedirs(buffer_dir, exist_ok=True)
@@ -195,9 +195,9 @@ def run_agy_cli(full_prompt: str, target_model: str, effort: str) -> str:
             exec_prompt = f"Please process and respond to the complete conversational prompt stored in: '{temp_prompt_file}'"
         except Exception as e_buf:
             logger.warning(f"Prompt buffer creation failed: {e_buf}")
-            exec_prompt = full_prompt[:7500]
+            exec_prompt = full_prompt[:24000]
 
-    cmd = ["agy", "-p", exec_prompt, "--dangerously-skip-permissions"]
+    cmd = ["agy", "-p", exec_prompt, "--disable-slash-commands", "--dangerously-skip-permissions", "--print-timeout", "60s"]
     if target_model and target_model not in ("agy-default", "gpt-4o", "gpt-4o-mini", "default"):
         cmd.extend(["--model", target_model])
     if effort:
@@ -206,11 +206,12 @@ def run_agy_cli(full_prompt: str, target_model: str, effort: str) -> str:
     try:
         proc = subprocess.run(
             cmd,
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=180
+            timeout=75
         )
         out = proc.stdout.strip()
         # Clean up temporary buffer file
@@ -254,7 +255,7 @@ async def chat_completions(request: ChatCompletionRequest, token: str = Security
         role_label = msg.role.upper()
         content_str = process_message_content(msg.content, temp_dir)
         full_prompt += f"{role_label}: {content_str}\n"
-    if request.max_tokens and request.max_tokens <= 260:
+    if request.max_tokens and request.max_tokens < 200:
         full_prompt += (
             f"\nSYSTEM_LENGTH_CONSTRAINT: Keep your reply very concise, natural, and casual like everyday chat "
             f"(1-2 short sentences, max ~{request.max_tokens} tokens, no long paragraphs).\n"
