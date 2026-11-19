@@ -8872,7 +8872,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     logger.error(f"Chat error / LLM exhausted retries: {err_str}")
                     pending_manager.record_failed_message(message, user_text, is_voice=is_voice, error=err_str)
                     health_engine.mark_llm_failure(bot=bot, get_recipients_func=get_notification_recipient_ids, error_msg=err_str)
-                    u_lang_mode = USER_LANGUAGE.get(user_id, "auto")
+                    u_lang_mode = persona_mgr.get_user_language(user_id) if hasattr(persona_mgr, "get_user_language") else os.environ.get("BOT_LANGUAGE", "auto")
                     is_en_user = (u_lang_mode == "en") or (persona_mgr.detect_text_language(user_text) == "en" and u_lang_mode != "id")
                     if is_en_user:
                         err_msg = (
