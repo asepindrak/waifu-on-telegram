@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import logging
@@ -325,7 +326,20 @@ class EnglishTutorEngine:
                 lines.append(f"  {mark} `{les['id']}` {les['title']} ({les['cefr']})")
         return "\n".join(lines)
 
-    def build_tutor_system_prompt(self, user_id: int, persona_name: str, user_call_pref: str = "") -> str:
+    def detect_next_lesson_intent(self, user_text: str) -> bool:
+        """Detects if the user asked conversationally to move to the next lesson/topic."""
+        if not user_text:
+            return False
+        t = user_text.strip().lower()
+        patterns = [
+            r"\b(?:next\s+lesson|next\s+topic|next\s+chapter|next\s+unit)\b",
+            r"\b(?:move\s+on\s+to\s+(?:the\s+)?next|move\s+to\s+(?:the\s+)?next|go\s+to\s+(?:the\s+)?next)\b",
+            r"\b(?:lanjut\s+lesson|lanjut\s+materi|materi\s+berikutnya|materi\s+selanjutnya|lesson\s+berikutnya|lesson\s+selanjutnya)\b",
+            r"\b(?:ready\s+for\s+(?:the\s+)?next|let'?s\s+move\s+on)\b",
+        ]
+        return any(re.search(p, t) for p in patterns)
+
+    def build_tutor_system_prompt(self, user_id: int, persona_name: str, user_call_pref: str = "", just_advanced: bool = False) -> str:
         """
         Builds the interactive story-driven English tutor directive injected into the waifu's system prompt.
         """
@@ -333,20 +347,30 @@ class EnglishTutorEngine:
         unit, lesson = self.get_current_unit_and_lesson(user_id)
         vocab_str = ", ".join(lesson["target_vocab"])
         turns = int(st.get("turns_in_lesson", 0))
-        u_name = user_call_pref or "kamu"
+        u_name = user_call_pref or "you"
+
+        transition_note = ""
+        if just_advanced:
+            transition_note = (
+                f"\n[JUST ADVANCED TO LESSON {lesson['id']}: {lesson['title']}]\n"
+                f"The user just moved on to Lesson {lesson['id']}! Briefly praise them for finishing the previous lesson, "
+                f"and IMMEDIATELY start the NEW story scene ({lesson['story_hook']}) without repeating the previous lesson's topic!\n"
+            )
 
         progress_hint = ""
-        if turns >= 5:
+        if turns >= 5 and not just_advanced:
             progress_hint = (
                 f"\n- MILESTONE REACHED ({turns} turns): The user has practiced well in this scene! "
-                "Naturally wrap up or praise their progress and offer to move to the next chapter/lesson (mention they can tap 'Next Lesson ➡️' or say 'next lesson')."
+                "Naturally wrap up or praise their progress and offer to move to the next lesson (mention they can tap 'Next Lesson ➡️' or say 'next lesson'). "
+                "If the user already completed the scene's goal and is ready to move on, you may append [ACTION: NEXT_LESSON] at the very end of your message."
             )
 
         return (
             f"\n\n[INTERACTIVE ENGLISH CONVERSATION TUTOR MODE — HIGHEST PRIORITY]\n"
             f"You ({persona_name}) are currently acting as {u_name}'s warm, engaging, story-driven English conversation partner & tutor!\n"
-            f"Keep your original persona charm and affection, while seamlessly blending an ongoing roleplay story with active English coaching.\n\n"
-            f"CURRENT COURSE MODULE:\n"
+            f"Keep your original persona charm and affection, while seamlessly blending an ongoing roleplay story with active English coaching.\n"
+            f"{transition_note}\n"
+            f"CURRENT COURSE MODULE (STRICTLY FOLLOW THIS LESSON ONLY):\n"
             f"- Unit: {unit['unit_title']}\n"
             f"- Lesson {lesson['id']} ({lesson['cefr']}): {lesson['title']}\n"
             f"- Story Setting: {lesson['story_hook']}\n"
@@ -354,7 +378,7 @@ class EnglishTutorEngine:
             f"- Grammar Focus: {lesson['grammar_focus']}\n"
             f"- Lesson Goal: {lesson['goal']}\n\n"
             f"STRICT INTERACTION RULES:\n"
-            f"1. STORY FIRST, NATURAL FLOW: Stay inside the story scene! Start with 1 brief gesture/action in *...* (e.g., *smiles warmly and slides a cup of coffee toward you*), then speak in clear, natural English matching level {lesson['cefr']}. Do NOT sound like a robotic textbook!\n"
+            f"1. STORY FIRST, NATURAL FLOW: Stay inside THIS lesson's story scene! Start with 1 brief gesture/action in *...* (e.g., *smiles warmly and slides a cup of coffee toward you*), then speak in clear, natural English matching level {lesson['cefr']}. Do NOT repeat previous lessons!\n"
             f"2. ACTIVE CORRECTION & FEEDBACK (MANDATORY): Carefully inspect the user's message:\n"
             f"   - If the user makes grammar, word-choice, or phrasing mistakes (or mixes Indonesian & English), gently correct it in a short block right below or before your story reply:\n"
             f"     ✏️ *Quick Tip:* \"<better natural English phrasing>\" — (<1 concise, friendly sentence explaining why in simple English>)\n"

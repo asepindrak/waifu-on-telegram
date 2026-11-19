@@ -8914,9 +8914,13 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                 long_form_req = is_long_form_request(user_text)
 
+                just_advanced_lesson = False
                 if is_english_tutor:
+                    if english_tutor.detect_next_lesson_intent(user_text):
+                        english_tutor.advance_lesson(message.from_user.id)
+                        just_advanced_lesson = True
                     system_inst += english_tutor.build_tutor_system_prompt(
-                        message.from_user.id, p_name, user_call_pref=user_call_pref
+                        message.from_user.id, p_name, user_call_pref=user_call_pref, just_advanced=just_advanced_lesson
                     )
                 else:
                     system_inst += (
@@ -9147,7 +9151,12 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                             reply_text = sanitize_waifu_tone_and_pronouns(reply_text)
 
                 if is_english_tutor:
-                    english_tutor.record_turn(message.from_user.id)
+                    if re.search(r"\[(?:ACTION:\s*)?NEXT_LESSON\]", reply_text, re.IGNORECASE):
+                        reply_text = re.sub(r"\s*\[(?:ACTION:\s*)?NEXT_LESSON\]\s*", " ", reply_text, flags=re.IGNORECASE).strip()
+                        if not just_advanced_lesson:
+                            english_tutor.advance_lesson(message.from_user.id)
+                    else:
+                        english_tutor.record_turn(message.from_user.id)
 
                 # Check if waifu takes initiative to send spontaneous PAP photo
                 has_action_tag = bool(re.search(r"\[(ACTION:\s*)?(SEND_PAP|SEND_SELFIE|PAP)\]", reply_text, re.IGNORECASE))
