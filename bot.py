@@ -5464,9 +5464,13 @@ def sanitize_waifu_tone_and_pronouns(text: Optional[str]) -> str:
     res = re.sub(r"(?i)\bapaan\s+sih\b", "ada apa", res)
     res = re.sub(r"(?i)\b(?:bodo\s+amat|bodo\s+ah)\b", "nggak apa-apa kok", res)
 
-    # Fix first-person pronoun leaks inside *...* visual novel action narration (e.g. "wrapping my arms" -> "wrapping her arms")
+    # Fix first-person/third-person pronoun leaks inside *...* visual novel action narration
+    # (e.g. "wrapping my arms" -> "wrapping her arms", "smiling at him" -> "smiling at you")
     def _fix_action_block(m: re.Match) -> str:
         inner = m.group(1)
+        # Never touch Quick Tip / grammar tip blocks or quoted speech
+        if any(kw in inner.lower() for kw in ("quick tip", "try saying", "nice phrasing")) or '"' in inner or len(inner) > 150:
+            return m.group(0)
         def _rep_case(word: str, target: str) -> str:
             if word.isupper() and len(word) > 1:
                 return target.upper()
@@ -5480,6 +5484,9 @@ def sanitize_waifu_tone_and_pronouns(text: Optional[str]) -> str:
         inner = re.sub(r"\b(I'll|I’ll)\b", lambda x: _rep_case(x.group(1), "she'll"), inner, flags=re.IGNORECASE)
         inner = re.sub(r"\b(I've|I’ve)\b", lambda x: _rep_case(x.group(1), "she's"), inner, flags=re.IGNORECASE)
         inner = re.sub(r"\bI\b", "she", inner)
+        inner = re.sub(r"\b(at|to|for|with|beside|toward|towards|near|by|around|against|onto|into)\s+(him)\b", r"\1 you", inner, flags=re.IGNORECASE)
+        inner = re.sub(r"\b(his)\b", lambda x: _rep_case(x.group(1), "your"), inner, flags=re.IGNORECASE)
+        inner = re.sub(r"\b(himself)\b", lambda x: _rep_case(x.group(1), "yourself"), inner, flags=re.IGNORECASE)
         return f"*{inner}*"
 
     res = re.sub(r"\*([^*\n]+)\*", _fix_action_block, res)
@@ -5916,7 +5923,7 @@ def process_photo_request(
             is_asking_outfit = any(k in (actual_user_msg or "").lower() for k in ["baju", "outfit", "pakaian", "pake apa", "pakai apa", "liat baju", "lihat baju", "pamer", "wearing", "clothes"])
             indo_scene = persona_mgr.get_indonesian_scene_desc(detected_scene)
             u_lang = persona_mgr.get_user_language(user_id) if hasattr(persona_mgr, "get_user_language") else BOT_LANGUAGE
-            is_en = (u_lang == "en") or (persona_mgr.detect_text_language(actual_user_msg) == "en" and u_lang != "id")
+            is_en = (u_lang == "en") or english_tutor.is_active(user_id) or (persona_mgr.detect_text_language(actual_user_msg) == "en" and u_lang != "id")
 
             if is_en:
                 outfit_context = (

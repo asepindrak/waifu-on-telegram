@@ -650,10 +650,17 @@ BEDROOM_SCENE_VARIATIONS = [
 ]
 
 LOCATION_PRESETS: Dict[str, Dict[str, Any]] = {
+    "hotel": {
+        "name": "Hotel / Lobby Hotel",
+        "patterns": [r"\b(hotel\s+lobby|lobi\s+hotel|check[\s-]?in|reception|resepsionis|kamar\s+hotel|hotel\s+room|hotel)\b"],
+        "prompt": "standing inside luxurious modern hotel lobby, polished marble floor, warm chandelier lighting, reception desk and luggage in background, elegant hotel interior",
+        "nsfw_prompt": "luxurious modern hotel suite bedroom, king-size bed with crisp white sheets, warm ambient bedside lamp, city night window",
+        "is_public": True,
+    },
     "kitchen": {
         "name": "Dapur",
         "patterns": [r"\b(dapur|kitchen|masak|memasak|masakin|kompor|nyiapin makan|baking|goreng|rebus|cuci piring)\b"],
-        "prompt": "standing in modern cozy kitchen preparing food, warm domestic lighting, clean kitchen counter, stove and cookware in soft blur",
+        "prompt": "standing in modern cozy kitchen preparing food, warm domestic lighting, clean kitchen counter, stove and cookware in background",
         "nsfw_prompt": "standing by modern kitchen counter, kitchen island, intimate warm domestic kitchen ambiance, seductive pose",
         "is_public": False,
     },
@@ -691,7 +698,7 @@ LOCATION_PRESETS: Dict[str, Dict[str, Any]] = {
     "cafe": {
         "name": "Kafe / Coffee Shop",
         "patterns": [r"\b(kafe|cafe|coffee\s*shop|kopi|ngopi|boba|matcha|starbucks|nongkrong\s+di\s+kafe|meja\s+kafe|nongkrong)\b"],
-        "prompt": "sitting at aesthetic cafe table holding a warm beverage, beautiful coffee shop interior, warm bokeh background",
+        "prompt": "sitting at aesthetic cafe table holding a warm beverage, cozy coffee shop interior, espresso bar and wooden shelves in background, warm pendant lighting",
         "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
         "is_public": True,
     },
@@ -704,8 +711,8 @@ LOCATION_PRESETS: Dict[str, Dict[str, Any]] = {
     },
     "lobby_campus": {
         "name": "Lobby Kampus",
-        "patterns": [r"\b(lobby\s+kampus|lobi\s+kampus|lobby|lobi|atrium|lorong\s+kampus|gedung\s+fakultas|campus\s+lobby)\b"],
-        "prompt": "standing inside modern university campus lobby, open atrium, university building interior, clean bright indoor lighting, soft bokeh",
+        "patterns": [r"\b(lobby\s+kampus|lobi\s+kampus|lorong\s+kampus|gedung\s+fakultas|campus\s+lobby)\b"],
+        "prompt": "standing inside modern university campus lobby, open atrium, university building interior, clean bright indoor lighting, detailed architectural background",
         "nsfw_prompt": "romantic intimate bedroom setting, soft dim lighting, cozy bed with fluffy pillows",
         "is_public": True,
     },
@@ -2147,8 +2154,10 @@ class PersonaManager:
              "standing in modern bathroom with soft steam, post-shower glow, bathroom mirror"),
             (["halte", "bus stop", "shelter", "halte bis", "halte bus", "angkot", "stasiun bis"],
              "waiting at outdoor bus stop shelter, sitting on bench, bus stop sign, atmospheric street perspective, cinematic depth of field"),
-            (["lobby kampus", "lobi kampus", "lobby", "lobi", "atrium", "lorong kampus", "gedung fakultas", "hallway", "campus lobby"],
-             "standing inside modern university campus lobby, open atrium, university building interior, clean bright indoor lighting, soft bokeh"),
+            (["hotel lobby", "lobi hotel", "check in", "check-in", "reception", "resepsionis", "kamar hotel", "hotel room", "hotel"],
+             "standing inside luxurious modern hotel lobby, polished marble floor, warm chandelier lighting, reception desk and luggage in background, elegant hotel interior"),
+            (["lobby kampus", "lobi kampus", "lorong kampus", "gedung fakultas", "campus lobby"],
+             "standing inside modern university campus lobby, open atrium, university building interior, clean bright indoor lighting, detailed architectural background"),
             (["kehujanan", "berteduh", "hujan lebat", "hujan deras", "bawa payung", "payung", "gerimis", "hujan", "rain", "rainy", "umbrella"],
              "sheltering from rain under awning, holding transparent umbrella, wet reflections on pavement, cozy romantic rainy day atmosphere, atmospheric street lighting"),
             (["street food", "jajanan", "jajan", "kaki lima", "pinggir jalan", "angkringan", "warung", "kuliner", "festival makanan", "food stall", "bazaar", "food court", "pasar malam"],
