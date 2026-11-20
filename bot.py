@@ -5108,6 +5108,30 @@ def callback_english_tutor(call):
         bot.answer_callback_query(call.id, f"➡️ Next: {lesson['id']} {lesson['title']}")
         _show_english_tutor_panel(chat_id, uid, message_to_edit=call.message.message_id)
         _send_english_tutor_kickoff(chat_id, uid)
+    elif action == "next_chat":
+        english_tutor.set_active(uid, True)
+        unit, lesson, _ = english_tutor.advance_lesson(uid)
+        bot.answer_callback_query(call.id, f"➡️ Moving to Lesson {lesson['id']}: {lesson['title']}")
+        # Preserve the chat message text and keep only any voice button on the old bubble
+        try:
+            old_rows = getattr(getattr(call.message, "reply_markup", None), "keyboard", None) or []
+            kept_markup = types.InlineKeyboardMarkup()
+            for r in old_rows:
+                kept_row = [b for b in r if not (getattr(b, "callback_data", "") or "").startswith("eng_tutor:")]
+                if kept_row:
+                    kept_markup.row(*kept_row)
+            bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=kept_markup if kept_markup.keyboard else None)
+        except Exception:
+            pass
+        _send_english_tutor_kickoff(chat_id, uid)
+    elif action == "syllabus_chat":
+        bot.answer_callback_query(call.id)
+        overview = english_tutor.format_syllabus_overview(uid)
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for u_idx, u in enumerate(ENGLISH_SYLLABUS):
+            markup.add(types.InlineKeyboardButton(f"📂 {u['unit_title']}", callback_data=f"eng_tutor:unit:{u_idx}"))
+        markup.add(types.InlineKeyboardButton("🔙 Back to Panel", callback_data="eng_tutor:panel"))
+        bot.send_message(chat_id, overview, parse_mode="Markdown", reply_markup=markup)
     elif action == "kickoff":
         english_tutor.set_active(uid, True)
         bot.answer_callback_query(call.id, "💬 Starting story prompt...")
@@ -9358,6 +9382,13 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     formatted_reply = f"{formatted_reply}\n\n`{engine_badge}`"
 
                 chat_markup = attach_voice_button(None, clean_reply, message.from_user.id)
+                if is_english_tutor:
+                    if chat_markup is None:
+                        chat_markup = types.InlineKeyboardMarkup()
+                    chat_markup.row(
+                        types.InlineKeyboardButton("➡️ Next Lesson", callback_data="eng_tutor:next_chat"),
+                        types.InlineKeyboardButton("📚 Syllabus", callback_data="eng_tutor:syllabus_chat"),
+                    )
                 typing_loop.stop()
                 if did_advance_lesson:
                     try:
