@@ -2092,7 +2092,8 @@ class PersonaManager:
                             "Given what the user asked and what the waifu JUST replied in chat, output ONLY 8-18 concise English Danbooru-style descriptive visual tokens "
                             "describing the EXACT physical location, background, weather, and props she just described (e.g. holding a bag of street food, warm stall lights). "
                             "Do NOT invent a different location (do NOT turn street food into a kitchen or campus into a bedroom). "
-                            "Do NOT include character hair or eye colors."
+                            "Do NOT include character hair or eye colors. "
+                            "NEVER include multi-person interaction tags like 'holding hands', 'walking together', 'hugging', 'couple', 'two people', 'crowd', or '2girls' — describe ONLY the solo environment, lighting, and solo props."
                         )
                     },
                     {
@@ -2107,8 +2108,9 @@ class PersonaManager:
                     and "none" not in dyn_scene.lower()
                 ):
                     clean_dyn = re.sub(r"^(Setting|Scene|Background|Visuals?)\s*:\s*", "", dyn_scene.strip(), flags=re.I).strip().strip('"\'')
-                    # Strip any accidental character trait hallucination from the LLM so it never corrupts persona features
-                    clean_dyn = re.sub(r'(?i)\b(?:1girl|solo|girl|woman|female|eyes?|hair|face|cheeks?|breasts?|chest|thighs?|legs?|feet|body|child|kid|loli|petite)\b,?\s*', '', clean_dyn).strip(', ')
+                    # Strip any accidental character trait or multi-person interaction tags that cause 2girls in Anything XL
+                    clean_dyn = re.sub(r'(?i)\b(?:1girl|solo|girl|woman|female|eyes?|hair|face|cheeks?|breasts?|chest|thighs?|legs?|feet|body|child|kid|loli|petite)\b,?\s*', '', clean_dyn)
+                    clean_dyn = re.sub(r'(?i)\b(?:holding\s+hands|walking\s+together|hugging|cuddling|couple|two\s+people|2girls|multiple\s+girls|crowd\s+in\s+background|crowd)\b,?\s*', '', clean_dyn).strip(', ')
                     if len(clean_dyn) >= 5:
                         logger.info(f"LLM aligned visual scene from conversational reply: {clean_dyn}")
                         return clean_dyn
@@ -2904,10 +2906,11 @@ class PersonaManager:
             # Strictly enforce adult woman solo shot without wasting CLIP token budget on redundant pseudo-tags
             cleaned_base = re.sub(r'^(?:masterpiece,\s*)*(?:best quality,\s*)*(?:solo,\s*)*(?:1girl,\s*)*', '', base_visual, flags=re.IGNORECASE).strip()
             cleaned_base = re.sub(r',?\s*masterpiece,\s*best quality,\s*highly detailed.*$', '', cleaned_base, flags=re.IGNORECASE).strip()
-            base_visual = f"masterpiece, best quality, 1girl, solo, (mature female:1.2), (adult woman:1.2), {cleaned_base}"
+            base_visual = f"masterpiece, best quality, (solo:1.4), (1girl:1.35), (mature female:1.2), (adult woman:1.2), {cleaned_base}"
 
             solo_guard_neg = (
-                "(2girls:1.5), (3girls:1.5), (multiple girls:1.5), (2people:1.5), (multiple persons:1.5), (group:1.5), "
+                "(2girls:1.6), (3girls:1.6), (multiple girls:1.6), (2people:1.6), (multiple persons:1.6), (group:1.5), "
+                "(yuri:1.5), (couple:1.5), (holding hands:1.5), (extra people:1.5), (crowd:1.4), "
                 "(extra characters:1.5), (extra heads:1.5), (extra head:1.5), (extra faces:1.5), (extra face:1.5), "
                 "(two heads:1.5), (two faces:1.5), (multiple heads:1.5), (multiple faces:1.5), (fused bodies:1.4), "
                 "(conjoined:1.4), (cloned face:1.4), (duplicate character:1.4), (duplicate:1.4), (split screen:1.3)"
@@ -3042,6 +3045,13 @@ class PersonaManager:
 
         anti_blank_bg_neg = "(simple background:1.45), (white background:1.45), (plain background:1.45), (gradient background:1.45), (blank background:1.45), (grey background:1.4), (abstract background:1.35)"
         extra_neg = f"{extra_neg}, {anti_blank_bg_neg}" if extra_neg else anti_blank_bg_neg
+
+        if not wants_multi and scene:
+            scene = re.sub(
+                r'(?i)\b(?:holding\s+hands|walking\s+together|hugging|cuddling|couple|two\s+people|2girls|multiple\s+girls|crowd\s+in\s+background|crowd)\b,?\s*',
+                '',
+                scene
+            ).strip(', ')
 
         emphasized_scene = f"(detailed background:1.25), (scenery:1.2), ({scene}:1.2)" if scene else "(detailed background:1.25), cozy modern room interior"
         prompt_elements = [base_visual, outfit_prompt, emphasized_scene, lighting_pos, chosen_angle]

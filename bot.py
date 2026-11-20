@@ -484,8 +484,17 @@ def format_roleplay_italics(text: str, character_name: Optional[str] = None) -> 
             if rest and (re.search(rf'\b{char_pat}\b', rest, re.IGNORECASE) or _starts_with_subject(rest)):
                 content = rest
 
-        # Prepend char_name only for bare verb/predicate cues without a subject or existing character mention
-        if not re.search(rf'\b{char_pat}\b', content, re.IGNORECASE) and not _starts_with_subject(content):
+        # Never prepend char_name to short emphasis/grammar words or non-action phrases
+        words_c = content.split()
+        is_short_emphasis = len(words_c) <= 3 and not any(
+            w.lower().rstrip('.,!?:') in (
+                'smiles', 'blushes', 'laughs', 'giggles', 'sighs', 'nods', 'waves', 'looks', 'leans', 'tilts',
+                'tersenyum', 'tersipu', 'tertawa', 'mengangguk', 'melirik', 'menatap', 'berbisik', 'memeluk'
+            )
+            for w in words_c
+        )
+        # Prepend char_name only for real bare verb/predicate cues without a subject or existing character mention
+        if not is_short_emphasis and not re.search(rf'\b{char_pat}\b', content, re.IGNORECASE) and not _starts_with_subject(content):
             content = f'{char_name} {content}'
 
         return content.strip(' -—~')
@@ -494,23 +503,33 @@ def format_roleplay_italics(text: str, character_name: Optional[str] = None) -> 
         c = _clean_action(m.group(1))
         return f'_{c}_'
 
-    # 4. Add visual separation (double newline) around roleplay *action* blocks (strictly single asterisk)
-    text = re.sub(r'(?<!\*)\*([^*\n]+?)\*(?!\*)[ \t]*([^\n*])', r'*\1*\n\n\2', text)
-    text = re.sub(r'([^\n*])[ \t]*(?<!\*)\*([^*\n]+?)\*(?!\*)', r'\1\n\n*\2*', text)
-    # Normalize excessive newlines to at most 2
-    text = re.sub(r'\n{3,}', '\n\n', text).strip()
-
-    # 5. Convert single *action* into Telegram Markdown italic: _action_
-    def _convert_segment(seg: str) -> str:
+    # 4. Process line-by-line so Quick Tip / Try saying lines are NEVER split or treated as VN stage actions
+    def _format_non_tip_segment(seg: str) -> str:
+        # Only separate genuine stage-action *...* blocks (>= 12 chars, not inline emphasis after a word/paren)
+        seg = re.sub(r'(?<!\*)(?<![(\w])\*([^*\n]{12,}?)\*(?!\*)[ \t]*([^\n*])', r'*\1*\n\n\2', seg)
+        seg = re.sub(r'([^\n*])[ \t]*(?<!\*)\*([^*\n]{12,}?)\*(?!\*)', r'\1\n\n*\2*', seg)
+        seg = re.sub(r'\n{3,}', '\n\n', seg).strip()
         return re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', _vn_replace, seg)
+
+    def _process_lines(txt: str) -> str:
+        out_lines = []
+        for line in txt.split('\n'):
+            low = line.strip().lower()
+            if any(k in low for k in ('quick tip:', 'try saying:', 'nice phrasing:')) or line.strip().startswith(('✏️', '💡')):
+                # Keep tutor tip lines intact with standard Telegram italics
+                out_lines.append(re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'_\1_', line))
+            else:
+                out_lines.append(_format_non_tip_segment(line))
+        joined = '\n'.join(out_lines)
+        return re.sub(r'\n{3,}', '\n\n', joined).strip()
 
     if "`" in text:
         parts = re.split(r'(`[^`]+`)', text)
         for i in range(len(parts)):
             if not parts[i].startswith("`"):
-                parts[i] = _convert_segment(parts[i])
+                parts[i] = _process_lines(parts[i])
         return "".join(parts)
-    return _convert_segment(text)
+    return _process_lines(text)
 
 
 # --- Telegram Safe Messaging Helpers ---
@@ -5898,8 +5917,9 @@ def process_photo_request(
                 )
 
             cap_guide = (
-                f" You just took a sweet, cute photo to send on Telegram to your partner. "
+                f" You just took a sweet, cute solo selfie/PAP photo to send on Telegram to your partner. "
                 f"Write ONLY 1 short natural chat caption sentence (10-25 words) accompanying the photo in the exact same language as your partner's messages. "
+                f"STRICT: Describe a solo selfie/portrait moment of YOU alone in the frame (NEVER claim 'holding your hand' or 'walking hand-in-hand' inside the photo caption unless it is a couple photo). "
                 f"STRICT: Match the exact Outfit ('{outfit_label}') and Setting ('{detected_scene}') shown in the photo. "
                 f"NEVER mention clothes or locations you are NOT wearing/in (e.g. do not claim jeans/campus if wearing underwear/pajamas). "
                 f"DILARANG KERAS bersikap defensif atau meyakinkan keberadaan ('biar percaya', 'biar yakin', 'beneran ada di sini', 'nih buktinya', 'diliatin aja'). "
