@@ -5014,11 +5014,12 @@ def _send_english_tutor_kickoff(chat_id: int, user_id: int):
 
 def _show_english_tutor_panel(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
     st = english_tutor.get_state(user_id)
+    all_units = english_tutor._get_all_units(user_id)
     unit, lesson = english_tutor.get_current_unit_and_lesson(user_id)
     is_on = bool(st.get("active"))
     status_str = "🟢 *ACTIVE* (Story-Driven English Tutor)" if is_on else "⚪ *INACTIVE* (Normal Chat Mode)"
     completed_cnt = len(st.get("completed_lessons", []))
-    total_cnt = sum(len(u["lessons"]) for u in ENGLISH_SYLLABUS)
+    total_cnt = sum(len(u["lessons"]) for u in all_units)
     text = (
         f"🎓 *Interactive English Conversation Tutor*\n"
         f"Status: {status_str}\n\n"
@@ -5061,7 +5062,7 @@ def handle_learn_english_command(message):
     if arg in ("syllabus", "course", "curriculum", "list"):
         overview = english_tutor.format_syllabus_overview(uid)
         markup = types.InlineKeyboardMarkup(row_width=1)
-        for u_idx, u in enumerate(ENGLISH_SYLLABUS):
+        for u_idx, u in enumerate(english_tutor._get_all_units(uid)):
             markup.add(types.InlineKeyboardButton(f"📂 Browse {u['unit_title']}", callback_data=f"eng_tutor:unit:{u_idx}"))
         markup.add(types.InlineKeyboardButton("🔙 Back to Tutor Panel", callback_data="eng_tutor:panel"))
         bot.reply_to(message, overview, parse_mode="Markdown", reply_markup=markup)
@@ -5069,9 +5070,8 @@ def handle_learn_english_command(message):
 
     if arg in ("next", "continue"):
         english_tutor.set_active(uid, True)
-        unit, lesson, wrapped = english_tutor.advance_lesson(uid)
-        note = "🎉 Congratulations! You completed all units — cycling back to the start for review." if wrapped else "➡️ Advanced to the next lesson!"
-        bot.reply_to(message, f"{note}\n🎯 *{lesson['id']} — {lesson['title']}* (`{lesson['cefr']}`)", parse_mode="Markdown")
+        unit, lesson, _ = english_tutor.advance_lesson(uid, llm_client=llm_client)
+        bot.reply_to(message, f"➡️ Advanced to the next lesson!\n🎯 *{lesson['id']} — {lesson['title']}* (`{lesson['cefr']}`)", parse_mode="Markdown")
         _send_english_tutor_kickoff(message.chat.id, uid)
         return
 
@@ -5104,14 +5104,14 @@ def callback_english_tutor(call):
         _show_english_tutor_panel(chat_id, uid, message_to_edit=call.message.message_id)
     elif action == "next":
         english_tutor.set_active(uid, True)
-        unit, lesson, _ = english_tutor.advance_lesson(uid)
-        bot.answer_callback_query(call.id, f"➡️ Next: {lesson['id']} {lesson['title']}")
+        bot.answer_callback_query(call.id, "⏳ Preparing next lesson...")
+        unit, lesson, _ = english_tutor.advance_lesson(uid, llm_client=llm_client)
         _show_english_tutor_panel(chat_id, uid, message_to_edit=call.message.message_id)
         _send_english_tutor_kickoff(chat_id, uid)
     elif action == "next_chat":
         english_tutor.set_active(uid, True)
-        unit, lesson, _ = english_tutor.advance_lesson(uid)
-        bot.answer_callback_query(call.id, f"➡️ Moving to Lesson {lesson['id']}: {lesson['title']}")
+        bot.answer_callback_query(call.id, "⏳ Generating next lesson...")
+        unit, lesson, _ = english_tutor.advance_lesson(uid, llm_client=llm_client)
         # Preserve the chat message text and keep only any voice button on the old bubble
         try:
             old_rows = getattr(getattr(call.message, "reply_markup", None), "keyboard", None) or []
@@ -5128,7 +5128,7 @@ def callback_english_tutor(call):
         bot.answer_callback_query(call.id)
         overview = english_tutor.format_syllabus_overview(uid)
         markup = types.InlineKeyboardMarkup(row_width=1)
-        for u_idx, u in enumerate(ENGLISH_SYLLABUS):
+        for u_idx, u in enumerate(english_tutor._get_all_units(uid)):
             markup.add(types.InlineKeyboardButton(f"📂 {u['unit_title']}", callback_data=f"eng_tutor:unit:{u_idx}"))
         markup.add(types.InlineKeyboardButton("🔙 Back to Panel", callback_data="eng_tutor:panel"))
         bot.send_message(chat_id, overview, parse_mode="Markdown", reply_markup=markup)
@@ -5140,7 +5140,7 @@ def callback_english_tutor(call):
         bot.answer_callback_query(call.id)
         overview = english_tutor.format_syllabus_overview(uid)
         markup = types.InlineKeyboardMarkup(row_width=1)
-        for u_idx, u in enumerate(ENGLISH_SYLLABUS):
+        for u_idx, u in enumerate(english_tutor._get_all_units(uid)):
             markup.add(types.InlineKeyboardButton(f"📂 {u['unit_title']}", callback_data=f"eng_tutor:unit:{u_idx}"))
         markup.add(types.InlineKeyboardButton("🔙 Back to Panel", callback_data="eng_tutor:panel"))
         try:
@@ -5149,7 +5149,8 @@ def callback_english_tutor(call):
             bot.send_message(chat_id, overview, parse_mode="Markdown", reply_markup=markup)
     elif action == "unit" and len(parts) > 2:
         u_idx = int(parts[2])
-        unit = ENGLISH_SYLLABUS[max(0, min(u_idx, len(ENGLISH_SYLLABUS) - 1))]
+        all_units = english_tutor._get_all_units(uid)
+        unit = all_units[max(0, min(u_idx, len(all_units) - 1))]
         bot.answer_callback_query(call.id)
         markup = types.InlineKeyboardMarkup(row_width=1)
         for l_idx, les in enumerate(unit["lessons"]):
@@ -9005,7 +9006,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                 just_advanced_lesson = False
                 if is_english_tutor:
                     if english_tutor.detect_next_lesson_intent(user_text):
-                        english_tutor.advance_lesson(message.from_user.id)
+                        english_tutor.advance_lesson(message.from_user.id, llm_client=llm_client)
                         just_advanced_lesson = True
                     system_inst += english_tutor.build_tutor_system_prompt(
                         message.from_user.id, p_name, user_call_pref=user_call_pref, just_advanced=just_advanced_lesson
@@ -9243,7 +9244,7 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                     if re.search(r"\[(?:ACTION:\s*)?NEXT_LESSON\]", reply_text, re.IGNORECASE):
                         reply_text = re.sub(r"\s*\[(?:ACTION:\s*)?NEXT_LESSON\]\s*", " ", reply_text, flags=re.IGNORECASE).strip()
                         if not just_advanced_lesson:
-                            english_tutor.advance_lesson(message.from_user.id)
+                            english_tutor.advance_lesson(message.from_user.id, llm_client=llm_client)
                             did_advance_lesson = True
                     else:
                         english_tutor.record_turn(message.from_user.id)

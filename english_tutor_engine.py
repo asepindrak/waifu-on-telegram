@@ -242,18 +242,153 @@ class EnglishTutorEngine:
         self._save()
         return st
 
+    ADVANCED_MASTERY_TEMPLATES = [
+        {
+            "title": "Spontaneous Improvisation & Plot Twists",
+            "cefr": "C1–C2",
+            "story_hook": "We're caught in an unexpected real-world twist—our train got rerouted to a charming coastal town at sunset, and we have to improvise our evening.",
+            "target_vocab": ["Play it by ear", "Make the best of it", "Long story short", "Come to think of it", "Silver lining"],
+            "grammar_focus": "Mixed conditionals & natural conversational pivots",
+            "goal": "Think on your feet in English and adapt smoothly to unexpected situations."
+        },
+        {
+            "title": "Nuanced Humor, Witty Banter & Teasing",
+            "cefr": "C1–C2",
+            "story_hook": "Cooking a chaotic late-night meal together in the kitchen while trading witty jokes, playful sarcasm, and lighthearted teasing.",
+            "target_vocab": ["Pulling my leg", "No offense, but...", "Easier said than done", "Speak for yourself", "Touché"],
+            "grammar_focus": "Understatement, rhetorical questions & conversational tone",
+            "goal": "Master playful humor, sarcasm cues, and natural banter like a native speaker."
+        },
+        {
+            "title": "Persuasive Pitching & Diplomatic Negotiation",
+            "cefr": "C2",
+            "story_hook": "Roleplaying a high-stakes negotiation—convincing a picky client or landlord to agree to our terms while keeping everyone smiling.",
+            "target_vocab": ["Meet halfway", "Bottom line", "Take into account", "Win-win situation", "With all due respect"],
+            "grammar_focus": "Softening hedges, subjunctive mood & persuasive framing",
+            "goal": "Negotiate, persuade, and handle delicate disagreements with polish and poise."
+        },
+        {
+            "title": "Emotional Intelligence & Heart-to-Heart Advice",
+            "cefr": "C2",
+            "story_hook": "Sitting together on a quiet balcony at night after one of us had a tough, stressful week—listening deeply and offering thoughtful empathy.",
+            "target_vocab": ["Get it off your chest", "Wrap my head around", "In your shoes", "Take a toll on", "I've got your back"],
+            "grammar_focus": "Empathetic modals ('must have been', 'might feel') & nuanced emotional vocabulary",
+            "goal": "Express complex emotions, give nuanced advice, and comfort someone naturally."
+        },
+        {
+            "title": "Cultural Nuance, Media & Rapid-Fire Opinions",
+            "cefr": "C2",
+            "story_hook": "Walking out of a thought-provoking movie theater or art exhibit and dissecting its hidden themes, plot holes, and cultural impact.",
+            "target_vocab": ["Hit close to home", "Overrated", "Food for thought", "Read into it", "Hands down"],
+            "grammar_focus": "Cleft sentences ('What struck me was...') & inversion for emphasis",
+            "goal": "Critique films, books, and cultural trends fluently with sophisticated vocabulary."
+        },
+        {
+            "title": "High-Speed Storytelling & Vivid Descriptions",
+            "cefr": "C2",
+            "story_hook": "Sharing the wildest, most unforgettable travel or work mishap we've ever experienced, bringing every sensory detail to life.",
+            "target_vocab": ["Out of the blue", "Blessing in disguise", "Before I knew it", "To top it all off", "Had me in stitches"],
+            "grammar_focus": "Narrative tenses, vivid participles & dramatic pacing",
+            "goal": "Tell gripping, vivid stories in English without pausing to translate."
+        }
+    ]
+
+    def _get_all_units(self, user_id: int) -> List[Dict[str, Any]]:
+        st = self.get_state(user_id)
+        units = list(ENGLISH_SYLLABUS)
+        custom = st.get("custom_lessons", [])
+        if custom:
+            for chunk_idx in range(0, len(custom), 3):
+                unit_num = 6 + (chunk_idx // 3)
+                chunk = custom[chunk_idx:chunk_idx + 3]
+                units.append({
+                    "unit_id": f"unit_{unit_num}",
+                    "unit_title": f"Unit {unit_num}: Infinite Fluency & Mastery (C1–C2)",
+                    "level": "Mastery (C1–C2)",
+                    "lessons": chunk
+                })
+        return units
+
+    def _generate_next_advanced_lesson(self, user_id: int, llm_client: Any = None) -> Dict[str, Any]:
+        """Dynamically generates a brand-new C1–C2 advanced lesson so learning never wraps back to A1."""
+        st = self.get_state(user_id)
+        custom = st.setdefault("custom_lessons", [])
+        idx = len(custom)
+        unit_num = 6 + (idx // 3)
+        sub_num = (idx % 3) + 1
+        lesson_id = f"{unit_num}.{sub_num}"
+
+        existing_titles = [les["title"] for u in ENGLISH_SYLLABUS for les in u["lessons"]] + [les.get("title", "") for les in custom]
+
+        generated = None
+        if llm_client and hasattr(llm_client, "chat"):
+            try:
+                gen_prompt = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an expert C1–C2 English conversation curriculum designer. "
+                            "Generate ONE unique, engaging, real-world advanced English conversation lesson in strict JSON format with keys: "
+                            "\"title\", \"cefr\" (\"C1\" or \"C1–C2\" or \"C2\"), \"story_hook\" (vivid 1-sentence roleplay setting between two close friends/partners), "
+                            "\"target_vocab\" (array of 5 natural advanced idioms/phrasal verbs/expressions), "
+                            "\"grammar_focus\" (1 concise advanced grammar/style point), and \"goal\" (1 concise sentence). "
+                            "Output ONLY valid JSON, no markdown code fences."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Create Lesson {lesson_id}. Avoid repeating any of these past topics: {', '.join(existing_titles[-15:])}."
+                    }
+                ]
+                raw, _ = llm_client.chat(gen_prompt, max_tokens=260, temperature=0.85)
+                if raw:
+                    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.I).strip()
+                    m = re.search(r"\{.*\}", cleaned, re.DOTALL)
+                    if m:
+                        parsed = json.loads(m.group(0))
+                        if parsed.get("title") and parsed.get("story_hook") and isinstance(parsed.get("target_vocab"), list):
+                            generated = {
+                                "id": lesson_id,
+                                "title": str(parsed["title"])[:80],
+                                "cefr": str(parsed.get("cefr", "C1–C2"))[:12],
+                                "story_hook": str(parsed["story_hook"]),
+                                "target_vocab": [str(x) for x in parsed["target_vocab"][:5]],
+                                "grammar_focus": str(parsed.get("grammar_focus", "Natural C1–C2 nuance, idioms & fluid transitions")),
+                                "goal": str(parsed.get("goal", "Practice speaking fluently and naturally at an advanced level."))
+                            }
+            except Exception as e_gen:
+                logger.debug(f"Dynamic advanced lesson LLM generation fallback: {e_gen}")
+
+        if not generated:
+            tpl = self.ADVANCED_MASTERY_TEMPLATES[idx % len(self.ADVANCED_MASTERY_TEMPLATES)]
+            generated = {
+                "id": lesson_id,
+                "title": tpl["title"],
+                "cefr": tpl["cefr"],
+                "story_hook": tpl["story_hook"],
+                "target_vocab": list(tpl["target_vocab"]),
+                "grammar_focus": tpl["grammar_focus"],
+                "goal": tpl["goal"],
+            }
+
+        custom.append(generated)
+        self._save()
+        return generated
+
     def get_current_unit_and_lesson(self, user_id: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         st = self.get_state(user_id)
-        u_idx = max(0, min(int(st.get("unit_idx", 0)), len(ENGLISH_SYLLABUS) - 1))
-        unit = ENGLISH_SYLLABUS[u_idx]
+        all_units = self._get_all_units(user_id)
+        u_idx = max(0, min(int(st.get("unit_idx", 0)), len(all_units) - 1))
+        unit = all_units[u_idx]
         lessons = unit["lessons"]
         l_idx = max(0, min(int(st.get("lesson_idx", 0)), len(lessons) - 1))
         return unit, lessons[l_idx]
 
     def select_lesson(self, user_id: int, unit_idx: int, lesson_idx: int = 0) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         st = self.get_state(user_id)
-        u_idx = max(0, min(int(unit_idx), len(ENGLISH_SYLLABUS) - 1))
-        lessons = ENGLISH_SYLLABUS[u_idx]["lessons"]
+        all_units = self._get_all_units(user_id)
+        u_idx = max(0, min(int(unit_idx), len(all_units) - 1))
+        lessons = all_units[u_idx]["lessons"]
         l_idx = max(0, min(int(lesson_idx), len(lessons) - 1))
         st["unit_idx"] = u_idx
         st["lesson_idx"] = l_idx
@@ -261,36 +396,39 @@ class EnglishTutorEngine:
         st["active"] = True
         st["updated_at"] = time.time()
         self._save()
-        return ENGLISH_SYLLABUS[u_idx], lessons[l_idx]
+        return all_units[u_idx], lessons[l_idx]
 
-    def advance_lesson(self, user_id: int) -> Tuple[Dict[str, Any], Dict[str, Any], bool]:
-        """Moves to the next lesson in the syllabus. Returns (unit, lesson, wrapped_around)."""
+    def advance_lesson(self, user_id: int, llm_client: Any = None) -> Tuple[Dict[str, Any], Dict[str, Any], bool]:
+        """Moves to the next lesson in the syllabus, auto-generating infinite C1–C2 Mastery lessons after 5.3."""
         st = self.get_state(user_id)
-        u_idx = int(st.get("unit_idx", 0))
-        l_idx = int(st.get("lesson_idx", 0))
-        cur_unit = ENGLISH_SYLLABUS[u_idx]
+        all_units = self._get_all_units(user_id)
+        u_idx = max(0, min(int(st.get("unit_idx", 0)), len(all_units) - 1))
+        cur_unit = all_units[u_idx]
+        l_idx = max(0, min(int(st.get("lesson_idx", 0)), len(cur_unit["lessons"]) - 1))
         cur_lesson = cur_unit["lessons"][l_idx]
+
         completed = st.setdefault("completed_lessons", [])
         if cur_lesson["id"] not in completed:
             completed.append(cur_lesson["id"])
 
-        wrapped = False
         if l_idx + 1 < len(cur_unit["lessons"]):
             l_idx += 1
-        elif u_idx + 1 < len(ENGLISH_SYLLABUS):
+        elif u_idx + 1 < len(all_units):
             u_idx += 1
             l_idx = 0
         else:
-            u_idx = 0
-            l_idx = 0
-            wrapped = True
+            # Auto-generate next infinite C1–C2 Mastery lesson instead of wrapping back to 1.1!
+            self._generate_next_advanced_lesson(user_id, llm_client=llm_client)
+            all_units = self._get_all_units(user_id)
+            u_idx = len(all_units) - 1
+            l_idx = len(all_units[u_idx]["lessons"]) - 1
 
         st["unit_idx"] = u_idx
         st["lesson_idx"] = l_idx
         st["turns_in_lesson"] = 0
         st["updated_at"] = time.time()
         self._save()
-        return ENGLISH_SYLLABUS[u_idx], ENGLISH_SYLLABUS[u_idx]["lessons"][l_idx], wrapped
+        return all_units[u_idx], all_units[u_idx]["lessons"][l_idx], False
 
     def record_turn(self, user_id: int) -> Dict[str, Any]:
         st = self.get_state(user_id)
@@ -314,6 +452,7 @@ class EnglishTutorEngine:
 
     def format_syllabus_overview(self, user_id: int) -> str:
         st = self.get_state(user_id)
+        all_units = self._get_all_units(user_id)
         cur_unit, cur_lesson = self.get_current_unit_and_lesson(user_id)
         completed = set(st.get("completed_lessons", []))
         status_badge = "🟢 ACTIVE" if st.get("active") else "⚪ INACTIVE"
@@ -323,10 +462,10 @@ class EnglishTutorEngine:
             f"🎯 *Active Lesson:* `{cur_lesson['id']}` — *{cur_lesson['title']}* (`{cur_lesson['cefr']}`)",
             f"📖 *Story Setting:* _{cur_lesson['story_hook']}_",
             f"🔤 *Target Expressions:* `{'`, `'.join(cur_lesson['target_vocab'])}`",
-            f"📊 *Progress:* {len(completed)}/{sum(len(u['lessons']) for u in ENGLISH_SYLLABUS)} lessons completed · {st.get('turns_in_lesson', 0)} turns in this lesson\n",
+            f"📊 *Progress:* {len(completed)}/{sum(len(u['lessons']) for u in all_units)} lessons completed · {st.get('turns_in_lesson', 0)} turns in this lesson\n",
             "━━━━━━━━━━━━━━━━━━━━"
         ]
-        for u_idx, u in enumerate(ENGLISH_SYLLABUS):
+        for u_idx, u in enumerate(all_units):
             lines.append(f"*{u['unit_title']}*")
             for l_idx, les in enumerate(u["lessons"]):
                 if les["id"] == cur_lesson["id"]:
