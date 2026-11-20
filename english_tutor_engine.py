@@ -300,6 +300,18 @@ class EnglishTutorEngine:
         self._save()
         return st
 
+    def format_lesson_brief_card(self, user_id: int) -> str:
+        """Returns a concise, clear overview card for the current lesson so the user knows the topic, goal, and expressions."""
+        unit, lesson = self.get_current_unit_and_lesson(user_id)
+        vocab_str = ", ".join(f"`{v}`" for v in lesson["target_vocab"])
+        return (
+            f"📘 *Lesson {lesson['id']}: {lesson['title']}* (`{lesson['cefr']}`)\n"
+            f"🎯 *What we're practicing:* {lesson['goal']}\n"
+            f"📖 *Story Scene:* _{lesson['story_hook']}_\n"
+            f"🔤 *Key Expressions:* {vocab_str}\n"
+            f"🧩 *Grammar Focus:* {lesson['grammar_focus']}"
+        )
+
     def format_syllabus_overview(self, user_id: int) -> str:
         st = self.get_state(user_id)
         cur_unit, cur_lesson = self.get_current_unit_and_lesson(user_id)

@@ -484,17 +484,25 @@ def format_roleplay_italics(text: str, character_name: Optional[str] = None) -> 
             if rest and (re.search(rf'\b{char_pat}\b', rest, re.IGNORECASE) or _starts_with_subject(rest)):
                 content = rest
 
-        # Never prepend char_name to short emphasis/grammar words or non-action phrases
+        # Never prepend char_name to short emphasis/grammar words, quoted examples, or praise/dialogue italics
         words_c = content.split()
-        is_short_emphasis = len(words_c) <= 3 and not any(
-            w.lower().rstrip('.,!?:') in (
-                'smiles', 'blushes', 'laughs', 'giggles', 'sighs', 'nods', 'waves', 'looks', 'leans', 'tilts',
-                'tersenyum', 'tersipu', 'tertawa', 'mengangguk', 'melirik', 'menatap', 'berbisik', 'memeluk'
+        first_w = re.sub(r'^[^\w-]+|[^\w-]+$', '', words_c[0].lower()) if words_c else ''
+        non_action_starters = {'great', 'nice', 'good', 'well', 'try', 'use', 'tip', 'note', 'ready', 'let', "let's", 'quick', 'spot-on', 'awesome', 'perfect'}
+        is_dialogue_or_emphasis = (
+            any(ch in content for ch in ('"', '“', '”', '!', '?'))
+            or first_w in non_action_starters
+            or (
+                len(words_c) <= 3 and not any(
+                    w.lower().rstrip('.,!?:') in (
+                        'smiles', 'blushes', 'laughs', 'giggles', 'sighs', 'nods', 'waves', 'looks', 'leans', 'tilts',
+                        'tersenyum', 'tersipu', 'tertawa', 'mengangguk', 'melirik', 'menatap', 'berbisik', 'memeluk'
+                    )
+                    for w in words_c
+                )
             )
-            for w in words_c
         )
         # Prepend char_name only for real bare verb/predicate cues without a subject or existing character mention
-        if not is_short_emphasis and not re.search(rf'\b{char_pat}\b', content, re.IGNORECASE) and not _starts_with_subject(content):
+        if not is_dialogue_or_emphasis and not re.search(rf'\b{char_pat}\b', content, re.IGNORECASE) and not _starts_with_subject(content):
             content = f'{char_name} {content}'
 
         return content.strip(' -—~')
@@ -503,11 +511,11 @@ def format_roleplay_italics(text: str, character_name: Optional[str] = None) -> 
         c = _clean_action(m.group(1))
         return f'_{c}_'
 
-    # 4. Process line-by-line so Quick Tip / Try saying lines are NEVER split or treated as VN stage actions
+    # 4. Process line-by-line so Quick Tip / Try saying / praise lines are NEVER split or treated as VN stage actions
     def _format_non_tip_segment(seg: str) -> str:
-        # Only separate genuine stage-action *...* blocks (>= 12 chars, not inline emphasis after a word/paren)
-        seg = re.sub(r'(?<!\*)(?<![(\w])\*([^*\n]{12,}?)\*(?!\*)[ \t]*([^\n*])', r'*\1*\n\n\2', seg)
-        seg = re.sub(r'([^\n*])[ \t]*(?<!\*)\*([^*\n]{12,}?)\*(?!\*)', r'\1\n\n*\2*', seg)
+        # Only separate genuine stage-action *...* blocks (>= 12 chars, no quotes/!/? inside)
+        seg = re.sub(r'(?<!\*)(?<![(\w])\*([^*\n"!?]{12,}?)\*(?!\*)[ \t]*([^\n*])', r'*\1*\n\n\2', seg)
+        seg = re.sub(r'([^\n*])[ \t]*(?<!\*)\*([^*\n"!?]{12,}?)\*(?!\*)', r'\1\n\n*\2*', seg)
         seg = re.sub(r'\n{3,}', '\n\n', seg).strip()
         return re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', _vn_replace, seg)
 
@@ -515,8 +523,8 @@ def format_roleplay_italics(text: str, character_name: Optional[str] = None) -> 
         out_lines = []
         for line in txt.split('\n'):
             low = line.strip().lower()
-            if any(k in low for k in ('quick tip:', 'try saying:', 'nice phrasing:')) or line.strip().startswith(('✏️', '💡')):
-                # Keep tutor tip lines intact with standard Telegram italics
+            if any(k in low for k in ('quick tip:', 'try saying:', 'nice phrasing:', 'you can also say:')) or line.strip().startswith(('✏️', '💡', '✨', '(')):
+                # Keep tutor tip / parenthetical lines intact with standard Telegram italics
                 out_lines.append(re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'_\1_', line))
             else:
                 out_lines.append(_format_non_tip_segment(line))
@@ -5000,7 +5008,8 @@ def _send_english_tutor_kickoff(chat_id: int, user_id: int):
             f"{lesson['story_hook']} So, how's your day going so far? 😊"
         )
     opener = strip_meta_reasoning_leak(opener).strip()
-    bot.send_message(chat_id, f"🎓 *{p_name} (English Tutor Mode)*\n\n{opener}", parse_mode="Markdown")
+    brief_card = english_tutor.format_lesson_brief_card(user_id)
+    bot.send_message(chat_id, f"{brief_card}\n\n━━━━━━━━━━━━━━━━━━━━\n🎓 *{p_name} (English Tutor Mode)*\n\n{opener}", parse_mode="Markdown")
 
 
 def _show_english_tutor_panel(chat_id: int, user_id: int, message_to_edit: Optional[int] = None):
@@ -9205,11 +9214,13 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
                         else:
                             reply_text = sanitize_waifu_tone_and_pronouns(reply_text)
 
+                did_advance_lesson = bool(is_english_tutor and just_advanced_lesson)
                 if is_english_tutor:
                     if re.search(r"\[(?:ACTION:\s*)?NEXT_LESSON\]", reply_text, re.IGNORECASE):
                         reply_text = re.sub(r"\s*\[(?:ACTION:\s*)?NEXT_LESSON\]\s*", " ", reply_text, flags=re.IGNORECASE).strip()
                         if not just_advanced_lesson:
                             english_tutor.advance_lesson(message.from_user.id)
+                            did_advance_lesson = True
                     else:
                         english_tutor.record_turn(message.from_user.id)
 
@@ -9348,6 +9359,15 @@ def _execute_text_chat_direct(message, user_text: str, is_voice: bool = False):
 
                 chat_markup = attach_voice_button(None, clean_reply, message.from_user.id)
                 typing_loop.stop()
+                if did_advance_lesson:
+                    try:
+                        safe_send_message(
+                            message.chat.id,
+                            english_tutor.format_lesson_brief_card(message.from_user.id),
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
                 safe_reply_to(message, formatted_reply, reply_markup=chat_markup, parse_mode="Markdown")
 
                 if should_send_conv_photo or should_send_spontaneous:
