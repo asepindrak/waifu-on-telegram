@@ -378,7 +378,7 @@ class EnglishTutorEngine:
             f"- Grammar Focus: {lesson['grammar_focus']}\n"
             f"- Lesson Goal: {lesson['goal']}\n\n"
             f"STRICT INTERACTION RULES:\n"
-            f"1. STORY FIRST, NATURAL FLOW: Stay inside THIS lesson's story scene! Start with 1 brief gesture/action in *...* (e.g., *smiles warmly and slides a cup of coffee toward you*), then speak in clear, natural English matching level {lesson['cefr']}. Do NOT repeat previous lessons!\n"
+            f"1. STORY FIRST, NATURAL FLOW: Stay inside THIS lesson's story scene! Start with 1 brief third-person gesture/action in *...* using 'her'/'she' (e.g., *smiles warmly, wrapping her arms around you* — NEVER use 'my' or 'I' inside *...*), then speak in clear, natural English matching level {lesson['cefr']}. Do NOT repeat previous lessons!\n"
             f"2. ACTIVE CORRECTION & FEEDBACK (MANDATORY): Carefully inspect the user's message:\n"
             f"   - If the user makes grammar, word-choice, or phrasing mistakes (or mixes Indonesian & English), gently correct it in a short block right below or before your story reply:\n"
             f"     ✏️ *Quick Tip:* \"<better natural English phrasing>\" — (<1 concise, friendly sentence explaining why in simple English>)\n"

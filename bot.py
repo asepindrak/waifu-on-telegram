@@ -5464,6 +5464,26 @@ def sanitize_waifu_tone_and_pronouns(text: Optional[str]) -> str:
     res = re.sub(r"(?i)\bapaan\s+sih\b", "ada apa", res)
     res = re.sub(r"(?i)\b(?:bodo\s+amat|bodo\s+ah)\b", "nggak apa-apa kok", res)
 
+    # Fix first-person pronoun leaks inside *...* visual novel action narration (e.g. "wrapping my arms" -> "wrapping her arms")
+    def _fix_action_block(m: re.Match) -> str:
+        inner = m.group(1)
+        def _rep_case(word: str, target: str) -> str:
+            if word.isupper() and len(word) > 1:
+                return target.upper()
+            if word[0].isupper():
+                return target[0].upper() + target[1:]
+            return target
+        inner = re.sub(r"\b(my)\b", lambda x: _rep_case(x.group(1), "her"), inner, flags=re.IGNORECASE)
+        inner = re.sub(r"\b(myself)\b", lambda x: _rep_case(x.group(1), "herself"), inner, flags=re.IGNORECASE)
+        inner = re.sub(r"\b(mine)\b", lambda x: _rep_case(x.group(1), "hers"), inner, flags=re.IGNORECASE)
+        inner = re.sub(r"\b(I'm|I’m)\b", lambda x: _rep_case(x.group(1), "she's"), inner, flags=re.IGNORECASE)
+        inner = re.sub(r"\b(I'll|I’ll)\b", lambda x: _rep_case(x.group(1), "she'll"), inner, flags=re.IGNORECASE)
+        inner = re.sub(r"\b(I've|I’ve)\b", lambda x: _rep_case(x.group(1), "she's"), inner, flags=re.IGNORECASE)
+        inner = re.sub(r"\bI\b", "she", inner)
+        return f"*{inner}*"
+
+    res = re.sub(r"\*([^*\n]+)\*", _fix_action_block, res)
+
     if res and res[0].islower():
         res = res[0].upper() + res[1:]
 
